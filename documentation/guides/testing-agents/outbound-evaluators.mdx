@@ -31,6 +31,65 @@ To retrieve the available evaluators and their associated phone numbers:
 Check out the [List Evaluators API](/api-reference/test_framework/get-test_frameworkv1scenarios-external) documentation
 </Card>
 
+### Example Code Running Outbound Call
+```python
+import requests
+import time
+from typing import Callable, Dict, List
+
+api_key = "your_api_key"
+
+headers = {
+    'X-VOCERA-API-KEY': api_key,
+    'Content-Type': 'application/json'
+}
+
+def run_evaluators(scenarios: List[int], agent_id: int, freq: int = 1) -> Dict:
+    
+    url = 'https://new-prod.vocera.ai/test_framework/v1/scenarios-external/run_scenarios/'
+
+    data = {
+        'scenarios': scenarios,
+        'freq': freq,
+        'agent_id': agent_id
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+    return response.json()
+
+def poll_status(response_json: Dict, func: Callable) -> None:
+
+    run_ids = [str(run["id"]) for run in response_json.get("runs")]
+
+    while run_ids:
+
+        url = f'https://new-prod.vocera.ai/test_framework/v1/runs-external/bulk/?run_ids={",".join(run_ids)}'
+
+        runs_list = requests.get(url, headers=headers).json()
+
+        for run in runs_list:
+
+            if run["status"] in ["completed", "in_progress",]:
+                func(run["id"])  # Call function immediately
+                run_ids.remove(str(run["id"]))
+        
+        if not run_ids:
+            break
+
+        time.sleep(3)  # Poll every 3 seconds
+
+def call(number: int) -> None:
+    print(f"Calling {number}...")  # Replace with actual call logic
+
+# Example Usage
+scenarios = [1514, 1515]
+agent_id = 26
+
+response_json = run_evaluators(scenarios, agent_id)
+
+poll_status(response_json, call)
+```
+
 ### Example Response Structure
 
 ```json

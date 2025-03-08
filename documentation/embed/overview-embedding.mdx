@@ -1,0 +1,330 @@
+---
+title: Overview Embedding
+description: Learn how to embed Vocera agent overview in your application using our embed widget. For token management details, see our [Token Generation](/embed/generate-token) and [Token Refresh](/embed/refreshing-expired-token) guides.
+---
+
+
+## Prerequisites
+- Vocera API key
+- Agent ID
+- Development environment for your chosen framework
+
+## URL Structure
+The embed URL follows this pattern:
+```
+https://dashboard.vocera.ai/embed/{agentId}/overview?token={token}
+```
+
+Where:
+- `{agentId}`: Your agent's unique identifier
+- `{token}`: Your authentication token
+
+## Framework Implementations
+
+<Tabs>
+  <Tab title="React">
+```jsx
+import { useEffect, useState } from 'react';
+
+const VoceraOverviewEmbed = ({ agentId }) => {
+  const [token, setToken] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const handleMessage = async (event) => {
+      // Token expired event
+      if (event.data === 'token_expired') {
+        try {
+          await refreshToken(); // See /embed/refreshing-expired-token for implementation
+        } catch (err) {
+          setError('Failed to refresh token');
+        }
+      }
+     
+    };
+
+    const initializeToken = async () => {
+      try {
+        const newToken = await initToken(); // See /embed/generate-token for implementation
+        setToken(newToken);
+      } catch (err) {
+        setError('Failed to initialize token');
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    initializeToken();
+
+    return () => window.removeEventListener('message', handleMessage);
+  }, [agentId]);
+
+  if (error) return <div className="error-message">{error}</div>;
+  if (!token || isLoading) return <div className="loading-state">Loading...</div>;
+
+  return (
+    <iframe
+      src={`https://dashboard.vocera.ai/embed/${agentId}/overview?token=${token}`}
+      className="w-full h-[950px] border-0"
+      allowFullScreen
+      loading="lazy"
+      title="Vocera Overview Embed"
+    />
+  );
+};
+
+export default VoceraOverviewEmbed;
+```
+  </Tab>
+  <Tab title="Vue">
+```vue
+<template>
+  <div class="vocera-embed-container">
+    <div v-if="error" class="error-message">{{ error }}</div>
+    <iframe
+      v-else-if="token && !isLoading"
+      :src="embedUrl"
+      class="w-full h-[950px] border-0"
+      allowfullscreen
+      loading="lazy"
+      title="Vocera Overview Embed"
+    />
+    <div v-else class="loading-state">Loading...</div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'VoceraOverviewEmbed',
+  props: {
+    agentId: {
+      type: String,
+      required: true
+    }
+  },
+  data() {
+    return {
+      token: null,
+      isLoading: true,
+      error: null
+    }
+  },
+  computed: {
+    embedUrl() {
+      return `https://dashboard.vocera.ai/embed/${this.agentId}/overview?token=${this.token}`;
+    }
+  },
+  methods: {
+    async handleMessage(event) {
+      if (event.data === 'token_expired') {
+        try {
+          await this.refreshToken(); // See /embed/refreshing-expired-token
+        } catch (err) {
+          this.error = 'Failed to refresh token';
+        }
+      }
+
+     
+    },
+    async initializeToken() {
+      try {
+        this.token = await this.initToken(); // See /embed/generate-token
+      } catch (err) {
+        this.error = 'Failed to initialize token';
+      }
+    }
+  },
+  async mounted() {
+    window.addEventListener('message', this.handleMessage);
+    await this.initializeToken();
+  },
+  beforeUnmount() {
+    window.removeEventListener('message', this.handleMessage);
+  }
+};
+</script>
+
+<style scoped>
+.error-message {
+  color: red;
+  padding: 1rem;
+}
+.loading-state {
+  padding: 1rem;
+  text-align: center;
+}
+</style>
+```
+  </Tab>
+  <Tab title="Angular">
+```typescript
+// vocera-overview-embed.component.ts
+import { Component, Input, OnInit, OnDestroy } from '@angular/core';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
+
+@Component({
+  selector: 'app-vocera-overview-embed',
+  template: `
+    <div class="vocera-embed-container">
+      <div *ngIf="error" class="error-message">{{ error }}</div>
+      <iframe
+        *ngIf="token && !isLoading"
+        [src]="embedUrl"
+        class="w-full h-[950px] border-0"
+        allowfullscreen
+        loading="lazy"
+        title="Vocera Overview Embed"
+      ></iframe>
+      <div *ngIf="!token || isLoading" class="loading-state">Loading...</div>
+    </div>
+  `,
+  styles: [`
+    .error-message {
+      color: red;
+      padding: 1rem;
+    }
+    .loading-state {
+      padding: 1rem;
+      text-align: center;
+    }
+  `]
+})
+export class VoceraOverviewEmbedComponent implements OnInit, OnDestroy {
+  @Input() agentId!: string;
+  
+  token: string | null = null;
+  isLoading = true;
+  error: string | null = null;
+
+  constructor(private sanitizer: DomSanitizer) {}
+
+  get embedUrl(): SafeUrl {
+    const url = `https://dashboard.vocera.ai/embed/${this.agentId}/overview?token=${this.token}`;
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
+  async handleMessage(event: MessageEvent): Promise<void> {
+    if (event.data === 'token_expired') {
+      try {
+        await this.refreshToken(); // See /embed/refreshing-expired-token
+      } catch (err) {
+        this.error = 'Failed to refresh token';
+      }
+    }
+
+   
+  }
+
+  async ngOnInit(): Promise<void> {
+    window.addEventListener('message', this.handleMessage.bind(this));
+    try {
+      this.token = await this.initToken(); // See /embed/generate-token
+    } catch (err) {
+      this.error = 'Failed to initialize token';
+    }
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('message', this.handleMessage.bind(this));
+  }
+}
+```
+  </Tab>
+  <Tab title="HTML/JavaScript">
+```javascript
+class VoceraOverviewEmbed {
+  constructor(containerId, agentId) {
+    this.container = document.getElementById(containerId);
+    this.agentId = agentId;
+    this.token = null;
+    this.isLoading = true;
+    
+    this.init();
+  }
+
+  async init() {
+    try {
+      this.token = await this.initToken(); // See /embed/generate-token
+      this.createIframe();
+      window.addEventListener('message', this.handleMessage.bind(this));
+    } catch (err) {
+      this.showError('Failed to initialize token');
+    }
+  }
+
+  handleMessage(event) {
+    if (event.data === 'token_expired') {
+      this.handleTokenExpiration();
+    }
+
+  
+  }
+
+  async handleTokenExpiration() {
+    try {
+      await this.refreshToken(); // See /embed/refreshing-expired-token
+      this.updateIframe();
+    } catch (err) {
+      this.showError('Failed to refresh token');
+    }
+  }
+
+  createIframe() {
+    const iframe = document.createElement('iframe');
+    iframe.width = '100%';
+    iframe.height = '950';
+    iframe.style.border = '0';
+    iframe.allowFullscreen = true;
+    iframe.loading = 'lazy';
+    iframe.title = 'Vocera Overview Embed';
+    
+    this.iframe = iframe;
+    this.updateIframe();
+    this.container.appendChild(iframe);
+  }
+
+  updateIframe() {
+    if (this.iframe && this.token) {
+      this.iframe.src = `https://dashboard.vocera.ai/embed/${this.agentId}/overview?token=${this.token}`;
+    }
+  }
+
+  showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.style.color = 'red';
+    errorDiv.style.padding = '1rem';
+    errorDiv.textContent = message;
+    
+    this.container.innerHTML = '';
+    this.container.appendChild(errorDiv);
+  }
+
+  hideLoading() {
+    const loadingElement = this.container.querySelector('.loading-state');
+    if (loadingElement) {
+      loadingElement.remove();
+    }
+  }
+}
+
+// Usage example
+const overviewEmbed = new VoceraOverviewEmbed('vocera-overview-embed', 'YOUR_AGENT_ID');
+```
+  </Tab>
+</Tabs>
+
+## Event Handling
+
+Each framework implementation above includes handlers for these core events:
+
+```javascript
+// Token expired event
+if (event.data === 'token_expired') {
+  await refreshToken(); // See /embed/refreshing-expired-token for implementation
+}
+```
+
+For token management implementation details, refer to:
+- [Token Generation Guide](/embed/generate-token)
+- [Token Refresh Guide](/embed/refreshing-expired-token) 

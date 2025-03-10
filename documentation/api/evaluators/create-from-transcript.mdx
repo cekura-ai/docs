@@ -1,0 +1,146 @@
+# Create Evaluator from Transcript API
+
+Create a new evaluator for a specific agent using an existing conversation transcript.
+
+## API Endpoint
+
+| Method | Endpoint |
+|--------|----------|
+| `POST` | `https://new-prod.vocera.ai/test_framework/v1/scenarios-external/create_scenario_from_transcript/` |
+
+## Authentication
+
+Include your API key in the request headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-VOCERA-API-KEY` | Your API key obtained from the dashboard |
+
+## Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `agent` | integer | Yes* | ID of the agent |
+| `assistant_id` | string | Yes* | The assistant ID associated with agent |
+| `name` | string | No | Name of the evaluator |
+| `personality` | integer | No | ID of the personality to use |
+| `expected_outcome_prompt` | string | No | Prompt to evaluate expected outcome |
+| `transcript_json` | array | Yes | Transcript in JSON format |
+
+\* Only either of `agent` or `assistant_id` is required
+
+## Example Request
+
+```json
+{
+  "agent": 1,
+  "personality": 1,
+  "name": "Appointment Booking Evaluator",
+  "expected_outcome_prompt": "Appointment was successfully booked",
+  "transcript_json": [
+    {"role": "Testing Agent", "time": "0:01", "content": "Hello.", "end_time": 1.94, "start_time": 1.44},
+    {"role": "Main Agent", "time": "0:03", "content": "Hello. I want to book appointment.", "end_time": 7.54, "start_time": 3.1}
+  ]
+}
+```
+
+## Response
+
+A successful request returns the created evaluator details.
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | integer | Unique identifier for the evaluator |
+| `name` | string | Name of the evaluator |
+| `personality_name` | string | Human-readable name of the personality |
+| `expected_outcome_prompt` | string | Prompt to evaluate expected outcome |
+| `instructions` | string | Auto-generated instructions based on the transcript |
+
+## Example Response
+
+```json
+{
+  "id": 42,
+  "name": "Appointment Booking Evaluator",
+  "personality_name": "Helpful Assistant",
+  "expected_outcome_prompt": "Appointment was successfully booked",
+  "instructions": "You are a testing agent evaluating a conversation about booking an appointment. Assess whether the main agent successfully books the appointment as requested."
+}
+```
+
+## Code Examples
+
+<CodeGroup>
+
+```bash Curl
+curl -X POST https://new-prod.vocera.ai/test_framework/v1/scenarios-external/create_scenario_from_transcript/ \
+  -H "X-VOCERA-API-KEY: <your-api-key-here>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent": 1,
+    "personality": 1,
+    "name": "Appointment Booking Evaluator",
+    "expected_outcome_prompt": "Appointment was successfully booked",
+    "transcript_json": [
+      {"role": "Testing Agent", "time": "0:01", "content": "Hello.", "end_time": 1.94, "start_time": 1.44},
+      {"role": "Main Agent", "time": "0:03", "content": "Hello. I want to book appointment.", "end_time": 7.54, "start_time": 3.1}
+    ]
+  }'
+```
+
+```python Python
+import requests
+
+def create_evaluator_from_transcript(
+        api_key, 
+        transcript_json, 
+        agent_id=None, 
+        assistant_id=None, 
+        personality_id=None, 
+        name=None, 
+        expected_outcome_prompt=None
+    ):
+    url = 'https://new-prod.vocera.ai/test_framework/v1/scenarios-external/create_scenario_from_transcript/'
+    
+    headers = {
+        'X-VOCERA-API-KEY': api_key,
+        'Content-Type': 'application/json'
+    }
+    
+    data = {
+        'transcript_json': transcript_json
+    }
+    if assistant_id:
+        data['assistant_id'] = assistant_id
+    if agent_id:
+        data['agent'] = agent_id
+    if personality_id:
+        data['personality'] = personality_id
+    if name:
+        data['name'] = name
+    if expected_outcome_prompt:
+        data['expected_outcome_prompt'] = expected_outcome_prompt
+
+    response = requests.post(url, headers=headers, json=data)
+    return response.json()
+```
+
+```javascript JavaScript
+async function createEvaluatorFromTranscript(apiKey, data) {
+  const url = 'https://new-prod.vocera.ai/test_framework/v1/scenarios-external/create_scenario_from_transcript/';
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'X-VOCERA-API-KEY': apiKey,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  });
+
+  return await response.json();
+}
+```
+</CodeGroup>

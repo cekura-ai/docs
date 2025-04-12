@@ -37,16 +37,21 @@ import requests
 import time
 from typing import Callable, Dict, List
 
-api_key = "your_api_key"
+# Set variables
+SCENARIO_IDS = [1514, 1515] # change_me
+AGENT_ID = 26 # change_me
+API_KEY = "api_key" # change_me
 
 headers = {
-    'X-VOCERA-API-KEY': api_key,
+    'X-VOCERA-API-KEY': API_KEY,
     'Content-Type': 'application/json'
 }
 
+base_url = "https://new-prod.cekura.ai/test_framework"
+
 def run_evaluators(scenarios: List[int], agent_id: int, freq: int = 1) -> Dict:
     
-    url = 'https://new-prod.vocera.ai/test_framework/v1/scenarios-external/run_scenarios/'
+    url = f'{base_url}/v1/scenarios-external/run_scenarios/'
 
     data = {
         'scenarios': scenarios,
@@ -55,22 +60,42 @@ def run_evaluators(scenarios: List[int], agent_id: int, freq: int = 1) -> Dict:
     }
 
     response = requests.post(url, headers=headers, json=data)
+
     return response.json()
 
-def poll_status(response_json: Dict, func: Callable) -> None:
+status_message = {
+    "running": "🏃 Run is currently executing",
+    "completed": "✅ Run completed successfully",
+    "failed": "❌ Run failed during execution",
+    "pending": "⏳ Run is waiting to be executed",
+    "in_progress": "🔄 Run is in progress",
+    "evaluating": "🔍 Run is being evaluated",
+    "in_queue": "📋 Run is waiting in queue",
+    "timeout": "⏱️ Run timed out after exceeding time limit"
+}
+
+def monitor_runs(response_json: Dict, func: Callable, call_func: bool = False) -> None:
 
     run_ids = [str(run["id"]) for run in response_json.get("runs")]
 
     while run_ids:
 
-        url = f'https://new-prod.vocera.ai/test_framework/v1/runs-external/bulk/?run_ids={",".join(run_ids)}'
+        url = f'{base_url}/v1/runs-external/bulk/?run_ids={",".join(run_ids)}'
 
         runs_list = requests.get(url, headers=headers).json()
 
         for run in runs_list:
 
-            if run["status"] in ["completed", "in_progress",]:
-                func(run["id"])  # Call function immediately
+            if run["status"] in ["pending", "in_progress"] and call_func:
+                if run.get("outbound_number"):
+                    func(run["outbound_number"])  # Call function immediately
+                run_ids.remove(str(run["id"]))
+            
+            if not call_func:
+                phone_number = run.get("outbound_number", "No phone number")
+                print(f"{status_message.get(run['status'])} - Run ID: {run['id']}, Phone: {phone_number}")
+
+            if run["status"] in ["completed", "failed", "timeout"]:
                 run_ids.remove(str(run["id"]))
         
         if not run_ids:
@@ -78,16 +103,19 @@ def poll_status(response_json: Dict, func: Callable) -> None:
 
         time.sleep(3)  # Poll every 3 seconds
 
-def call(number: int) -> None:
-    print(f"Calling {number}...")  # Replace with actual call logic
+def call(number: str) -> None:
+    '''
+    Outbound call function to be implemented
+    Examples: 
+        number = "+14154133800"
+        number = "+14154133900"
+    '''
+    print(f"📞 Initiating outbound call to {number}...")  # Replace with actual call logic
+   
 
-# Example Usage
-scenarios = [1514, 1515]
-agent_id = 26
-
-response_json = run_evaluators(scenarios, agent_id)
-
-poll_status(response_json, call)
+response_json = run_evaluators(SCENARIO_IDS, AGENT_ID)
+monitor_runs(response_json, func=call, call_func=True)
+monitor_runs(response_json, func=call, call_func=False)
 ```
 
 ### Example Response Structure

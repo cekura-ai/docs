@@ -31,7 +31,7 @@ Send a POST request to [`https://new-prod.vocera.ai/observability/v1/observe/`](
 
 - `customer_number` (optional): Phone number of the customer
 
-- `transcript_type` (required): Format the transcript is sent in. can be `vocera`, `vapi`, `retell`, `deepgram` or `pipecat`
+- `transcript_type` (required): Format the transcript is sent in. can be `vocera`, `vapi`, `retell`, `deepgram`, `pipecat` or `livekit`
 
 - `transcript_json` (required): JSON object containing the transcript of the call. Can be in Vocera, Vapi or Retell format
 
@@ -717,6 +717,17 @@ Vocera Format
 ]
 ```
 
+```text LiveKit Format
+Representative: Hello?
+Lena AI: Hi, this is Lena, a digital coordinator...
+Representative: Hello?
+Lena AI: Hi, this is Lena, a digital coordinator with Houston Methodist! Am I speaking with Megan Whittaker?
+Representative: You are.
+Lena AI: Great! I'm reaching out about a new care coordinator who's been assigned to you. Is now a good time to chat?
+Representative: Sure.
+Lena AI: Thank you, Megan! Houston Methodist has assigned you a dedicated care coordinator named Brandi, to make managing your healthcare tasks easier.
+```
+
 </CodeGroup>
 
 ### Method 1: Using a Voice Recording URL
@@ -1055,6 +1066,78 @@ def submit_pipecat_transcript(transcript, agent_id, api_key):
     payload = {
         "agent": agent_id,
         "transcript_type": "pipecat",
+        "transcript_json": transcript,
+        "call_id": "unique_call_id"  # Replace with your actual call ID
+    }
+
+    response = requests.post(
+        "https://new-prod.vocera.ai/observability/v1/observe/",
+        headers={
+            "X-VOCERA-API-KEY": api_key,
+            "Content-Type": "application/json"
+        },
+        data=json.dumps(payload)
+    )
+
+    return response.json()
+```
+
+## LiveKit Transcript Integration
+
+The API supports LiveKit transcripts in a simple text format where each line represents a message with a speaker label.
+
+### Format Specification
+
+Each line follows this format:
+
+```
+Speaker: Message text
+```
+
+Example:
+
+```
+Representative: Hello?
+Lena AI: Hi, this is Lena, a digital coordinator with Houston Methodist!
+Representative: You are.
+Lena AI: Great! Is now a good time to chat?
+```
+
+**Important Notes:**
+
+- Speaker labels before the colon identify the role
+- Common speaker labels are automatically mapped to internal roles:
+  - "Representative", "User", "Customer", "Caller" → "Testing Agent"
+  - "Lena AI", "Assistant", "Agent", "Bot" → "Main Agent"
+- Timestamps are automatically generated based on message length
+
+### Transcript Processing
+
+When you submit a LiveKit transcript, our system:
+
+1. Parses each line into speaker and content
+2. Maps speakers to our internal roles
+3. Automatically generates timing information
+4. Evaluates the conversation for insights
+
+### Example Python Code
+
+```python
+import requests
+import json
+
+def submit_livekit_transcript(transcript, agent_id, api_key):
+    """
+    Submit a LiveKit transcript to the API.
+
+    Parameters:
+    - transcript: The LiveKit transcript as a string
+    - agent_id: Your agent ID
+    - api_key: Your API key
+    """
+    payload = {
+        "agent": agent_id,
+        "transcript_type": "livekit",
         "transcript_json": transcript,
         "call_id": "unique_call_id"  # Replace with your actual call ID
     }

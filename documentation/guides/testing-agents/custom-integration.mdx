@@ -1,0 +1,127 @@
+---
+title: 'Custom Integration Provider'
+description: 'Learn how to use your own backend system for simulation testing with Cekura by integrating a custom transcript provider.'
+---
+
+## Overview
+
+The custom transcript provider feature allows you to use your own backend system or third-party service for simulation testing while maintaining full control over your conversation data.
+
+## Setup
+
+### In Cekura Dashboard
+
+1. Create or edit an agent in the Cekura dashboard
+2. Set the transcript provider to "Custom"
+3. Configure your custom provider credentials:
+   - API endpoint (where Cekura will fetch calls)
+   - API key value for authentication
+
+### API Endpoint Requirements
+
+Your API endpoint should:
+
+1. Accept GET requests
+2. Return a list of calls in the expected format (see below)
+3. Support authentication via the `Authorization` header
+
+## Call Format
+
+Your API should return a JSON array of call objects. Each call object should include:
+```json
+[
+  {
+    "id": "unique-call-id",
+    "startedAt": "2023-04-28T08:50:23.608Z", // ISO 8601 format
+    "endedAt": "2023-04-28T08:50:43.608Z",   // ISO 8601 format
+    "customer": {
+      "number": "+16505551234",  // Must match the number used in scenarios
+      "name": "optional-name"
+    },
+    "messages": [
+      {
+        "role": "system",        // System message (optional)
+        "content": "System instructions",
+        "start_time": 0.0,       // Seconds from call start
+        "end_time": 0.0
+      },
+      {
+        "role": "bot",           // Agent/bot message
+        "content": "Hello, how can I help you today?",
+        "start_time": 1.5,       // Seconds from call start
+        "end_time": 3.2
+      },
+      {
+        "role": "user",          // User/customer message
+        "content": "I have a question about my account.",
+        "start_time": 4.1,
+        "end_time": 6.8
+      },
+      // Function calls (optional)
+      {
+        "role": "function_call",
+        "content": "Function description",
+        "start_time": 7.0,
+        "end_time": 7.1,
+        "data": {
+          "id": "function_name",
+          "name": "function_name",
+          "arguments": "arg1, arg2, arg3"
+        }
+      },
+      // Function results (optional)
+      {
+        "role": "function_call_result",
+        "start_time": 7.1,
+        "end_time": 7.2,
+        "data": {
+          "id": "function_name",
+          "name": "function_name",
+          "result": "Function returned data"
+        }
+      }
+    ]
+  },
+  // ... more call objects can be included in the array
+]
+```
+
+## Important Considerations
+
+For successful integration, ensure:
+
+1. The phone number in your API response matches the scenario's inbound number
+2. Call timestamps are in ISO 8601 format
+3. Your server time is accurate and synchronized
+4. Message timing is relative to the start of the call (in seconds)
+
+## Function Calls and Advanced Features
+
+To include tool usage in your evaluations, add function calls and results:
+
+- Use `role: "function_call"` for tool invocations
+- Use `role: "function_call_result"` for tool responses
+- Include a `data` object with function details
+
+## Testing Your Integration
+
+To verify your custom transcript provider is working correctly:
+
+1. Set up your API endpoint and ensure it's accessible
+2. Create an agent with the custom provider configured
+3. Create a scenario with an inbound phone number
+4. Run the scenario
+5. Check the results in the Cekura dashboard
+
+## Troubleshooting
+
+If your integration isn't working as expected:
+
+1. **No calls appear in results**: Verify your API endpoint is returning data and check the response format
+2. **Authentication issues**: Confirm your API key and header configuration
+3. **Missing calls**: Ensure your API returns calls that match the scenario's requirements
+
+## Next Steps
+- Learn about [custom metrics](/testing-voice-agents/metrics/custom-metrics)
+- Explore [predefined metrics](/testing-voice-agents/metrics/pre-defined-metrics)
+- Set up [critical workflow metrics](/testing-voice-agents/metrics/critical-workflow-metric) 

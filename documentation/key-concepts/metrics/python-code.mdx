@@ -27,6 +27,10 @@ When writing your custom code, you have access to the following data variables:
   <Accordion title="call_duration" href="#call-duration">
     <code>data["call_duration"]</code> - Call duration in seconds as an integer
   </Accordion>
+  <Accordion title="metric_results" href="#metric-results">
+    <code>data["metric_results"]</code> - Results from other Basic, Advanced,
+    and pre-defined metrics evaluated for this call
+  </Accordion>
 </AccordionGroup>
 
 ### Required Output Variables
@@ -49,6 +53,34 @@ if "premium plan" in transcript:
 else:
     _result = False
     _explanation = "Agent did not mention the Premium Plan in the conversation"
+```
+
+### Using Metric Results
+
+You can access the results of other metrics that were evaluated for the same call using `data["metric_results"]`. This allows you to create complex evaluations that depend on the outcomes of other metrics.
+
+The `metric_results` is a dictionary where:
+
+- **Keys** are metric names
+- **Values** are dictionaries containing the metric result and explanation
+
+Example structure:
+
+```python
+data["metric_results"] = {
+    "Customer Satisfaction": {
+        "result": True,
+        "explanation": "Customer expressed satisfaction with the service"
+    },
+    "Response Time": {
+        "result": 85.5,
+        "explanation": "Average response time was 85.5 seconds"
+    },
+    "Product Knowledge": {
+        "result": "Excellent",
+        "explanation": "Agent demonstrated excellent product knowledge"
+    }
+}
 ```
 
 ### Advanced Example
@@ -86,4 +118,32 @@ if agent_responses:
 else:
     _result = False
     _explanation = "No agent responses found in transcript"
+```
+
+### Example Using Metric Results
+
+Here's an example that combines multiple metric results to create a comprehensive evaluation:
+
+```python
+# Get metric results from other evaluations
+metric_results = data["metric_results"]
+
+# Check if required metrics exist
+if "Customer Satisfaction" in metric_results and "Response Time" in metric_results:
+    satisfaction = metric_results["Customer Satisfaction"]["result"]
+    response_time = metric_results["Response Time"]["result"]
+
+    # Create a composite score based on multiple metrics
+    if satisfaction and response_time < 60:
+        _result = "Excellent"
+        _explanation = f"Customer was satisfied ({satisfaction}) and response time was fast ({response_time}s)"
+    elif satisfaction and response_time < 120:
+        _result = "Good"
+        _explanation = f"Customer was satisfied ({satisfaction}) but response time was moderate ({response_time}s)"
+    else:
+        _result = "Needs Improvement"
+        _explanation = f"Either customer satisfaction ({satisfaction}) or response time ({response_time}s) needs improvement"
+else:
+    _result = "Incomplete"
+    _explanation = "Required metrics (Customer Satisfaction, Response Time) not found in results"
 ```

@@ -1,0 +1,136 @@
+## Python Code Metrics
+
+Python Code Metrics allow you to write custom evaluation logic in Python to evaluate your AI agent's performance. This gives you complete control over the evaluation process and enables complex analysis that goes beyond simple prompt-based metrics.
+
+### Overview
+
+Custom code metrics are executed in a secure Python environment with access to call data including transcripts, metadata, and dynamic variables. Your code must set specific output variables to provide the evaluation result and explanation.
+
+### Available Data Variables
+
+When writing your custom code, you have access to the following data variables:
+
+<AccordionGroup>
+  <Accordion title="transcript" href="#transcript">
+    <code>data["transcript"]</code> - Full conversation transcript as a string
+  </Accordion>
+  <Accordion title="transcript_json" href="#transcript-json">
+    <code>data["transcript_json"]</code> - Transcript as a structured list with
+    speaker information
+  </Accordion>
+  <Accordion title="metadata" href="#metadata">
+    <code>data["metadata"]</code> - Additional metadata as a dictionary
+  </Accordion>
+  <Accordion title="dynamic_variables" href="#dynamic-variables">
+    <code>data["dynamic_variables"]</code> - Dynamic variables as a dictionary
+  </Accordion>
+  <Accordion title="call_duration" href="#call-duration">
+    <code>data["call_duration"]</code> - Call duration in seconds as an integer
+  </Accordion>
+  <Accordion title="metric_results" href="#metric-results">
+    <code>data["metric_results"]</code> - Results from other Basic, Advanced,
+    and pre-defined metrics evaluated for this call
+  </Accordion>
+</AccordionGroup>
+
+### Required Output Variables
+
+Your Python code must set these two variables:
+
+- **`_result`** - The evaluation outcome (can be boolean, numeric, string, etc.)
+- **`_explanation`** - A string explaining the reasoning behind the result
+
+### Example Code
+
+Here's a simple example that checks if the agent mentioned a specific product:
+
+```python
+# Check if the agent mentioned "Premium Plan" in the conversation
+transcript = data["transcript"].lower()
+if "premium plan" in transcript:
+    _result = True
+    _explanation = "Agent successfully mentioned the Premium Plan during the conversation"
+else:
+    _result = False
+    _explanation = "Agent did not mention the Premium Plan in the conversation"
+```
+
+### Using Metric Results
+
+You can access the results of other metrics that were evaluated for the same call directly by metric name using `data[<metric_name>]`. This allows you to create complex evaluations that depend on the outcomes of other metrics.
+
+Example usage:
+
+```python
+# Access metric results directly by name
+customer_satisfaction = data["Customer Satisfaction"]
+response_time = data["Response Time"]
+product_knowledge = data["Product Knowledge"]
+
+# Each metric result contains the evaluation outcome
+if customer_satisfaction and response_time < 60:
+    _result = "Excellent"
+    _explanation = "Customer was satisfied and response time was fast"
+```
+
+### Advanced Example
+
+Here's a more complex example that analyzes sentiment and response time:
+
+```python
+import re
+from datetime import datetime
+
+# Get transcript data
+transcript = data["transcript"]
+call_duration = data["call_duration"]
+
+# Analyze agent responses
+agent_responses = []
+lines = transcript.split('\n')
+
+for line in lines:
+    if line.strip().startswith('Agent:'):
+        response = line.replace('Agent:', '').strip()
+        agent_responses.append(response)
+
+# Calculate average response length
+if agent_responses:
+    avg_response_length = sum(len(response) for response in agent_responses) / len(agent_responses)
+
+    # Check if responses are detailed enough (more than 50 characters average)
+    if avg_response_length > 50:
+        _result = True
+        _explanation = f"Agent provided detailed responses with average length of {avg_response_length:.1f} characters"
+    else:
+        _result = False
+        _explanation = f"Agent responses were too brief with average length of {avg_response_length:.1f} characters"
+else:
+    _result = False
+    _explanation = "No agent responses found in transcript"
+```
+
+### Example Using Metric Results
+
+Here's an example that combines multiple metric results to create a comprehensive evaluation:
+
+```python
+# Access metric results directly by name
+try:
+    satisfaction = data["Customer Satisfaction"]
+    response_time = data["Response Time"]
+
+    # Create a composite score based on multiple metrics
+    if satisfaction and response_time < 60:
+        _result = "Excellent"
+        _explanation = f"Customer was satisfied ({satisfaction}) and response time was fast ({response_time}s)"
+    elif satisfaction and response_time < 120:
+        _result = "Good"
+        _explanation = f"Customer was satisfied ({satisfaction}) but response time was moderate ({response_time}s)"
+    else:
+        _result = "Needs Improvement"
+        _explanation = f"Either customer satisfaction ({satisfaction}) or response time ({response_time}s) needs improvement"
+except KeyError:
+    _result = "Incomplete"
+    _explanation = "Required metrics (Customer Satisfaction, Response Time) not found in results"
+```

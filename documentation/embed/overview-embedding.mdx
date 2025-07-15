@@ -3,21 +3,25 @@ title: Overview Embedding
 description: Learn how to embed Cekura agent overview in your application using our embed widget. For token management details, see our [Token Generation](/embed/generate-token) and [Token Refresh](/embed/refreshing-expired-token) guides.
 ---
 
-
 ## Prerequisites
+
 - Cekura API key
 - Agent ID
 - Development environment for your chosen framework
 
 ## URL Structure
+
 The embed URL follows this pattern:
+
 ```
-https://dashboard.cekura.ai/embed/{agentId}/overview?token={token}
+https://dashboard.cekura.ai/embed/{agentId}/overview?token={token}&theme={theme}
 ```
 
 Where:
+
 - `{agentId}`: Your agent's unique identifier
 - `{token}`: Your authentication token
+- `{theme}`: Theme preference ('dark' or 'light')
 
 ## Framework Implementations
 
@@ -26,22 +30,22 @@ Where:
 ```jsx
 import { useEffect, useState } from 'react';
 
-const VoceraOverviewEmbed = ({ agentId }) => {
-  const [token, setToken] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+const VoceraOverviewEmbed = ({ agentId, theme = 'light' }) => {
+const [token, setToken] = useState(null);
+const [isLoading, setIsLoading] = useState(true);
+const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const handleMessage = async (event) => {
-      // Token expired event
-      if (event.data === 'token_expired') {
-        try {
-          await refreshToken(); // See /embed/refreshing-expired-token for implementation
-        } catch (err) {
-          setError('Failed to refresh token');
-        }
-      }
-     
+useEffect(() => {
+const handleMessage = async (event) => {
+// Token expired event
+if (event.data === 'token_expired') {
+try {
+await refreshToken(); // See /embed/refreshing-expired-token for implementation
+} catch (err) {
+setError('Failed to refresh token');
+}
+}
+
     };
 
     const initializeToken = async () => {
@@ -57,20 +61,21 @@ const VoceraOverviewEmbed = ({ agentId }) => {
     initializeToken();
 
     return () => window.removeEventListener('message', handleMessage);
-  }, [agentId]);
 
-  if (error) return <div className="error-message">{error}</div>;
-  if (!token || isLoading) return <div className="loading-state">Loading...</div>;
+}, [agentId]);
 
-  return (
-    <iframe
-      src={`https://dashboard.cekura.ai/embed/${agentId}/overview?token=${token}`}
-      className="w-full h-[950px] border-0"
-      allowFullScreen
-      loading="lazy"
-      title="Cekura Overview Embed"
-    />
-  );
+if (error) return <div className="error-message">{error}</div>;
+if (!token || isLoading) return <div className="loading-state">Loading...</div>;
+
+return (
+<iframe
+src={`https://dashboard.cekura.ai/embed/${agentId}/overview?token=${token}&theme=${theme}`}
+className="w-full h-[950px] border-0"
+allowFullScreen
+loading="lazy"
+title="Cekura Overview Embed"
+/>
+);
 };
 
 export default VoceraOverviewEmbed;
@@ -100,6 +105,11 @@ export default {
     agentId: {
       type: String,
       required: true
+    },
+    theme: {
+      type: String,
+      default: 'light',
+      validator: value => ['dark', 'light'].includes(value)
     }
   },
   data() {
@@ -111,7 +121,7 @@ export default {
   },
   computed: {
     embedUrl() {
-      return `https://dashboard.cekura.ai/embed/${this.agentId}/overview?token=${this.token}`;
+      return `https://dashboard.cekura.ai/embed/${this.agentId}/overview?token=${this.token}&theme=${this.theme}`;
     }
   },
   methods: {
@@ -154,7 +164,8 @@ export default {
   text-align: center;
 }
 </style>
-```
+
+````
   </Tab>
   <Tab title="Angular">
 ```typescript
@@ -191,7 +202,8 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 })
 export class VoceraOverviewEmbedComponent implements OnInit, OnDestroy {
   @Input() agentId!: string;
-  
+  @Input() theme: 'dark' | 'light' = 'light';
+
   token: string | null = null;
   isLoading = true;
   error: string | null = null;
@@ -199,7 +211,7 @@ export class VoceraOverviewEmbedComponent implements OnInit, OnDestroy {
   constructor(private sanitizer: DomSanitizer) {}
 
   get embedUrl(): SafeUrl {
-    const url = `https://dashboard.cekura.ai/embed/${this.agentId}/overview?token=${this.token}`;
+    const url = `https://dashboard.cekura.ai/embed/${this.agentId}/overview?token=${this.token}&theme=${this.theme}`;
     return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
 
@@ -212,7 +224,7 @@ export class VoceraOverviewEmbedComponent implements OnInit, OnDestroy {
       }
     }
 
-   
+
   }
 
   async ngOnInit(): Promise<void> {
@@ -228,89 +240,94 @@ export class VoceraOverviewEmbedComponent implements OnInit, OnDestroy {
     window.removeEventListener('message', this.handleMessage.bind(this));
   }
 }
-```
+````
+
   </Tab>
   <Tab title="HTML/JavaScript">
 ```javascript
 class VoceraOverviewEmbed {
-  constructor(containerId, agentId) {
+  constructor(containerId, agentId, theme = 'light') {
     this.container = document.getElementById(containerId);
     this.agentId = agentId;
+    this.theme = theme;
     this.token = null;
     this.isLoading = true;
     
     this.init();
   }
 
-  async init() {
-    try {
-      this.token = await this.initToken(); // See /embed/generate-token
-      this.createIframe();
-      window.addEventListener('message', this.handleMessage.bind(this));
-    } catch (err) {
-      this.showError('Failed to initialize token');
-    }
-  }
+async init() {
+try {
+this.token = await this.initToken(); // See /embed/generate-token
+this.createIframe();
+window.addEventListener('message', this.handleMessage.bind(this));
+} catch (err) {
+this.showError('Failed to initialize token');
+}
+}
 
-  handleMessage(event) {
-    if (event.data === 'token_expired') {
-      this.handleTokenExpiration();
-    }
+handleMessage(event) {
+if (event.data === 'token_expired') {
+this.handleTokenExpiration();
+}
 
-  
-  }
+}
 
-  async handleTokenExpiration() {
-    try {
-      await this.refreshToken(); // See /embed/refreshing-expired-token
-      this.updateIframe();
-    } catch (err) {
-      this.showError('Failed to refresh token');
-    }
-  }
+async handleTokenExpiration() {
+try {
+await this.refreshToken(); // See /embed/refreshing-expired-token
+this.updateIframe();
+} catch (err) {
+this.showError('Failed to refresh token');
+}
+}
 
-  createIframe() {
-    const iframe = document.createElement('iframe');
-    iframe.width = '100%';
-    iframe.height = '950';
-    iframe.style.border = '0';
-    iframe.allowFullscreen = true;
-    iframe.loading = 'lazy';
-    iframe.title = 'Cekura Overview Embed';
-    
+createIframe() {
+const iframe = document.createElement('iframe');
+iframe.width = '100%';
+iframe.height = '950';
+iframe.style.border = '0';
+iframe.allowFullscreen = true;
+iframe.loading = 'lazy';
+iframe.title = 'Cekura Overview Embed';
+
     this.iframe = iframe;
     this.updateIframe();
     this.container.appendChild(iframe);
-  }
 
-  updateIframe() {
-    if (this.iframe && this.token) {
-      this.iframe.src = `https://dashboard.cekura.ai/embed/${this.agentId}/overview?token=${this.token}`;
-    }
-  }
-
-  showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.style.color = 'red';
-    errorDiv.style.padding = '1rem';
-    errorDiv.textContent = message;
-    
-    this.container.innerHTML = '';
-    this.container.appendChild(errorDiv);
-  }
-
-  hideLoading() {
-    const loadingElement = this.container.querySelector('.loading-state');
-    if (loadingElement) {
-      loadingElement.remove();
-    }
-  }
 }
 
-// Usage example
-const overviewEmbed = new VoceraOverviewEmbed('vocera-overview-embed', 'YOUR_AGENT_ID');
-```
+updateIframe() {
+if (this.iframe && this.token) {
+this.iframe.src = `https://dashboard.cekura.ai/embed/${this.agentId}/overview?token=${this.token}&theme=${this.theme}`;
+}
+}
+
+showError(message) {
+const errorDiv = document.createElement('div');
+errorDiv.className = 'error-message';
+errorDiv.style.color = 'red';
+errorDiv.style.padding = '1rem';
+errorDiv.textContent = message;
+
+    this.container.innerHTML = '';
+    this.container.appendChild(errorDiv);
+
+}
+
+hideLoading() {
+const loadingElement = this.container.querySelector('.loading-state');
+if (loadingElement) {
+loadingElement.remove();
+}
+}
+}
+
+// Usage examples
+const overviewEmbed = new VoceraOverviewEmbed('vocera-overview-embed', 'YOUR_AGENT_ID', 'dark');
+const lightOverviewEmbed = new VoceraOverviewEmbed('vocera-overview-embed', 'YOUR_AGENT_ID', 'light');
+
+````
   </Tab>
 </Tabs>
 
@@ -323,8 +340,9 @@ Each framework implementation above includes handlers for these core events:
 if (event.data === 'token_expired') {
   await refreshToken(); // See /embed/refreshing-expired-token for implementation
 }
-```
+````
 
 For token management implementation details, refer to:
+
 - [Token Generation Guide](/embed/generate-token)
-- [Token Refresh Guide](/embed/refreshing-expired-token) 
+- [Token Refresh Guide](/embed/refreshing-expired-token)

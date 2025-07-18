@@ -27,9 +27,18 @@ When writing your custom code, you have access to the following data variables:
   <Accordion title="call_duration" href="#call-duration">
     <code>data["call_duration"]</code> - Call duration in seconds as an integer
   </Accordion>
+  <Accordion title="tags" href="#tags">
+    <code>data["tags"]</code> - Tags associated with the call as a list
+  </Accordion>
+  <Accordion title="call_ended_reason" href="#call-ended-reason">
+    <code>data["call_ended_reason"]</code> - Reason why the call ended (e.g.,
+    "hangup", "timeout", "error")
+  </Accordion>
   <Accordion title="metric_results" href="#metric-results">
     <code>data["metric_results"]</code> - Results from other Basic, Advanced,
-    and pre-defined metrics evaluated for this call
+    and pre-defined metrics evaluated for this call. You can also access
+    individual metric results directly using{" "}
+    <code>data[&lt;metric_name&gt;]</code>
   </Accordion>
 </AccordionGroup>
 
@@ -110,9 +119,9 @@ else:
     _explanation = "No agent responses found in transcript"
 ```
 
-### Example Using Metric Results
+### Example Using Multiple Data Sources
 
-Here's an example that combines multiple metric results to create a comprehensive evaluation:
+Here's an example that combines multiple metric results with call metadata and tags:
 
 ```python
 # Access metric results directly by name
@@ -120,17 +129,30 @@ try:
     satisfaction = data["Customer Satisfaction"]
     response_time = data["Response Time"]
 
-    # Create a composite score based on multiple metrics
-    if satisfaction and response_time < 60:
-        _result = "Excellent"
-        _explanation = f"Customer was satisfied ({satisfaction}) and response time was fast ({response_time}s)"
-    elif satisfaction and response_time < 120:
-        _result = "Good"
-        _explanation = f"Customer was satisfied ({satisfaction}) but response time was moderate ({response_time}s)"
+    # Access additional call data
+    call_duration = data["call_duration"]
+    call_ended_reason = data["call_ended_reason"]
+    tags = data["tags"]
+
+    # Check if this was a priority call based on tags
+    is_priority = "priority" in tags or "vip" in tags
+
+    # Evaluate based on multiple factors
+    if call_ended_reason == "hangup" and satisfaction and response_time < 60:
+        if is_priority:
+            _result = "Excellent"
+            _explanation = f"Priority customer was satisfied ({satisfaction}) with fast response time ({response_time}s) and completed the call normally"
+        else:
+            _result = "Good"
+            _explanation = f"Customer was satisfied ({satisfaction}) with fast response time ({response_time}s) and completed the call normally"
+    elif call_ended_reason in ["timeout", "error"]:
+        _result = "Poor"
+        _explanation = f"Call ended unexpectedly due to {call_ended_reason}, indicating technical issues"
     else:
         _result = "Needs Improvement"
-        _explanation = f"Either customer satisfaction ({satisfaction}) or response time ({response_time}s) needs improvement"
-except KeyError:
+        _explanation = f"Call performance needs improvement - satisfaction: {satisfaction}, response time: {response_time}s, ended reason: {call_ended_reason}"
+
+except KeyError as e:
     _result = "Incomplete"
-    _explanation = "Required metrics (Customer Satisfaction, Response Time) not found in results"
+    _explanation = f"Required data not found: {str(e)}"
 ```

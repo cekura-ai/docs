@@ -1,0 +1,96 @@
+---
+title: "Dynamic Agent Description "
+description: "Learn how to use dynamic agent descriptions with Cekura's observability features to evaluate different agent configurations"
+---
+
+## Overview
+
+Dynamic agent description allows you to modify your agent's description and instructions on-the-fly during observability. This powerful feature enables you to test different prompts, agent descriptions, and behaviors without changing your agent's core configuration, making it perfect for A/B testing and prompt optimization.
+
+## How Dynamic Agent Description Works
+
+When you send call data to Cekura's observability platform, you can include `dynamic_variables` in your request. These variables override your agent's default agent description for that specific call evaluation. This feature is useful for these use cases:
+
+- If you use dynamic_variables in your AI agent's prompt
+- You want to record calls under one agent on Cekura
+
+## Setting Up Your Agent Description
+
+Before using dynamic agent description, ensure your agent description on the Cekura platform is configured to handle dynamic variables. You can add dynamic variables using the `{{ }}` syntax in your agent description.
+
+### Examples of Dynamic Variables
+
+**Full prompt replacement:**
+
+```
+{{prompt}}
+```
+
+**Mixed content with variables:**
+
+```
+You are a {{agent_type}} assistant. Your primary goal is to {{primary_goal}}.
+Always be {{tone}} and focus on {{focus_area}}.
+```
+
+**Multiple variables:**
+
+```
+You are a {{role}} working for {{company}}.
+Your expertise includes {{expertise_areas}}.
+Always respond in a {{communication_style}} manner.
+```
+
+**Important**: Set your agent description in the dashboard to work with dynamic prompting. The agent should be configured to accept and process the dynamic prompt variable effectively.
+
+![Dynamic Prompting Configuration](/images/dynamic-prompting.png)
+
+## API Integration
+
+### Retell Integration Example
+
+When integrating with Retell, use the [Cekura Observe API](/api-reference/observability/post-observabilityv1observe) with the following structure:
+
+```json
+{
+  "call_id": "retell_response.call_id",
+  "transcript_type": "retell",
+  "transcript_json": "retell_response.transcript_with_tool_calls",
+  "call_ended_reason": "retell_response.disconnect_reason",
+  "voice_recording_url": "retell_response.recording_url",
+  "dynamic_variables": {
+    "prompt": "Your custom prompt as a string"
+  }
+}
+```
+
+### Implementation Example
+
+Here's a practical example of how to implement dynamic agent description with Retell:
+
+```javascript
+// After receiving a webhook from Retell
+const observeData = {
+  call_id: retellWebhook.call_id,
+  transcript_type: "retell",
+  transcript_json: retellWebhook.transcript_with_tool_calls,
+  call_ended_reason: retellWebhook.disconnect_reason,
+  voice_recording_url: retellWebhook.recording_url,
+  dynamic_variables: {
+    prompt: `You are a helpful customer service representative. 
+             Be empathetic and solution-focused. 
+             Always confirm understanding before proceeding.
+             Prioritize customer satisfaction above all else.`,
+  },
+};
+
+// Send to Cekura Observability
+const response = await fetch("https://api.cekura.ai/observability/v1/observe", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: "Bearer YOUR_API_KEY",
+  },
+  body: JSON.stringify(observeData),
+});
+```

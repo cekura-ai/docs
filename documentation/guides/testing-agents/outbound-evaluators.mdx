@@ -42,7 +42,8 @@ API_KEY = "api_key" # change_me
 SCENARIO_IDS = [1514, 1515] # change_me
 AGENT_ID = 26 # change_me
 
-def call(number: str) -> None:
+
+def call(number: str, test_profile: Dict | None) -> None:
     '''
     Outbound call function to be implemented
     Example: number = "+14154133900"
@@ -59,7 +60,7 @@ base_url = "https://api.cekura.ai/test_framework"
 
 
 def check_agent_inbound(agent_id: int) -> bool:
-    url = f'{base_url}/v1/aiagents-external/{agent_id}/'
+    url = f'{base_url}/v1/aiagents/{agent_id}/'
     data = {
         'agent_id': agent_id
     }
@@ -76,7 +77,7 @@ def check_agent_inbound(agent_id: int) -> bool:
 
 def run_evaluators(scenarios: List[int], agent_id: int, freq: int = 1) -> Dict:
     
-    url = f'{base_url}/v1/scenarios-external/run_scenarios/'
+    url = f'{base_url}/v1/scenarios/run_scenarios/'
 
     data = {
         'scenarios': scenarios,
@@ -101,17 +102,18 @@ status_message = {
 def monitor_runs(response_json: Dict, func: Callable, call_func: bool = False) -> None:
 
     run_ids = [str(run["id"]) for run in response_json.get("runs")]
+    test_profiles = { run["id"]: run["test_profile_data"] for run in response_json.get("runs")}
 
     while run_ids:
 
-        url = f'{base_url}/v1/runs-external/bulk/?run_ids={",".join(run_ids)}'
+        url = f'{base_url}/v1/runs/bulk/?run_ids={",".join(run_ids)}'
 
         runs_list = requests.get(url, headers=headers).json()
 
         for run in runs_list:
             phone_number = run.get("outbound_number")
             if run["status"] == "pending" and call_func:
-                func(phone_number)  # Call function immediately
+                func(phone_number, test_profiles[run["id"]])  # Call function immediately
                 run_ids.remove(str(run["id"]))
             
             if not call_func:

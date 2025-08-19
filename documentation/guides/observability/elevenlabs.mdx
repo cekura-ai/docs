@@ -49,6 +49,152 @@ When using Elevenlabs, here's what the request body will look like when creating
   "agent": <agent_id_in_cekura>,
   "transcript_type": "elevenlabs",
   "transcript_json": elevenlabs_response["transcript"],
-  "call_id": elevenlabs_response["conversation_id"]
+  "call_id": elevenlabs_response["conversation_id"],
+  "voice_recording": <binary_audio_file>
 }
+```
+
+<Note>
+You should first download the audio data from the ElevenLabs API using the conversation ID, then pass this binary audio data to the Cekura Observe API as shown in the code examples below.
+</Note>
+
+## Downloading Call Audio from ElevenLabs
+
+You can download call audio recordings directly from ElevenLabs using their API. Here's a Python snippet that demonstrates how to retrieve call audio using the conversation ID and your ElevenLabs API key:
+
+```python
+import requests
+from typing import Optional, Union, Dict, Any, List, bytes
+
+# configuration variables
+ELEVENLABS_API_KEY = "your_elevenlabs_api_key"
+
+ELEVENLABS_API_BASE_URL = "https://api.elevenlabs.io/v1"
+
+def download_elevenlabs_call_audio(conversation_id: str, output_file: Optional[str] = None) -> Union[bytes, bool, None]:
+    """
+    Download call audio recording from ElevenLabs API.
+    
+    Args:
+        conversation_id (str): The ElevenLabs conversation ID
+        output_file (str, optional): Path to save the audio file. If None, returns the audio content
+                                     without saving to file.
+    
+    Returns:
+        Union[bytes, bool, None]: If output_file is None, returns the audio content as bytes.
+                                 If output_file is provided, returns True if successful.
+                                 Returns None if the request fails.
+    """
+    # API endpoint for retrieving conversation audio
+    url = f"{ELEVENLABS_API_BASE_URL}/convai/conversations/{conversation_id}/audio"
+    
+    # Set up headers with API key
+    headers = {
+        "xi-api-key": ELEVENLABS_API_KEY,
+    }
+    
+    # Make the request to ElevenLabs API
+    response = requests.get(url, headers=headers)
+    
+    # Check if the request was successful
+    if response.status_code == 200:
+        # If output file is provided, save the file
+        if output_file:
+            with open(output_file, 'wb') as f:
+                f.write(response.content)
+            return True
+        
+        # Otherwise return the audio content
+        return response.content
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
+        return None
+
+# Example usage:
+# conversation_id = "your_conversation_id"
+# 
+# # Download and save to a file
+# download_elevenlabs_call_audio(conversation_id, "call_recording.mp3")
+# 
+# # Or just get the audio content without saving
+# audio_content = download_elevenlabs_call_audio(conversation_id)
+```
+
+## Sending Call Data to Cekura's Observability API
+
+After downloading the audio from ElevenLabs, you can send it along with the transcript data to Cekura's observability API. Here's how to do it:
+
+```python
+import requests
+import json
+from typing import Optional, Dict, Any, List, Union
+
+# configuration variables
+ELEVENLABS_API_KEY = "your_elevenlabs_api_key"
+CEKURA_API_KEY = "your_cekura_api_key"
+CEKURA_AGENT_ID = "your_cekura_agent_id"
+
+
+CEKURA_API_BASE_URL = "https://api.cekura.ai"
+ELEVENLABS_API_BASE_URL = "https://api.elevenlabs.io/v1"
+
+def send_to_cekura_observe(conversation_id: str, transcript_data: List[Dict[str, Any]], 
+                           audio_content: bytes) -> Optional[Dict[str, Any]]:
+    """
+    Send ElevenLabs call data to Cekura's observability API.
+    
+    Args:
+        conversation_id (str): The ElevenLabs conversation ID
+        transcript_data (List[Dict[str, Any]]): The transcript data from ElevenLabs
+        audio_content (bytes): The audio content downloaded from ElevenLabs
+        
+    Returns:
+        Optional[Dict[str, Any]]: The response from the Cekura API or None if request failed
+    """
+    # Cekura observability API endpoint
+    url = f"{CEKURA_API_BASE_URL}/observability/v1/observe/"
+    
+    # Set up headers with Cekura API key
+    headers = {
+        "X-CEKURA-API-KEY": CEKURA_API_KEY
+    }
+    
+    # Prepare the data payload
+    data = {
+        "agent": CEKURA_AGENT_ID,
+        "call_id": conversation_id,
+        "transcript_type": "elevenlabs",
+        "transcript_json": json.dumps(transcript_data)
+    }
+    
+    # Prepare the files payload with the audio content
+    files = {
+        "voice_recording": (f"elevenlabs_recording_{conversation_id}.mp3", audio_content, "audio/mpeg")
+    }
+    
+    # Make the request to Cekura API
+    response = requests.post(url, headers=headers, data=data, files=files)
+    
+    # Check if the request was successful
+    if response.status_code == 201:
+        return response.json()
+    else:
+        print(f"Error: {response.status_code}")
+        print(response.text)
+        return None
+
+# Example usage:
+# conversation_id = "your_conversation_id"
+# 
+# # First download the audio from ElevenLabs
+# audio_content = download_elevenlabs_call_audio(conversation_id)
+# 
+# # Get the transcript data from ElevenLabs (this would come from your webhook or API call)
+# transcript_data = [...]  # Your ElevenLabs transcript data
+
+# # Send everything to Cekura
+# if audio_content:
+#     result = send_to_cekura_observe(conversation_id, transcript_data, audio_content)
+#     print(f"Call log created with ID: {result['id']}")
 ```

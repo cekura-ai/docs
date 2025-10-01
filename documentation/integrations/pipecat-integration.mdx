@@ -1,0 +1,126 @@
+---
+title: 'Pipecat'
+description: 'This guide shows how to run evaluator scenarios that connect to a Pipecat agent over WebRTC.'
+---
+
+## Overview
+
+Use this flow to test your agent by joining a Pipecat session via WebRTC for each evaluator run. Each item you submit will create a run that connects using your provided Pipecat session URL and configuration.
+
+<Note>
+  Each array element you send creates a separate run. To run the same scenario multiple times in parallel, repeat that scenario object multiple times in the payload.
+</Note>
+
+## Prerequisites
+- A Cekura account
+- One or more scenarios created for your agent
+- Pipecat agent endpoint and any required authentication tokens for each run you intend to start
+
+## API Endpoint
+
+- **Method**: POST
+- **URL**: `https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_pipecat/`
+- **Headers**:
+  - `X-CEKURA-API-KEY`: your API key
+  - `Content-Type`: `application/json`
+
+### Request Body
+
+- **scenarios**: Array of objects. Each object fields:
+  - **scenario** (number, required): Scenario ID
+  - **pipecat_url** (string, required): Your Pipecat agent URL
+  - **access_token** (string, optional): Authentication token if required
+
+### Example: Minimal Single Run (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_pipecat/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [
+      {
+        "scenario": 30,
+        "pipecat_url": "https://<PIPECAT_URL>",
+        "access_token": "<PIPECAT_TOKEN>"
+      }
+    ]
+  }'
+```
+
+### Example: Multiple Runs (JSON)
+
+```json
+{
+  "scenarios": [
+    {
+      "scenario": 30,
+      "pipecat_url": "https://<PIPECAT_URL>",
+      "access_token": "<PIPECAT_TOKEN_1>"
+    },
+    {
+      "scenario": 31,
+      "pipecat_url": "https://<PIPECAT_URL>",
+      "access_token": "<PIPECAT_TOKEN_2>"
+    }
+  ]
+}
+```
+
+### Example: Python
+
+```python
+import requests
+
+API_KEY = "<YOUR_API_KEY>"
+BASE_URL = "https://api.cekura.ai/test_framework"
+
+headers = {
+    "X-CEKURA-API-KEY": API_KEY,
+    "Content-Type": "application/json",
+}
+
+payload = {
+    "scenarios": [
+        {
+            "scenario": 30,
+            "pipecat_url": "https://<PIPECAT_URL>",
+            "access_token": "<PIPECAT_TOKEN_1>",
+        },
+        {
+            "scenario": 31,
+            "pipecat_url": "https://<PIPECAT_URL>",
+            "access_token": "<PIPECAT_TOKEN_2>",
+        },
+    ]
+}
+
+resp = requests.post(
+    f"{BASE_URL}/v1/scenarios-external/run_scenarios_pipecat/",
+    headers=headers,
+    json=payload,
+)
+result = resp.json()
+print(result)
+```
+
+## Expected Behavior
+- A result is created and a run is queued for each item in `scenarios`
+- Each run connects to the provided Pipecat agent URL using the given access token
+- You can poll run statuses using the Bulk Runs API:
+
+<Card title="API Reference" icon="link">
+Get Runs with IDs: [API Doc](/api-reference/test_framework/get-test_frameworkv1runs-externalbulk)
+</Card>
+
+## Troubleshooting
+- **401/403 errors**: Check your `X-CEKURA-API-KEY`
+- **Connection failures**: Verify `pipecat_url` and `access_token`
+- **No runs created**: Ensure the `scenarios` array is not empty and scenario IDs are valid
+
+## Next Steps
+- Learn about [custom metrics](/documentation/key-concepts/metrics/custom-metrics)
+- Explore [predefined metrics](/documentation/key-concepts/metrics/pre-defined-metrics)
+- Set up [instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)
+- Perform [load testing](/documentation/guides/testing-agents/load-testing)

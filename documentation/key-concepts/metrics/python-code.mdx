@@ -82,6 +82,80 @@ if customer_satisfaction and response_time < 60:
     _explanation = "Customer was satisfied and response time was fast"
 ```
 
+
+### Example for Calling New Binary And Advanced Metrics
+
+To call new Binary and Advanced metrics from your Python code, you can use the `evaluate_advance_metric` function. This function requires your API key, a description or prompt for the metric, and the metric name.
+
+#### Example For Calling Basic Metrics
+
+```python
+key = "<your_cekura_api_key"
+
+def get_not_early_end_call_description():
+    return f"""You are an AI quality assurance analyst tasked with evaluating customer service call transcripts. Your primary objective is to determine if a Main Agent terminated a call prematurely without valid reason. This analysis is crucial for maintaining high standards in customer service interactions."""
+
+call_end_reason = data["call_end_reason"]
+transcript_json = data["transcript_json"]
+
+if "main" not in call_end_reason.lower():
+    _score = 5
+    _explanation = "The call was ended by the Testing Agent or due to error."
+
+description = get_not_early_end_call_description()
+
+response = evaluate_advance_metric(data, key, description, "binary_workflow_adherence")
+_result = response.get("result")
+_explanation = response.get("explanation")
+```
+
+#### Example For Calling Advanced Metrics
+
+```python
+
+key = "<your_cekura_api_key"
+
+def get_not_early_end_call_prompt(transcript, call_end_reason):
+    return f"""You are an AI quality assurance analyst tasked with evaluating customer service call transcripts. Your primary objective is to determine if a Main Agent terminated a call prematurely without valid reason. This analysis is crucial for maintaining high standards in customer service interactions.
+
+Please review the following call transcript:
+
+<call_transcript>
+{transcript}
+</call_transcript>
+
+Now, consider the reason provided for why the call ended:
+
+<call_end_reason>
+{call_end_reason}
+</call_end_reason>
+
+Your task is to analyze the transcript and call end reason to determine if the Main Agent terminated the call early without justification. 
+"""
+
+if "transcript_json" not in data or not data["transcript_json"]:
+    _score = None
+    _explanation = "No transcript available"
+
+if "call_end_reason" not in data or not data["call_end_reason"]:
+    _score = None
+    _explanation = "No call end reason available"
+
+
+call_end_reason = data["call_end_reason"]
+transcript_json = data["transcript_json"]
+
+if "main" not in call_end_reason.lower():
+    _score = 5
+    _explanation = "The call was ended by the Testing Agent or due to error."
+
+prompt = get_not_early_end_call_prompt(data["transcript"], data["call_end_reason"])
+
+response = evaluate_advance_metric(data, key, prompt, "binary_workflow_adherence")
+_result = response.get("result")
+_explanation = response.get("explanation")
+```
+
 ### Advanced Example
 
 Here's a more complex example that analyzes sentiment and response time:

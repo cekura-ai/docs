@@ -1,0 +1,144 @@
+---
+title: 'LiveKit (Automated)'
+description: 'Test agents with automated LiveKit room creation and token generation'
+---
+
+## Overview
+
+Use this flow to test your agent with LiveKit without manually managing rooms or tokens. Cekura automatically creates rooms and generates access tokens for each test run.
+
+<Tabs>
+<Tab title="No-code">
+
+Configure LiveKit credentials once, then run tests without manually creating rooms or tokens.
+
+<Steps>
+<Step title="Configure LiveKit credentials">
+Navigate to agent settings and add LiveKit as provider:
+
+<img src="/images/livekit-v2-config.png" alt="LiveKit Configuration" />
+
+**Required:**
+- **Provider**: LiveKit
+- **LiveKit API Key**: Your API key
+- **LiveKit API Secret**: Your API secret
+- **LiveKit URL**: Server URL (e.g., `wss://your-server.livekit.cloud`)
+
+**Optional - Room Config (JSON):**
+```json
+{
+  "empty_timeout": 300,
+  "max_participants": 10,
+  "departure_timeout": 60
+}
+```
+</Step>
+
+<Step title="Run scenarios">
+**Endpoint:** `POST https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit_v2/`
+
+**cURL:**
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit_v2/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{"scenarios": [{"scenario": 30}]}'
+```
+
+**Python:**
+```python
+import requests
+
+resp = requests.post(
+    "https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit_v2/",
+    headers={"X-CEKURA-API-KEY": "<YOUR_API_KEY>", "Content-Type": "application/json"},
+    json={"scenarios": [{"scenario": 30}]}
+)
+print(resp.json())
+```
+
+**What happens:**
+- Creates unique LiveKit room per scenario
+- Generates access tokens automatically
+- Executes tests and auto-cleans up rooms
+</Step>
+
+<Step title="Monitor results">
+Poll using [Bulk Runs API](/api-reference/test_framework/get-test_frameworkv1runs-externalbulk).
+
+**Response:**
+```json
+{
+  "id": 167,
+  "status": "pending",
+  "runs": [{"id": 274, "scenario": 30, "status": "pending"}]
+}
+```
+</Step>
+</Steps>
+
+</Tab>
+
+<Tab title="With code">
+
+Create LiveKit rooms and tokens manually, then run tests.
+
+<Steps>
+<Step title="Create room and token">
+Use your LiveKit server to create room and generate token with permissions:
+- `room_join`: true
+- `can_publish`: true
+- `can_subscribe`: true
+</Step>
+
+<Step title="Run scenarios">
+**Endpoint:** `POST https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit/`
+
+**cURL:**
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [{
+      "scenario": 30,
+      "livekit_room_url": "wss://<LK_ROOM_URL>",
+      "access_token": "<LK_TOKEN>"
+    }]
+  }'
+```
+
+**Python:**
+```python
+import requests
+
+resp = requests.post(
+    "https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit/",
+    headers={"X-CEKURA-API-KEY": "<YOUR_API_KEY>", "Content-Type": "application/json"},
+    json={
+        "scenarios": [{
+            "scenario": 30,
+            "livekit_room_url": "wss://<LK_ROOM_URL>",
+            "access_token": "<LK_TOKEN>"
+        }]
+    }
+)
+print(resp.json())
+```
+</Step>
+
+<Step title="Monitor results">
+Poll using [Bulk Runs API](/api-reference/test_framework/get-test_frameworkv1runs-externalbulk).
+</Step>
+</Steps>
+
+</Tab>
+</Tabs>
+
+## Next Steps
+
+- [Custom metrics](/documentation/key-concepts/metrics/custom-metrics)
+- [Instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)
+- [Load testing](/documentation/guides/testing-agents/load-testing)

@@ -1,11 +1,19 @@
 ---
 title: 'Custom Integration'
-description: 'Learn how to use your own backend system for simulation testing with Cekura by integrating a custom transcript provider.'
+description: 'Learn how to send call transcripts from your own backend system to Cekura using webhooks for simulation testing and observability.'
 ---
 
 ## Overview
 
-The custom transcript provider feature allows you to use your own backend system or third-party service for simulation testing while maintaining full control over your conversation data.
+The custom integration feature allows you to send call transcripts from your own backend system or third-party service to Cekura via webhooks. This provides flexibility to integrate any voice platform while maintaining full control over your conversation data.
+
+## How It Works
+
+1. Configure your agent in Cekura and select "Custom" as the provider
+2. Cekura provides you with a webhook URL
+3. After each call ends, send the transcript to the webhook URL
+4. Cekura listens for transcripts for 5 minutes after the call starts
+5. View evaluation results in the Cekura dashboard
 
 ## Setup
 
@@ -13,115 +21,178 @@ The custom transcript provider feature allows you to use your own backend system
 
 1. Create or edit an agent in the Cekura dashboard
 2. Set the transcript provider to "Custom"
-3. Configure your custom provider credentials:
-   - API endpoint (where Cekura will fetch calls)
-   - API key value for authentication
+3. Copy the webhook URL provided by Cekura
+4. Note your API key for authentication
 
-### API Endpoint Requirements
+### Webhook Implementation Requirements
 
-Your API endpoint should:
+Your system should send call transcripts to the Cekura webhook with the following specifications:
 
-1. Accept GET requests
-2. Return a list of calls in the expected format (see below)
-3. Support authentication via the `Authorization` header
+**HTTP Method:** `POST`
 
-## Call Format
+**Headers:**
+```
+X-CEKURA-API-KEY: your-api-key-here
+Content-Type: application/json
+```
 
-Your API should return a JSON array of call objects. Each call object should include:
+**Timing:** Send the transcript within 5 minutes after the call ends. Cekura will listen for webhooks for 5 minutes from when the call starts.
+
+## Payload Format
+
+Your webhook POST request should send a JSON payload with the following structure:
+
+### Top Level Structure
+
 ```json
-[
-  {
-    "id": "unique-call-id",
-    "startedAt": "2023-04-28T08:50:23.608Z", // ISO 8601 format
-    "endedAt": "2023-04-28T08:50:43.608Z",   // ISO 8601 format
-    "customer": {
-      "number": "+16505551234",  // Must match the number used in scenarios
-      "name": "optional-name"
+{
+  "agent_id": 123,  // Required: The ID of the AI agent in Cekura
+  "calls": [...]    // Required: Array of call objects
+}
+```
+
+### Call Object Structure
+
+Each call in the `calls` array should include:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | Unique identifier for this call from your system |
+| `startedAt` | string | Yes | Call start time in ISO 8601 format |
+| `endedAt` | string | Yes | Call end time in ISO 8601 format |
+| `messages` | array | Yes | List of transcript messages (see below) |
+| `customer` | object | No | Customer information with `number` and `name` fields |
+| `endedReason` | string | No | Reason call ended (e.g., "assistant-ended-call", "customer-ended-call") |
+
+### Message Object Structure
+
+Each message in the `messages` array should include:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `role` | string | Yes | Message role: "bot", "user", "system", "function_call", or "function_call_result" |
+| `content` | string | Yes | The message content or function description |
+| `start_time` | number | Yes | Start time in milliseconds from epoch |
+| `end_time` | number | Yes | End time in milliseconds from epoch |
+| `data` | object | No | Additional data for function calls (see below) |
+
+## Complete Example
+
+Here's a complete example payload with two calls:
+
+```json
+{
+  "agent_id": 2,
+  "calls": [
+    {
+      "id": "0199e72d-795e-7ffe-b9b9-d3b08a3a11ae",
+      "startedAt": "2025-10-15T09:22:21.787Z",
+      "endedAt": "2025-10-15T09:24:30.229Z",
+      "messages": [
+        {
+          "role": "bot",
+          "content": "Hi there. This is Alex from Tech Solutions customer support. How can I help you today?",
+          "start_time": 1760520142852,
+          "end_time": 1760520147842
+        },
+        {
+          "role": "user",
+          "content": "Yeah. I have a question about a recent recurring charge on my account.",
+          "start_time": 1760520149392,
+          "end_time": 1760520153012
+        },
+        {
+          "role": "bot",
+          "content": "Got it. Let me help you figure that out. Could you tell me the email address linked to your account so I can look this up for you?",
+          "start_time": 1760520154442,
+          "end_time": 1760520160522
+        },
+        {
+          "role": "user",
+          "content": "Okay. It's john dot doe at email dot com",
+          "start_time": 1760520157372,
+          "end_time": 1760520165132
+        }
+      ],
+      "customer": {
+        "number": "+18646190758",
+        "name": null
+      },
+      "endedReason": "customer-ended-call"
     },
-    "messages": [
-      {
-        "role": "system",        // System message (optional)
-        "content": "System instructions",
-        "start_time": 0.0,       // Seconds from call start
-        "end_time": 0.0
-      },
-      {
-        "role": "bot",           // Agent/bot message
-        "content": "Hello, how can I help you today?",
-        "start_time": 1.5,       // Seconds from call start
-        "end_time": 3.2
-      },
-      {
-        "role": "user",          // User/customer message
-        "content": "I have a question about my account.",
-        "start_time": 4.1,
-        "end_time": 6.8
-      },
-      // Function calls (optional)
-      {
-        "role": "function_call",
-        "content": "Function description",
-        "start_time": 7.0,
-        "end_time": 7.1,
-        "data": {
-          "id": "function_name",
-          "name": "function_name",
-          "arguments": "arg1, arg2, arg3"
+    {
+      "id": "0199e72d-791d-7eee-b5d9-b82843919e42",
+      "startedAt": "2025-10-15T09:22:21.727Z",
+      "endedAt": "2025-10-15T09:23:48.100Z",
+      "messages": [
+        {
+          "role": "bot",
+          "content": "Hi there. This is Alex from Tech Solutions customer support. How can I help you today?",
+          "start_time": 1760520142868,
+          "end_time": 1760520147998
+        },
+        {
+          "role": "user",
+          "content": "Yeah. The Taskmaster Pro app keeps crashing.",
+          "start_time": 1760520149538,
+          "end_time": 1760520152118
         }
+      ],
+      "customer": {
+        "number": "+18646190758",
+        "name": null
       },
-      // Function results (optional)
-      {
-        "role": "function_call_result",
-        "start_time": 7.1,
-        "end_time": 7.2,
-        "data": {
-          "id": "function_name",
-          "name": "function_name",
-          "result": "Function returned data"
-        }
-      }
-    ]
-  },
-  // ... more call objects can be included in the array
-]
+      "endedReason": "customer-ended-call"
+    }
+  ]
+}
 ```
 
 ## Important Considerations
 
-For successful integration, ensure:
+For successful webhook integration, ensure:
 
-1. The phone number in your API response matches the scenario's inbound number
-2. Call timestamps are in ISO 8601 format
-3. Your server time is accurate and synchronized
-4. Message timing is relative to the start of the call (in seconds)
-
-## Function Calls and Advanced Features
-
-To include tool usage in your evaluations, add function calls and results:
-
-- Use `role: "function_call"` for tool invocations
-- Use `role: "function_call_result"` for tool responses
-- Include a `data` object with function details
-
-## Testing Your Integration
-
-To verify your custom transcript provider is working correctly:
-
-1. Set up your API endpoint and ensure it's accessible
-2. Create an agent with the custom provider configured
-3. Create a scenario with an inbound phone number
-4. Run the scenario
-5. Check the results in the Cekura dashboard
+1. **Timing**: Send the webhook within 5 minutes after the call ends
+2. **Authentication**: Include the `X-CEKURA-API-KEY` header with your API key
+3. **Phone Numbers**: The customer phone number should match the scenario's inbound number for testing
+4. **Timestamps**: Use ISO 8601 format for `startedAt` and `endedAt`
+5. **Message Timing**: Use milliseconds from epoch for message `start_time` and `end_time`
+6. **Agent ID**: Use the correct agent ID from your Cekura dashboard
+7. **Unique Call IDs**: Each call should have a unique identifier
 
 ## Troubleshooting
 
-If your integration isn't working as expected:
+If your webhook integration isn't working as expected:
 
-1. **No calls appear in results**: Verify your API endpoint is returning data and check the response format
-2. **Authentication issues**: Confirm your API key and header configuration
-3. **Missing calls**: Ensure your API returns calls that match the scenario's requirements
+### No calls appear in Cekura
+
+- Verify the webhook URL is correct
+- Check that the `X-CEKURA-API-KEY` header is included and correct
+- Ensure the payload format matches the specification
+- Confirm the `agent_id` is correct
+- Verify the webhook was sent within 5 minutes after the call ended
+
+### Authentication issues
+
+- Double-check your API key is correct
+- Ensure the header name is exactly `X-CEKURA-API-KEY` (case-sensitive)
+- Verify the API key has proper permissions
+
+### Calls not matching scenarios
+
+- Confirm the customer phone number in the payload matches the scenario's inbound number
+- Check that the call ID is unique
+- Verify timestamps are in ISO 8601 format
+
+### Invalid payload errors
+
+- Validate your JSON payload structure
+- Ensure all required fields are present (`id`, `startedAt`, `endedAt`, `messages`)
+- Check that message timestamps are in milliseconds from epoch
+- Verify the `agent_id` is an integer, not a string
 
 ## Next Steps
+
 - Learn about [custom metrics](/documentation/key-concepts/metrics/custom-metrics)
 - Explore [predefined metrics](/documentation/key-concepts/metrics/pre-defined-metrics)
-- Set up [instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric) 
+- Set up [instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)

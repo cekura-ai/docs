@@ -186,10 +186,10 @@ def send_to_cekura_observe(conversation_id: str, transcript_data: List[Dict[str,
 
 # Example usage:
 # conversation_id = "your_conversation_id"
-# 
+#
 # # First download the audio from ElevenLabs
 # audio_content = download_elevenlabs_call_audio(conversation_id)
-# 
+#
 # # Get the transcript data from ElevenLabs (this would come from your webhook or API call)
 # transcript_data = [...]  # Your ElevenLabs transcript data
 
@@ -198,3 +198,114 @@ def send_to_cekura_observe(conversation_id: str, transcript_data: List[Dict[str,
 #     result = send_to_cekura_observe(conversation_id, transcript_data, audio_content)
 #     print(f"Call log created with ID: {result['id']}")
 ```
+
+## Extracting Agent Description from Workflows
+
+If your ElevenLabs agent uses workflows, you can extract the complete agent description including system prompts, workflow nodes, and transfer conditions. This is useful for understanding your agent's structure when setting up observability and monitoring.
+
+### Usage
+
+Run the script with your agent ID and ElevenLabs API key:
+
+```bash
+python script.py <AGENT_ID> <11LABS_API_KEY>
+```
+
+### Script
+
+```python
+# python script.py <AGENT_ID> <11LABS_API_KEY>
+
+import requests
+import json
+import argparse
+
+def get_agent_description(agent_id: str, api_key: str) -> list | None:
+    api_url = f"https://api.elevenlabs.io/v1/convai/agents/{agent_id}"
+    headers = {
+        "Content-Type": "application/json",
+        "xi-api-key": api_key
+    }
+
+    try:
+        print(f"Fetching data for agent ID: {agent_id}...")
+        response = requests.get(api_url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        print("Successfully fetched data.")
+    except requests.exceptions.RequestException as e:
+        print(f"Error: Failed to fetch data from API. {e}")
+        return None
+
+    agent_description = []
+
+    try:
+        system_prompt = data['conversation_config']['agent']['prompt']['prompt']
+        agent_description.append({
+            "node name": "system",
+            "node prompt": system_prompt
+        })
+    except KeyError:
+        print("Warning: Could not find the main system prompt.")
+        agent_description.append({
+            "node name": "system",
+            "node prompt": "Prompt not found in API response."
+        })
+
+    workflow = data.get('workflow', {})
+    if not workflow:
+        print("No workflow found for this agent.")
+        return agent_description
+
+    nodes = workflow.get('nodes', {})
+    edges = workflow.get('edges', {})
+
+    for node_id, node_data in nodes.items():
+        if node_data.get('type') == 'start':
+            continue
+
+        node_name = node_data.get('label', 'Unnamed Node')
+        node_prompt = node_data.get('additional_prompt', '')
+        transfer_conditions = []
+
+        if edges:
+            for edge_data in edges.values():
+                if edge_data.get('target') == node_id:
+                    fwd_cond = edge_data.get('forward_condition')
+                    if fwd_cond and fwd_cond.get('type') != 'unconditional':
+                        condition_text = fwd_cond.get('condition') or fwd_cond.get('label')
+                        if condition_text:
+                            transfer_conditions.append(condition_text)
+
+                    bwd_cond = edge_data.get('backward_condition')
+                    if bwd_cond:
+                        condition_text = bwd_cond.get('condition') or bwd_cond.get('label')
+                        if condition_text:
+                            transfer_conditions.append(condition_text)
+
+        agent_description.append({
+            "node name": node_name,
+            "node prompt": node_prompt,
+            "transfer conditions": transfer_conditions
+        })
+
+    return agent_description
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Fetch and format agent data from the Eleven Labs API.")
+    parser.add_argument("agent_id", type=str, help="The ID of the Eleven Labs agent to query.")
+    parser.add_argument("api_key", type=str, help="Your Eleven Labs API key.")
+
+    args = parser.parse_args()
+
+    description = get_agent_description(args.agent_id, args.api_key)
+
+    if description:
+        print("\n--- Generated Agent Description ---")
+        print(json.dumps(description, indent=2))
+        print("---------------------------------\n")
+```
+
+<Note>
+This script retrieves the agent's configuration from ElevenLabs, including the system prompt and all workflow nodes with their prompts and transfer conditions. The output is formatted as JSON and can be used to understand your agent's conversation flow when analyzing call logs in Cekura's observability suite.
+</Note>

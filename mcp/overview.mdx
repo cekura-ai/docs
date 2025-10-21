@@ -1,0 +1,385 @@
+---
+title: "Model Context Protocol (MCP)"
+description: "Connect your assistant to Cekura through MCP servers for enhanced capabilities"
+---
+
+<Note>
+Cekura provides an MCP server that automatically exposes all API endpoints, allowing AI assistants like Claude Desktop, Cursor, and VS Code to interact with your agents, metrics, and test results.
+</Note>
+
+## Prerequisites
+
+Before setting up MCP, ensure you have:
+
+1. Access to [Cekura Dashboard](https://dashboard.cekura.ai)
+2. A valid Cekura API key
+3. An MCP server URL from a compatible provider
+
+## Setup
+
+### 1. Get Your Cekura API Key
+
+<Steps>
+  <Step title="Navigate to API Settings">
+    Log in to your Cekura dashboard and go to **Settings** → **API Keys**
+  </Step>
+
+  <Step title="Create API Key">
+    Click **Create New Key** and copy the generated API key
+  </Step>
+
+  <Step title="Store Securely">
+    Save your API key in a secure location. You'll need it for MCP configuration.
+  </Step>
+</Steps>
+
+### 2. Configure MCP Server
+
+Add the Cekura MCP server to your AI assistant:
+
+<Tabs>
+  <Tab title="Claude Desktop">
+    1. Open Claude Desktop
+    2. Go to **Settings** → **Developer** → **Edit Config**
+    3. Add the following configuration:
+
+    ```json
+    {
+      "mcpServers": {
+        "cekura": {
+          "url": "https://docs.cekura.ai/mcp",
+          "headers": {
+            "X-CEKURA-API-KEY": "YOUR_API_KEY_HERE"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Cursor">
+    1. Open Cursor
+    2. Press `Cmd/Ctrl + Shift + P` and search for **"MCP: Edit Config"**
+    3. Add the following configuration:
+
+    ```json
+    {
+      "mcpServers": {
+        "cekura": {
+          "url": "https://docs.cekura.ai/mcp",
+          "headers": {
+            "X-CEKURA-API-KEY": "YOUR_API_KEY_HERE"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="VS Code">
+    1. Create or edit `.vscode/mcp.json` in your project
+    2. Add the following configuration:
+
+    ```json
+    {
+      "mcpServers": {
+        "cekura": {
+          "url": "https://docs.cekura.ai/mcp",
+          "headers": {
+            "X-CEKURA-API-KEY": "YOUR_API_KEY_HERE"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### 3. Verify Connection
+
+Restart your AI assistant and verify the connection:
+
+```plaintext
+Ask your AI: "List my Cekura agents"
+```
+
+If configured correctly, your assistant will be able to interact with Cekura's API.
+
+## How MCP Works
+
+When you add an MCP server to your AI assistant, here's what happens:
+
+<Steps>
+  <Step title="Multiple Sessions Created">
+    Cekura creates a unique MCP session for each conversation. The MCP tool itself is not meant to be invoked by the model directly.
+  </Step>
+
+  <Step title="Tools Become Available">
+    All Cekura API endpoints become available as tools that your AI assistant can use automatically when needed.
+  </Step>
+
+  <Step title="Model Selects Tools">
+    Based on your conversation, the AI assistant determines which Cekura tools to use (e.g., list agents, create metrics, get test results).
+  </Step>
+
+  <Step title="Authentication Handled">
+    Your API key is automatically included in each request via the `X-CEKURA-API-KEY` header.
+  </Step>
+</Steps>
+
+<Note>
+The MCP server URL should be treated as a credential. Keep it secure and do not share it publicly.
+</Note>
+
+<Warning>
+Be mindful of context window limits. Large responses from Cekura APIs (like detailed transcripts) may consume significant context space.
+</Warning>
+
+## Request Headers
+
+Cekura's MCP server uses the following headers for authentication and identification:
+
+| Header | Value | Description |
+|--------|-------|-------------|
+| `X-CEKURA-API-KEY` | Your API key | Required for authentication |
+| `User-Agent` | `MCP-Client` | Identifies requests from MCP |
+| `Content-Type` | `application/json` | Request payload format |
+
+<Note>
+All API requests through MCP require a valid API key in the `X-CEKURA-API-KEY` header.
+</Note>
+
+## Tool Configuration
+
+Each Cekura API endpoint is exposed as an MCP tool with the following structure:
+
+### Required Fields
+
+- **name**: The tool identifier (e.g., `list-agents`, `create-metric`)
+- **description**: What the tool does
+- **inputSchema**: JSON schema defining required parameters
+
+### Optional Fields
+
+- **examples**: Example usage patterns
+- **deprecated**: Whether the endpoint is deprecated
+
+### Example Configuration
+
+Cekura automatically configures all endpoints. Here's what a typical tool looks like:
+
+```json
+{
+  "name": "list-agents",
+  "description": "List all AI voice agents in your organization",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "page": {
+        "type": "integer",
+        "description": "Page number for pagination"
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Number of results per page"
+      }
+    }
+  }
+}
+```
+
+## Example Usage
+
+Here are common workflows using MCP with Cekura:
+
+### Listing Agents
+
+```plaintext
+User: "Show me all my Cekura agents"
+
+AI: [Uses list-agents tool]
+"You have 3 agents:
+1. Customer Support Bot (active)
+2. Sales Agent (active)
+3. Test Agent (inactive)"
+```
+
+### Creating Metrics
+
+```plaintext
+User: "Create a metric to check if the agent greeted the customer"
+
+AI: [Uses create-metric tool]
+"I've created a new metric called 'Greeting Quality' that evaluates
+whether the agent properly greets customers at the start of calls."
+```
+
+### Checking Test Results
+
+```plaintext
+User: "What are my latest test results?"
+
+AI: [Uses list-results tool]
+"Your most recent test run completed 2 hours ago with:
+- 8/10 scenarios passed
+- Average score: 87%
+- 2 failures in error handling scenarios"
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="1. System Prompts with MCP References">
+    Add a system prompt mentioning available tools:
+
+    ```
+    You have access to Cekura tools that allow you to manage voice agents,
+    create test scenarios, and analyze call quality.
+    ```
+  </Accordion>
+
+  <Accordion title="2. Secure Your API Keys">
+    - Never commit API keys to version control
+    - Use environment variables for API keys
+    - Rotate keys regularly
+    - Create separate keys for different environments
+  </Accordion>
+
+  <Accordion title="3. Handle Rate Limits">
+    Cekura enforces rate limits based on your plan:
+    - Free: 1,000 requests/day
+    - Pro: 10,000 requests/day
+    - Enterprise: Custom limits
+  </Accordion>
+
+  <Accordion title="4. Monitor Usage">
+    Check your MCP usage in the Cekura dashboard:
+    - Navigate to **Settings** → **API Usage**
+    - Monitor request counts and error rates
+    - Set up alerts for unusual activity
+  </Accordion>
+
+  <Accordion title="5. Start with Read Operations">
+    Begin by using read-only operations (GET endpoints) before using
+    write operations (POST/PATCH/DELETE).
+  </Accordion>
+
+  <Accordion title="6. Test in Development First">
+    Always test MCP configuration with a development API key before
+    using production credentials.
+  </Accordion>
+</AccordionGroup>
+
+## Available Tools
+
+Cekura exposes all API endpoints as MCP tools. Here are some commonly used ones:
+
+<CardGroup cols={2}>
+  <Card title="Agent Management" icon="robot">
+    - List agents
+    - Create agent
+    - Update agent
+    - Get agent details
+  </Card>
+
+  <Card title="Metrics & Evaluation" icon="chart-line">
+    - List metrics
+    - Create metric
+    - Generate metrics
+    - List predefined metrics
+  </Card>
+
+  <Card title="Testing" icon="flask">
+    - List test results
+    - Run scenarios
+    - Get test profiles
+    - Rerun tests
+  </Card>
+
+  <Card title="Observability" icon="eye">
+    - List call logs
+    - Get call details
+    - Send call logs
+    - Evaluate metrics
+  </Card>
+</CardGroup>
+
+For a complete list of available tools, see the [API Reference](/api-reference).
+
+## Example MCP Providers
+
+### Make.com
+
+Make.com provides MCP servers for workflow automation.
+
+**Server URL Format:**
+```
+https://hook.make.com/YOUR_WEBHOOK_ID
+```
+
+### Zapier
+
+Zapier offers MCP integration through webhooks.
+
+**Server URL Format:**
+```
+https://hooks.zapier.com/hooks/catch/YOUR_HOOK_ID/
+```
+
+### Custom Servers
+
+You can also run your own MCP server. See [Building Custom MCP Servers](#) for details.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API Key Authentication Failed">
+    **Error**: `401 Unauthorized`
+
+    **Solutions**:
+    - Verify your API key is correct
+    - Check the header name is `X-CEKURA-API-KEY` (case-sensitive)
+    - Ensure the API key hasn't expired
+    - Generate a new API key from the dashboard
+  </Accordion>
+
+  <Accordion title="Tools Not Showing Up">
+    **Issue**: AI assistant doesn't see Cekura tools
+
+    **Solutions**:
+    - Restart your AI assistant after configuration
+    - Verify the MCP server URL is correct: `https://docs.cekura.ai/mcp`
+    - Check your configuration file syntax is valid JSON
+    - Look for error messages in the assistant's logs
+  </Accordion>
+
+  <Accordion title="Rate Limit Exceeded">
+    **Error**: `429 Too Many Requests`
+
+    **Solutions**:
+    - Check your current usage in the dashboard
+    - Upgrade your plan for higher limits
+    - Implement request throttling in your workflows
+    - Contact support for temporary limit increases
+  </Accordion>
+</AccordionGroup>
+
+## References
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Complete API documentation
+  </Card>
+
+  <Card title="Authentication" icon="key" href="/api-reference#authentication">
+    API key setup and management
+  </Card>
+
+  <Card title="Dashboard" icon="gauge" href="https://dashboard.cekura.ai">
+    Manage your API keys
+  </Card>
+
+  <Card title="Support" icon="life-ring" href="mailto:support@cekura.ai">
+    Get help with MCP setup
+  </Card>
+</CardGroup>

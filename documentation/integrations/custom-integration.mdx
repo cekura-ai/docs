@@ -57,12 +57,14 @@ Each call in the `calls` array should include:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | string | Yes | Unique identifier for this call from your system |
+| `id` | string | Yes | Unique identifier for this call from your system (max 255 chars) |
 | `startedAt` | string | Yes | Call start time in ISO 8601 format |
 | `endedAt` | string | Yes | Call end time in ISO 8601 format |
 | `messages` | array | Yes | List of transcript messages (see below) |
-| `customer` | object | No | Customer information with `number` and `name` fields |
-| `endedReason` | string | No | Reason call ended (e.g., "assistant-ended-call", "customer-ended-call") |
+| `to_phone_number` | string | No | Phone number that received the call (must start with + followed by digits, max 15 chars). Example: '+14155551234' |
+| `from_phone_number` | string | No | Phone number that initiated the call (must start with + followed by digits, max 15 chars). Example: '+18005551234' |
+| `metadata` | object | No | Optional metadata as key-value pairs for additional call information |
+| `endedReason` | string | No | Reason call ended (default: "unknown", e.g., "assistant-ended-call", "customer-hungup") |
 
 ### Message Object Structure
 
@@ -72,9 +74,9 @@ Each message in the `messages` array should include:
 |-------|------|----------|-------------|
 | `role` | string | Yes | Message role: "bot", "user", "system", "function_call", or "function_call_result" |
 | `content` | string | Yes | The message content or function description |
-| `start_time` | number | Yes | Start time in milliseconds from epoch |
-| `end_time` | number | Yes | End time in milliseconds from epoch |
-| `data` | object | No | Additional data for function calls (see below) |
+| `start_time` | number | No | Start time in milliseconds from epoch |
+| `end_time` | number | No | End time in milliseconds from epoch |
+| `data` | object | No | Additional data for function calls |
 
 ## Complete Example
 
@@ -88,6 +90,8 @@ Here's a complete example payload with two calls:
       "id": "0199e72d-795e-7ffe-b9b9-d3b08a3a11ae",
       "startedAt": "2025-10-15T09:22:21.787Z",
       "endedAt": "2025-10-15T09:24:30.229Z",
+      "to_phone_number": "+18646190758",
+      "from_phone_number": "+14155551234",
       "messages": [
         {
           "role": "bot",
@@ -114,16 +118,18 @@ Here's a complete example payload with two calls:
           "end_time": 1760520165132
         }
       ],
-      "customer": {
-        "number": "+18646190758",
-        "name": null
+      "metadata": {
+        "customer_name": "John Doe",
+        "call_type": "support"
       },
-      "endedReason": "customer-ended-call"
+      "endedReason": "customer-hungup"
     },
     {
       "id": "0199e72d-791d-7eee-b5d9-b82843919e42",
       "startedAt": "2025-10-15T09:22:21.727Z",
       "endedAt": "2025-10-15T09:23:48.100Z",
+      "to_phone_number": "+18646190758",
+      "from_phone_number": "+14155559999",
       "messages": [
         {
           "role": "bot",
@@ -138,11 +144,11 @@ Here's a complete example payload with two calls:
           "end_time": 1760520152118
         }
       ],
-      "customer": {
-        "number": "+18646190758",
-        "name": null
+      "metadata": {
+        "customer_name": "Jane Smith",
+        "call_type": "technical_issue"
       },
-      "endedReason": "customer-ended-call"
+      "endedReason": "assistant-ended-call"
     }
   ]
 }
@@ -154,11 +160,12 @@ For successful webhook integration, ensure:
 
 1. **Timing**: Send the webhook within 5 minutes after the call ends
 2. **Authentication**: Include the `X-CEKURA-API-KEY` header with your API key
-3. **Phone Numbers**: The customer phone number should match the scenario's inbound number for testing
+3. **Phone Numbers**: Phone numbers must start with + followed by digits (max 15 chars, e.g., '+14155551234'). The `to_phone_number` should match the scenario's inbound number for testing
 4. **Timestamps**: Use ISO 8601 format for `startedAt` and `endedAt`
-5. **Message Timing**: Use milliseconds from epoch for message `start_time` and `end_time`
+5. **Message Timing**: Use milliseconds from epoch for message `start_time` and `end_time` (optional fields)
 6. **Agent ID**: Use the correct agent ID from your Cekura dashboard
-7. **Unique Call IDs**: Each call should have a unique identifier
+7. **Unique Call IDs**: Each call should have a unique identifier (max 255 chars)
+8. **Metadata**: Use the `metadata` field to pass additional key-value pairs for call information
 
 ## Troubleshooting
 
@@ -180,16 +187,18 @@ If your webhook integration isn't working as expected:
 
 ### Calls not matching scenarios
 
-- Confirm the customer phone number in the payload matches the scenario's inbound number
-- Check that the call ID is unique
+- Confirm the `to_phone_number` in the payload matches the scenario's inbound number
+- Ensure phone numbers start with + followed by digits (max 15 chars)
+- Check that the call ID is unique and under 255 characters
 - Verify timestamps are in ISO 8601 format
 
 ### Invalid payload errors
 
 - Validate your JSON payload structure
 - Ensure all required fields are present (`id`, `startedAt`, `endedAt`, `messages`)
-- Check that message timestamps are in milliseconds from epoch
 - Verify the `agent_id` is an integer, not a string
+- Check that phone numbers follow the correct format (+ followed by digits, max 15 chars)
+- Ensure `messages` is an array with dictionaries containing role and content fields
 
 ## Next Steps
 

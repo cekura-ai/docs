@@ -1,0 +1,253 @@
+---
+title: 'Pipecat (Automated)'
+description: 'Test agents with automated Pipecat Cloud session creation'
+---
+
+## Overview
+
+Test your Pipecat Cloud agents with automated session management. Cekura handles Daily.co room creation and token generation through Pipecat Cloud automatically.
+
+<Tabs>
+<Tab title="No-code">
+
+Run tests directly from the frontend without writing code.
+
+<Steps>
+<Step title="Configure Pipecat Cloud credentials">
+Go to your agent settings and configure Pipecat Cloud integration:
+
+**Required fields:**
+- **Provider**: Pipecat
+- **Pipecat API Key**: Your Pipecat Cloud API key (e.g., `pk_xxxxx...`)
+- **Agent Name**: Your Pipecat Cloud agent name
+- **Config (JSON)**: Session configuration
+- **Room Properties (JSON)**: Daily.co room properties
+
+**Example Configuration:**
+```json
+{
+  "pipecat_agent_name": "your-agent-name",
+  "config": {},
+  "room_properties": {
+    "enable_dialout": true,
+    "enable_chat": false,
+    "start_video_off": true
+  }
+}
+```
+
+<Note>
+**Accessing Config in Your Agent:**
+The configuration JSON is passed as session parameters to Pipecat Cloud. Your agent receives these settings when the session starts, enabling you to customize behavior per test run.
+</Note>
+
+</Step>
+
+<Step title="Run tests from frontend">
+Select scenarios and run tests using the UI.
+
+Click **"Run with Pipecat"** to execute your tests. Cekura automatically:
+- Creates unique Pipecat Cloud sessions for each scenario
+- Generates Daily.co rooms and tokens via Pipecat Cloud
+- Executes tests and manages the session lifecycle
+</Step>
+
+<Step title="View results">
+Results appear in your dashboard. Track test status, metrics, and conversation details in real-time.
+</Step>
+</Steps>
+
+</Tab>
+
+<Tab title="Code">
+
+Use the API to integrate Pipecat Cloud testing into your workflow.
+
+## Prerequisites
+
+Configure Pipecat Cloud credentials in your agent settings. You can do this via the agent PATCH endpoint:
+
+```bash
+curl --location --request PATCH \
+  'https://api.cekura.ai/test_framework/v1/aiagents/<AGENT_ID>/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "transcript_provider": "pipecat",
+    "pipecat_api_key": "pk_xxxxx...",
+    "pipecat_data": {
+      "pipecat_agent_name": "your-agent-name",
+      "config": {},
+      "room_properties": {
+        "enable_dialout": true,
+        "enable_chat": false,
+        "start_video_off": true
+      }
+    },
+    "project": <PROJECT_ID>
+  }'
+```
+
+**Required fields:**
+- **transcript_provider**: Set to `"pipecat"`
+- **pipecat_api_key**: Your Pipecat Cloud API key (e.g., `pk_xxxxx...`)
+- **pipecat_data.pipecat_agent_name**: Your Pipecat Cloud agent name
+- **pipecat_data.config**: Session configuration object (can be empty `{}`)
+- **pipecat_data.room_properties**: Daily.co room properties
+
+<Note>
+**Configuration Structure:**
+The `config` object can contain custom settings for your Pipecat agent, while `room_properties` controls Daily.co room behavior like dialout support, chat, and video settings.
+</Note>
+
+## API Endpoint
+
+```
+POST https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_pipecat_v2/
+```
+
+## Authentication
+
+Include your API key in the request header:
+```
+X-CEKURA-API-KEY: <YOUR_API_KEY>
+```
+
+## Request Parameters
+
+- **name** (string, optional): Optional name for the test result
+- **frequency** (integer, optional): Number of times to run each scenario (default: 1, min: 1, max: 100)
+- **scenarios** (array, required): Array of test configurations
+
+Each scenario object contains:
+- **scenario** (number, required): Scenario ID
+- **publish_data_message** (object, optional): JSON data message to publish during the session
+
+## Examples
+
+### Single Run (cURL)
+
+```bash
+curl --location 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_pipecat_v2/' \
+  --header 'Content-Type: application/json' \
+  --header 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  --data '{
+    "name": "Pipecat E2E Test",
+    "frequency": 1,
+    "scenarios": [
+      {
+        "scenario": 30
+      }
+    ]
+  }'
+```
+
+### Multiple Runs (cURL)
+
+```bash
+curl --location 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_pipecat_v2/' \
+  --header 'Content-Type: application/json' \
+  --header 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  --data '{
+    "name": "Multi-Scenario Test",
+    "frequency": 2,
+    "scenarios": [
+      {
+        "scenario": 30
+      },
+      {
+        "scenario": 31
+      }
+    ]
+  }'
+```
+
+### Python Example
+
+```python
+import requests
+
+API_KEY = "<YOUR_API_KEY>"
+BASE_URL = "https://api.cekura.ai/test_framework"
+
+headers = {
+    "X-CEKURA-API-KEY": API_KEY,
+    "Content-Type": "application/json",
+}
+
+payload = {
+    "name": "Pipecat E2E Test",
+    "frequency": 1,
+    "scenarios": [
+        {
+            "scenario": 30,
+        },
+        {
+            "scenario": 31,
+        },
+    ]
+}
+
+resp = requests.post(
+    f"{BASE_URL}/v1/scenarios/run_scenarios_pipecat_v2/",
+    headers=headers,
+    json=payload,
+)
+result = resp.json()
+print(result)
+```
+
+## Response
+
+```json
+{
+  "id": 16870,
+  "name": "Pipecat E2E Test",
+  "agent": 5,
+  "status": "in_progress",
+  "success_rate": 0.0,
+  "run_as_text": false,
+  "is_cronjob": false,
+  "runs": [
+    {
+      "id": 34625,
+      "status": "running",
+      "scenario": 11547,
+      "scenario_name": "Customer Support Escalation",
+      "test_profile_data": {"key": "value"}
+    }
+  ],
+  "created_at": "2025-10-16T09:32:59.484534Z",
+  "updated_at": "2025-10-16T09:32:59.484942Z"
+}
+```
+
+## Monitor Results
+
+Poll for results using the [List Runs with IDs API](/api-reference/test_framework/list-runs-with-ids).
+
+</Tab>
+</Tabs>
+
+## How It Works
+
+1. **Session Creation**: Cekura uses your Pipecat Cloud credentials to create a session via the Pipecat Cloud SDK
+2. **Daily.co Integration**: Pipecat Cloud automatically provisions a Daily.co room and returns:
+   - Daily room URL
+   - Daily access token
+   - Pipecat session ID
+3. **Test Execution**: Cekura connects to the Daily.co room and runs your scenario tests
+4. **Retry Logic**: Automatic retry with exponential backoff (up to 4 attempts) for session creation failures
+
+## Troubleshooting
+
+- **401/403 errors**: Check your Cekura API key
+- **Session creation failures**: Verify your Pipecat Cloud API key and agent name are correct
+- **No runs created**: Ensure the `scenarios` array is not empty and scenario IDs are valid
+- **Configuration issues**: Check that your Pipecat Cloud agent is properly configured and running
+
+## Next Steps
+
+- [Custom metrics](/documentation/key-concepts/metrics/custom-metrics)
+- [Instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)
+- [Load testing](/documentation/guides/testing-agents/load-testing)

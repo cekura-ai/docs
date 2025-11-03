@@ -1,0 +1,368 @@
+---
+title: 'GitHub Actions CI/CD Setup'
+description: 'Learn how to create and configure GitHub Actions workflows for automated scenario testing with Cekura'
+---
+
+# GitHub Actions CI/CD Setup
+
+Learn how to create GitHub Actions workflows for automated scenario testing with Cekura. This guide teaches you how to build workflows from scratch and customize them for your needs.
+
+---
+
+## Step 1: Configure GitHub Secrets
+
+Secrets store your API credentials securely.
+
+1. Go to your GitHub repository → **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret** and add:
+
+| Secret Name | Description | Required |
+|------------|-------------|----------|
+| `API_BASE_URL` | Your Cekura API base URL | Yes |
+| `API_KEY` | Your Cekura API key | Yes |
+| `AGENT_ID` | Default agent ID | No* |
+| `SCENARIOS` | Default scenario IDs (comma-separated) | No* |
+
+*Required for automatic triggers, optional for manual runs
+
+---
+
+## Step 2: Create Workflow File
+
+### Understanding Workflows
+
+Workflows are YAML files in `.github/workflows/` directory. Each workflow defines:
+- **Triggers**: When to run (manual, PR, label, push, etc.)
+- **Jobs**: What tasks to execute
+- **Steps**: Individual commands in each job
+
+### Create Your Workflow
+
+1. Create the workflow directory:
+
+```bash
+mkdir -p .github/workflows
+```
+
+2. Create `.github/workflows/run-scenarios.yml`:
+
+```yaml
+name: Run Scenarios
+
+# Define when this workflow should run
+on:
+  # 1. Manual trigger - run from GitHub UI with custom inputs
+  workflow_dispatch:
+    inputs:
+      agent_id:
+        description: 'Agent ID'
+        required: true
+      scenarios:
+        description: 'Comma-separated scenario IDs (e.g., 123,456)'
+        required: true
+      frequency:
+        description: 'Number of times to run each scenario'
+        required: false
+        default: '1'
+      timeout:
+        description: 'Timeout in seconds'
+        required: false
+        default: '3600'
+
+  # 2. Automatic trigger on pull requests
+  pull_request:
+    branches:
+      - main  # Change to your main branch name
+    types: [opened, synchronize, reopened, labeled]
+
+jobs:
+  run-scenarios:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout your code
+    - uses: actions/checkout@v4
+
+    # Setup Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+
+    # Install dependencies
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    # Run scenarios
+    - name: Run scenarios
+      env:
+        API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        API_KEY: ${{ secrets.API_KEY }}
+        # Use manual inputs if available, otherwise use secrets
+        AGENT_ID: ${{ github.event.inputs.agent_id || secrets.AGENT_ID }}
+        SCENARIOS: ${{ github.event.inputs.scenarios || secrets.SCENARIOS }}
+        FREQUENCY: ${{ github.event.inputs.frequency || '1' }}
+        TIMEOUT: ${{ github.event.inputs.timeout || '3600' }}
+      run: |
+        curl -o run_scenarios.py https://raw.githubusercontent.com/cekura-ai/vocera-github-actions/main/run_scenarios.py
+        python run_scenarios.py
+```
+
+3. Commit and push:
+
+```bash
+git add .github/workflows/run-scenarios.yml
+git commit -m "Add scenario testing workflow"
+git push
+```
+
+---
+
+## Step 3: Configure Workflow Triggers
+
+You can customize when workflows run by modifying the `on:` section.
+
+### Option 1: Manual Trigger Only
+
+Run workflows only when you manually trigger them:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      agent_id:
+        description: 'Agent ID'
+        required: true
+      scenarios:
+        description: 'Scenario IDs (comma-separated)'
+        required: true
+```
+
+**To run**: Actions tab → Select workflow → Run workflow → Enter inputs
+
+### Option 2: Automatic on Pull Request
+
+Run automatically when PRs are created or updated:
+
+```yaml
+on:
+  pull_request:
+    branches:
+      - main          # Run on PRs to main branch
+      - develop       # Also run on PRs to develop
+    types: [opened, synchronize, reopened]
+```
+
+### Option 3: Label-Based Trigger
+
+Run when specific labels are added to PRs:
+
+```yaml
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  run-scenarios:
+    # Only run if specific label is added
+    if: github.event.label.name == 'run-tests'  # Change 'run-tests' to your label name
+    runs-on: ubuntu-latest
+    steps:
+      # ... your steps
+```
+
+**To run**: Add the label (e.g., `run-tests`) to any PR
+
+### Option 4: Combine Multiple Triggers
+
+Use all three methods in one workflow:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      agent_id:
+        description: 'Agent ID'
+        required: true
+      scenarios:
+        description: 'Scenario IDs'
+        required: true
+
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, labeled]
+```
+
+This allows manual runs, automatic PR runs, and label-based runs.
+
+---
+
+## Step 4: Customize Label Names
+
+You can use any label name you want. Here's how:
+
+### Create Custom Labels
+
+1. Go to your repository → **Issues** → **Labels**
+2. Click **New label**
+3. Enter label details:
+   - **Name**: `test-scenarios` (or any name you prefer)
+   - **Description**: "Run scenario tests"
+   - **Color**: Choose a color
+
+### Update Workflow to Use Custom Label
+
+Edit your workflow file to use your custom label:
+
+```yaml
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  run-scenarios:
+    # Change this to match your label name
+    if: github.event.label.name == 'test-scenarios'
+    runs-on: ubuntu-latest
+    steps:
+      # ... rest of your workflow
+```
+
+### Multiple Labels for Different Test Suites
+
+Create different workflows for different test types:
+
+**`.github/workflows/smoke-tests.yml`:**
+```yaml
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  smoke-tests:
+    if: github.event.label.name == 'smoke-test'
+    runs-on: ubuntu-latest
+    steps:
+      # ... steps with smoke test scenarios
+```
+
+**`.github/workflows/regression-tests.yml`:**
+```yaml
+on:
+  pull_request:
+    types: [labeled]
+
+jobs:
+  regression-tests:
+    if: github.event.label.name == 'regression-test'
+    runs-on: ubuntu-latest
+    steps:
+      # ... steps with regression test scenarios
+```
+
+---
+
+## Step 5: Advanced Configurations
+
+### Run on Different Branches
+
+```yaml
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+      - develop
+```
+
+### Run on Specific File Changes
+
+Only run when certain files change:
+
+```yaml
+on:
+  pull_request:
+    paths:
+      - 'src/**'           # Run when source code changes
+      - 'config/**'        # Run when config changes
+      - '.github/workflows/**'  # Run when workflow changes
+```
+
+### Schedule Regular Test Runs
+
+Run scenarios automatically on a schedule:
+
+```yaml
+on:
+  schedule:
+    # Run every day at 2 AM UTC
+    - cron: '0 2 * * *'
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+```
+
+### Environment-Specific Workflows
+
+Use different secrets for different environments:
+
+```yaml
+jobs:
+  run-scenarios-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run scenarios
+        env:
+          API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
+          API_KEY: ${{ secrets.STAGING_API_KEY }}
+          AGENT_ID: ${{ secrets.STAGING_AGENT_ID }}
+          SCENARIOS: ${{ secrets.STAGING_SCENARIOS }}
+        run: |
+          # ... run scenarios
+```
+
+---
+
+## Examples & Reference
+
+For complete workflow examples and ready-to-use templates, check:
+- [Cekura GitHub Actions repository](https://github.com/cekura-ai/vocera-github-actions) - Working examples and templates
+- Copy and customize workflows from this repository for your needs
+
+---
+
+## Troubleshooting
+
+### Workflow Not Running
+
+- Check workflow file is in `.github/workflows/` directory
+- Verify YAML syntax is correct
+- Ensure trigger conditions match (branch name, label name must match exactly)
+- For label triggers, workflow file must be on the base branch
+
+### Secrets Not Working
+
+- Verify secrets are added in **Settings** → **Secrets and variables** → **Actions**
+- Secret names are case-sensitive and must match exactly
+- Secrets from forked repositories are not accessible for security reasons
+
+### Scenarios Failing
+
+- Check agent ID and scenario IDs are correct
+- Verify API credentials have necessary permissions
+- Check workflow logs in Actions tab for detailed error messages
+- Increase timeout if scenarios take longer to complete
+
+### Need More Help?
+
+- Check workflow run logs in the **Actions** tab
+- Visit [Cekura GitHub Actions repository](https://github.com/cekura-ai/vocera-github-actions) for examples
+- Review workflow file for configuration issues
+
+---
+
+## Reference
+
+For more workflow examples and advanced configurations, check the [Cekura GitHub Actions repository](https://github.com/cekura-ai/vocera-github-actions).

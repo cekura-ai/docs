@@ -1,9 +1,9 @@
 ---
-title: 'Observability'
+title: "Observability"
 sidebarTitle: "VAPI Observability"
 icon: "chart-network"
-iconType: "solid"
-description: 'Monitor and analyze your VAPI-based voice agents'
+iconType: "regular"
+description: "Monitor and analyze your VAPI-based voice agents"
 ---
 
 ## Overview
@@ -11,84 +11,74 @@ description: 'Monitor and analyze your VAPI-based voice agents'
 Learn how to monitor, analyze, and optimize your VAPI-based voice agents using Cekura's observability tools. This guide will walk you through setting up and configuring your VAPI integration.
 
 <Tabs>
-<Tab title="No-code from VAPI">
+  <Tab title="No-code from VAPI">
+    Follow these steps to connect your VAPI agent with Cekura's observability suite:
 
+    <Steps>
+      <Step title="Configure Server URL in VAPI">
+        In your VAPI dashboard, navigate to your agent settings and configure the Server URL. This URL is used for all communication between your application and VAPI, including context retrieval, function calls, and end-of-call reporting.
 
-Follow these steps to connect your VAPI agent with Cekura's observability suite:
+        Set the Server URL to:
 
-<Steps>
-<Step title="Configure Server URL in VAPI">
-In your VAPI dashboard, navigate to your agent settings and configure the Server URL. This URL is used for all communication between your application and VAPI, including context retrieval, function calls, and end-of-call reporting.
+        ```
+        https://api.cekura.ai/observability/v1/vapi/observe/?agent_id=YOUR_AGENT_ID
+        ```
 
-Set the Server URL to:
-```
-https://api.cekura.ai/observability/v1/vapi/observe/?agent_id=YOUR_AGENT_ID
-```
+        ![VAPI Server URL Configuration](/images/Vapi_observability.png)
+      </Step>
+      <Step title="Get your Assistant ID">
+        Each VAPI agent has a unique Assistant ID that identifies your specific implementation. Copy your Assistant ID from the VAPI dashboard:
 
-<img src="/images/vapi-observe.png" alt="VAPI Server URL Configuration" />
-</Step>
+        ![VAPI Assistant ID](/images/vapi-assistant-id.png)
+      </Step>
+      <Step title="Add credentials to Cekura">
+        In your Cekura Agent Settings page:
 
-<Step title="Get your Assistant ID">
-Each VAPI agent has a unique Assistant ID that identifies your specific implementation. Copy your Assistant ID from the VAPI dashboard:
+        1. Add the API key from VAPI with the tag `webhook`
+        2. Copy and add your `agent ID` from VAPI
 
-<img src="/images/vapi-assistant-id.png" alt="VAPI Assistant ID" />
-</Step>
+        ![Navigate to API Keys](/images/vapi_agentsettings.png)
+      </Step>
+      <Step title="Test your integration">
+        Make a test call from VAPI (phone number based or webcall). Your calls should now appear in the Cekura observability `Calls` section.
+      </Step>
+    </Steps>
 
-<Step title="Obtain your Cekura API key">
-Navigate to the API Keys section in your [Cekura dashboard](https://dashboard.cekura.ai):
+  </Tab>
+  <Tab title="Forwarding VAPI respone">
+    If you already have an existing webhook setup and want to forward the VAPI response to Cekura's observability suite:
 
-<img src="/images/get-vocera-api-key-1.png" alt="Navigate to API Keys" />
+    <Steps>
+      <Step title="Configure forwarding endpoint">
+        Set up a forwarding mechanism to send the VAPI webhook response to Cekura's observability endpoint:
 
-Copy your private API key from the modal:
+        ```
+        POST https://api.cekura.ai/observability/v1/observe/
+        ```
+      </Step>
+      <Step title="Add authentication headers">
+        Include your Cekura API key in the request headers:
 
-<img src="/images/get-vocera-api-key-2.png" alt="Copy API Key" />
+        ```
+        X-CEKURA-API-KEY: <your_cekura_api_key>
+        Content-Type: application/json
+        ```
+      </Step>
+      <Step title="Forward the request body">
+        Forward the VAPI webhook response to Cekura with the following request body structure:
 
-Keep this key secure and never share it publicly, as it provides access to your VAPI integration.
-</Step>
+        ```json
+        {
+          "agent": <agent_id_in_cekura>,
+          "voice_recording_url": vapi_response["stereoRecordingUrl"],
+          "transcript_type": "vapi",
+          "transcript_json": vapi_response["messages"],
+          "call_id": vapi_response["id"],
+          "call_ended_reason": vapi_response["endedReason"]
+        }
+        ```
+      </Step>
+    </Steps>
 
-<Step title="Configure API key in VAPI">
-Set up the API key in VAPI so it will be included with each request to the server. This key is sent as a header `X-VAPI-SECRET` with each request for security purposes.
-</Step>
-</Steps>
-
-</Tab>
-<Tab title="Forwarding VAPI respone">
-
-If you already have an existing webhook setup and want to forward the VAPI response to Cekura's observability suite:
-
-<Steps>
-<Step title="Configure forwarding endpoint">
-Set up a forwarding mechanism to send the VAPI webhook response to Cekura's observability endpoint:
-
-```
-POST https://api.cekura.ai/observability/v1/observe/
-```
-</Step>
-
-<Step title="Add authentication headers">
-Include your Cekura API key in the request headers:
-
-```
-X-CEKURA-API-KEY: <your_cekura_api_key>
-Content-Type: application/json
-```
-</Step>
-
-<Step title="Forward the request body">
-Forward the VAPI webhook response to Cekura with the following request body structure:
-
-```json
-{
-  "agent": <agent_id_in_cekura>,
-  "voice_recording_url": vapi_response["stereoRecordingUrl"],
-  "transcript_type": "vapi",
-  "transcript_json": vapi_response["messages"],
-  "call_id": vapi_response["id"],
-  "call_ended_reason": vapi_response["endedReason"]
-}
-```
-</Step>
-</Steps>
-
-</Tab>
+  </Tab>
 </Tabs>

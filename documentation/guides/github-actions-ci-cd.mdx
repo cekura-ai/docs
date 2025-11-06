@@ -1,0 +1,277 @@
+---
+title: 'GitHub Actions Tutorial'
+sidebarTitle: "GitHub Actions Tutorial"
+icon: "github"
+iconType: "duotone"
+description: 'Learn how to set up GitHub Actions workflows to automatically test your agents with each change'
+---
+
+Automate your agent testing by integrating Cekura with GitHub Actions. This guide walks you through setting up workflows to test your agents automatically on every code change, pull request, or on a custom schedule.
+
+## Before You Get Started
+
+<Note>
+**Important**: Before setting up a workflow, ensure your agent is properly configured with scenarios in the Cekura dashboard.
+</Note>
+
+You'll need your **Agent ID** and either **Scenario IDs** or **Tags** to select which tests to run.
+
+### Finding Your Agent ID
+
+<AccordionGroup>
+  <Accordion title="Using the Dashboard">
+    1. Log in to your [Cekura dashboard](https://dashboard.cekura.ai)
+    2. Navigate to the **Agents** section
+    3. Select your agent
+    4. Copy the **Agent ID** displayed in the agent details
+  </Accordion>
+
+  <Accordion title="Using the API">
+    You can retrieve your agent ID programmatically using the Cekura API:
+
+    ```bash
+    curl --request GET \
+      --url https://api.cekura.ai/test_framework/v1/aiagents/ \
+      --header 'X-CEKURA-API-KEY: <api-key>'
+    ```
+
+    The response will include your agent ID in the `id` field.
+  </Accordion>
+</AccordionGroup>
+
+## Using Tags vs Scenario IDs
+
+You can run tests in two ways:
+
+<CardGroup cols={2}>
+  <Card title="Using Scenario IDs" icon="list-ol">
+    Run specific scenarios by their IDs. Use this when you want to test exact scenarios.
+
+    ```yaml
+    with:
+      agent_id: ${{ vars.AGENT_ID }}
+      scenario_ids: ${{ vars.SCENARIO_IDS }}
+    ```
+  </Card>
+
+  <Card title="Using Tags" icon="tag">
+    Run all scenarios with specific tags. Use this when you want to test groups of scenarios (e.g., `smoke-test`, `critical`).
+
+    ```yaml
+    with:
+      agent_id: ${{ vars.AGENT_ID }}
+      tags: ${{ vars.TAGS }}
+    ```
+  </Card>
+</CardGroup>
+
+## Step-by-Step Tutorial
+
+<Steps>
+  <Step title="Create Workflow File">
+    In your repository, create a file at `.github/workflows/test-agents.yml`:
+
+    ```yaml
+    name: Agent Tests
+
+    on:
+      push:
+        branches: [main]
+      pull_request:
+        types:
+          - opened
+    jobs:
+      test:
+        uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
+        with:
+          agent_id: ${{ vars.AGENT_ID }}
+          scenario_ids: ${{ vars.SCENARIO_IDS }}
+        secrets:
+          CEKURA_API_KEY: ${{ secrets.CEKURA_API_KEY }}
+    ```
+
+    Your workflow should look like this:
+    <img src="/images/workflow-file-created.png" alt="Create Workflow File" />
+  </Step>
+
+  <Step title="Configure Variables & Secrets">
+    Go to your repository → **Settings** → **Secrets and variables** → **Actions**
+
+    **Add Secret (API Key):**
+    1. Click **New repository secret**
+    2. Name: `CEKURA_API_KEY`
+    3. Value: Your API key from the Cekura dashboard
+
+    **Add Variables:**
+    1. Click the **Variables** tab
+    2. Click **New repository variable**
+    3. Add required variables:
+       - `AGENT_ID` - Your agent ID (required)
+    4. Add one or both of the following:
+       - `SCENARIO_IDS` - Comma-separated scenario IDs (e.g., `123,456,789`)
+       - `TAGS` - Comma-separated tags (e.g., `smoke-test,critical`)
+    5. Optionally add:
+       - `PHONE_NUMBER` - Outbound phone number for testing (e.g., `+1234567890`)
+
+    <img src="/images/github-variables-setup.png" alt="Add GitHub Variables" />
+  </Step>
+
+  <Step title="Start Test Run">
+    To test your workflow, make a change to your codebase and raise a pull request. This will trigger the workflow automatically.
+
+    <img src="/images/workflow-triggered.png" alt="Workflow Triggered" />
+  </Step>
+
+  <Step title="Monitor Workflow">
+    1. Go to your repository on GitHub
+    2. Click the **Actions** tab
+    3. You'll see your workflow running
+    4. Click on the workflow run to see detailed logs
+
+    <img src="/images/workflow-running.png" alt="Workflow Running" />
+  </Step>
+</Steps>
+
+## Advanced Usage
+
+### Different Triggers
+
+<AccordionGroup>
+  <Accordion title="Run on Push Only">
+    ```yaml
+    on:
+      push:
+        branches: [main]
+    ```
+  </Accordion>
+
+  <Accordion title="Run on Pull Request Only">
+    ```yaml
+    on:
+      pull_request:
+        branches: [main]
+    ```
+  </Accordion>
+
+  <Accordion title="Manual Trigger">
+    ```yaml
+    on:
+      workflow_dispatch:
+    ```
+
+    Then trigger from the Actions tab → Run workflow button.
+  </Accordion>
+</AccordionGroup>
+
+### Environment-Specific Testing
+
+Test different environments (staging, production) with separate secrets:
+
+```yaml
+jobs:
+  test-staging:
+    uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
+    with:
+      agent_id: ${{ vars.STAGING_AGENT_ID }}
+      tags: ${{ vars.STAGING_TAGS }}
+      api_url: 'https://staging-api.cekura.ai'
+    secrets:
+      CEKURA_API_KEY: ${{ secrets.STAGING_API_KEY }}
+
+  test-production:
+    uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
+    with:
+      agent_id: ${{ vars.PROD_AGENT_ID }}
+      tags: ${{ vars.PROD_TAGS }}
+    secrets:
+      CEKURA_API_KEY: ${{ secrets.PROD_API_KEY }}
+```
+
+### Testing with Phone Numbers
+
+When testing agents that make outbound calls, you can specify a phone number:
+
+```yaml
+jobs:
+  test:
+    uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
+    with:
+      agent_id: ${{ vars.AGENT_ID }}
+      scenario_ids: ${{ vars.SCENARIO_IDS }}
+      phone_number: ${{ vars.PHONE_NUMBER }}
+    secrets:
+      CEKURA_API_KEY: ${{ secrets.CEKURA_API_KEY }}
+```
+
+## Workflow Inputs
+
+The reusable workflow accepts these inputs:
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `agent_id` | Agent ID to test | Yes | - |
+| `scenario_ids` | Comma-separated scenario IDs (e.g., `123,456,789`) | No* | - |
+| `tags` | Comma-separated tags (e.g., `smoke-test,critical`) | No* | - |
+| `phone_number` | Outbound phone number for testing | No | - |
+| `api_url` | Cekura API URL | No | `https://api.cekura.ai` |
+| `frequency` | Run each scenario N times | No | `1` |
+| `timeout` | Timeout in seconds | No | `3600` |
+
+*Either `scenario_ids` or `tags` must be provided (or both)
+
+### Example with All Options
+
+```yaml
+jobs:
+  test:
+    uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
+    with:
+      agent_id: ${{ vars.AGENT_ID }}
+      scenario_ids: ${{ vars.SCENARIO_IDS }}
+      tags: ${{ vars.TAGS }}
+      phone_number: ${{ vars.PHONE_NUMBER }}
+      api_url: 'https://api.cekura.ai'
+      frequency: '3'      # Run each scenario 3 times
+      timeout: '7200'     # 2 hour timeout
+    secrets:
+      CEKURA_API_KEY: ${{ secrets.CEKURA_API_KEY }}
+```
+
+## Examples & Reference
+
+For complete workflow examples and ready-to-use templates, check:
+- [Cekura GitHub Actions repository](https://github.com/cekura-ai/vocera-github-actions) - Working examples and templates
+- Copy and customize workflows from this repository for your needs
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Workflow Not Found">
+    Make sure your workflow file is:
+    - Located in `.github/workflows/` directory
+    - Pushed to your repository (workflows don't run from local files)
+    - Named with `.yml` or `.yaml` extension
+  </Accordion>
+
+  <Accordion title="Secrets Not Working">
+    Common secret issues:
+    - Secret names are **case-sensitive** - must match exactly
+    - Secrets must be added in **Settings → Secrets and variables → Actions**
+    - Forked repos can't access secrets from the parent repository
+  </Accordion>
+
+  <Accordion title="Workflow Runs But Tests Fail">
+    Check these in your workflow logs:
+    - API key is valid and has correct permissions
+    - Agent ID and Scenario IDs are correct
+    - Scenario IDs format: comma-separated with no spaces (e.g., `123,456,789`)
+    - Try increasing timeout with `timeout: '7200'` parameter
+  </Accordion>
+
+  <Accordion title="Variables Not Found">
+    Make sure you're using **Variables** (not Secrets) for Agent ID and Scenario IDs:
+    - Go to **Settings → Secrets and variables → Actions → Variables tab**
+    - Variables are referenced with `vars.VARIABLE_NAME`
+    - Secrets are referenced with `secrets.SECRET_NAME`
+  </Accordion>
+</AccordionGroup>

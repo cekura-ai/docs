@@ -237,3 +237,77 @@ except KeyError as e:
     _result = "Incomplete"
     _explanation = f"Required data not found: {str(e)}"
 ```
+
+### Accessing Latency Data
+
+Access latency data to analyze voice agent response timing performance. This data is available only when the call is evaluated with a Latency metric.
+
+#### Available Latency Variables
+
+<AccordionGroup>
+  <Accordion title="Latency (in ms)" href="#latency">
+    <code>data["Latency (in ms)"]</code> - Overall average latency for the entire call in milliseconds
+  </Accordion>
+  <Accordion title="latency_data" href="#latency-data">
+    <code>data["latency_data"]</code> - Array of individual response latency measurements with detailed timing information
+  </Accordion>
+</AccordionGroup>
+
+#### Example Latency Data Structure
+
+```json
+{
+  "Latency (in ms)": 2240.0,
+  "latency_data": [
+    {
+      "latency": 1570.0,
+      "speaker": "Main Agent",
+      "start_time": 4.61
+    },
+    {
+      "latency": 2910.0,
+      "speaker": "Main Agent",
+      "start_time": 16.09
+    }
+  ]
+}
+```
+
+**Field Descriptions:**
+- `Latency (in ms)`: Overall average latency (2240.0 milliseconds in this example)
+- `latency_data`: Array containing individual response
+- `latency`: Response time in milliseconds for each interaction
+- `start_time`: When the response started in seconds from call beginning
+
+#### Example Code Using Latency Data
+
+```python
+# Access overall latency
+overall_latency = data.get("Latency (in ms)", 0)
+
+# Access detailed latency measurements
+latency_data = data.get("latency_data", [])
+
+# Check if latency data is available
+if not latency_data:
+    _result = False
+    _explanation = "No latency data available"
+else:
+    # Process individual measurements
+    high_latency_responses = []
+    for measurement in latency_data:
+        latency_ms = measurement["latency"]
+        speaker = measurement["speaker"]
+        start_time = measurement["start_time"]
+        
+        # Check if latency exceeds threshold (3 seconds)
+        if latency_ms > 3000:
+            high_latency_responses.append(f"{speaker}: {latency_ms}ms at {start_time}s")
+    
+    if high_latency_responses:
+        _result = False
+        _explanation = f"High latency detected in {len(high_latency_responses)} responses: {', '.join(high_latency_responses)}"
+    else:
+        _result = True
+        _explanation = f"All responses within acceptable range. Average: {overall_latency}ms"
+```

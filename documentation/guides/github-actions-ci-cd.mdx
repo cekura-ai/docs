@@ -8,6 +8,8 @@ description: 'Learn how to set up GitHub Actions workflows to automatically test
 
 Automate your agent testing by integrating Cekura with GitHub Actions. This guide walks you through setting up workflows to test your agents automatically on every code change, pull request, or on a custom schedule.
 
+The Cekura GitHub Action is a simple, dependency-free solution that uses standard tools available on GitHub runners (curl, bash, and python3 for JSON parsing). No installation or setup required - it works out of the box.
+
 ## Before You Get Started
 
 <Note>
@@ -48,9 +50,11 @@ You can run tests in two ways:
     Run specific scenarios by their IDs. Use this when you want to test exact scenarios.
 
     ```yaml
-    with:
-      agent_id: ${{ vars.AGENT_ID }}
-      scenario_ids: ${{ vars.SCENARIO_IDS }}
+    - uses: cekura-ai/cekura-github-actions@v1.0.0
+      with:
+        agent_id: ${{ vars.AGENT_ID }}
+        scenario_ids: ${{ vars.SCENARIO_IDS }}
+        api_key: ${{ secrets.CEKURA_API_KEY }}
     ```
   </Card>
 
@@ -58,9 +62,11 @@ You can run tests in two ways:
     Run all scenarios with specific tags. Use this when you want to test groups of scenarios (e.g., `smoke-test`, `critical`).
 
     ```yaml
-    with:
-      agent_id: ${{ vars.AGENT_ID }}
-      tags: ${{ vars.TAGS }}
+    - uses: cekura-ai/cekura-github-actions@v1.0.0
+      with:
+        agent_id: ${{ vars.AGENT_ID }}
+        tags: ${{ vars.TAGS }}
+        api_key: ${{ secrets.CEKURA_API_KEY }}
     ```
   </Card>
 </CardGroup>
@@ -75,19 +81,38 @@ You can run tests in two ways:
     name: Agent Tests
 
     on:
+      workflow_dispatch:
+        inputs:
+          agent_id:
+            description: 'The agent identifier'
+            required: false
+            type: string
+          scenario_ids:
+            description: 'Comma-separated scenario IDs (e.g., "123,456,789")'
+            required: false
+            type: string
+          api_url:
+            description: 'Custom Cekura API endpoint'
+            required: false
+            type: string
+            default: 'https://api.cekura.ai'
+
       push:
         branches: [main]
       pull_request:
-        types:
-          - opened
+        types: [opened, synchronize]
+
     jobs:
-      test:
-        uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
-        with:
-          agent_id: ${{ vars.AGENT_ID }}
-          scenario_ids: ${{ vars.SCENARIO_IDS }}
-        secrets:
-          CEKURA_API_KEY: ${{ secrets.CEKURA_API_KEY }}
+      run-simulation-tests:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Cekura Run Tests
+            uses: cekura-ai/cekura-github-actions@v1.0.0
+            with:
+              agent_id: ${{ inputs.agent_id || vars.AGENT_ID }}
+              scenario_ids: ${{ inputs.scenario_ids || vars.SCENARIO_IDS }}
+              api_url: ${{ inputs.api_url || vars.API_URL }}
+              api_key: ${{ secrets.CEKURA_API_KEY }}
     ```
   </Step>
 
@@ -146,7 +171,7 @@ You can run tests in two ways:
     ```yaml
     on:
       pull_request:
-        branches: [main]
+        types: [opened, synchronize]
     ```
   </Accordion>
 
@@ -160,28 +185,37 @@ You can run tests in two ways:
   </Accordion>
 </AccordionGroup>
 
+<Note>
+For more information about workflow triggers and events, check out the [GitHub Actions official documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).
+</Note>
+
 ### Environment-Specific Testing
 
 Test different environments (staging, production) with separate secrets:
 
 ```yaml
 jobs:
-  test-staging:
-    uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
-    with:
-      agent_id: ${{ vars.STAGING_AGENT_ID }}
-      tags: ${{ vars.STAGING_TAGS }}
-      api_url: 'https://staging-api.cekura.ai'
-    secrets:
-      CEKURA_API_KEY: ${{ secrets.STAGING_API_KEY }}
+  staging-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Staging
+        uses: cekura-ai/cekura-github-actions@v1.0.0
+        with:
+          agent_id: ${{ vars.STAGING_AGENT_ID }}
+          tags: ${{ vars.STAGING_TAGS }}
+          api_url: 'https://api.cekura.ai'
+          api_key: ${{ secrets.STAGING_API_KEY }}
 
-  test-production:
-    uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
-    with:
-      agent_id: ${{ vars.PROD_AGENT_ID }}
-      tags: ${{ vars.PROD_TAGS }}
-    secrets:
-      CEKURA_API_KEY: ${{ secrets.PROD_API_KEY }}
+  production-tests:
+    runs-on: ubuntu-latest
+    needs: staging-tests
+    steps:
+      - name: Test Production
+        uses: cekura-ai/cekura-github-actions@v1.0.0
+        with:
+          agent_id: ${{ vars.PROD_AGENT_ID }}
+          tags: ${{ vars.PROD_TAGS }}
+          api_key: ${{ secrets.PROD_API_KEY }}
 ```
 
 ### Testing with Phone Numbers
@@ -190,23 +224,26 @@ When testing agents that make outbound calls, you can specify a phone number:
 
 ```yaml
 jobs:
-  test:
-    uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
-    with:
-      agent_id: ${{ vars.AGENT_ID }}
-      scenario_ids: ${{ vars.SCENARIO_IDS }}
-      phone_number: ${{ vars.PHONE_NUMBER }}
-    secrets:
-      CEKURA_API_KEY: ${{ secrets.CEKURA_API_KEY }}
+  run-simulation-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Cekura Tests
+        uses: cekura-ai/cekura-github-actions@v1.0.0
+        with:
+          agent_id: ${{ vars.AGENT_ID }}
+          scenario_ids: ${{ vars.SCENARIO_IDS }}
+          phone_number: ${{ vars.PHONE_NUMBER }}
+          api_key: ${{ secrets.CEKURA_API_KEY }}
 ```
 
-## Workflow Inputs
+## Action Inputs
 
-The reusable workflow accepts these inputs:
+The action accepts these inputs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
 | `agent_id` | Agent ID to test | Yes | - |
+| `api_key` | Cekura API Key | Yes | - |
 | `scenario_ids` | Comma-separated scenario IDs (e.g., `123,456,789`) | No* | - |
 | `tags` | Comma-separated tags (e.g., `smoke-test,critical`) | No* | - |
 | `phone_number` | Outbound phone number for testing | No | - |
@@ -220,25 +257,21 @@ The reusable workflow accepts these inputs:
 
 ```yaml
 jobs:
-  test:
-    uses: cekura-ai/vocera-github-actions/.github/workflows/cekura_run_tests.yml@main
-    with:
-      agent_id: ${{ vars.AGENT_ID }}
-      scenario_ids: ${{ vars.SCENARIO_IDS }}
-      tags: ${{ vars.TAGS }}
-      phone_number: ${{ vars.PHONE_NUMBER }}
-      api_url: 'https://api.cekura.ai'
-      frequency: '3'      # Run each scenario 3 times
-      timeout: '7200'     # 2 hour timeout
-    secrets:
-      CEKURA_API_KEY: ${{ secrets.CEKURA_API_KEY }}
+  run-simulation-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Cekura Tests
+        uses: cekura-ai/cekura-github-actions@v1.0.0
+        with:
+          agent_id: ${{ vars.AGENT_ID }}
+          scenario_ids: ${{ vars.SCENARIO_IDS }}
+          tags: ${{ vars.TAGS }}
+          phone_number: ${{ vars.PHONE_NUMBER }}
+          api_url: 'https://api.cekura.ai'
+          frequency: '3'      # Run each scenario 3 times
+          timeout: '7200'     # 2 hour timeout
+          api_key: ${{ secrets.CEKURA_API_KEY }}
 ```
-
-## Examples & Reference
-
-For complete workflow examples and ready-to-use templates, check:
-- [Cekura GitHub Actions repository](https://github.com/cekura-ai/vocera-github-actions) - Working examples and templates
-- Copy and customize workflows from this repository for your needs
 
 ## Troubleshooting
 

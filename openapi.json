@@ -1152,21 +1152,53 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
+                            },
+                            "examples": {
+                                "Create-scenarios-with-agent-id": {
+                                    "value": {
+                                        "agent_id": 2142,
+                                        "call_logs": [
+                                            1,
+                                            2,
+                                            3
+                                        ],
+                                        "copy_to_agent": null
+                                    },
+                                    "summary": "create-scenarios-with-agent-id"
+                                },
+                                "Create-scenarios-with-assistant-id": {
+                                    "value": {
+                                        "assistant_id": "asst_1234567890",
+                                        "call_logs": "all"
+                                    },
+                                    "summary": "create-scenarios-with-assistant-id"
+                                },
+                                "Create-scenarios-with-copy-to-agent": {
+                                    "value": {
+                                        "agent_id": 2142,
+                                        "call_logs": [
+                                            1,
+                                            2,
+                                            3
+                                        ],
+                                        "copy_to_agent": 2143
+                                    },
+                                    "summary": "create-scenarios-with-copy-to-agent"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -1178,7 +1210,47 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
+                                    "type": "object",
+                                    "properties": {
+                                        "progress_id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "description": "Unique identifier for tracking the progress of scenario creation"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -1198,6 +1270,18 @@
             "get": {
                 "operationId": "observability_v1_call_logs_external_create_scenarios_progress_retrieve",
                 "description": "Get the progress of background scenario creation by progress_id.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Progress ID returned from create_scenarios endpoint",
+                        "required": true
+                    }
+                ],
                 "tags": [
                     "observability"
                 ],
@@ -1211,7 +1295,173 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
+                                    "$ref": "#/components/schemas/SchemaCreateScenariosProgressResponse"
+                                },
+                                "examples": {
+                                    "Progress-in-progress": {
+                                        "value": {
+                                            "agent_id": 2142,
+                                            "completed_scenarios": 2,
+                                            "failed_scenarios": 0,
+                                            "total_scenarios": 5,
+                                            "scenarios_list": [],
+                                            "errors": []
+                                        },
+                                        "summary": "progress-in-progress"
+                                    },
+                                    "Progress-completed": {
+                                        "value": {
+                                            "agent_id": 2142,
+                                            "completed_scenarios": 4,
+                                            "failed_scenarios": 1,
+                                            "total_scenarios": 5,
+                                            "scenarios_list": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "description": "Unique identifier for the scenario"
+                                                        },
+                                                        "name": {
+                                                            "type": "string",
+                                                            "description": "Name of the scenario"
+                                                        },
+                                                        "agent": {
+                                                            "type": "integer",
+                                                            "description": "ID of the AI agent this scenario belongs to"
+                                                        },
+                                                        "assistant_id": {
+                                                            "type": "string",
+                                                            "description": "Alternative to agent ID - the assistant ID to use for this scenario"
+                                                        },
+                                                        "personality": {
+                                                            "type": "integer",
+                                                            "description": "ID of the personality used in this scenario"
+                                                        },
+                                                        "personality_name": {
+                                                            "type": "string",
+                                                            "description": "Name of the personality used in this scenario"
+                                                        },
+                                                        "tags": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string"
+                                                            },
+                                                            "description": "Tags associated with this scenario."
+                                                        },
+                                                        "runs": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "integer"
+                                                            },
+                                                            "description": "List of IDs for the last run of this scenario"
+                                                        },
+                                                        "metrics": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "integer"
+                                                            },
+                                                            "description": "List of metric IDs to associate with this scenario"
+                                                        },
+                                                        "metric_names": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string"
+                                                            },
+                                                            "description": "List of metric names associated with this scenario"
+                                                        },
+                                                        "phone_number": {
+                                                            "type": "string",
+                                                            "description": "Phone number used for outbound calls in this scenario"
+                                                        },
+                                                        "phone_number_queue_length": {
+                                                            "type": "integer",
+                                                            "description": "Number of runs in queue for this phone number"
+                                                        },
+                                                        "first_message": {
+                                                            "type": "string",
+                                                            "description": "First message to be sent in the scenario"
+                                                        },
+                                                        "inbound_phone_number": {
+                                                            "type": "integer",
+                                                            "description": "ID of the phone number used for inbound calls"
+                                                        },
+                                                        "inbound_phone_number_data": {
+                                                            "type": "object",
+                                                            "description": "Details of the phone number used for inbound calls",
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "description": "ID of the inbound phone number"
+                                                                },
+                                                                "number": {
+                                                                    "type": "string",
+                                                                    "description": "The actual phone number"
+                                                                },
+                                                                "phone_number_id": {
+                                                                    "type": "string",
+                                                                    "description": "External ID of the phone number"
+                                                                }
+                                                            }
+                                                        },
+                                                        "instructions": {
+                                                            "type": "string",
+                                                            "description": "Instructions for the AI agent in this scenario"
+                                                        },
+                                                        "simulation_description": {
+                                                            "type": "string",
+                                                            "description": "Description of the simulation if this scenario was created by simulation"
+                                                        },
+                                                        "information_fields": {
+                                                            "type": "object",
+                                                            "description": "Additional information fields for the scenario"
+                                                        },
+                                                        "expected_outcome_prompt": {
+                                                            "type": "string",
+                                                            "description": "Expected outcome prompt for the scenario"
+                                                        },
+                                                        "scenario_language": {
+                                                            "type": "string",
+                                                            "description": "Language of the scenario"
+                                                        },
+                                                        "is_simulating": {
+                                                            "type": "boolean",
+                                                            "description": "Whether this scenario was created by simulation"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "errors": [
+                                                {
+                                                    "call_log_id": 3,
+                                                    "error": {
+                                                        "detail": "Transcript is missing"
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        "summary": "progress-completed"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -2186,21 +2436,53 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
+                            },
+                            "examples": {
+                                "Create-scenarios-with-agent-id": {
+                                    "value": {
+                                        "agent_id": 2142,
+                                        "call_logs": [
+                                            1,
+                                            2,
+                                            3
+                                        ],
+                                        "copy_to_agent": null
+                                    },
+                                    "summary": "create-scenarios-with-agent-id"
+                                },
+                                "Create-scenarios-with-assistant-id": {
+                                    "value": {
+                                        "assistant_id": "asst_1234567890",
+                                        "call_logs": "all"
+                                    },
+                                    "summary": "create-scenarios-with-assistant-id"
+                                },
+                                "Create-scenarios-with-copy-to-agent": {
+                                    "value": {
+                                        "agent_id": 2142,
+                                        "call_logs": [
+                                            1,
+                                            2,
+                                            3
+                                        ],
+                                        "copy_to_agent": 2143
+                                    },
+                                    "summary": "create-scenarios-with-copy-to-agent"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -2212,7 +2494,47 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
+                                    "type": "object",
+                                    "properties": {
+                                        "progress_id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "description": "Unique identifier for tracking the progress of scenario creation"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -2232,6 +2554,18 @@
             "get": {
                 "operationId": "observability_v1_call_logs_create_scenarios_progress_retrieve",
                 "description": "Get the progress of background scenario creation by progress_id.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Progress ID returned from create_scenarios endpoint",
+                        "required": true
+                    }
+                ],
                 "tags": [
                     "observability"
                 ],
@@ -2245,7 +2579,173 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
+                                    "$ref": "#/components/schemas/SchemaCreateScenariosProgressResponse"
+                                },
+                                "examples": {
+                                    "Progress-in-progress": {
+                                        "value": {
+                                            "agent_id": 2142,
+                                            "completed_scenarios": 2,
+                                            "failed_scenarios": 0,
+                                            "total_scenarios": 5,
+                                            "scenarios_list": [],
+                                            "errors": []
+                                        },
+                                        "summary": "progress-in-progress"
+                                    },
+                                    "Progress-completed": {
+                                        "value": {
+                                            "agent_id": 2142,
+                                            "completed_scenarios": 4,
+                                            "failed_scenarios": 1,
+                                            "total_scenarios": 5,
+                                            "scenarios_list": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "description": "Unique identifier for the scenario"
+                                                        },
+                                                        "name": {
+                                                            "type": "string",
+                                                            "description": "Name of the scenario"
+                                                        },
+                                                        "agent": {
+                                                            "type": "integer",
+                                                            "description": "ID of the AI agent this scenario belongs to"
+                                                        },
+                                                        "assistant_id": {
+                                                            "type": "string",
+                                                            "description": "Alternative to agent ID - the assistant ID to use for this scenario"
+                                                        },
+                                                        "personality": {
+                                                            "type": "integer",
+                                                            "description": "ID of the personality used in this scenario"
+                                                        },
+                                                        "personality_name": {
+                                                            "type": "string",
+                                                            "description": "Name of the personality used in this scenario"
+                                                        },
+                                                        "tags": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string"
+                                                            },
+                                                            "description": "Tags associated with this scenario."
+                                                        },
+                                                        "runs": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "integer"
+                                                            },
+                                                            "description": "List of IDs for the last run of this scenario"
+                                                        },
+                                                        "metrics": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "integer"
+                                                            },
+                                                            "description": "List of metric IDs to associate with this scenario"
+                                                        },
+                                                        "metric_names": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string"
+                                                            },
+                                                            "description": "List of metric names associated with this scenario"
+                                                        },
+                                                        "phone_number": {
+                                                            "type": "string",
+                                                            "description": "Phone number used for outbound calls in this scenario"
+                                                        },
+                                                        "phone_number_queue_length": {
+                                                            "type": "integer",
+                                                            "description": "Number of runs in queue for this phone number"
+                                                        },
+                                                        "first_message": {
+                                                            "type": "string",
+                                                            "description": "First message to be sent in the scenario"
+                                                        },
+                                                        "inbound_phone_number": {
+                                                            "type": "integer",
+                                                            "description": "ID of the phone number used for inbound calls"
+                                                        },
+                                                        "inbound_phone_number_data": {
+                                                            "type": "object",
+                                                            "description": "Details of the phone number used for inbound calls",
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "description": "ID of the inbound phone number"
+                                                                },
+                                                                "number": {
+                                                                    "type": "string",
+                                                                    "description": "The actual phone number"
+                                                                },
+                                                                "phone_number_id": {
+                                                                    "type": "string",
+                                                                    "description": "External ID of the phone number"
+                                                                }
+                                                            }
+                                                        },
+                                                        "instructions": {
+                                                            "type": "string",
+                                                            "description": "Instructions for the AI agent in this scenario"
+                                                        },
+                                                        "simulation_description": {
+                                                            "type": "string",
+                                                            "description": "Description of the simulation if this scenario was created by simulation"
+                                                        },
+                                                        "information_fields": {
+                                                            "type": "object",
+                                                            "description": "Additional information fields for the scenario"
+                                                        },
+                                                        "expected_outcome_prompt": {
+                                                            "type": "string",
+                                                            "description": "Expected outcome prompt for the scenario"
+                                                        },
+                                                        "scenario_language": {
+                                                            "type": "string",
+                                                            "description": "Language of the scenario"
+                                                        },
+                                                        "is_simulating": {
+                                                            "type": "boolean",
+                                                            "description": "Whether this scenario was created by simulation"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "errors": [
+                                                {
+                                                    "call_log_id": 3,
+                                                    "error": {
+                                                        "detail": "Transcript is missing"
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        "summary": "progress-completed"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -27677,6 +28177,7 @@
                             "de",
                             "el",
                             "hi",
+                            "he",
                             "hu",
                             "id",
                             "it",
@@ -27698,9 +28199,9 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2d8a97c9b24818a6",
+                        "x-spec-enum-id": "47057a83d036d342",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -27776,12 +28277,13 @@
                             "bland",
                             "livekit",
                             "pipecat",
+                            "koreai",
                             "custom"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "d6e767b9fb02ebff",
+                        "x-spec-enum-id": "aa22baddf041a6c8",
                         "default": "vocera",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `vocera` - Vocera\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `custom` - Custom"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `vocera` - Vocera\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -27828,6 +28330,14 @@
                     "pipecat_data": {
                         "type": "string",
                         "description": "\nPipecat/Daily.co additional data (webhook_url and config)\n"
+                    },
+                    "koreai_client_secret": {
+                        "type": "string",
+                        "description": "\nClient secret key for Kore.ai service provider\nExample: `\"client_secret_key_123\"`\n"
+                    },
+                    "koreai_data": {
+                        "type": "string",
+                        "description": "\nKore.ai additional data - client_id, bot_id, and host (optional)\n"
                     },
                     "custom_provider_api_key": {
                         "type": "string",
@@ -28502,6 +29012,7 @@
                             "de",
                             "el",
                             "hi",
+                            "he",
                             "hu",
                             "id",
                             "it",
@@ -28523,8 +29034,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2d8a97c9b24818a6",
-                        "description": "\nLanguage of the personality\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "47057a83d036d342",
+                        "description": "\nLanguage of the personality\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -30396,6 +30907,7 @@
                             "de",
                             "el",
                             "hi",
+                            "he",
                             "hu",
                             "id",
                             "it",
@@ -30417,9 +30929,9 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2d8a97c9b24818a6",
+                        "x-spec-enum-id": "47057a83d036d342",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -30495,12 +31007,13 @@
                             "bland",
                             "livekit",
                             "pipecat",
+                            "koreai",
                             "custom"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "d6e767b9fb02ebff",
+                        "x-spec-enum-id": "aa22baddf041a6c8",
                         "default": "vocera",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `vocera` - Vocera\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `custom` - Custom"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `vocera` - Vocera\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -30547,6 +31060,14 @@
                     "pipecat_data": {
                         "type": "string",
                         "description": "\nPipecat/Daily.co additional data (webhook_url and config)\n"
+                    },
+                    "koreai_client_secret": {
+                        "type": "string",
+                        "description": "\nClient secret key for Kore.ai service provider\nExample: `\"client_secret_key_123\"`\n"
+                    },
+                    "koreai_data": {
+                        "type": "string",
+                        "description": "\nKore.ai additional data - client_id, bot_id, and host (optional)\n"
                     },
                     "custom_provider_api_key": {
                         "type": "string",
@@ -30764,6 +31285,7 @@
                             "de",
                             "el",
                             "hi",
+                            "he",
                             "hu",
                             "id",
                             "it",
@@ -30785,8 +31307,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2d8a97c9b24818a6",
-                        "description": "\nLanguage of the personality\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "47057a83d036d342",
+                        "description": "\nLanguage of the personality\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -31681,6 +32203,10 @@
                         "type": "boolean",
                         "description": "\nNotify daily report\nExample: `true` or `false`\n"
                     },
+                    "notify_daily_report_no_calls": {
+                        "type": "boolean",
+                        "description": "\nNotify daily report even if there are no calls\nExample: `true` or `false`\n"
+                    },
                     "notify_cron_failure": {
                         "type": "boolean",
                         "description": "\nNotify cron failure\nExample: `true` or `false`\n"
@@ -31867,11 +32393,12 @@
                             "bland",
                             "livekit",
                             "pipecat",
+                            "koreai",
                             "custom"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `custom` - Custom",
-                        "x-spec-enum-id": "09d0bab54400b9cc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom",
+                        "x-spec-enum-id": "0b53dda280cb4882"
                     },
                     "key": {
                         "type": "string",
@@ -33040,6 +33567,10 @@
                         "type": "boolean",
                         "description": "\nNotify daily report\nExample: `true` or `false`\n"
                     },
+                    "notify_daily_report_no_calls": {
+                        "type": "boolean",
+                        "description": "\nNotify daily report even if there are no calls\nExample: `true` or `false`\n"
+                    },
                     "notify_cron_failure": {
                         "type": "boolean",
                         "description": "\nNotify cron failure\nExample: `true` or `false`\n"
@@ -33249,11 +33780,12 @@
                             "bland",
                             "livekit",
                             "pipecat",
+                            "koreai",
                             "custom"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `custom` - Custom",
-                        "x-spec-enum-id": "09d0bab54400b9cc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom",
+                        "x-spec-enum-id": "0b53dda280cb4882"
                     },
                     "key": {
                         "type": "string",
@@ -33295,11 +33827,12 @@
                             "bland",
                             "livekit",
                             "pipecat",
+                            "koreai",
                             "custom"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `custom` - Custom",
-                        "x-spec-enum-id": "09d0bab54400b9cc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom",
+                        "x-spec-enum-id": "0b53dda280cb4882"
                     },
                     "created_at": {
                         "type": "string",
@@ -34052,6 +34585,7 @@
                             "de",
                             "el",
                             "hi",
+                            "he",
                             "hu",
                             "id",
                             "it",
@@ -34073,8 +34607,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2d8a97c9b24818a6",
-                        "description": "\nLanguage of the scenario\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "47057a83d036d342",
+                        "description": "\nLanguage of the scenario\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "test_profile": {
                         "type": [
@@ -34201,6 +34735,7 @@
                             "de",
                             "el",
                             "hi",
+                            "he",
                             "hu",
                             "id",
                             "it",
@@ -34226,8 +34761,8 @@
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "2d8a97c9b24818a6",
-                        "description": "Language code for the scenario (ISO language code)\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "47057a83d036d342",
+                        "description": "Language code for the scenario (ISO language code)\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "tags": {
                         "description": "\nList of tags associated with this scenario for categorization\nExample: `[\"tag1\", \"tag2\", \"tag3\"]`\n"
@@ -34312,6 +34847,42 @@
                 "required": [
                     "scenario"
                 ]
+            },
+            "SchemaCreateScenariosProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "ID of the agent associated with the scenario creation"
+                    },
+                    "completed_scenarios": {
+                        "type": "integer",
+                        "description": "Number of scenarios successfully created"
+                    },
+                    "failed_scenarios": {
+                        "type": "integer",
+                        "description": "Number of scenarios that failed to create"
+                    },
+                    "total_scenarios": {
+                        "type": "integer",
+                        "description": "Total number of scenarios being processed"
+                    },
+                    "scenarios_list": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Scenario"
+                        },
+                        "description": "List of created scenario objects (only included when processing is complete)"
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "description": "List of errors encountered during scenario creation"
+                    }
+                }
             },
             "SchemaCreateShareableLinkTokenResponse": {
                 "type": "object",
@@ -34524,6 +35095,33 @@
                     "copy_scenarios": {
                         "type": "boolean",
                         "description": "\nIf true, scenarios will be copied\nExample: `true` or `fase`\n"
+                    }
+                }
+            },
+            "SchemaPostCreateScenarios": {
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "\nAgent ID, required if assistant_id is not provided\nExample: `2142`\n"
+                    },
+                    "assistant_id": {
+                        "type": "string",
+                        "description": "\nAssistant ID, required if agent_id is not provided\nExample: `asst_1234567890`\n"
+                    },
+                    "call_logs": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of call log IDs to create scenarios from. Can also be the string \"all\" to process all call logs.\nExample: `[1, 2, 3]` or `\"all\"`\n"
+                    },
+                    "copy_to_agent": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "\nOptional agent ID to copy created scenarios to\nExample: `2142`\n"
                     }
                 }
             },
@@ -35278,6 +35876,7 @@
                             "de",
                             "el",
                             "hi",
+                            "he",
                             "hu",
                             "id",
                             "it",
@@ -35299,8 +35898,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2d8a97c9b24818a6",
-                        "description": "\nLanguage of the scenario\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "47057a83d036d342",
+                        "description": "\nLanguage of the scenario\n\n\n* `ar` - Arabic\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `ko` - Korean\n* `ms` - Malay\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `tr` - Turkish\n* `ta` - Tamil\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "test_profile": {
                         "type": [

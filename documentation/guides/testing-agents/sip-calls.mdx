@@ -1,0 +1,224 @@
+---
+title: 'SIP Calls'
+sidebarTitle: "SIP Calls"
+icon: "phone-volume"
+iconType: "regular"
+description: 'Testing SIP (Session Initiation Protocol) Based Agents'
+---
+
+## Overview
+
+Test your SIP (Session Initiation Protocol) based agents directly through Cekura's agents, bypassing traditional telephony networks. This provides enhanced control, reduced latency, and access to rich call metadata through custom headers.
+
+## What is SIP?
+
+SIP (Session Initiation Protocol) is a signaling protocol used for initiating, maintaining, and terminating real-time communication sessions. Unlike traditional PSTN calls that route through telephone networks, SIP enables direct IP-based communication between endpoints.
+
+### How SIP Testing Works on Cekura
+
+When you run a SIP test, the flow works as follows:
+
+1. **SIP Invite**: Cekura sends a SIP INVITE request to your agent's SIP endpoint
+2. **Header Injection**: Cekura automatically injects custom headers with test metadata
+3. **Session Negotiation**: SIP protocols negotiate audio codecs, media parameters, and connection details
+4. **Media Stream**: Direct RTP (Real-time Transport Protocol) audio streams are established
+5. **Call Handling**: Your agent processes the call with full access to SIP headers and metadata
+6. **Results Collection**: Cekura captures audio, transcripts, and evaluation metrics
+
+### Custom Headers
+
+Cekura automatically injects critical headers into every SIP INVITE request to link the call session to the test run:
+
+```
+X-Run-Id: <unique-run-id>
+X-Scenario-Id: <scenario-id>
+X-Result-Id: <result-id>
+```
+
+These headers allow you to:
+- Track which test scenario triggered the call
+- Link calls with specific test runs
+- Extract metadata for debugging and analysis
+- Enrich simulation evaluations programmatically
+
+<Tabs>
+<Tab title="No-code">
+
+Test your SIP-based agents directly from the frontend without writing code.
+
+<Steps>
+<Step title="Configure SIP endpoint">
+Go to your agent settings and configure the SIP endpoint:
+
+<img src="/images/sip/endpoint-config.png" alt="SIP Endpoint Configuration" />
+
+**Required field:**
+- **SIP Endpoint**: The SIP URI where your agent receives calls (e.g., `sip:agent@yourdomain.com` or `sip:192.168.1.100:5060`)
+
+<Note>
+Your SIP endpoint must be publicly accessible and able to receive incoming SIP INVITE requests from Cekura.
+</Note>
+
+</Step>
+
+<Step title="Run tests from frontend">
+Select scenarios and run tests using the UI:
+
+<img src="/images/sip/run-sip-tests.png" alt="Run SIP Tests" />
+
+Click **"Run with Voice (SIP)"** to execute your tests. Cekura automatically:
+- Sends SIP INVITE requests to your configured endpoint
+- Injects custom headers (`X-Run-Id`, `X-Scenario-Id`, `X-Result-Id`)
+- Executes test scenarios
+- Captures audio and transcript data
+- Evaluates metrics in real-time
+</Step>
+
+<Step title="View results">
+Results appear in your dashboard.
+Track test status, metrics, conversation details, and other details.
+</Step>
+</Steps>
+
+</Tab>
+
+<Tab title="Code">
+
+Use the API to integrate SIP testing into your CI/CD workflow.
+
+## Prerequisites
+
+Configure the SIP endpoint in your agent settings:
+
+<img src="/images/sip/endpoint-config.png" alt="SIP Endpoint Configuration" />
+
+**Required field:**
+- **SIP Endpoint**: The SIP URI where your agent receives calls (e.g., `sip:agent@yourdomain.com` or `sip:192.168.1.100:5060`)
+
+<Note>
+Your SIP endpoint must be publicly accessible and able to receive incoming SIP INVITE requests from Cekura's cloud infrastructure.
+</Note>
+
+## API Endpoint
+
+```
+POST https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_sip/
+```
+
+## Authentication
+
+Include your API key in the request header:
+```
+X-CEKURA-API-KEY: <YOUR_API_KEY>
+```
+
+## Request Parameters
+
+**scenarios** (array | integer | string, required): Test scenarios to run
+- **Array format**: List of scenario IDs `[123, 456, 789]`
+- **Integer format**: Run first N scenarios for the agent `5`
+- **String format**: Run all scenarios for the agent `"all"`
+
+**agent_id** (integer, optional): Your Agent ID in Cekura. Required when using integer or "all" format for scenarios
+
+**frequency** (integer, optional): Number of times to run each scenario (default: 1)
+
+**name** (string, optional): Custom name for this test run
+
+## Examples
+
+### Single Run (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_sip/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [30]
+  }'
+```
+
+### Multiple Runs (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_sip/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [30, 31, 32],
+    "frequency": 2,
+    "name": "SIP Test Run"
+  }'
+```
+
+## Response
+
+```json
+{
+  "id": 16870,
+  "name": "SIP Test Run",
+  "agent": 5,
+  "status": "in_progress",
+  "success_rate": 0.0,
+  "run_as_text": false,
+  "is_cronjob": false,
+  "runs": [
+    {
+      "id": 34625,
+      "status": "running",
+      "scenario": 11547,
+      "scenario_name": "Customer Support Scenario",
+      "test_profile_data": {"key": "value"}
+    }
+  ],
+  "created_at": "2025-10-16T09:32:59.484534Z",
+  "updated_at": "2025-10-16T09:32:59.484942Z"
+}
+```
+
+## Error Responses
+
+### Missing SIP Endpoint
+
+```json
+{
+  "sip_endpoint": ["Agent does not have a SIP endpoint configured. Please configure sip_endpoint in the agent settings."]
+}
+```
+
+### Invalid SIP Endpoint Format
+
+```json
+{
+  "sip_endpoint": ["Invalid SIP URI format. Expected format: sip:user@host[:port]"]
+}
+```
+
+## Monitor Results
+
+Poll for results using the [List Runs with IDs API](/api-reference/test_framework/list-runs-with-ids).
+
+## Extracting Custom Headers
+
+Your SIP infrastructure can extract the custom headers during call setup for tracking and debugging:
+
+```python
+# Example: Extracting headers in a SIP application
+def handle_sip_invite(invite_message):
+    run_id = invite_message.headers.get('X-Run-Id')
+    scenario_id = invite_message.headers.get('X-Scenario-Id')
+    result_id = invite_message.headers.get('X-Result-Id')
+
+    if run_id and scenario_id and result_id:
+        # Store for later use in debugging or enriching evaluations
+        log_test_metadata(run_id, scenario_id, result_id)
+```
+
+<Tip>
+Use these headers to correlate SIP calls with specific test runs in your own logging and monitoring systems.
+</Tip>
+
+</Tab>
+</Tabs>

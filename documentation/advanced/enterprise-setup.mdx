@@ -1,0 +1,336 @@
+---
+title: "Enterprise Setup"
+sidebarTitle: "Enterprise Setup"
+icon: "building"
+iconType: "regular"
+description: "Role-Based Access Control and API key management for enterprise deployments"
+---
+
+## Overview
+
+Cekura provides comprehensive Role-Based Access Control (RBAC) to help enterprise teams manage permissions and secure access to your voice AI testing infrastructure. Control who can access what through both the dashboard UI and programmatic API keys.
+
+## User Roles (Dashboard)
+
+Cekura supports three membership types for team collaboration through the dashboard interface:
+
+### Admin
+
+Full administrative access to all features and settings.
+
+**Permissions include:**
+- Complete workspace management and configuration
+- User management (invite, remove, and change member roles)
+- Billing and subscription management
+- Create, edit, and delete agents, evaluators, and metrics
+- Access to all projects and test results
+- Configure integrations and webhooks
+- Manage API keys and developer settings
+- View raw transcripts, recordings, and analytics
+
+**Use cases:**
+- Engineering leads and managers
+- DevOps and infrastructure teams
+- Account owners
+
+### Member
+
+Standard access for developers and engineers building and testing agents. Members only have access to **selected projects** assigned to them by Admins.
+
+**Permissions include:**
+- Create, edit, and delete agents, evaluators, and metrics within assigned projects
+- Run tests and simulations on assigned projects
+- View test results and analytics for assigned projects
+- Access raw transcripts and recordings for assigned projects
+- Configure test profiles and scenarios within assigned projects
+
+**Cannot:**
+- Access projects they haven't been assigned to
+- Manage billing or subscriptions
+- Invite or remove team members
+- Change other users' permissions
+- Delete the workspace
+
+**Use cases:**
+- Voice AI developers working on specific environments (dev, staging, production)
+- Team-specific access (e.g., Team A only accesses their projects, Team B only accesses theirs)
+- QA engineers testing specific product lines
+- Contractors or external developers with limited scope
+
+<Note>
+**Project-based isolation:** Use projects to separate environments (dev, staging, production) or teams. Assign Members only to the projects they need access to for enhanced security and organization.
+</Note>
+
+### Viewer
+
+Read-only access for stakeholders who need visibility without modification capabilities.
+
+**Permissions include:**
+- View agents, evaluators, and test results
+- Access analytics and dashboards
+- View scrubbed call history
+- Generate reports
+
+**Cannot:**
+- Create or modify any resources
+- Start tests or make calls
+- Access raw transcripts or recordings
+- Manage integrations or settings
+- View billing information
+
+**Use cases:**
+- Product managers
+- Business stakeholders
+- Compliance and audit teams
+
+## API Key Types
+
+Cekura provides three types of API keys with different permission levels for programmatic access:
+
+### Admin API Keys
+
+Full API access equivalent to Admin dashboard permissions.
+
+**Capabilities:**
+- All CRUD operations across all resources
+- Access to all projects in the organization
+- User and organization management
+- Billing and usage data retrieval
+- Webhook configuration
+- Complete observability data access
+
+**Security considerations:**
+- Treat as highly sensitive credentials
+- Rotate regularly (recommended: every 90 days)
+- Store in secure secret management systems
+- Limit to backend services only
+- Never commit to version control
+
+**Example use cases:**
+```bash
+# Access all projects
+curl https://api.cekura.ai/v1/projects \
+  -H "Authorization: Bearer admin_api_key_xxx"
+
+# Manage organization settings
+curl https://api.cekura.ai/v1/organization \
+  -H "Authorization: Bearer admin_api_key_xxx"
+```
+
+### Project API Keys
+
+Scoped access limited to specific projects for enhanced security.
+
+**Capabilities:**
+- Full access to assigned project resources only
+- Create and manage agents, evaluators, metrics within the project
+- Run tests and retrieve results for the project
+- Send observability data for the project
+- Access transcripts and analytics for the project
+
+**Restrictions:**
+- Cannot access other projects
+- Cannot manage users or organization settings
+- Cannot view billing information
+- Cannot create or delete projects
+
+**Security considerations:**
+- Use for development and staging environments
+- Assign minimum required project access
+- Different keys per project for isolation
+- Safe to use in CI/CD pipelines
+
+**Example use cases:**
+```bash
+# Send observability data for specific project
+curl https://api.cekura.ai/v1/observability/observe \
+  -H "Authorization: Bearer project_api_key_xxx" \
+  -d '{"project_id": "proj_123", "transcript": [...]}'
+
+# Run evaluator within project scope
+curl https://api.cekura.ai/v1/evaluators/{evaluator_id}/run \
+  -H "Authorization: Bearer project_api_key_xxx"
+```
+
+### Read-Only API Keys
+
+Limited to read operations only, ideal for analytics and monitoring.
+
+**Capabilities:**
+- Retrieve agents, evaluators, and metrics (GET only)
+- Access test results and analytics
+- Fetch call transcripts and recordings
+- Query observability data
+- Generate reports
+
+**Restrictions:**
+- No write, update, or delete operations
+- Cannot start tests or make calls
+- Cannot modify any configurations
+- Cannot access billing or user management
+
+**Security considerations:**
+- Safe for frontend applications with proper precautions
+- Suitable for monitoring and alerting systems
+- Can be shared with external analytics tools
+- Lower risk if accidentally exposed
+
+**Example use cases:**
+```bash
+# Retrieve test results for dashboards
+curl https://api.cekura.ai/v1/results \
+  -H "Authorization: Bearer readonly_api_key_xxx"
+
+# Fetch call analytics for monitoring
+curl https://api.cekura.ai/v1/calls \
+  -H "Authorization: Bearer readonly_api_key_xxx"
+```
+
+## Best Practices
+
+### Team Structure Recommendations
+
+<Tip>
+**Small teams (1-5 people):** Most users can be Members with 1-2 Admins. Create separate projects for dev, staging, and production environments.
+
+**Medium teams (5-20 people):** Use project-based access - assign Members to only the projects they need. For example, create projects per environment (dev/staging/prod) or per team, and grant selective access.
+
+**Large enterprises (20+ people):** Implement least-privilege access with granular project assignments. Use projects to isolate:
+- Different environments (dev, staging, production)
+- Different teams or business units
+- Different product lines or clients
+- Combine with Viewers for stakeholders and limited Admins for leads
+</Tip>
+
+### Project-Based Access Patterns
+
+**Environment Separation:**
+```
+Projects: prod-voice-ai, staging-voice-ai, dev-voice-ai
+- Production team Members: Access to prod-voice-ai only
+- QA team Members: Access to staging-voice-ai and dev-voice-ai
+- Dev team Members: Access to dev-voice-ai only
+```
+
+**Team Isolation:**
+```
+Projects: team-a-agents, team-b-agents, shared-resources
+- Team A Members: Access to team-a-agents and shared-resources
+- Team B Members: Access to team-b-agents and shared-resources
+- Contractors: Access to specific team project only
+```
+
+**Client/Product Separation:**
+```
+Projects: client-acme, client-globex, internal-testing
+- Client A team Members: Access to client-acme only
+- Client B team Members: Access to client-globex only
+- Internal QA: Access to internal-testing only
+```
+
+### API Key Management
+
+1. **Key Rotation**
+   - Admin keys: Rotate every 90 days
+   - Project keys: Rotate every 180 days
+   - Read-only keys: Rotate annually or when team members leave
+
+2. **Storage**
+   - Use environment variables for all API keys
+   - Store in secret management systems (AWS Secrets Manager, HashiCorp Vault, etc.)
+   - Never hardcode in application code
+   - Never commit to version control
+
+3. **Access Patterns**
+   ```bash
+   # Production: Use Project API keys
+   CEKURA_API_KEY=project_api_key_xxx
+
+   # CI/CD: Use Project API keys scoped to test projects
+   CEKURA_TEST_API_KEY=project_api_key_yyy
+
+   # Monitoring: Use Read-Only keys
+   CEKURA_READONLY_KEY=readonly_api_key_zzz
+   ```
+
+4. **Monitoring and Auditing**
+   - Track API key usage through activity logs
+   - Set up alerts for unusual access patterns
+   - Review permissions quarterly
+   - Audit key access when team members change roles
+
+### Security Checklist
+
+<Check>
+- [ ] All Admin API keys stored in secure secret management
+- [ ] Project API keys used for development and CI/CD
+- [ ] Read-Only keys used for monitoring and analytics
+- [ ] Regular key rotation schedule established
+- [ ] Team members have minimum required permissions
+- [ ] Viewers assigned for stakeholders without modification needs
+- [ ] API key usage monitored and logged
+- [ ] Keys revoked when team members leave
+</Check>
+
+## Managing Access
+
+### Adding Team Members
+
+<Steps>
+  <Step title="Navigate to Settings">
+    Go to your Cekura dashboard and click on **Settings** > **Team**.
+  </Step>
+
+  <Step title="Invite User">
+    Click **Invite Member** and enter their email address.
+  </Step>
+
+  <Step title="Assign Role">
+    Select the appropriate role: Admin, Member, or Viewer based on their responsibilities.
+  </Step>
+
+  <Step title="Send Invitation">
+    The user will receive an email invitation to join your workspace.
+  </Step>
+</Steps>
+
+### Creating API Keys
+
+<Steps>
+  <Step title="Access Developer Settings">
+    Navigate to **Settings** > **API Keys** in the dashboard.
+  </Step>
+
+  <Step title="Generate New Key">
+    Click **Create API Key** and select the key type.
+  </Step>
+
+  <Step title="Configure Scope">
+    For Project API keys, select which projects should be accessible.
+  </Step>
+
+  <Step title="Save Securely">
+    Copy the API key immediately - it will only be shown once. Store it in your secret management system.
+  </Step>
+</Steps>
+
+<Warning>
+API keys cannot be recovered if lost. If you lose an API key, you must generate a new one and update all systems using the old key.
+</Warning>
+
+## Migration Guide
+
+### Upgrading from Single API Key
+
+If you're currently using a single API key for all purposes, follow these steps to implement proper RBAC:
+
+1. **Audit current usage** - Identify all systems and services using your current key
+2. **Create scoped keys** - Generate Project API keys for each service/environment
+3. **Update services** - Migrate each service to use its dedicated Project key
+4. **Enable read-only keys** - Switch monitoring and analytics tools to read-only keys
+5. **Rotate admin key** - Generate a new Admin key and update only necessary systems
+6. **Revoke old key** - Once migration is complete, revoke the original key
+
+## Support
+
+Need help setting up RBAC for your organization? Contact our enterprise support team at [support@cekura.ai](mailto:support@cekura.ai) or visit our [support portal](https://support.cekura.ai).

@@ -1,0 +1,146 @@
+---
+title: 'Auto Outbound Calls'
+sidebarTitle: "Auto Outbound Calls"
+icon: "phone-volume"
+iconType: "regular"
+description: "Automatically trigger outbound calls for testing without writing any scripts - the system handles everything using your voice provider configuration."
+---
+
+## What is Auto Outbound Call?
+
+Auto Outbound Call is an automated testing feature where Cekura automatically initiates outbound calls when you run evaluators. Unlike [manual outbound testing](/documentation/guides/testing-agents/outbound-evaluators) where you write scripts to handle calls, this feature does everything automatically.
+
+## How It Works
+
+<Steps>
+  <Step title="Enable Auto Outbound">
+    Toggle the **Auto Outbound Call** setting ON in your agent settings
+  </Step>
+
+  <Step title="Run Evaluators">
+    Execute evaluators through the dashboard - no script needed
+  </Step>
+
+  <Step title="System Calls Automatically">
+    Cekura uses your voice provider (Vapi, Retell, or ElevenLabs) to initiate calls
+  </Step>
+
+  <Step title="Review Results">
+    Check test results and transcripts in your dashboard
+  </Step>
+</Steps>
+
+## Prerequisites
+
+- **Outbound mode enabled**: Agent's `inbound` must be set to `false`
+- **Voice provider configured**: Valid API key and Assistant ID for your provider (Vapi, Retell, or ElevenLabs)
+- **Evaluators ready**: Created evaluators with valid phone numbers
+
+## Enabling Auto Outbound Call
+
+Navigate to your agent settings and toggle **Auto Outbound Call** to ON.
+
+<Frame>
+  <img src="/images/outbound-auto-call/enable-auto-outbound.png" alt="Enable Auto Outbound" />
+</Frame>
+
+<Note>
+Ensure your voice provider account has sufficient credits for making calls.
+</Note>
+
+## Advanced: Trigger URL Webhook
+
+For advanced use cases, you can configure a **Trigger URL** to receive webhook notifications instead of automatic calls. This lets you add custom logic before the call is made.
+
+<Warning>
+**Advanced Feature**: When you configure a trigger URL, Cekura sends a webhook to your endpoint **instead of** automatically calling. You must handle the actual call initiation yourself.
+</Warning>
+
+### When to Use
+
+Use trigger URLs when you need to:
+- Add validation or business logic before calls
+- Schedule calls for specific times
+- Integrate with internal systems
+- Log or audit call requests
+
+### How It Works
+
+<Steps>
+  <Step title="Add Trigger URL">
+    In your agent settings, navigate to the **Provider Data** field (Vapi Data / Retell Data / ElevenLabs Data) and enter your webhook URL.
+
+    <Frame>
+      <img src="/images/outbound-auto-call/configure-trigger-url.png" alt="Configure Trigger URL in UI" />
+    </Frame>
+  </Step>
+
+  <Step title="Receive Webhook">
+    When evaluators run, Cekura sends a POST request to your URL with call details
+  </Step>
+
+  <Step title="Make the Call">
+    Your system processes the webhook and initiates the call using your provider's API
+  </Step>
+</Steps>
+
+### Webhook Payload
+
+Cekura sends the following JSON payload to your trigger URL:
+
+```json
+{
+  "from_number": "+1234567890",
+  "to_number": "+14159976447",
+  "dynamic_variables": {
+    "customer_name": "John Doe",
+    "policy_number": "POL123456"
+  }
+}
+```
+
+**Fields:**
+- `from_number`: Your agent's contact number (the number making the call)
+- `to_number`: The evaluator's phone number (where to call)
+- `dynamic_variables`: Optional test profile data for dynamic prompting
+
+<Note>
+Your webhook endpoint must be publicly accessible (HTTPS), return a 200 or 201 status code, and respond within 30 seconds.
+</Note>
+
+### Response Format
+
+Your webhook should return:
+
+```json
+{
+  "success": true,
+  "call_id": "optional_provider_call_id"
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Calls Not Starting">
+    Check that Auto Outbound Call is enabled, agent is in Outbound mode, and voice provider credentials are valid.
+  </Accordion>
+
+  <Accordion title="Webhook Not Working">
+    Verify trigger URL is publicly accessible (HTTPS), returns 200/201 status, and no firewall is blocking requests.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+- **Monitor credits**: Track your provider account balance
+- **Valid numbers**: Use correct phone number format (+1XXXXXXXXXX)
+- **Secure webhooks**: Use HTTPS, validate requests, implement rate limiting
+
+---
+
+## Next Steps
+
+- Learn about [manual outbound testing](/documentation/guides/testing-agents/outbound-evaluators) for more control
+- Explore [load testing](/documentation/guides/testing-agents/load-testing) capabilities
+- Set up [custom metrics](/documentation/key-concepts/metrics/custom-metrics) for your tests

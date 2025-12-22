@@ -205,7 +205,12 @@ When writing your custom code, you have access to the following data variables:
     ```
   </Accordion>
   <Accordion title="Latency Metrics" href="#latency-metrics">
-    Latency metrics for performance analysis
+    Latency metrics for performance analysis.
+    
+    The `latency_data` list contains detailed information about each turn's latency:
+    - **`latency`**: The duration of the latency in milliseconds.
+    - **`speaker`**: The entity associated with the latency (e.g., "Main Agent").
+    - **`start_time`**: The timestamp when the turn started, in seconds.
     
     ```python
     # Access latency metrics
@@ -275,6 +280,48 @@ if "premium plan" in transcript:
 else:
     _result = False
     _explanation = "Agent did not mention the Premium Plan in the conversation"
+```
+
+### Latency Threshold Example
+
+This example detects if latency is under a threshold in each turn.
+
+```python
+import json 
+THRESHOLD = 2000
+
+latency_data = data["latency_data"]
+
+# Use a standard loop to avoid the 'NameError'
+violations = []
+for item in latency_data:
+    if item["latency"] > THRESHOLD:
+        violations.append(item)
+
+if not violations:
+    _result = True
+    _explanation = f"Every return is under {THRESHOLD} milliseconds."
+else:
+    _result = False
+    
+    formatted_lines = []
+    for v in violations:
+        # Get the time in seconds (default to 0 if missing)
+        total_seconds = v.get('start_time', 0)
+        
+        # Calculate Minutes and Seconds
+        minutes = int(total_seconds // 60)
+        seconds = int(total_seconds % 60)
+        
+        # Format as [MM:SS] with leading zeros (e.g., [01:05])
+        timestamp_str = f"[{minutes:02d}:{seconds:02d}]"
+        
+        # Create the final line
+        line = f"{timestamp_str} {json.dumps(v)}"
+        formatted_lines.append(line)
+    
+    # Join with new lines
+    _explanation = f"Items with latency > {THRESHOLD}:\n" + "\n".join(formatted_lines)
 ```
 
 ### Complete Data Reference

@@ -197,7 +197,7 @@ def main():
     from starlette.middleware.base import BaseHTTPMiddleware
 
     parser = argparse.ArgumentParser(description="Cekura OpenAPI MCP Server")
-    parser.add_argument("--port", type=int, default=8000, help="Port to run the HTTP server on (default: 8000)")
+    parser.add_argument("--port", type=int, default=8001, help="Port to run the HTTP server on (default: 8001)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
     args = parser.parse_args()
 

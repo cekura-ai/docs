@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class HealthCheckFilter(logging.Filter):
     def filter(self, record):
         message = record.getMessage()
-        return not any(path in message for path in ['/health', '/healthz', '/favicon.ico'])
+        return not any(path in message for path in ['/mcp/health', '/mcp/healthz', '/favicon.ico'])
 
 
 mcp = FastMCP("Cekura API")
@@ -195,7 +195,7 @@ def main():
 
     class APIKeyMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request, call_next):
-            if request.url.path in ["/health", "/healthz"]:
+            if request.url.path in ["/mcp/health", "/mcp/healthz"]:
                 response = await call_next(request)
                 return response
 
@@ -214,9 +214,8 @@ def main():
             response = await call_next(request)
             return response
 
-    from starlette.applications import Starlette
     from starlette.responses import JSONResponse
-    from starlette.routing import Route, Mount
+    from starlette.routing import Route
 
     async def health_check(request):
         return JSONResponse({
@@ -225,17 +224,14 @@ def main():
             "tools_registered": len(operations_registry)
         })
 
-    mcp_app = mcp.streamable_http_app()
+    app = mcp.streamable_http_app()
 
-    app = Starlette(routes=[
-        Route("/health", health_check),
-        Route("/healthz", health_check),
-        Mount("/", mcp_app)
-    ])
+    app.router.routes.insert(0, Route("/mcp/health", health_check))
+    app.router.routes.insert(1, Route("/mcp/healthz", health_check))
 
     app.add_middleware(APIKeyMiddleware)
     logger.info("API Key middleware added")
-    logger.info("Health check endpoints: /health, /healthz")
+    logger.info("Health check endpoints: /mcp/health, /mcp/healthz")
 
     logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
 

@@ -68,7 +68,7 @@ python3 openapi_mcp_server.py
 # Output: "Registered 74 MCP tools"
 
 # Health check (for load balancers/monitoring)
-curl http://localhost:8000/health
+curl http://localhost:8000/mcp/health
 # Response: {"status":"healthy","service":"cekura-mcp-server","tools_registered":74}
 ```
 
@@ -76,8 +76,8 @@ curl http://localhost:8000/health
 
 The server provides health check endpoints for monitoring and load balancers:
 
-- **`/health`** - Returns health status (not logged)
-- **`/healthz`** - Kubernetes-style health check (not logged)
+- **`/mcp/health`** - Returns health status (not logged)
+- **`/mcp/healthz`** - Kubernetes-style health check (not logged)
 
 Both endpoints return:
 ```json

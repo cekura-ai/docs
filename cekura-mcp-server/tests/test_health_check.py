@@ -16,11 +16,11 @@ class TestHealthCheck:
             })
 
         app = Starlette(routes=[
-            Route("/health", health_check),
+            Route("/mcp/health", health_check),
         ])
 
         client = TestClient(app)
-        response = client.get("/health")
+        response = client.get("/mcp/health")
 
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
@@ -40,11 +40,11 @@ class TestHealthCheck:
             })
 
         app = Starlette(routes=[
-            Route("/healthz", health_check),
+            Route("/mcp/healthz", health_check),
         ])
 
         client = TestClient(app)
-        response = client.get("/healthz")
+        response = client.get("/mcp/healthz")
 
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
@@ -62,11 +62,11 @@ class TestHealthCheck:
             })
 
         app = Starlette(routes=[
-            Route("/health", health_check),
+            Route("/mcp/health", health_check),
         ])
 
         client = TestClient(app)
-        response = client.get("/health")
+        response = client.get("/mcp/health")
         data = response.json()
 
         assert isinstance(data["status"], str)

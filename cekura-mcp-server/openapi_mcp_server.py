@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict
 from contextvars import ContextVar
 from mcp.server.fastmcp import FastMCP
-from mcp import types
+from mcp.server.transport_security import TransportSecuritySettings
 
 from config import load_config
 from openapi_parser import load_openapi_spec
@@ -32,7 +32,21 @@ class HealthCheckFilter(logging.Filter):
 
 request_api_key: ContextVar[str] = ContextVar('request_api_key', default=None)
 
-mcp = FastMCP("Cekura API")
+# Configure transport security to allow api.cekura.ai as Host header
+transport_security = TransportSecuritySettings(
+    enable_dns_rebinding_protection=True,
+    allowed_hosts=[
+        "api.cekura.ai",
+        "localhost",
+        "localhost:8000",
+        "127.0.0.1",
+        "127.0.0.1:8000",
+        "0.0.0.0",
+        "0.0.0.0:8000"
+    ]
+)
+
+mcp = FastMCP("Cekura API", transport_security=transport_security)
 
 server_config = None
 openapi_parser = None

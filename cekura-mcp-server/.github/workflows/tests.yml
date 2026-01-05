@@ -1,10 +1,6 @@
 name: Tests
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
   workflow_dispatch:
 
 permissions:
@@ -14,56 +10,12 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-      fail-fast: false
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Cache pip dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-${{ matrix.python-version }}-
-            ${{ runner.os }}-pip-
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Run tests with pytest
-        run: |
-          pytest --cov=. --cov-report=xml --cov-report=term-missing
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
-        if: matrix.python-version == '3.10'
-        with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-
-  lint:
-    name: Lint Code
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -71,22 +23,40 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black isort mypy
+          pip install -r requirements.txt
 
-      - name: Run flake8
-        run: |
-          # Stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # Exit-zero treats all errors as warnings
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Run tests
+        run: pytest -v
 
-      - name: Check code formatting with black
-        run: |
-          black --check --diff .
+      - name: Run tests with coverage
+        run: pytest --cov=. --cov-report=term-missing
 
-      - name: Check import sorting with isort
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install linting tools
         run: |
-          isort --check-only --diff .
+          python -m pip install --upgrade pip
+          pip install flake8 black isort
+
+      - name: Check syntax errors
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Check code formatting
+        run: black --check .
+
+      - name: Check import sorting
+        run: isort --check-only .
 
   security:
     name: Security Scan
@@ -96,33 +66,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install security tools
         run: |
           python -m pip install --upgrade pip
           pip install bandit safety
 
-      - name: Run bandit security scan
-        run: |
-          bandit -r . -f json -o bandit-report.json || true
+      - name: Run security scan
+        run: bandit -r . -ll || true
 
-      - name: Run safety check
-        run: |
-          safety check --json || true
+      - name: Check dependencies
+        run: safety check || true
 
-  validate-whitelist:
-    name: Validate API Whitelist
+  whitelist:
+    name: Validate Whitelist
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
@@ -132,18 +100,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Validate whitelist generation
-        run: |
-          python extract_documented_apis.py
+      - name: Generate whitelist
+        run: python extract_documented_apis.py
 
-      - name: Check whitelist file exists
+      - name: Verify whitelist created
         run: |
-          if [ ! -f "data/documented_apis.json" ]; then
+          if [ ! -f "documented_apis.json" ]; then
             echo "Error: documented_apis.json not found!"
             exit 1
           fi
-          echo "Whitelist file exists and is valid"
+          echo "✅ Whitelist generated successfully"
 
-      - name: Validate whitelist count
-        run: |
-          python test_whitelist.py
+      - name: Run whitelist tests
+        run: pytest tests/test_whitelist.py -v

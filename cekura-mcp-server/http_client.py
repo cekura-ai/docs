@@ -77,7 +77,7 @@ class CekuraAPIClient:
         if not isinstance(value, str):
             return value
 
-        json_field_patterns = ['_json', 'metadata', 'dynamic_variables', 'context']
+        json_field_patterns = ['_json', 'metadata', 'dynamic_variables', 'context', '_data']
         if any(pattern in key.lower() for pattern in json_field_patterns):
             try:
                 return json.loads(value)

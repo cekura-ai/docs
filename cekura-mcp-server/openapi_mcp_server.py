@@ -2,6 +2,7 @@ import sys
 import asyncio
 import logging
 from typing import Any, Dict
+from contextvars import ContextVar
 from mcp.server.fastmcp import FastMCP
 from mcp import types
 
@@ -29,13 +30,13 @@ class HealthCheckFilter(logging.Filter):
         message = record.getMessage()
         return not any(path in message for path in ['/mcp/health', '/mcp/healthz', '/favicon.ico'])
 
+request_api_key: ContextVar[str] = ContextVar('request_api_key', default=None)
 
 mcp = FastMCP("Cekura API")
 
 server_config = None
 openapi_parser = None
 operations_registry = {}
-session_api_keys = {}
 
 
 async def initialize_server():
@@ -111,15 +112,14 @@ async def test_simple_tool(message: str) -> str:
     return f"Hello from Cekura MCP Server! You said: {message}"
 
 
-def get_session_api_key():
-    if session_api_keys:
-        for session_id, api_key in session_api_keys.items():
-            logger.info(f"Using API key from session: {session_id}")
-            return api_key
-
-    raise ValueError(
-        "No API key found. Please provide API key via X-CEKURA-API-KEY header when connecting to the MCP server."
-    )
+def get_request_api_key():
+    """Get API key from current request context."""
+    api_key = request_api_key.get()
+    if not api_key:
+        raise ValueError(
+            "No API key found. Please provide API key via X-CEKURA-API-KEY header when connecting to the MCP server."
+        )
+    return api_key
 
 def setup_dynamic_tool_handlers():
     from mcp.types import Tool as MCPTool
@@ -144,8 +144,8 @@ def setup_dynamic_tool_handlers():
     async def call_tool_with_dynamic(name: str, arguments: dict):
         if name in operations_registry:
             try:
-                # Get API key from session (raises ValueError if not found)
-                api_key = get_session_api_key()
+                # Get API key from request context (raises ValueError if not found)
+                api_key = get_request_api_key()
 
                 tool_data = operations_registry[name]
                 op = tool_data['operation']
@@ -200,16 +200,10 @@ def main():
                 return response
 
             api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
-            session_id = request.headers.get('mcp-session-id')
 
             if api_key:
-                logger.info(f"Captured API key: {api_key[:20]}...")
-                if session_id:
-                    session_api_keys[session_id] = api_key
-                    logger.info(f"Stored API key for session: {session_id}")
-                else:
-                    session_api_keys['_default'] = api_key
-                    logger.info("Stored API key as default (no session ID yet)")
+                request_api_key.set(api_key)
+                logger.debug(f"API key set for request: {api_key[:20]}...")
 
             response = await call_next(request)
             return response

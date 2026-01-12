@@ -8,7 +8,127 @@ description: "Configure Interactive Voice Response (IVR) and voicemail scenarios
 
 ## Overview
 
-Learn how to create IVR (Interactive Voice Response) and voicemail scenarios in Cekura using conditional actions. These powerful features allow you to build menu-driven phone systems and voicemail receivers that respond to DTMF tones.
+Learn how to create voicemail and IVR (Interactive Voice Response) scenarios in Cekura using conditional actions. These powerful features allow you to build voicemail receivers and menu-driven phone systems that respond to DTMF tones.
+
+## Voicemail
+
+### What is Voicemail?
+
+Voicemail systems allow callers to leave messages when the recipient is unavailable. With Cekura, you can create intelligent voicemail receivers that guide callers through the message recording process using conditional action-based test cases.
+
+### How It Works
+
+1. The voicemail system greets the caller with a personalized message
+2. Prompts the caller to record their message
+3. Waits for a DTMF signal (e.g., pressing 0) to mark the end of the message
+4. Ends the call after message completion, signifying the recording was saved
+
+### Creating a Voicemail Scenario
+
+Follow these steps to set up a voicemail system in Cekura:
+
+#### Step 1: Open Create Evaluator Form
+
+Navigate to the evaluator creation form and click on "Create Evaluator" to begin setting up your voicemail scenario. Select **Conditional Actions** as the evaluator type. Conditional actions are conditional action-based test cases that allow you to define specific behaviors based on caller interactions.
+
+<img src="/images/voicemail/conditional-actions-select.png" alt="Select Conditional Actions Type" />
+
+#### Step 2: Configure Voicemail Conditions
+
+In the conditions configuration:
+
+**First Message (Optional):** You can leave this field empty for voicemail scenarios.
+
+**Condition 1 - Voicemail Greeting:**
+When the main agent starts the conversation, add a voicemail greeting using the `<voicemail>` XML tag with the following syntax:
+
+```xml
+<voicemail text="Hello, [Name] is not available right now. Please record your message after this message and please press [digit] button after you have finished speaking the message to mark the end of message." />
+```
+
+**Important:** When using XML tags like `<voicemail>`, make sure to set the `fixed_message` field to `true` in your condition configuration.
+
+**Condition 2 - End Call on DTMF:**
+When the main agent sends a DTMF tone of the digit you mentioned (e.g., 0), end the call using the `<endcall />` tag. This simulates that the recording was saved successfully. Remember to set `fixed_message` to `true` for this condition as well.
+
+Following is an example of how to do the same.
+
+<img src="/images/voicemail/voicemail-configure-conditions.png" alt="Step 2: Configure Voicemail Conditions" />
+
+#### Step 3: Assign a Twilio/Telnyx Number
+
+In the final step of evaluator creation, you need to assign a phone number that supports DTMF tone reception. Currently, DTMF reception is supported for **Twilio and Telnyx numbers only**.
+
+**Select one of the following:**
+- Use one of these pre-configured numbers:
+  - `+14482202817`
+  - `+18148592081`
+- Or use your own imported Twilio/Telnyx number
+
+<img src="/images/voicemail/assign-number.png" alt="Step 3: Assign Twilio/Telnyx Number" />
+
+<Note>
+**Note:** DTMF tone reception is currently supported for Twilio and Telnyx numbers only. Support for additional providers will be extended soon. Make sure to select a Twilio/Telnyx number for your voicemail system to work correctly.
+</Note>
+
+### Complete Voicemail Configuration Example
+
+Here's a complete JSON configuration example for a personal voicemail system:
+
+```json
+{
+  "conditions": [
+    {
+      "id": 1,
+      "condition": "The main agent starts the conversation and says \"Hello\".",
+      "action": "<voicemail text=\"Hello, Adarsh is not available right now please record your message after this message and please press 0 button after you have finished speaking the message to mark the end of message.\" />",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 2,
+      "condition": "Main Agent sent DTMF: 0",
+      "action": "<endcall />",
+      "type": "standard",
+      "fixed_message": true
+    }
+  ],
+  "role": "You are a bot acting as a voicemail receiver."
+}
+```
+
+**Key Configuration Points:**
+- **conditions**: Array of condition-action pairs that define the voicemail flow
+- **role**: Defines the agent's behavior as a voicemail receiver
+- **fixed_message**: Set to `true` when using XML tags (`<voicemail>`, `<endcall />`)
+- **action**: Contains either XML tags for structured responses or natural language instructions
+
+### Key Voicemail Features
+
+- **Personalized Greetings**: Custom messages for different recipients
+- **Message Recording**: Capture caller messages automatically
+- **Completion Signals**: Use DTMF tones to indicate message completion
+- **Automatic Call Termination**: End call after message is recorded
+- **Conditional Actions**: Define specific behaviors based on caller interactions
+
+### Voicemail Best Practices
+
+- Start with a clear greeting identifying the recipient
+- Provide explicit instructions for leaving a message
+- Specify how to end the message (e.g., "Press 0 when finished")
+- Keep the greeting brief and professional
+- Always use a Twilio or Telnyx number for DTMF support
+- Consider adding options for urgent messages or alternative contacts
+- Test with different phone carriers to ensure compatibility
+
+### Voicemail Use Cases
+
+- Personal voicemail boxes
+- After-hours message collection
+- Event registration confirmations
+- Customer callback requests
+- Survey response collection
+- Automated appointment reminders with response capture
 
 ## IVR (Interactive Voice Response)
 
@@ -21,6 +141,40 @@ IVR systems provide menu-based navigation for phone calls, allowing callers to i
 1. The IVR system waits for DTMF tones from the caller
 2. Based on the received tone and current menu context, the system responds with the appropriate action
 3. Actions can include playing menu prompts or transitioning to natural conversation
+
+### Creating an IVR Scenario
+
+Follow these steps to set up an IVR system in Cekura:
+
+#### Step 1: Create Evaluator with Conditional Actions
+
+Navigate to the evaluator creation form and select **Conditional Actions** as the evaluator type, similar to the voicemail setup.
+
+#### Step 2: Configure IVR Menu Structure
+
+Define your IVR menu flow using conditions and actions:
+
+- **FIRST_MESSAGE**: Set up the initial greeting and menu options
+- **DTMF-based conditions**: Create conditions for each menu option based on DTMF tones
+- **Actions**: Use `<ivr>` XML tags for menu prompts or transition to natural conversation
+
+<Note>
+**Important:** When using XML tags like `<ivr>` in your actions, always set the `fixed_message` field to `true`. Only set `fixed_message` to `false` when you want the agent to respond naturally without using XML tags.
+</Note>
+
+#### Step 3: Assign a Twilio/Telnyx Number
+
+Just like voicemail, IVR systems require DTMF reception capabilities. You need to assign a phone number that supports DTMF tone detection.
+
+**Select one of the following:**
+- Use one of these pre-configured numbers:
+  - `+14482202817`
+  - `+18148592081`
+- Or use your own imported Twilio/Telnyx number
+
+<Note>
+**Important:** IVR functionality relies on DTMF tone reception, which is currently supported for Twilio and Telnyx numbers only. Support for additional providers will be extended soon. Make sure to select a Twilio/Telnyx number for your IVR system to work correctly.
+</Note>
 
 ### IVR Configuration Structure
 
@@ -39,19 +193,17 @@ IVR scenarios are configured using a JSON structure with conditions and actions:
 | `condition` | string | Yes | Description of when this condition applies (e.g., "FIRST_MESSAGE", specific DTMF tones) |
 | `action` | string | Yes | Action to take (XML tag for IVR prompt or natural response instruction) |
 | `type` | string | Yes | Type of condition (typically "standard") |
-| `fixed_message` | boolean | Yes | Whether the message is fixed (true for IVR prompts, false for natural responses) |
+| `fixed_message` | boolean | Yes | Whether the message is fixed. **Must be `true` when using XML tags** like `<ivr>`. Set to `false` only for natural conversation responses. |
 
 ### IVR XML Tags
 
-Use the `<ivr>` XML tag to define menu prompts:
+Use the `<ivr>` XML tag to define menu prompts. Remember to set `fixed_message: true` when using this tag:
 
 ```xml
 <ivr text="Your menu text here. Press 1 for Option A, Press 2 for Option B." />
 ```
 
 ### Example: Hospital IVR System
-
-[Screenshot placeholder - User will add]
 
 ```json
 {
@@ -152,94 +304,15 @@ Use the `<ivr>` XML tag to define menu prompts:
 - **Context-Aware Routing**: Different actions based on previous menu selections
 - **Hybrid Mode**: Mix IVR menus with natural conversation (set `fixed_message: false`)
 
-## Voicemail
-
-### What is Voicemail?
-
-Voicemail systems allow callers to leave messages when the recipient is unavailable. With Cekura, you can create intelligent voicemail receivers that guide callers through the message recording process.
-
-### How It Works
-
-1. The voicemail system greets the caller
-2. Prompts the caller to record their message
-3. Waits for a DTMF signal (e.g., pressing 0) to mark the end of the message
-4. Ends the call after message completion
-
-### Voicemail Configuration Structure
-
-Voicemail scenarios use the same JSON structure as IVR:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `conditions` | array | Yes | Array of condition objects defining the voicemail flow |
-| `role` | string | Yes | System role defining the agent's behavior |
-
-### Voicemail XML Tags
-
-Use the `<voicemail>` XML tag to define voicemail prompts:
-
-```xml
-<voicemail text="Your voicemail greeting here. Please leave a message after the tone." />
-```
-
-Use the `<endcall />` tag to terminate the call:
-
-```xml
-<endcall />
-```
-
-### Example: Personal Voicemail System
-
-[Screenshot placeholder - User will add]
-
-```json
-{
-  "conditions": [
-    {
-      "id": 1,
-      "condition": "The main agent starts the conversation and only says \"Hello\".",
-      "action": "<voicemail text=\"Hello, Adarsh is not available right now please record your message after this message and please press 0 button after you have finished speaking the message to mark the end of message.\" />",
-      "type": "standard",
-      "fixed_message": true
-    },
-    {
-      "id": 2,
-      "condition": "Main Agent sent DTMF: 0",
-      "action": "<endcall />",
-      "type": "standard",
-      "fixed_message": true
-    }
-  ],
-  "role": "You are a bot acting as a voicemail receiver."
-}
-```
-
-### Key Voicemail Features
-
-- **Personalized Greetings**: Custom messages for different recipients
-- **Message Recording**: Capture caller messages
-- **Completion Signals**: Use DTMF tones to indicate message completion
-- **Automatic Call Termination**: End call after message is recorded
-
-## Best Practices
-
-### IVR Systems
+### IVR Best Practices
 
 - Keep menu options concise (3-4 options per menu level)
 - Provide clear instructions for navigation
 - Always include an option to return to the main menu
 - Offer an escape to natural conversation when needed
 - Use consistent DTMF patterns (e.g., 9 for main menu, 0 for operator)
-
-### Voicemail Systems
-
-- Start with a clear greeting identifying the recipient
-- Provide explicit instructions for leaving a message
-- Specify how to end the message (e.g., "Press 0 when finished")
-- Keep the greeting brief and professional
-- Consider adding options for urgent messages
-
-## Common Use Cases
+- Always use a Twilio or Telnyx number for DTMF support
+- Test menu flows thoroughly before deployment
 
 ### IVR Use Cases
 
@@ -248,19 +321,13 @@ Use the `<endcall />` tag to terminate the call:
 - Appointment scheduling
 - Order status inquiries
 - Department directory navigation
-
-### Voicemail Use Cases
-
-- Personal voicemail boxes
-- After-hours message collection
-- Event registration confirmations
-- Customer callback requests
-- Survey response collection
+- Multi-level menu systems for large organizations
 
 ## Next Steps
 
-After configuring your IVR or voicemail scenario:
+After configuring your voicemail or IVR scenario:
 1. Test thoroughly with different DTMF sequences
 2. Monitor call transcripts for user behavior patterns
-3. Refine menu structures based on usage data
-4. Update prompts for clarity and efficiency
+3. Refine menu structures and prompts based on usage data
+4. Ensure proper error handling for invalid inputs
+5. Update prompts for clarity and efficiency

@@ -6610,7 +6610,7 @@
             },
             "patch": {
                 "operationId": "test-framework-metric-reviews-partial-update",
-                "description": "Update a metric review in Labs. Typically used to add or update feedback notes for test sets.",
+                "description": "A mixin that provides a get_value method to extract values from request data.\n\nThis mixin can be added to any Django REST Framework view to easily extract\nvalues from either query parameters or request body, depending on the HTTP method.",
                 "parameters": [
                     {
                         "in": "path",
@@ -6665,7 +6665,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-metric-reviews-partial-update",
-                        "description": "Update a metric review in Labs. Typically used to add or update feedback notes for test sets."
+                        "description": "A mixin that provides a get_value method to extract values from request data.\n\nThis mixin can be added to any Django REST Framework view to easily extract\nvalues from either query parameters or request body, depending on the HTTP method."
                     }
                 }
             },
@@ -6824,7 +6824,7 @@
         "/test_framework/metric-reviews/process_feedbacks/": {
             "post": {
                 "operationId": "test-framework-metric-reviews-process-feedbacks-create",
-                "description": "Improve a metric using feedback from test sets. Returns improved metric configuration. Use the Update Metric endpoint to save changes.",
+                "description": "Process multiple feedbacks for a metric across multiple test sets.\n\nThis endpoint takes a metric ID and test set IDs, retrieves the associated\nmetric reviews with feedback, and calls process_metric_feedbacks to generate\nimproved metric description and evaluation trigger. After optimization, it\nruns reviews on all test sets with the optimized parameters and returns the\nresults.",
                 "tags": [
                     "test_framework"
                 ],
@@ -6832,17 +6832,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ProcessFeedbacksRequest"
+                                "$ref": "#/components/schemas/MetricReviewInline"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/ProcessFeedbacksRequest"
+                                "$ref": "#/components/schemas/MetricReviewInline"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/ProcessFeedbacksRequest"
+                                "$ref": "#/components/schemas/MetricReviewInline"
                             }
                         }
                     },
@@ -6855,14 +6855,21 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Returns progress_id for tracking progress"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricReviewInline"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 },
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-metric-reviews-process-feedbacks-create",
-                        "description": "Improve a metric using feedback from test sets. Returns improved metric configuration. Use the Update Metric endpoint to save changes."
+                        "description": "Process multiple feedbacks for a metric across multiple test sets.\n\nThis endpoint takes a metric ID and test set IDs, retrieves the associated\nmetric reviews with feedback, and calls process_metric_feedbacks to generate\nimproved metric description and evaluation trigger. After optimization, it\nruns reviews on all test sets with the optimized parameters and returns the\nresults."
                     }
                 }
             }
@@ -6870,34 +6877,7 @@
         "/test_framework/metric-reviews/process_feedbacks_progress/": {
             "get": {
                 "operationId": "test-framework-metric-reviews-process-feedbacks-progress-retriev",
-                "description": "Poll the progress of metric optimization from feedback processing. Returns the improved metric description and evaluation trigger when complete.",
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "Progress ID returned from the process_feedbacks endpoint",
-                        "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "agent_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Agent ID for permission validation"
-                    },
-                    {
-                        "in": "query",
-                        "name": "project_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Project ID for permission validation"
-                    }
-                ],
+                "description": "A mixin that provides a get_value method to extract values from request data.\n\nThis mixin can be added to any Django REST Framework view to easily extract\nvalues from either query parameters or request body, depending on the HTTP method.",
                 "tags": [
                     "test_framework"
                 ],
@@ -6911,7 +6891,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ProcessFeedbacksResponse"
+                                    "$ref": "#/components/schemas/MetricReviewInline"
                                 }
                             }
                         },
@@ -6922,7 +6902,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-metric-reviews-process-feedbacks-progress-retriev",
-                        "description": "Poll the progress of metric optimization from feedback processing. Returns the improved metric description and evaluation trigger when complete."
+                        "description": "A mixin that provides a get_value method to extract values from request data.\n\nThis mixin can be added to any Django REST Framework view to easily extract\nvalues from either query parameters or request body, depending on the HTTP method."
                     }
                 }
             }
@@ -8092,6 +8072,45 @@
         "/test_framework/test-sets/create_from_call_log/": {
             "post": {
                 "operationId": "test-framework-test-sets-create-from-call-log-create",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "call_log_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the call log to create test set from",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the agent that owns the call log",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "name",
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        },
+                        "description": "Optional name for the test set. If not provided, call log ID will be used"
+                    },
+                    {
+                        "in": "query",
+                        "name": "metrics",
+                        "schema": {
+                            "type": "array",
+                            "items": {}
+                        },
+                        "description": "List of metrics with optional notes to include in the test set",
+                        "required": true
+                    }
+                ],
                 "tags": [
                     "test_framework"
                 ],
@@ -8099,17 +8118,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromCallLogRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromCallLogRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromCallLogRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         }
                     },
@@ -8144,6 +8163,34 @@
         "/test_framework/test-sets/create_from_call_logs/": {
             "post": {
                 "operationId": "test-framework-test-sets-create-from-call-logs-create",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "call_logs",
+                        "schema": {},
+                        "description": "Can be 'all', a positive integer (number of call logs), or a list of call log IDs",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the agent that owns the call logs",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "metrics",
+                        "schema": {
+                            "type": "array",
+                            "items": {}
+                        },
+                        "description": "List of metrics with optional notes to include in the test set",
+                        "required": true
+                    }
+                ],
                 "tags": [
                     "test_framework"
                 ],
@@ -8151,17 +8198,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromCallLogsRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromCallLogsRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromCallLogsRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         }
                     },
@@ -8196,6 +8243,45 @@
         "/test_framework/test-sets/create_from_run/": {
             "post": {
                 "operationId": "test-framework-test-sets-create-from-run-create",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "run_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the run to create test set from",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the agent that owns the run",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "name",
+                        "schema": {
+                            "type": "string",
+                            "default": ""
+                        },
+                        "description": "Optional name for the test set. If not provided, run ID will be used"
+                    },
+                    {
+                        "in": "query",
+                        "name": "metrics",
+                        "schema": {
+                            "type": "array",
+                            "items": {}
+                        },
+                        "description": "List of metrics with optional notes to include in the test set",
+                        "required": true
+                    }
+                ],
                 "tags": [
                     "test_framework"
                 ],
@@ -8203,17 +8289,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromRunRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromRunRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreateFromRunRequest"
+                                "$ref": "#/components/schemas/TestSetDetail"
                             }
                         }
                     },
@@ -9288,7 +9374,6 @@
                                         "value": {
                                             "id": 1,
                                             "name": "tool_user_data",
-                                            "description": "This tool retrieves user data from the database based on user ID",
                                             "information": [
                                                 {
                                                     "input": {
@@ -9432,7 +9517,6 @@
                                 "UpdateToolRequest": {
                                     "value": {
                                         "name": "tool_user_data",
-                                        "description": "This tool retrieves user data from the database based on user ID",
                                         "information": [
                                             {
                                                 "input": {
@@ -9490,7 +9574,6 @@
                                             "id": 1,
                                             "agent": 123,
                                             "name": "tool_user_data",
-                                            "description": "This tool retrieves user data from the database based on user ID",
                                             "information": [
                                                 {
                                                     "input": {
@@ -9613,7 +9696,6 @@
                                             {
                                                 "id": 1,
                                                 "name": "tool_user_data",
-                                                "description": "This tool retrieves user data from the database based on user ID",
                                                 "information": [
                                                     {
                                                         "input": {
@@ -9688,8 +9770,7 @@
                                 "$ref": "#/components/schemas/Tool"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -9707,7 +9788,6 @@
                                     "CreateToolResponse": {
                                         "value": {
                                             "name": "tool_user_data",
-                                            "description": "This tool retrieves user data from the database based on user ID",
                                             "information": [
                                                 {
                                                     "input": {
@@ -12455,56 +12535,7 @@
         "/test_framework/v1/metrics-external/{id}/run_reviews/": {
             "post": {
                 "operationId": "metrics-external-run-reviews-create",
-                "description": "Re-evaluate all test sets for this metric with optional overrides. Returns a progress_id to poll for completion.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this metric.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/RunReviewsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/RunReviewsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/RunReviewsRequest"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Returns progress_id for tracking progress"
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/metrics-external/{id}/variables/": {
-            "post": {
-                "operationId": "metrics-external-variables-create",
-                "description": "Get all variables and their values for a specific test_set and metric combination.\n\nURL Parameter:\n- pk: The metric_id\n\nRequest Body:\n- test_set_id (required): The ID of the test_set (datapoint)\n- metric_description_variables (required/optional): Array of variable names for description.\n  At least one of metric_description_variables or evaluation_trigger_variables must be provided.\n- evaluation_trigger_variables (required/optional): Array of variable names for trigger.\n  At least one of metric_description_variables or evaluation_trigger_variables must be provided.\n\nThis endpoint retrieves the variables and populates them with values from the test_set (datapoint).",
+                "description": "Triggers background processing of metric reviews using Celery tasks.\nReturns a progress_id that can be used to poll for completion status.",
                 "parameters": [
                     {
                         "in": "path",
@@ -13001,7 +13032,7 @@
         "/test_framework/v1/metrics-external/preview/": {
             "post": {
                 "operationId": "metrics-external-preview-create",
-                "description": "Preview metric evaluation on call logs or runs before creating it. Supports up to 10 items. Returns progress_id to poll for results.",
+                "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization.",
                 "tags": [
                     "test_framework"
                 ],
@@ -13009,17 +13040,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricPreview"
+                                "$ref": "#/components/schemas/MetricDetailV2"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricPreview"
+                                "$ref": "#/components/schemas/MetricDetailV2"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricPreview"
+                                "$ref": "#/components/schemas/MetricDetailV2"
                             }
                         }
                     },
@@ -13032,7 +13063,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Returns progress_id for tracking progress"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricDetailV2"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -13040,18 +13078,7 @@
         "/test_framework/v1/metrics-external/preview-progress/": {
             "get": {
                 "operationId": "metrics-external-preview-progress-retrieve",
-                "description": "Poll the progress of metric preview. Returns current state with evaluation results.",
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "Progress ID returned from the preview endpoint",
-                        "required": true
-                    }
-                ],
+                "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization.",
                 "tags": [
                     "test_framework"
                 ],
@@ -13062,7 +13089,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Returns preview state with status and results"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricDetailV2"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -13070,34 +13104,7 @@
         "/test_framework/v1/metrics-external/run_reviews_progress/": {
             "get": {
                 "operationId": "metrics-external-run-reviews-progress-retrieve",
-                "description": "Poll the progress of metric re-evaluation. Returns current state and full metric data when complete.",
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "Progress ID returned from the run_reviews endpoint",
-                        "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "agent_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Agent ID for permission validation"
-                    },
-                    {
-                        "in": "query",
-                        "name": "project_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Project ID for permission validation"
-                    }
-                ],
+                "description": "Polls the progress of background review processing.\nReturns current progress state including completed/failed counts and metric data.",
                 "tags": [
                     "test_framework"
                 ],
@@ -13108,7 +13115,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Returns progress state with completed/failed counts and metric data when finished"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricDetailV2"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -13622,63 +13636,7 @@
         "/test_framework/v1/metrics/{id}/run_reviews/": {
             "post": {
                 "operationId": "metrics-run-reviews-create",
-                "description": "Re-evaluate all test sets for this metric with optional overrides. Returns a progress_id to poll for completion.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this metric.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/RunReviewsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/RunReviewsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/RunReviewsRequest"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Returns progress_id for tracking progress"
-                    }
-                },
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "metrics-run-reviews-create",
-                        "description": "Re-evaluate all test sets for this metric with optional overrides. Returns a progress_id to poll for completion."
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/metrics/{id}/variables/": {
-            "post": {
-                "operationId": "metrics-variables-create",
-                "description": "Get all variables and their values for a specific test_set and metric combination.\n\nURL Parameter:\n- pk: The metric_id\n\nRequest Body:\n- test_set_id (required): The ID of the test_set (datapoint)\n- metric_description_variables (required/optional): Array of variable names for description.\n  At least one of metric_description_variables or evaluation_trigger_variables must be provided.\n- evaluation_trigger_variables (required/optional): Array of variable names for trigger.\n  At least one of metric_description_variables or evaluation_trigger_variables must be provided.\n\nThis endpoint retrieves the variables and populates them with values from the test_set (datapoint).",
+                "description": "Triggers background processing of metric reviews using Celery tasks.\nReturns a progress_id that can be used to poll for completion status.",
                 "parameters": [
                     {
                         "in": "path",
@@ -13733,8 +13691,8 @@
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "metrics-variables-create",
-                        "description": "Get all variables and their values for a specific test_set and metric combination.\n\nURL Parameter:\n- pk: The metric_id\n\nRequest Body:\n- test_set_id (required): The ID of the test_set (datapoint)\n- metric_description_variables (required/optional): Array of variable names for description.\n  At least one of metric_description_variables or evaluation_trigger_variables must be provided.\n- evaluation_trigger_variables (required/optional): Array of variable names for trigger.\n  At least one of metric_description_variables or evaluation_trigger_variables must be provided.\n\nThis endpoint retrieves the variables and populates them with values from the test_set (datapoint)."
+                        "name": "metrics-run-reviews-create",
+                        "description": "Triggers background processing of metric reviews using Celery tasks.\nReturns a progress_id that can be used to poll for completion status."
                     }
                 }
             }
@@ -14252,7 +14210,7 @@
         "/test_framework/v1/metrics/preview/": {
             "post": {
                 "operationId": "metrics-preview-create",
-                "description": "Preview metric evaluation on call logs or runs before creating it. Supports up to 10 items. Returns progress_id to poll for results.",
+                "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization.",
                 "tags": [
                     "test_framework"
                 ],
@@ -14260,17 +14218,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricPreview"
+                                "$ref": "#/components/schemas/MetricDetailV2"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricPreview"
+                                "$ref": "#/components/schemas/MetricDetailV2"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricPreview"
+                                "$ref": "#/components/schemas/MetricDetailV2"
                             }
                         }
                     },
@@ -14283,14 +14241,21 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Returns progress_id for tracking progress"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricDetailV2"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 },
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
                         "name": "metrics-preview-create",
-                        "description": "Preview metric evaluation on call logs or runs before creating it. Supports up to 10 items. Returns progress_id to poll for results."
+                        "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization."
                     }
                 }
             }
@@ -14298,18 +14263,7 @@
         "/test_framework/v1/metrics/preview-progress/": {
             "get": {
                 "operationId": "metrics-preview-progress-retrieve",
-                "description": "Poll the progress of metric preview. Returns current state with evaluation results.",
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "Progress ID returned from the preview endpoint",
-                        "required": true
-                    }
-                ],
+                "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization.",
                 "tags": [
                     "test_framework"
                 ],
@@ -14320,14 +14274,21 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Returns preview state with status and results"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricDetailV2"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 },
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
                         "name": "metrics-preview-progress-retrieve",
-                        "description": "Poll the progress of metric preview. Returns current state with evaluation results."
+                        "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization."
                     }
                 }
             }
@@ -14335,34 +14296,7 @@
         "/test_framework/v1/metrics/run_reviews_progress/": {
             "get": {
                 "operationId": "metrics-run-reviews-progress-retrieve",
-                "description": "Poll the progress of metric re-evaluation. Returns current state and full metric data when complete.",
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "Progress ID returned from the run_reviews endpoint",
-                        "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "agent_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Agent ID for permission validation"
-                    },
-                    {
-                        "in": "query",
-                        "name": "project_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Project ID for permission validation"
-                    }
-                ],
+                "description": "Polls the progress of background review processing.\nReturns current progress state including completed/failed counts and metric data.",
                 "tags": [
                     "test_framework"
                 ],
@@ -14373,14 +14307,21 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Returns progress state with completed/failed counts and metric data when finished"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricDetailV2"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 },
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
                         "name": "metrics-run-reviews-progress-retrieve",
-                        "description": "Poll the progress of metric re-evaluation. Returns current state and full metric data when complete."
+                        "description": "Polls the progress of background review processing.\nReturns current progress state including completed/failed counts and metric data."
                     }
                 }
             }
@@ -36633,84 +36574,6 @@
                     "id"
                 ]
             },
-            "CreateFromCallLogRequest": {
-                "type": "object",
-                "properties": {
-                    "call_log_id": {
-                        "type": "integer",
-                        "description": "ID of the call log to create test set from"
-                    },
-                    "agent": {
-                        "type": "integer",
-                        "description": "ID of the agent that owns the call log"
-                    },
-                    "name": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Optional name for the test set. If not provided, call log ID will be used"
-                    },
-                    "metrics": {
-                        "type": "array",
-                        "items": {},
-                        "description": "List of metrics with optional notes to include in the test set"
-                    }
-                },
-                "required": [
-                    "agent",
-                    "call_log_id",
-                    "metrics"
-                ]
-            },
-            "CreateFromCallLogsRequest": {
-                "type": "object",
-                "properties": {
-                    "call_logs": {
-                        "description": "Can be 'all', a positive integer (number of call logs), or a list of call log IDs"
-                    },
-                    "agent": {
-                        "type": "integer",
-                        "description": "ID of the agent that owns the call logs"
-                    },
-                    "metrics": {
-                        "type": "array",
-                        "items": {},
-                        "description": "List of metrics with optional notes to include in the test set"
-                    }
-                },
-                "required": [
-                    "agent",
-                    "call_logs",
-                    "metrics"
-                ]
-            },
-            "CreateFromRunRequest": {
-                "type": "object",
-                "properties": {
-                    "run_id": {
-                        "type": "integer",
-                        "description": "ID of the run to create test set from"
-                    },
-                    "agent": {
-                        "type": "integer",
-                        "description": "ID of the agent that owns the run"
-                    },
-                    "name": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Optional name for the test set. If not provided, run ID will be used"
-                    },
-                    "metrics": {
-                        "type": "array",
-                        "items": {},
-                        "description": "List of metrics with optional notes to include in the test set"
-                    }
-                },
-                "required": [
-                    "agent",
-                    "metrics",
-                    "run_id"
-                ]
-            },
             "CreatePersonality": {
                 "type": "object",
                 "properties": {
@@ -38067,121 +37930,6 @@
                         "description": "\nAlpha value for exponentially weighted moving average (EWMA) calculation.\nExample: `0.1`\n"
                     }
                 }
-            },
-            "MetricPreview": {
-                "type": "object",
-                "properties": {
-                    "agent_id": {
-                        "type": "integer",
-                        "description": "Agent ID - all call logs/runs must belong to this agent"
-                    },
-                    "call_log_ids": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        },
-                        "description": "List of call log IDs to evaluate (maximum 10, required if run_ids not provided)",
-                        "maxItems": 10,
-                        "minItems": 1
-                    },
-                    "run_ids": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        },
-                        "description": "List of run IDs to evaluate (maximum 10, required if call_log_ids not provided)",
-                        "maxItems": 10,
-                        "minItems": 1
-                    },
-                    "metric_data": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/MetricPreviewData"
-                            }
-                        ],
-                        "description": "Metric configuration to evaluate"
-                    }
-                },
-                "required": [
-                    "agent_id",
-                    "metric_data"
-                ]
-            },
-            "MetricPreviewData": {
-                "type": "object",
-                "properties": {
-                    "name": {
-                        "type": "string",
-                        "description": "Name of the metric",
-                        "maxLength": 255
-                    },
-                    "type": {
-                        "enum": [
-                            "basic",
-                            "custom_prompt",
-                            "custom_code",
-                            "llm_judge"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "b44700c0a6443b40",
-                        "description": "Type of metric: basic, custom_prompt, or custom_code\n\n* `basic` - Basic (Deprecated in favor of LLM Judge)\n* `custom_prompt` - Custom Prompt ( Deprecated in favor of LLM Judge)\n* `custom_code` - Custom Code\n* `llm_judge` - LLM Judge"
-                    },
-                    "eval_type": {
-                        "enum": [
-                            "binary_workflow_adherence",
-                            "binary_qualitative",
-                            "continuous_qualitative",
-                            "numeric",
-                            "enum"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "1e3e27b342bfd8ec",
-                        "description": "Evaluation type: binary_workflow_adherence, binary_qualitative, continuous_qualitative, numeric, or enum\n\n* `binary_workflow_adherence` - Binary Workflow Adherence\n* `binary_qualitative` - Binary Qualitative\n* `continuous_qualitative` - Continuous Qualitative\n* `numeric` - Numeric\n* `enum` - Enum"
-                    },
-                    "evaluation_trigger": {
-                        "enum": [
-                            "always",
-                            "automatic",
-                            "custom"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "ecd3c02e0e393ef5",
-                        "default": "always",
-                        "description": "When to trigger evaluation: always, automatic, or custom\n\n* `always` - Always\n* `automatic` - Automatic\n* `custom` - Custom"
-                    },
-                    "evaluation_trigger_prompt": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Prompt for evaluation trigger (required for custom trigger)"
-                    },
-                    "description": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Description of what the metric measures (required for basic type)"
-                    },
-                    "prompt": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Custom prompt for evaluation (required for custom_prompt type)"
-                    },
-                    "custom_code": {
-                        "type": "string",
-                        "default": "",
-                        "description": "Python code for custom evaluation (required for custom_code type)"
-                    },
-                    "enum_values": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "List of possible enum values (required when eval_type is enum)"
-                    }
-                },
-                "required": [
-                    "eval_type",
-                    "name",
-                    "type"
-                ]
             },
             "MetricReviewDetail": {
                 "type": "object",
@@ -41996,12 +41744,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, and hyphens",
                         "maxLength": 255
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "\nDescription of the mock tool.\nExample: \"This tool retrieves user data from the database based on user ID\"\n"
                     },
                     "information": {
                         "description": "\nInformation of the tool - must be a list of input-output mappings.\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    }\n]\n```\n"
@@ -42664,74 +42407,6 @@
                     }
                 }
             },
-            "ProcessFeedbacksRequest": {
-                "type": "object",
-                "properties": {
-                    "metric_id": {
-                        "type": "integer",
-                        "description": "ID of the metric to process feedbacks for"
-                    },
-                    "metric_type": {
-                        "enum": [
-                            "basic",
-                            "custom_prompt",
-                            "custom_code",
-                            "llm_judge"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "b44700c0a6443b40",
-                        "description": "Optional metric type\n\n* `basic` - Basic (Deprecated in favor of LLM Judge)\n* `custom_prompt` - Custom Prompt ( Deprecated in favor of LLM Judge)\n* `custom_code` - Custom Code\n* `llm_judge` - LLM Judge"
-                    },
-                    "test_set_ids": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        },
-                        "description": "List of test set IDs to process feedbacks from",
-                        "minItems": 1
-                    }
-                },
-                "required": [
-                    "metric_id",
-                    "test_set_ids"
-                ]
-            },
-            "ProcessFeedbacksResponse": {
-                "type": "object",
-                "properties": {
-                    "improved_metric_description": {
-                        "type": "string",
-                        "description": "Improved metric description"
-                    },
-                    "improved_evaluation_trigger": {
-                        "type": "string",
-                        "description": "Improved evaluation trigger"
-                    },
-                    "metric_description_program": {
-                        "description": "Advanced metric configuration"
-                    },
-                    "metric_description_variables": {
-                        "type": "array",
-                        "items": {},
-                        "description": "Variables used in metric description"
-                    },
-                    "evaluation_trigger_program": {
-                        "description": "Advanced trigger configuration"
-                    },
-                    "evaluation_trigger_variables": {
-                        "type": "array",
-                        "items": {},
-                        "description": "Variables used in evaluation trigger"
-                    },
-                    "review_results": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/ReviewResult"
-                        },
-                        "description": "Evaluation results for each test set"
-                    }
-                }
-            },
             "Project": {
                 "type": "object",
                 "properties": {
@@ -43380,42 +43055,6 @@
                     }
                 }
             },
-            "ReviewResult": {
-                "type": "object",
-                "properties": {
-                    "review_id": {
-                        "type": "integer"
-                    },
-                    "test_set_id": {
-                        "type": "integer"
-                    },
-                    "actual_value": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "explanation": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ]
-                    },
-                    "success": {
-                        "type": "boolean"
-                    },
-                    "error": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    }
-                }
-            },
             "Run": {
                 "type": "object",
                 "properties": {
@@ -43789,54 +43428,6 @@
                         "type": "number",
                         "format": "double",
                         "description": "Timestamp of the message"
-                    }
-                }
-            },
-            "RunReviewsRequest": {
-                "type": "object",
-                "properties": {
-                    "evaluation_trigger": {
-                        "type": "string",
-                        "description": "Override evaluation trigger setting"
-                    },
-                    "evaluation_trigger_prompt": {
-                        "type": "string",
-                        "description": "Override evaluation trigger prompt"
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Override metric description"
-                    },
-                    "type": {
-                        "enum": [
-                            "basic",
-                            "custom_prompt",
-                            "custom_code",
-                            "llm_judge"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "b44700c0a6443b40",
-                        "description": "Override metric type\n\n* `basic` - Basic (Deprecated in favor of LLM Judge)\n* `custom_prompt` - Custom Prompt ( Deprecated in favor of LLM Judge)\n* `custom_code` - Custom Code\n* `llm_judge` - LLM Judge"
-                    },
-                    "custom_code": {
-                        "type": "string",
-                        "description": "Override custom code"
-                    },
-                    "prompt": {
-                        "type": "string",
-                        "description": "Override evaluation prompt"
-                    },
-                    "metric_description_program": {
-                        "description": "Advanced metric description configuration"
-                    },
-                    "metric_description_variables": {
-                        "description": "Variables for metric description"
-                    },
-                    "evaluation_trigger_program": {
-                        "description": "Advanced trigger configuration"
-                    },
-                    "evaluation_trigger_variables": {
-                        "description": "Variables for evaluation trigger"
                     }
                 }
             },
@@ -45924,12 +45515,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, and hyphens",
                         "maxLength": 255
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "\nDescription of the mock tool.\nExample: \"This tool retrieves user data from the database based on user ID\"\n"
                     },
                     "information": {
                         "description": "\nInformation of the tool - must be a list of input-output mappings.\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    }\n]\n```\n"

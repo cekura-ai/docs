@@ -5673,6 +5673,98 @@
                 }
             }
         },
+        "/subscriptions/packs/add_developer_pack/": {
+            "post": {
+                "operationId": "subscriptions-packs-add-developer-pack-create",
+                "description": "Add developer pack to organization after verifying phone number.\nRequires phone number to be verified in Supabase.\nThrottled to 1 request per 30 seconds per user.",
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pack"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/subscriptions/packs/add_developer_trial_pack/": {
+            "post": {
+                "operationId": "subscriptions-packs-add-developer-trial-pack-create",
+                "description": "Add self-serve trial pack to organization after verifying phone number.",
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pack"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/subscriptions/packs/add_pack/": {
             "post": {
                 "operationId": "subscriptions-packs-add-pack-create",
@@ -6104,6 +6196,87 @@
                         "enabled": true,
                         "name": "test-framework-billing-add-credits-create",
                         "description": "Process a one-time payment to add credits to organization balance.\nAlternative to auto-refill for manual credit purchases."
+                    }
+                }
+            }
+        },
+        "/test_framework/billing/{id}/usage-chart/": {
+            "get": {
+                "operationId": "test-framework-billing-usage-chart-retrieve",
+                "description": "Returns transaction usage data split by testing (Run) and call evaluations (CallLog) aggregated by day. Shows net usage (deducted - refunded). By default, shows data for the last 30 days. Supports flexible filtering using JSON filter format.",
+                "summary": "Get usage chart data",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this billing.",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "time_period",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "hour",
+                                "month",
+                                "week"
+                            ]
+                        },
+                        "description": "Time period for aggregation (hour, day, week, month). Default: day"
+                    },
+                    {
+                        "in": "query",
+                        "name": "split_by_type",
+                        "schema": {
+                            "type": "boolean"
+                        },
+                        "description": "Split data by source type (Run vs CallLog). Default: true"
+                    },
+                    {
+                        "in": "query",
+                        "name": "filters",
+                        "schema": {
+                            "type": "object"
+                        },
+                        "description": "Optional JSON filters using TransactionQueryFilter format. If not provided, defaults to last 30 days. Example: {\"operator\": \"and\", \"conditions\": [{\"field\": \"created_at\", \"op\": \"gte\", \"value\": \"2025-11-01T00:00:00Z\"}]}"
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsageChartResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid parameters"
+                    },
+                    "404": {
+                        "description": "Billing not found"
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "test-framework-billing-usage-chart-retrieve",
+                        "description": "Returns transaction usage data split by testing (Run) and call evaluations (CallLog) aggregated by day. Shows net usage (deducted - refunded). By default, shows data for the last 30 days. Supports flexible filtering using JSON filter format."
                     }
                 }
             }
@@ -15824,6 +15997,112 @@
                 }
             }
         },
+        "/test_framework/v1/phone-numbers/providers/plivo/bulk-import/": {
+            "post": {
+                "operationId": "phone-numbers-providers-plivo-bulk-import-create",
+                "description": "Unified API viewset for BYOP (Bring Your Own Telephony Provider).\n\nHandles importing and managing phone numbers from various providers:\n- Twilio\n- Future: Vonage, Bandwidth, Telnyx, etc.\n\nURL Structure: /v1/phone-numbers/providers/{provider}/{action}\n\nHow to add a new provider:\n1. Add provider to PhoneNumberProviderChoices enum\n2. Create {Provider}Service class (e.g., VonageService)\n3. Create Import{Provider}NumberSerializer\n4. Add action method with @action(url_path=\"{provider}/import\")\n5. Update get_serializer_class() mapping",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BulkImportPlivoNumber"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BulkImportPlivoNumber"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/BulkImportPlivoNumber"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BulkImportPlivoResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "phone-numbers-providers-plivo-bulk-import-create",
+                        "description": "Unified API viewset for BYOP (Bring Your Own Telephony Provider).\n\nHandles importing and managing phone numbers from various providers:\n- Twilio\n- Future: Vonage, Bandwidth, Telnyx, etc.\n\nURL Structure: /v1/phone-numbers/providers/{provider}/{action}\n\nHow to add a new provider:\n1. Add provider to PhoneNumberProviderChoices enum\n2. Create {Provider}Service class (e.g., VonageService)\n3. Create Import{Provider}NumberSerializer\n4. Add action method with @action(url_path=\"{provider}/import\")\n5. Update get_serializer_class() mapping"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/phone-numbers/providers/plivo/import/": {
+            "post": {
+                "operationId": "phone-numbers-providers-plivo-import-create",
+                "description": "Unified API viewset for BYOP (Bring Your Own Telephony Provider).\n\nHandles importing and managing phone numbers from various providers:\n- Twilio\n- Future: Vonage, Bandwidth, Telnyx, etc.\n\nURL Structure: /v1/phone-numbers/providers/{provider}/{action}\n\nHow to add a new provider:\n1. Add provider to PhoneNumberProviderChoices enum\n2. Create {Provider}Service class (e.g., VonageService)\n3. Create Import{Provider}NumberSerializer\n4. Add action method with @action(url_path=\"{provider}/import\")\n5. Update get_serializer_class() mapping",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportPlivoNumber"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportPlivoNumber"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportPlivoNumber"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PhoneNumberDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "phone-numbers-providers-plivo-import-create",
+                        "description": "Unified API viewset for BYOP (Bring Your Own Telephony Provider).\n\nHandles importing and managing phone numbers from various providers:\n- Twilio\n- Future: Vonage, Bandwidth, Telnyx, etc.\n\nURL Structure: /v1/phone-numbers/providers/{provider}/{action}\n\nHow to add a new provider:\n1. Add provider to PhoneNumberProviderChoices enum\n2. Create {Provider}Service class (e.g., VonageService)\n3. Create Import{Provider}NumberSerializer\n4. Add action method with @action(url_path=\"{provider}/import\")\n5. Update get_serializer_class() mapping"
+                    }
+                }
+            }
+        },
         "/test_framework/v1/phone-numbers/providers/telnyx/bulk-import/": {
             "post": {
                 "operationId": "phone-numbers-providers-telnyx-bulk-import-create",
@@ -18598,7 +18877,7 @@
         "/test_framework/v1/runs/": {
             "get": {
                 "operationId": "runs-list",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "query",
@@ -18910,57 +19189,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-list",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
-                    }
-                }
-            },
-            "post": {
-                "operationId": "runs-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Run"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "runs-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -18968,7 +19197,7 @@
         "/test_framework/v1/runs-external/": {
             "get": {
                 "operationId": "runs-external-list",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "query",
@@ -19276,55 +19505,12 @@
                         "description": ""
                     }
                 }
-            },
-            "post": {
-                "operationId": "runs-external-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Run"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
             }
         },
         "/test_framework/v1/runs-external/{id}/": {
             "get": {
                 "operationId": "runs-external-retrieve",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19359,7 +19545,7 @@
             },
             "put": {
                 "operationId": "runs-external-update",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19413,7 +19599,7 @@
             },
             "patch": {
                 "operationId": "runs-external-partial-update",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19467,7 +19653,7 @@
             },
             "delete": {
                 "operationId": "runs-external-destroy",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19543,7 +19729,7 @@
         "/test_framework/v1/runs-external/{id}/expected_outcome/": {
             "post": {
                 "operationId": "runs-external-expected-outcome-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19599,7 +19785,7 @@
         "/test_framework/v1/runs-external/{id}/get_listen_url/": {
             "get": {
                 "operationId": "runs-external-get-listen-url-retrieve",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19636,7 +19822,7 @@
         "/test_framework/v1/runs-external/{id}/mark_critical_scenario_wrong/": {
             "post": {
                 "operationId": "runs-external-mark-critical-scenario-wrong-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19692,7 +19878,7 @@
         "/test_framework/v1/runs-external/{id}/mark_expected_outcome_vote/": {
             "post": {
                 "operationId": "runs-external-mark-expected-outcome-vote-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19748,7 +19934,7 @@
         "/test_framework/v1/runs-external/{id}/mark_metric_vote/": {
             "post": {
                 "operationId": "runs-external-mark-metric-vote-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19804,7 +19990,7 @@
         "/test_framework/v1/runs-external/{id}/run_expected_outcome/": {
             "post": {
                 "operationId": "runs-external-run-expected-outcome-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19860,7 +20046,7 @@
         "/test_framework/v1/runs-external/{id}/unmark_critical_scenario_wrong/": {
             "post": {
                 "operationId": "runs-external-unmark-critical-scenario-wrong-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -19916,7 +20102,7 @@
         "/test_framework/v1/runs-external/bulk/": {
             "get": {
                 "operationId": "runs-external-bulk-retrieve",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "query",
@@ -19956,7 +20142,7 @@
         "/test_framework/v1/runs-external/improve_prompt/": {
             "post": {
                 "operationId": "runs-external-improve-prompt-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "tags": [
                     "test_framework"
                 ],
@@ -20020,7 +20206,7 @@
         "/test_framework/v1/runs-external/improve_prompt_issues/": {
             "post": {
                 "operationId": "runs-external-improve-prompt-issues-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "tags": [
                     "test_framework"
                 ],
@@ -20065,7 +20251,7 @@
         "/test_framework/v1/runs/{id}/": {
             "get": {
                 "operationId": "runs-retrieve",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20101,13 +20287,13 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-retrieve",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             },
             "put": {
                 "operationId": "runs-update",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20162,13 +20348,13 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-update",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             },
             "patch": {
                 "operationId": "runs-partial-update",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20223,13 +20409,13 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-partial-update",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             },
             "delete": {
                 "operationId": "runs-destroy",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20258,7 +20444,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-destroy",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20312,7 +20498,7 @@
         "/test_framework/v1/runs/{id}/expected_outcome/": {
             "post": {
                 "operationId": "runs-expected-outcome-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20367,7 +20553,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-expected-outcome-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20375,7 +20561,7 @@
         "/test_framework/v1/runs/{id}/get_listen_url/": {
             "get": {
                 "operationId": "runs-get-listen-url-retrieve",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20411,7 +20597,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-get-listen-url-retrieve",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20419,7 +20605,7 @@
         "/test_framework/v1/runs/{id}/mark_critical_scenario_wrong/": {
             "post": {
                 "operationId": "runs-mark-critical-scenario-wrong-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20474,7 +20660,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-mark-critical-scenario-wrong-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20482,7 +20668,7 @@
         "/test_framework/v1/runs/{id}/mark_expected_outcome_vote/": {
             "post": {
                 "operationId": "runs-mark-expected-outcome-vote-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20537,7 +20723,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-mark-expected-outcome-vote-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20545,7 +20731,7 @@
         "/test_framework/v1/runs/{id}/mark_metric_vote/": {
             "post": {
                 "operationId": "runs-mark-metric-vote-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20600,7 +20786,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-mark-metric-vote-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20608,7 +20794,7 @@
         "/test_framework/v1/runs/{id}/run_expected_outcome/": {
             "post": {
                 "operationId": "runs-run-expected-outcome-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20663,7 +20849,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-run-expected-outcome-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20671,7 +20857,7 @@
         "/test_framework/v1/runs/{id}/unmark_critical_scenario_wrong/": {
             "post": {
                 "operationId": "runs-unmark-critical-scenario-wrong-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "path",
@@ -20726,7 +20912,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-unmark-critical-scenario-wrong-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20734,7 +20920,7 @@
         "/test_framework/v1/runs/bulk/": {
             "get": {
                 "operationId": "runs-bulk-retrieve",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "parameters": [
                     {
                         "in": "query",
@@ -20773,7 +20959,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-bulk-retrieve",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20781,7 +20967,7 @@
         "/test_framework/v1/runs/improve_prompt/": {
             "post": {
                 "operationId": "runs-improve-prompt-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "tags": [
                     "test_framework"
                 ],
@@ -20844,7 +21030,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-improve-prompt-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -20852,7 +21038,7 @@
         "/test_framework/v1/runs/improve_prompt_issues/": {
             "post": {
                 "operationId": "runs-improve-prompt-issues-create",
-                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.",
+                "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)",
                 "tags": [
                     "test_framework"
                 ],
@@ -20896,7 +21082,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-improve-prompt-issues-create",
-                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization."
+                        "description": "API view set for managing runs.\nThis view set provides endpoints to retrieve and manage runs associated with a specific organization.\nNote: POST method is not allowed. Runs are created automatically by the system.\nSupports: GET (list/retrieve), PATCH/PUT (update)"
                     }
                 }
             }
@@ -31829,6 +32015,7 @@
             },
             "post": {
                 "operationId": "user-organizations-create",
+                "description": "Create first organization for user if they are not in any organization.\nReturns 400 if user is already in an organization.",
                 "tags": [
                     "user"
                 ],
@@ -33204,6 +33391,42 @@
                 }
             }
         },
+        "/user/v1/projects-external/{id}/personalities/": {
+            "get": {
+                "operationId": "projects-external-personalities-retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this project.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Project"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/user/v1/projects-external/{id}/remove_member/": {
             "post": {
                 "operationId": "projects-external-remove-member-create",
@@ -33792,6 +34015,42 @@
         "/user/v1/projects/{id}/overview/critical-categories/": {
             "get": {
                 "operationId": "projects-overview-critical-categories-retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this project.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Project"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/user/v1/projects/{id}/personalities/": {
+            "get": {
+                "operationId": "projects-personalities-retrieve",
                 "parameters": [
                     {
                         "in": "path",
@@ -35713,6 +35972,16 @@
                         "format": "decimal",
                         "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$"
                     },
+                    "extra_balance": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
+                        "description": "Never expiry balance"
+                    },
+                    "total_balance": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "text_runs_count": {
                         "type": "string",
                         "readOnly": true
@@ -35722,6 +35991,14 @@
                         "readOnly": true
                     },
                     "call_logs_count": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "runs_count": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "concurrency_status": {
                         "type": "string",
                         "readOnly": true
                     },
@@ -35751,6 +36028,15 @@
                     "balance_expiry": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "type": {
+                        "enum": [
+                            "subscription",
+                            "self_serve"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "31820255025544ce",
+                        "description": "Billing type for the organization\n\n* `subscription` - Subscription\n* `self_serve` - Self Serve"
                     },
                     "created_at": {
                         "type": "string",
@@ -35808,6 +36094,50 @@
                         "format": "date-time",
                         "readOnly": true,
                         "description": "Timestamp when the billing record was last updated.\nExample: `2025-11-22T14:25:30Z`"
+                    }
+                }
+            },
+            "BulkImportPlivoNumber": {
+                "type": "object",
+                "properties": {
+                    "plivo_auth_id": {
+                        "type": "string",
+                        "description": "Plivo Auth ID (applies to all numbers unless overridden)"
+                    },
+                    "plivo_auth_token": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "Plivo Auth Token (applies to all numbers unless overridden)"
+                    },
+                    "phone_numbers": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "description": "List of phone number configurations to import"
+                    }
+                },
+                "required": [
+                    "phone_numbers",
+                    "plivo_auth_id",
+                    "plivo_auth_token"
+                ]
+            },
+            "BulkImportPlivoResponse": {
+                "type": "object",
+                "properties": {
+                    "successful": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "failed": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "summary": {
+                        "type": "object",
+                        "additionalProperties": {}
                     }
                 }
             },
@@ -36838,6 +37168,13 @@
                             "null"
                         ]
                     },
+                    "personalities": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of personalities to use for test execution. Multiple personalities can be assigned to run tests with different configurations.\nExample: `[1, 2, 3]` (personality IDs)\n"
+                    },
                     "tags": {
                         "type": "array",
                         "items": {
@@ -37229,6 +37566,42 @@
                     }
                 }
             },
+            "ImportPlivoNumber": {
+                "type": "object",
+                "properties": {
+                    "plivo_phone_number": {
+                        "type": "string",
+                        "description": "Phone number in E.164 format (e.g., +14156021922)",
+                        "maxLength": 15
+                    },
+                    "plivo_auth_id": {
+                        "type": "string",
+                        "description": "Plivo Auth ID",
+                        "maxLength": 255
+                    },
+                    "plivo_auth_token": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "Plivo Auth Token",
+                        "maxLength": 255
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Optional name for this phone number",
+                        "maxLength": 255
+                    },
+                    "is_sms_enabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Enable SMS for this phone number"
+                    }
+                },
+                "required": [
+                    "plivo_auth_id",
+                    "plivo_auth_token",
+                    "plivo_phone_number"
+                ]
+            },
             "ImportTelnyxNumber": {
                 "type": "object",
                 "description": "Serializer for importing Telnyx phone numbers.",
@@ -37348,6 +37721,10 @@
                     "updated_at": {
                         "type": "string",
                         "format": "date-time",
+                        "readOnly": true
+                    },
+                    "projects": {
+                        "type": "string",
                         "readOnly": true
                     }
                 }
@@ -38680,6 +39057,10 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "phone_number_verified": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "auto_refill": {
                         "type": "boolean"
                     },
@@ -38902,6 +39283,15 @@
                         "maximum": 2147483647,
                         "minimum": -2147483648
                     },
+                    "billing_type": {
+                        "enum": [
+                            "subscription",
+                            "self_serve"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "31820255025544ce",
+                        "description": "Billing type for the pack\n\n* `subscription` - Subscription\n* `self_serve` - Self Serve"
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -38929,10 +39319,28 @@
                         "type": "string",
                         "maxLength": 100
                     },
+                    "price": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$"
+                    },
                     "subscription_overage": {
                         "type": "string",
                         "format": "decimal",
                         "pattern": "^-?\\d{0,3}(?:\\.\\d{0,2})?$"
+                    },
+                    "billing_type": {
+                        "enum": [
+                            "subscription",
+                            "self_serve"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "31820255025544ce",
+                        "description": "Billing type for the pack\n\n* `subscription` - Subscription\n* `self_serve` - Self Serve"
+                    },
+                    "allow_cancellation": {
+                        "type": "boolean",
+                        "description": "Allow users to cancel subscription"
                     }
                 }
             },
@@ -40115,6 +40523,10 @@
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true
+                    },
+                    "projects": {
+                        "type": "string",
+                        "readOnly": true
                     }
                 }
             },
@@ -40510,6 +40922,10 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "phone_number_verified": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
                     "auto_refill": {
                         "type": "boolean"
                     },
@@ -40607,14 +41023,15 @@
                             "cekura",
                             "twilio",
                             "telnyx",
+                            "plivo",
                             null
                         ],
                         "type": [
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "53e5107d6e6356c5",
-                        "description": "Provider of this phone number (Cekura or Twilio)\n\n* `cekura` - Cekura\n* `twilio` - Twilio\n* `telnyx` - Telnyx"
+                        "x-spec-enum-id": "0a9c3a00dd5354a9",
+                        "description": "Provider of this phone number (Cekura or Twilio)\n\n* `cekura` - Cekura\n* `twilio` - Twilio\n* `telnyx` - Telnyx\n* `plivo` - Plivo"
                     },
                     "sms_enabled": {
                         "type": [
@@ -41589,6 +42006,17 @@
                         "type": "string",
                         "x-spec-enum-id": "6e7339d971185fa9",
                         "description": "\nTimezone for the cronjob (default: Project timezone)\n\n\n* `Africa/Abidjan` - Africa/Abidjan\n* `Africa/Accra` - Africa/Accra\n* `Africa/Addis_Ababa` - Africa/Addis_Ababa\n* `Africa/Algiers` - Africa/Algiers\n* `Africa/Asmara` - Africa/Asmara\n* `Africa/Bamako` - Africa/Bamako\n* `Africa/Bangui` - Africa/Bangui\n* `Africa/Banjul` - Africa/Banjul\n* `Africa/Bissau` - Africa/Bissau\n* `Africa/Blantyre` - Africa/Blantyre\n* `Africa/Brazzaville` - Africa/Brazzaville\n* `Africa/Bujumbura` - Africa/Bujumbura\n* `Africa/Cairo` - Africa/Cairo\n* `Africa/Casablanca` - Africa/Casablanca\n* `Africa/Ceuta` - Africa/Ceuta\n* `Africa/Conakry` - Africa/Conakry\n* `Africa/Dakar` - Africa/Dakar\n* `Africa/Dar_es_Salaam` - Africa/Dar_es_Salaam\n* `Africa/Djibouti` - Africa/Djibouti\n* `Africa/Douala` - Africa/Douala\n* `Africa/El_Aaiun` - Africa/El_Aaiun\n* `Africa/Freetown` - Africa/Freetown\n* `Africa/Gaborone` - Africa/Gaborone\n* `Africa/Harare` - Africa/Harare\n* `Africa/Johannesburg` - Africa/Johannesburg\n* `Africa/Juba` - Africa/Juba\n* `Africa/Kampala` - Africa/Kampala\n* `Africa/Khartoum` - Africa/Khartoum\n* `Africa/Kigali` - Africa/Kigali\n* `Africa/Kinshasa` - Africa/Kinshasa\n* `Africa/Lagos` - Africa/Lagos\n* `Africa/Libreville` - Africa/Libreville\n* `Africa/Lome` - Africa/Lome\n* `Africa/Luanda` - Africa/Luanda\n* `Africa/Lubumbashi` - Africa/Lubumbashi\n* `Africa/Lusaka` - Africa/Lusaka\n* `Africa/Malabo` - Africa/Malabo\n* `Africa/Maputo` - Africa/Maputo\n* `Africa/Maseru` - Africa/Maseru\n* `Africa/Mbabane` - Africa/Mbabane\n* `Africa/Mogadishu` - Africa/Mogadishu\n* `Africa/Monrovia` - Africa/Monrovia\n* `Africa/Nairobi` - Africa/Nairobi\n* `Africa/Ndjamena` - Africa/Ndjamena\n* `Africa/Niamey` - Africa/Niamey\n* `Africa/Nouakchott` - Africa/Nouakchott\n* `Africa/Ouagadougou` - Africa/Ouagadougou\n* `Africa/Porto-Novo` - Africa/Porto-Novo\n* `Africa/Sao_Tome` - Africa/Sao_Tome\n* `Africa/Tripoli` - Africa/Tripoli\n* `Africa/Tunis` - Africa/Tunis\n* `Africa/Windhoek` - Africa/Windhoek\n* `America/Adak` - America/Adak\n* `America/Anchorage` - America/Anchorage\n* `America/Chicago` - America/Chicago\n* `America/Denver` - America/Denver\n* `America/Los_Angeles` - America/Los_Angeles\n* `America/New_York` - America/New_York\n* `America/Phoenix` - America/Phoenix\n* `America/Sao_Paulo` - America/Sao_Paulo\n* `Asia/Dubai` - Asia/Dubai\n* `Asia/Hong_Kong` - Asia/Hong_Kong\n* `Asia/Kolkata` - Asia/Kolkata\n* `Asia/Seoul` - Asia/Seoul\n* `Asia/Shanghai` - Asia/Shanghai\n* `Asia/Singapore` - Asia/Singapore\n* `Asia/Tokyo` - Asia/Tokyo\n* `Australia/Melbourne` - Australia/Melbourne\n* `Australia/Perth` - Australia/Perth\n* `Australia/Sydney` - Australia/Sydney\n* `Europe/Amsterdam` - Europe/Amsterdam\n* `Europe/Berlin` - Europe/Berlin\n* `Europe/London` - Europe/London\n* `Europe/Madrid` - Europe/Madrid\n* `Europe/Moscow` - Europe/Moscow\n* `Europe/Paris` - Europe/Paris\n* `Europe/Rome` - Europe/Rome\n* `Pacific/Auckland` - Pacific/Auckland\n* `Pacific/Honolulu` - Pacific/Honolulu\n* `US/Central` - US/Central\n* `US/Eastern` - US/Eastern\n* `US/Mountain` - US/Mountain\n* `US/Pacific` - US/Pacific\n* `UTC` - UTC"
+                    },
+                    "personality": {
+                        "type": "integer",
+                        "description": "DEPRECATED: Use personalities instead"
+                    },
+                    "personalities": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of personalities to use for test execution. Multiple personalities can be assigned to run tests with different configurations.\nExample: `[1, 2, 3]` (personality IDs)\n"
                     }
                 }
             },
@@ -42254,14 +42682,15 @@
                             "cekura",
                             "twilio",
                             "telnyx",
+                            "plivo",
                             null
                         ],
                         "type": [
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "53e5107d6e6356c5",
-                        "description": "Provider of this phone number (Cekura or Twilio)\n\n* `cekura` - Cekura\n* `twilio` - Twilio\n* `telnyx` - Telnyx"
+                        "x-spec-enum-id": "0a9c3a00dd5354a9",
+                        "description": "Provider of this phone number (Cekura or Twilio)\n\n* `cekura` - Cekura\n* `twilio` - Twilio\n* `telnyx` - Telnyx\n* `plivo` - Plivo"
                     },
                     "sms_enabled": {
                         "type": [
@@ -42349,14 +42778,15 @@
                             "cekura",
                             "twilio",
                             "telnyx",
+                            "plivo",
                             null
                         ],
                         "type": [
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "53e5107d6e6356c5",
-                        "description": "Provider of this phone number (Cekura or Twilio)\n\n* `cekura` - Cekura\n* `twilio` - Twilio\n* `telnyx` - Telnyx"
+                        "x-spec-enum-id": "0a9c3a00dd5354a9",
+                        "description": "Provider of this phone number (Cekura or Twilio)\n\n* `cekura` - Cekura\n* `twilio` - Twilio\n* `telnyx` - Telnyx\n* `plivo` - Plivo"
                     },
                     "sms_enabled": {
                         "type": [
@@ -44773,6 +45203,17 @@
                         "type": "string",
                         "x-spec-enum-id": "6e7339d971185fa9",
                         "description": "\nTimezone for the cronjob (default: Project timezone)\n\n\n* `Africa/Abidjan` - Africa/Abidjan\n* `Africa/Accra` - Africa/Accra\n* `Africa/Addis_Ababa` - Africa/Addis_Ababa\n* `Africa/Algiers` - Africa/Algiers\n* `Africa/Asmara` - Africa/Asmara\n* `Africa/Bamako` - Africa/Bamako\n* `Africa/Bangui` - Africa/Bangui\n* `Africa/Banjul` - Africa/Banjul\n* `Africa/Bissau` - Africa/Bissau\n* `Africa/Blantyre` - Africa/Blantyre\n* `Africa/Brazzaville` - Africa/Brazzaville\n* `Africa/Bujumbura` - Africa/Bujumbura\n* `Africa/Cairo` - Africa/Cairo\n* `Africa/Casablanca` - Africa/Casablanca\n* `Africa/Ceuta` - Africa/Ceuta\n* `Africa/Conakry` - Africa/Conakry\n* `Africa/Dakar` - Africa/Dakar\n* `Africa/Dar_es_Salaam` - Africa/Dar_es_Salaam\n* `Africa/Djibouti` - Africa/Djibouti\n* `Africa/Douala` - Africa/Douala\n* `Africa/El_Aaiun` - Africa/El_Aaiun\n* `Africa/Freetown` - Africa/Freetown\n* `Africa/Gaborone` - Africa/Gaborone\n* `Africa/Harare` - Africa/Harare\n* `Africa/Johannesburg` - Africa/Johannesburg\n* `Africa/Juba` - Africa/Juba\n* `Africa/Kampala` - Africa/Kampala\n* `Africa/Khartoum` - Africa/Khartoum\n* `Africa/Kigali` - Africa/Kigali\n* `Africa/Kinshasa` - Africa/Kinshasa\n* `Africa/Lagos` - Africa/Lagos\n* `Africa/Libreville` - Africa/Libreville\n* `Africa/Lome` - Africa/Lome\n* `Africa/Luanda` - Africa/Luanda\n* `Africa/Lubumbashi` - Africa/Lubumbashi\n* `Africa/Lusaka` - Africa/Lusaka\n* `Africa/Malabo` - Africa/Malabo\n* `Africa/Maputo` - Africa/Maputo\n* `Africa/Maseru` - Africa/Maseru\n* `Africa/Mbabane` - Africa/Mbabane\n* `Africa/Mogadishu` - Africa/Mogadishu\n* `Africa/Monrovia` - Africa/Monrovia\n* `Africa/Nairobi` - Africa/Nairobi\n* `Africa/Ndjamena` - Africa/Ndjamena\n* `Africa/Niamey` - Africa/Niamey\n* `Africa/Nouakchott` - Africa/Nouakchott\n* `Africa/Ouagadougou` - Africa/Ouagadougou\n* `Africa/Porto-Novo` - Africa/Porto-Novo\n* `Africa/Sao_Tome` - Africa/Sao_Tome\n* `Africa/Tripoli` - Africa/Tripoli\n* `Africa/Tunis` - Africa/Tunis\n* `Africa/Windhoek` - Africa/Windhoek\n* `America/Adak` - America/Adak\n* `America/Anchorage` - America/Anchorage\n* `America/Chicago` - America/Chicago\n* `America/Denver` - America/Denver\n* `America/Los_Angeles` - America/Los_Angeles\n* `America/New_York` - America/New_York\n* `America/Phoenix` - America/Phoenix\n* `America/Sao_Paulo` - America/Sao_Paulo\n* `Asia/Dubai` - Asia/Dubai\n* `Asia/Hong_Kong` - Asia/Hong_Kong\n* `Asia/Kolkata` - Asia/Kolkata\n* `Asia/Seoul` - Asia/Seoul\n* `Asia/Shanghai` - Asia/Shanghai\n* `Asia/Singapore` - Asia/Singapore\n* `Asia/Tokyo` - Asia/Tokyo\n* `Australia/Melbourne` - Australia/Melbourne\n* `Australia/Perth` - Australia/Perth\n* `Australia/Sydney` - Australia/Sydney\n* `Europe/Amsterdam` - Europe/Amsterdam\n* `Europe/Berlin` - Europe/Berlin\n* `Europe/London` - Europe/London\n* `Europe/Madrid` - Europe/Madrid\n* `Europe/Moscow` - Europe/Moscow\n* `Europe/Paris` - Europe/Paris\n* `Europe/Rome` - Europe/Rome\n* `Pacific/Auckland` - Pacific/Auckland\n* `Pacific/Honolulu` - Pacific/Honolulu\n* `US/Central` - US/Central\n* `US/Eastern` - US/Eastern\n* `US/Mountain` - US/Mountain\n* `US/Pacific` - US/Pacific\n* `UTC` - UTC"
+                    },
+                    "personality": {
+                        "type": "integer",
+                        "description": "DEPRECATED: Use personalities instead"
+                    },
+                    "personalities": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of personalities to use for test execution. Multiple personalities can be assigned to run tests with different configurations.\nExample: `[1, 2, 3]` (personality IDs)\n"
                     }
                 },
                 "required": [
@@ -45538,6 +45979,10 @@
                     "pack": {
                         "$ref": "#/components/schemas/PackInline"
                     },
+                    "next_billing_cost": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "last_payment_at": {
                         "type": "string",
                         "format": "date-time"
@@ -45839,6 +46284,34 @@
                                 "type": "null"
                             }
                         ]
+                    }
+                }
+            },
+            "UsageChartResponse": {
+                "type": "object",
+                "properties": {
+                    "field_name": {
+                        "type": "string"
+                    },
+                    "chart_type": {
+                        "type": "string"
+                    },
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
+                    },
+                    "aggregation_function": {
+                        "type": "string"
+                    },
+                    "time_period": {
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
                     }
                 }
             },

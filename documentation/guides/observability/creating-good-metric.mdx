@@ -1,0 +1,141 @@
+---
+title: "Building High-Fidelity Metrics"
+sidebarTitle: "Creating Good Metrics"
+icon: "chart-line"
+iconType: "regular"
+description: "Learn how to build and optimize custom metrics for AI agents through an iterative process of definition, testing, feedback, and optimization"
+---
+
+Creating effective metrics for AI agents requires more than just defining a rule; it requires an iterative process of definition, testing, feedback, and optimization. This guide outlines the workflow to create custom metrics that accurately track specific behaviors (e.g., instruction following, tool call hallucination or proper call termination).
+
+<iframe src="https://www.tella.tv/video/building-good-metrics-on-cekura-0taa/embed" allowfullscreen width="100%" height="360" frameborder="0"></iframe>
+
+## Prerequisites
+
+Before building, clarify exactly what you are tracking. Understand the terminology used during monitoring:
+
+- **Main Agent:** Your AI agent (the one being tested).
+- **Testing Agent:** The simulated user interacting with your agent.
+
+## Step 1: Metric Definition
+
+Navigate to the **Metrics** section and select **Create Metric**.
+
+1. **Name & Type:** Give your metric a descriptive name (e.g., `Correct End Call by Main Agent`). Select the **Metric Type** (usually **Boolean** for pass/fail checks).
+2. **Success Impact:** Toggle **Affects Call Success** to `True` if this metric is critical (i.e., if this fails, the entire call is considered a failure).
+3. **Description (The Prompt):** Write a natural language description of what constitutes success.
+
+<Tip>
+Use context variables to make the metric dynamic. For example, use `metadata['instructions']` to reference specific scenario steps the agent was supposed to follow.
+
+You will see a list of context variables in the dashboard when creating a metric.
+</Tip>
+
+**Example Description:**
+
+```
+Check if the Main Agent ended the call only after all steps in
+metadata['instructions'] were completed by the Testing Agent.
+```
+
+## Step 2: Set Triggers
+
+Define when the metric should run under the **Evaluation Trigger** section.
+
+- **Always:** Runs on every call (default).
+- **Custom:** Use logic to run metrics only in specific scenarios (e.g., `return True` only if the agent is attempting to book an appointment).
+
+## Step 3: Initial Validation (Test Metric)
+
+Before saving, validate your logic immediately within the builder.
+
+<Steps>
+  <Step title="Click Test Metric">
+    Navigate to the test section within the metric builder.
+  </Step>
+  <Step title="Select Call IDs">
+    Select a few past **Call IDs** from the list to test against.
+  </Step>
+  <Step title="Run the Test">
+    Run the test to see if the metric passes/fails as expected on historical data.
+  </Step>
+  <Step title="Create Metric">
+    If satisfied with the results, click **Create Metric** to save.
+  </Step>
+</Steps>
+
+## Step 4: The Feedback Loop (Observability)
+
+This is the most critical step for accuracy. You must "teach" the metric by providing ground-truth data.
+
+<Steps>
+  <Step title="Navigate to Observability">
+    Go to the **Observability** tab in your dashboard.
+  </Step>
+  <Step title="Run Metric on Calls">
+    Select a batch of calls and run your new metric on them.
+  </Step>
+  <Step title="Review Results">
+    Look for false positives or false negatives in the metric results.
+  </Step>
+  <Step title="Provide Feedback">
+    For calls where the metric verdict was incorrect:
+
+    1. Click on the call
+    2. Click on 👎🏻 next to the metric of concern
+    3. **Write an Explanation:** In the feedback box, detail *why* the metric was wrong
+
+    **Example:**
+    ```
+    The Main Agent correctly ended the call because the Testing Agent
+    refused to proceed, which is a valid termination case.
+    ```
+
+    4. Click **Add to Lab**
+  </Step>
+</Steps>
+
+<Note>
+**Best Practice:** Repeat this process for at least **6 calls** to create a robust dataset for optimization.
+</Note>
+
+## Step 5: Optimization (Labs)
+
+Once you have annotated data (feedback), use the **Labs** feature to auto-optimize the metric.
+
+<Steps>
+  <Step title="Navigate to Labs">
+    Navigate to **Labs** and select your metric.
+  </Step>
+  <Step title="Review Current Performance">
+    You will see your annotated examples and the current "Overall Score" against your human feedback.
+  </Step>
+  <Step title="Auto Improve">
+    Click **Auto Improve**.
+
+    The system will use your feedback and explanations to rewrite the metric's internal logic/prompt to handle the edge cases you identified.
+  </Step>
+  <Step title="Verify & Save">
+    1. Review the **View Changes** (once optimization is complete) screen to see the old vs. new logic
+    2. Check the new score (e.g., improving from 0/6 to 6/6)
+    3. Click **Save** to push the optimized metric to production
+  </Step>
+</Steps>
+
+## Summary of Workflow
+
+The complete workflow for building high-fidelity metrics follows this iterative process:
+
+1. **Draft:** Create a basic description and logic.
+2. **Test:** Run on historical calls.
+3. **Annotate:** Correct mistakes manually and explain the *why*.
+4. **Optimize:** Use "Auto Improve" to let the system refine the prompt based on your annotations.
+
+By following this iterative approach, you can create metrics that accurately evaluate your AI agent's performance and continuously improve their accuracy over time.
+
+## Next Steps
+
+- Learn about [custom metrics](/documentation/key-concepts/metrics/custom-metrics)
+- Explore [predefined metrics](/documentation/key-concepts/metrics/pre-defined-metrics)
+- Set up [instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)
+- Use [Metric Lab](/documentation/guides/metric-lab) to optimize your metrics

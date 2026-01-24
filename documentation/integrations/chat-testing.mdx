@@ -1,0 +1,232 @@
+---
+title: "Chat-Based Testing"
+sidebarTitle: "Chat Testing"
+icon: "message-lines"
+iconType: "regular"
+description: "Test your voice agents faster and cheaper using text-based simulation"
+---
+
+## Overview
+
+Test your voice agents using text instead of phone calls. 10x faster and 90% cheaper - ideal for workflow validation, regression testing, and CI/CD pipelines.
+
+Use voice testing for ASR/TTS validation and final production checks.
+
+## Supported Providers
+
+<Tabs>
+  <Tab title="ElevenLabs">
+
+<Steps>
+  <Step title="Configure Chat Provider">
+    1. Go to **Agent Settings** → **Chatbot Integrations**
+    2. Select **ElevenLabs** from provider dropdown
+    3. Enter your **Assistant ID** from ElevenLabs
+    4. Save configuration
+
+    <img src="/images/elevenlabs/chat-provider-config.png" alt="ElevenLabs chat provider configuration" />
+  </Step>
+
+  <Step title="Run Tests">
+    1. Go to **Evaluator** page
+    2. Select scenarios
+    3. Click **"Run as Text"** button
+
+    <img src="/images/elevenlabs/run-websocket-tests.png" alt="Run as Text button" />
+  </Step>
+
+  <Step title="View Results">
+    Results appear in the dashboard with conversation transcript, metric evaluations, and function calls.
+  </Step>
+</Steps>
+
+  </Tab>
+
+  <Tab title="Retell">
+
+<Steps>
+  <Step title="Create Chat Agent in Retell">
+    1. Log in to Retell dashboard
+    2. Navigate to your voice agent
+    3. Click **"Copy as chat agent"**
+    4. Copy the **Agent ID** of the new chat agent
+
+    <img src="/images/retell_convert_to_chat_agent.png" alt="Convert Retell agent to chat mode" />
+  </Step>
+
+  <Step title="Configure in Cekura">
+    1. Go to **Agent Settings** → **Chatbot Integrations**
+    2. Select **Retell** from provider dropdown
+    3. Enter your **Chat Agent ID**
+    4. Save configuration
+
+    <img src="/images/retell_agentsettings.png" alt="Retell agent settings" />
+  </Step>
+
+  <Step title="Run Tests">
+    1. Go to **Evaluator** page
+    2. Select scenarios
+    3. Click **"Run as Text"**
+  </Step>
+</Steps>
+
+  </Tab>
+
+  <Tab title="Vapi">
+
+<Steps>
+  <Step title="Configure Chat Provider">
+    1. Go to **Agent Settings** → **Chatbot Integrations**
+    2. Select **Vapi** from provider dropdown
+    3. Enter your **Assistant ID** from Vapi
+    4. Save configuration
+
+    <img src="/images/vapi/chat-provider-config.png" alt="Vapi chat provider configuration" />
+  </Step>
+
+  <Step title="Run Tests">
+    1. Go to **Evaluator** page
+    2. Select scenarios
+    3. Click **"Run as Text"**
+  </Step>
+</Steps>
+
+  </Tab>
+
+  <Tab title="Custom WebSocket">
+
+<Steps>
+  <Step title="Set Up WebSocket Server">
+    Use the example implementation or build your own:
+
+    ```bash
+    git clone https://github.com/vocera-ai/llm-websocket-server-example.git
+    cd llm-websocket-server-example
+    python3 -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    python main.py
+    ```
+
+    <Info>
+    Update your OpenAI API key in `main.py` before starting the server.
+    </Info>
+
+    **WebSocket Message Format:**
+
+    Your server must handle message types: `response` (text), `function_call`, `function_result`, and `end_of_conversation`.
+
+    Example response message:
+    ```json
+    {"type": "response", "response": "Hello! How can I help?"}
+    ```
+
+    See [Custom Integration Guide](/documentation/integrations/custom-integration) for complete message format details.
+  </Step>
+
+  <Step title="Expose Server">
+    For local development, use ngrok:
+
+    ```bash
+    ngrok http 127.0.0.1:8765
+    ```
+
+    Convert the `https://` URL to `wss://` for WebSocket connection.
+  </Step>
+
+  <Step title="Configure in Cekura">
+    1. Go to **Agent Settings** → **Chatbot Integrations**
+    2. Select **Custom** from provider dropdown
+    3. Enter your WebSocket URL (starting with `wss://`)
+    4. Save configuration
+
+    <img src="/images/custom-websocket/config.png" alt="Custom WebSocket configuration" />
+  </Step>
+
+  <Step title="Run Tests">
+    1. Go to **Evaluator** page
+    2. Select scenarios
+    3. Click **"Run as Text"**
+  </Step>
+</Steps>
+
+</Tab>
+
+  <Tab title="Code">
+
+Run chat tests programmatically via API.
+
+For complete API documentation including authentication, request parameters, response format, and code examples in multiple languages, see:
+
+**[Run Evaluator Text API Reference](/api-reference/test_framework/run-evaluator-text)**
+
+### Quick Example
+
+```bash
+curl --request POST \
+  --url https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_text/ \
+  --header 'X-CEKURA-API-KEY: <api-key>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "agent_id": 123,
+    "scenarios": [456, 789],
+    "frequency": 1,
+    "name": "Chat Test Run"
+  }'
+```
+
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title='Error: "Chat provider not configured"'>
+    **Solution:**
+    1. Go to Agent Settings → Chatbot Integrations
+    2. Select a provider (ElevenLabs, Retell, Vapi, or Custom)
+    3. Enter required configuration (Assistant ID or WebSocket URL)
+    4. Save and retry
+  </Accordion>
+
+  <Accordion title="Tests timing out">
+    **Common causes:**
+    - Incorrect Assistant/Agent ID
+    - Custom WebSocket server not accessible
+    - Agent disabled or unpublished
+
+    **Debug steps:**
+    1. Verify your ID is correct
+    2. For Custom: check server is running and URL is accessible
+    3. Test provider's API directly
+    4. Check Cekura dashboard for error details
+  </Accordion>
+
+  <Accordion title='Cannot find "Run as Text" button'>
+    **Checklist:**
+    - ✅ Chat provider configured in Agent Settings
+    - ✅ On Evaluator page (not Calls/Runs)
+    - ✅ At least one scenario selected
+
+    Button appears next to "Run Tests" in Evaluator header. Refresh page if not visible.
+  </Accordion>
+</AccordionGroup>
+
+## Tips
+
+<Tip>
+Use chat tests for rapid iteration and CI/CD. Run voice tests on critical scenarios before production deployment.
+</Tip>
+
+<Tip>
+Tag scenarios as "critical" or "smoke-test" to run targeted test suites in your pipeline.
+</Tip>
+
+## Next Steps
+
+- [Suggested Testing Approach](/documentation/guides/testing-agents/suggested-testing-approach)
+- [GitHub Actions CI/CD](/documentation/guides/github-actions-ci-cd)
+- [CronJobs](/documentation/guides/cronjob)
+- [Custom Metrics](/documentation/key-concepts/metrics/custom-metrics)
+
+Need help? Contact [support@cekura.ai](mailto:support@cekura.ai)

@@ -35,6 +35,7 @@ Include your API key in the request headers:
 | `eval_type` | string | Yes | Type of metric (binary_workflow_adherence, binary_qualitative, continuous_qualitative, numeric, enum) |
 | `enum_values` | array | No | List of possible values when eval_type is "enum" |
 | `display_order` | integer | No | Order for displaying the metric. Defaults to next available order |
+| `sampling_enabled` | boolean | No | Enable sampling for this metric using the project-level sample rate. Defaults to false |
 
 \* Only either of `agent` or `assistant_id` is required
 
@@ -50,7 +51,8 @@ Include your API key in the request headers:
     "agent": 1,
     "eval_type": "binary_qualitative",
     "enum_values": [],
-    "display_order": 10
+    "display_order": 10,
+    "sampling_enabled": false
 }
 ```
 
@@ -72,6 +74,7 @@ A successful request returns the created metric details.
 | `prompt_enabled` | boolean | Whether custom prompt is enabled |
 | `prompt` | string | Custom evaluation prompt template when prompt_enabled is true |
 | `display_order` | integer | Order for displaying the metric |
+| `sampling_enabled` | boolean | Whether sampling is enabled for this metric |
 | `overall_score` | number | Total testsets passed (null if never run in testset) |
 | `total_score` | number | Reviewed in total testsets |
 
@@ -89,6 +92,7 @@ A successful request returns the created metric details.
     "prompt_enabled": true,
     "prompt": "Go through this transcript and check if appointment was booked successfully:\n\n\n{transcript}\n",
     "display_order": 10,
+    "sampling_enabled": false,
     "overall_score": null,
     "total_score": 0
 }
@@ -111,7 +115,8 @@ curl -X POST https://api.cekura.ai/test_framework/v1/metrics-external/ \
     "agent": 123,
     "eval_type": "binary_qualitative",
     "enum_values": [],
-    "display_order": 1
+    "display_order": 1,
+    "sampling_enabled": false
   }'
 ```
 
@@ -128,7 +133,8 @@ def create_metric(
         prompt_enabled=False,
         prompt=None,
         enum_values=[], 
-        display_order=None
+        display_order=None,
+        sampling_enabled=None
     ):
     url = 'https://api.cekura.ai/test_framework/v1/metrics-external/'
     
@@ -154,6 +160,8 @@ def create_metric(
         data['enum_values'] = enum_values
     if display_order:
         data['display_order'] = display_order
+    if sampling_enabled is not None:
+        data['sampling_enabled'] = sampling_enabled
 
 
     response = requests.post(url, headers=headers, json=data)
@@ -171,7 +179,8 @@ async function createMetric(
   promptEnabled = false,
   prompt = null,
   enumValues = [],
-  displayOrder = null
+  displayOrder = null,
+  samplingEnabled = null
 ) {
   const url = 'https://api.cekura.ai/test_framework/v1/metrics-external/';
   
@@ -187,6 +196,7 @@ async function createMetric(
   if (prompt) data.prompt = prompt;
   if (enumValues.length > 0) data.enum_values = enumValues;
   if (displayOrder) data.display_order = displayOrder;
+  if (samplingEnabled !== null) data.sampling_enabled = samplingEnabled;
 
   const response = await fetch(url, {
     method: 'POST',

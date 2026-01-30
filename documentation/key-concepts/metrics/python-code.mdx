@@ -612,3 +612,101 @@ except KeyError as e:
     _result = "Incomplete"
     _explanation = f"Required data not found: {str(e)}"
 ```
+## Custom Code Triggers
+
+You can use custom Python code to control **when** a metric triggers (gets evaluated).
+
+### When to Use Custom Code Triggers
+
+By default, setting a metric's `evaluation_trigger` to `custom` uses an LLM judge to decide if the metric is relevant. Custom code triggers replace that LLM decision with your own Python logic. Use them when:
+
+- You need deterministic, rule-based conditions
+- You want to avoid LLM costs for simple logic
+- Complex conditions are easier to express in code than in a prompt
+
+### How It Works
+
+Set your metric's `trigger_type` to `custom_code` and provide your Python code in the `evaluation_trigger_custom_code` field. Your code runs before evaluation and determines whether the metric should run.
+
+### Required Output Variables
+
+Your trigger code must set these two variables:
+
+- **`_result`** - Boolean (`True` = evaluate the metric, `False` = skip it)
+- **`_explanation`** - String explaining why the metric was triggered or skipped
+
+### Available Data
+
+Your custom trigger code has access to the following data:
+
+#### Top-Level Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `data["transcript"]` | string | Full conversation transcript as text |
+| `data["transcript_json"]` | list | Transcript as a list of message objects |
+| `data["call_ended_reason"]` | string | Reason the call ended |
+| `data["call_end_reason"]` | string | Reason the call ended (alias) |
+| `data["agent_description"]` | string | Description of the AI agent |
+| `data["dynamic_variables"]` | dict | Dynamic variables configured for the agent |
+
+#### Nested Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `data["metadata"]["call_duration"]` | float | Call duration in seconds |
+| `data["metadata"]["call_ended_reason"]` | string | Reason the call ended |
+| `data["metadata"]["call_end_reason"]` | string | Reason the call ended |
+| `data["agent"]["description"]` | string | Agent description |
+| `data["agent"]["language"]` | string | Agent language (e.g., "en") |
+
+#### Test Profile Fields (Simulation Context)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `data["test_profile"]["field_name"]` | any | Any fields from the test profile |
+
+### Example: Trigger When Agent Ended the Call
+
+Triggers the metric only when the main agent ended the call:
+
+```python
+call_end_reason = data.get("call_end_reason", "")
+
+if "main-agent" in call_end_reason.lower():
+    _result = True
+    _explanation = "Metric triggered because the main agent ended the call"
+else:
+    _result = False
+    _explanation = f"Metric skipped because call ended due to: {call_end_reason}"
+```
+
+### Example: Trigger Based on Call Duration
+
+Triggers the metric only for calls longer than 60 seconds:
+
+```python
+call_duration = data.get("metadata", {}).get("call_duration", 0)
+
+if call_duration > 60:
+    _result = True
+    _explanation = f"Metric triggered for call with duration {call_duration} seconds"
+else:
+    _result = False
+    _explanation = f"Metric skipped because call duration ({call_duration}s) was under 60 seconds"
+```
+
+### Example: Trigger Based on Transcript Content
+
+Triggers the metric only if a specific topic was mentioned:
+
+```python
+transcript = data.get("transcript", "").lower()
+
+if "billing" in transcript or "payment" in transcript:
+    _result = True
+    _explanation = "Metric triggered because billing/payment was discussed"
+else:
+    _result = False
+    _explanation = "Metric skipped because billing/payment was not mentioned"
+```

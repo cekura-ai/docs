@@ -1,0 +1,271 @@
+---
+title: "DTMF Testing"
+sidebarTitle: "DTMF Testing"
+icon: "phone-office"
+iconType: "regular"
+description: "Test DTMF (keypad) interactions with your voice agents - simulate button presses during calls for IVR navigation and menu testing"
+---
+
+## What is DTMF Testing?
+
+DTMF (Dual-Tone Multi-Frequency) testing allows you to simulate phone keypad button presses during test calls. This is essential for testing:
+
+- IVR (Interactive Voice Response) navigation
+- Menu selection scenarios
+- Account number or PIN entry
+- Call transfer requests ("Press 1 for sales")
+- Any interaction requiring keypad input
+
+## Two Ways to Use DTMF
+
+### 1. Via Evaluator Tools
+
+Enable DTMF tools on your evaluators to give them the ability to send or receive button presses during calls.
+
+**Send DTMF**: Evaluator sends button presses to the main agent (testing IVR navigation)
+
+**Receive DTMF**: Main agent sends button presses, evaluator receives them
+
+### 2. Via Conditional Actions
+
+Use the `<dtmf>` tag in conditional actions to send specific button sequences at precise moments during the conversation.
+
+## Enabling DTMF Tools
+
+To enable DTMF functionality for your testing agents:
+
+<Steps>
+  <Step title="Navigate to Your Agent">
+    Go to your **Agents** section and select the agent you want to test.
+  </Step>
+
+  <Step title="Access Evaluators">
+    Click on the **Evaluators** tab and select the evaluator you want to configure.
+  </Step>
+
+  <Step title="Enable DTMF Tools">
+    Scroll to the **Tools** section, find **Send DTMF** or **Receive DTMF** in the list of available tools, and toggle the switch to enable it.
+
+    <Frame>
+      <img src="/images/dtmf-testing/dtmf-tool-on-evaluater.png" alt="DTMF Tool Configuration" />
+    </Frame>
+  </Step>
+</Steps>
+
+### Available DTMF Tools
+
+| Tool | Description |
+|------|-------------|
+| **Send DTMF** | Allows the testing agent to send DTMF tones during the call. Use this when you want to test scenarios where the agent needs to send button presses. |
+| **Receive DTMF** | Allows the testing agent to receive DTMF tones from the call. Use this when you want to test scenarios where the agent needs to accept button presses from the user. |
+
+<Note>
+When Send DTMF is enabled, the evaluator can intelligently decide when to press buttons based on the conversation context.
+</Note>
+
+## Using the DTMF Tag in Conditional Actions
+
+The `<dtmf>` tag allows you to send specific button sequences at exact moments in your test scenarios.
+
+### Syntax
+
+```xml
+<dtmf digits="123" />
+```
+
+### Parameters
+
+- **digits**: The buttons to press (valid characters: `0-9`, `*`, `#`, `A-D`)
+
+### Example Scenario
+
+Here's a practical example of testing an agent that requires menu navigation:
+
+<Frame>
+  <img src="/images/dtmf-testing/dtmf-tag-in-conditional-actions.png" alt="DTMF Tag in Conditional Actions" />
+</Frame>
+
+```json
+{
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "FIRST_MESSAGE",
+      "action": "Hi I am here for ordering a pizza.",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "contains \"pull \" OR contains \"moment\" OR contains \"1234\" OR contains \"help you\"",
+      "action": "Great I want to order a pizza, let me enter the account number, can you please repeat what you received.",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 2,
+      "condition": 1,
+      "action": "<dtmf digits=\"123\" />",
+      "type": "action_followup",
+      "fixed_message": true
+    },
+    {
+      "id": 3,
+      "condition": "contains \"123\" OR contains \"1 2 3\"",
+      "action": "<endcall />",
+      "type": "standard",
+      "fixed_message": true
+    }
+  ],
+  "role": "A customer who presses phone keypad buttons while talking"
+}
+```
+
+In this example:
+1. Evaluator starts the conversation
+2. When the agent asks for account number, evaluator responds
+3. Immediately after, the `<dtmf>` tag sends "123" via keypad
+4. Agent confirms receiving "123" and the call ends
+
+### Combining DTMF with Text
+
+You can combine DTMF tags with text messages:
+
+```json
+{
+  "action": "Let me enter that now. <dtmf digits=\"*99\" />"
+}
+```
+
+This will speak "Let me enter that now." and then send the `*99` button sequence.
+
+### DTMF-Only Actions
+
+To send button presses without speaking:
+
+```json
+{
+  "action": "<dtmf digits=\"1\" />"
+}
+```
+
+This sends only the button press with no spoken message.
+
+## Valid DTMF Characters
+
+The following characters are supported for DTMF tones:
+
+| Character | Description |
+|-----------|-------------|
+| `0-9` | Numeric digits |
+| `*` | Star/asterisk key |
+| `#` | Pound/hash key |
+| `A-D` | Extended DTMF keys (rarely used) |
+
+<Warning>
+Invalid characters in the digits parameter will cause the DTMF send to fail. Always use only the characters listed above.
+</Warning>
+
+## Common Use Cases
+
+### 1. IVR Menu Navigation
+
+Test agents that navigate phone menus:
+
+```json
+{
+  "action": "<dtmf digits=\"1\" />",
+  "type": "action_followup"
+}
+```
+
+### 2. Account Number Entry
+
+Test multi-digit input scenarios:
+
+```json
+{
+  "action": "<dtmf digits=\"123456789\" />",
+  "type": "action_followup"
+}
+```
+
+### 3. PIN Verification
+
+Test secure input flows:
+
+```json
+{
+  "action": "Let me enter my PIN. <dtmf digits=\"9876\" />"
+}
+```
+
+### 4. Transfer Requests
+
+Test call transfer scenarios:
+
+```json
+{
+  "action": "<dtmf digits=\"0\" />",
+  "type": "action_followup"
+}
+```
+
+### 5. Star Codes
+
+Test special IVR functions:
+
+```json
+{
+  "action": "<dtmf digits=\"*99#\" />",
+  "type": "action_followup"
+}
+```
+
+## How DTMF Appears in Transcripts
+
+When DTMF tones are sent during a call, they appear in the transcript for tracking:
+
+- **Via Tool**: Shows as a function call with the digits sent
+- **Via Tag**: Automatically recorded in the conversation flow
+- **Received DTMF**: Shown as user input in the transcript
+
+This helps you verify that button presses were sent and received correctly during testing.
+
+## Best Practices
+
+### 1. Enable Tools Selectively
+
+Only enable Send/Receive DTMF tools for evaluators that need to test DTMF functionality.
+
+### 2. Use Conditional Actions for Precise Timing
+
+When you need exact control over when buttons are pressed, use the `<dtmf>` tag in conditional actions rather than relying on the LLM to decide.
+
+### 3. Clear Instructions
+
+When using DTMF tools (not tags), be explicit in your evaluator instructions:
+
+```
+✅ Good: "When the agent says 'Press 1 for sales', press 1"
+❌ Vague: "Navigate the menu appropriately"
+```
+
+### 4. Test Both Scenarios
+
+Test both sending DTMF (evaluator → agent) and receiving DTMF (agent → evaluator) to ensure bidirectional functionality works correctly.
+
+### 5. Validate with Metrics
+
+Use metrics to verify:
+- Agent correctly recognizes DTMF input
+- Agent responds appropriately to button presses
+- Navigation flows work as expected
+
+---
+
+## Next Steps
+
+- Learn about [Test Profiles](/documentation/key-concepts/evaluators/test-profile) for comprehensive testing
+- Explore [Conditional Actions](/documentation/key-concepts/evaluators/overview) for advanced scenarios
+- Review [Custom Metrics](/documentation/key-concepts/metrics/custom-metrics) for DTMF validation

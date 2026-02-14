@@ -1,20 +1,27 @@
 # Cekura MCP Server
 
-Model Context Protocol (MCP) server that exposes Cekura's documented APIs as tools for Claude and other MCP clients.
+Model Context Protocol (MCP) server that provides unified access to Cekura's documentation and APIs for Claude and other MCP clients.
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
 ## Overview
 
-This MCP server dynamically generates tools from Cekura's OpenAPI specification, filtered to only documented endpoints. It reduces the tool count from 622 to 74 operations (88% reduction), significantly improving context efficiency while maintaining full functionality.
+This MCP server provides **84+ tools** combining documentation search and API operations:
+- **1 Documentation Search Tool** - Proxies to Mintlify's search (no API key required)
+- **83 API Operations** - Dynamically generated from OpenAPI spec (requires API key)
+
+By connecting to one server, AI assistants get complete access to both learning resources and operational capabilities.
 
 ### Key Features
 
-- **Whitelist-Based Filtering**: Automatically registers only documented APIs from `mint.json` (docs root)
-- **Header-Based Authentication**: Secure API key management via `X-CEKURA-API-KEY` header
-- **Dynamic Tool Generation**: Tools generated from OpenAPI spec at runtime
+- **Unified Access**: Single connection for both documentation search and API operations
+- **Documentation Proxy**: Seamlessly proxies search requests to Mintlify's MCP server with retry logic
+- **Whitelist-Based API Filtering**: Automatically registers only documented APIs from `mint.json`
+- **64-Character Tool Name Limit**: Ensures Claude API compatibility with automatic truncation
+- **Selective Authentication**: Documentation search requires no API key; API operations use `X-CEKURA-API-KEY` header
+- **Dynamic Tool Generation**: API tools generated from OpenAPI spec at runtime
 - **Zero Configuration**: Works out-of-the-box with sensible defaults
-- **Production Ready**: Comprehensive logging, error handling, and test coverage
+- **Production Ready**: Comprehensive error handling, retry logic, and test coverage
 
 ## Quick Start
 
@@ -229,9 +236,17 @@ isort --check .
 bandit -r .
 ```
 
-## API Categories
+## Tool Categories
 
-The server exposes 74 documented API endpoints across these categories:
+The server provides 84 tools across two main groups:
+
+### Documentation Search (1 tool, no API key required)
+
+| Tool | Description |
+|------|-------------|
+| SearchCekura | Search across Cekura's knowledge base for integration guides, API schemas, code examples, and feature documentation. Proxies to Mintlify's MCP server with retry logic and error handling. |
+
+### API Operations (83 tools, API key required)
 
 | Category | Count | Description |
 |----------|-------|-------------|
@@ -245,7 +260,7 @@ The server exposes 74 documented API endpoints across these categories:
 | Schedules | 5 | Cron job scheduling |
 | Others | 3 | Personalities, predefined metrics, phone numbers |
 
-**Total:** 74 curated tools from 622 available operations
+**Total:** 84 tools (1 documentation + 83 API operations from 622 available endpoints)
 
 ## Architecture
 

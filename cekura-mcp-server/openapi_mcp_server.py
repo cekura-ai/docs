@@ -1,7 +1,9 @@
 import sys
 import asyncio
 import logging
-from typing import Any, Dict
+import httpx
+import json
+from typing import Any, Dict, List
 from contextvars import ContextVar
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
@@ -39,10 +41,16 @@ transport_security = TransportSecuritySettings(
         "api.cekura.ai",
         "localhost",
         "localhost:8000",
+        "localhost:8001",
+        "localhost:8002",
         "127.0.0.1",
         "127.0.0.1:8000",
+        "127.0.0.1:8001",
+        "127.0.0.1:8002",
         "0.0.0.0",
-        "0.0.0.0:8000"
+        "0.0.0.0:8000",
+        "0.0.0.0:8001",
+        "0.0.0.0:8002"
     ]
 )
 
@@ -51,6 +59,10 @@ mcp = FastMCP("Cekura API", transport_security=transport_security)
 server_config = None
 openapi_parser = None
 operations_registry = {}
+
+MINTLIFY_MCP_URL = "https://docs.cekura.ai/mcp"
+MINTLIFY_SEARCH_TIMEOUT = 15.0
+MINTLIFY_MAX_RETRIES = 2
 
 
 async def initialize_server():
@@ -100,11 +112,105 @@ async def initialize_server():
 
         logger.info(f"Registered {tools_registered} MCP tools")
 
+        # Register Mintlify documentation search tool
+        register_mintlify_search_tool()
+        logger.info("Registered Mintlify documentation search tool")
+
         setup_dynamic_tool_handlers()
 
     except Exception as e:
         logger.error(f"Failed to initialize server: {e}", exc_info=True)
         sys.exit(1)
+
+
+def register_mintlify_search_tool():
+    """Register Mintlify documentation search tool as a proxy."""
+    operations_registry['SearchCekura'] = {
+        'operation': None,
+        'schema': {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query"
+                }
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        'description': "Search across the Cekura knowledge base to find relevant information, code examples, API references, and guides. Use this tool when you need to answer questions about Cekura, find specific documentation, understand how features work, or locate implementation details. The search returns contextual content with titles and direct links to the documentation pages.",
+        'is_proxy': True
+    }
+
+
+async def call_mintlify_search(query: str) -> List[Dict[str, str]]:
+    """Proxy search requests to Mintlify's MCP server with retry logic."""
+    if not query or not query.strip():
+        return [{"type": "text", "text": "Please provide a search query."}]
+
+    for attempt in range(MINTLIFY_MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(MINTLIFY_SEARCH_TIMEOUT, connect=5.0),
+                follow_redirects=True
+            ) as client:
+                response = await client.post(
+                    MINTLIFY_MCP_URL,
+                    headers={
+                        "Content-Type": "application/json",
+                        "Accept": "application/json, text/event-stream"
+                    },
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "SearchCekura",
+                            "arguments": {"query": query.strip()}
+                        }
+                    }
+                )
+
+                response.raise_for_status()
+
+                for line in response.text.split('\n'):
+                    if line.startswith('data: '):
+                        try:
+                            data = json.loads(line[6:])
+                            if 'result' in data and 'content' in data['result']:
+                                content = data['result']['content']
+                                if content:
+                                    return content
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Failed to parse SSE data: {e}")
+                            continue
+
+                return [{"type": "text", "text": "No results found for your query."}]
+
+        except httpx.TimeoutException:
+            logger.warning(f"Timeout calling Mintlify search (attempt {attempt + 1}/{MINTLIFY_MAX_RETRIES})")
+            if attempt < MINTLIFY_MAX_RETRIES - 1:
+                await asyncio.sleep(0.5 * (attempt + 1))
+                continue
+            return [{"type": "text", "text": "Search request timed out. Please try again."}]
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error from Mintlify: {e.response.status_code}")
+            return [{"type": "text", "text": f"Documentation search temporarily unavailable (HTTP {e.response.status_code})."}]
+
+        except httpx.RequestError as e:
+            logger.error(f"Network error calling Mintlify: {e}")
+            if attempt < MINTLIFY_MAX_RETRIES - 1:
+                await asyncio.sleep(0.5 * (attempt + 1))
+                continue
+            return [{"type": "text", "text": "Unable to reach documentation search. Please check your connection."}]
+
+        except Exception as e:
+            logger.error(f"Unexpected error in Mintlify search: {e}", exc_info=True)
+            return [{"type": "text", "text": f"Search error: {str(e)}"}]
+
+    return [{"type": "text", "text": "Search failed after multiple attempts. Please try again later."}]
 
 
 def register_tool(name: str, description: str, input_schema: Dict[str, Any], operation):
@@ -158,10 +264,13 @@ def setup_dynamic_tool_handlers():
     async def call_tool_with_dynamic(name: str, arguments: dict):
         if name in operations_registry:
             try:
-                # Get API key from request context (raises ValueError if not found)
-                api_key = get_request_api_key()
-
                 tool_data = operations_registry[name]
+
+                if tool_data.get('is_proxy'):
+                    query = arguments.get('query', '')
+                    return await call_mintlify_search(query)
+
+                api_key = get_request_api_key()
                 op = tool_data['operation']
 
                 user_api_client = create_client(server_config.base_url, api_key)
@@ -227,7 +336,7 @@ def main():
 
     async def health_check(request):
         return JSONResponse({
-            "status": "healthy like a Thor !!!",
+            "status": "healthy",
             "service": "cekura-mcp-server",
             "tools_registered": len(operations_registry)
         })

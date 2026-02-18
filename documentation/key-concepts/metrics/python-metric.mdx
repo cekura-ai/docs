@@ -501,11 +501,80 @@ if isinstance(customer_satisfaction, (int, float)) and customer_satisfaction > 4
 ```
 
 
-### Example for Calling LLM Judge Metrics
+### Calling LLM Judge Metrics from Python
 
-To call LLM Judge metrics from your Python code, you can use the helper functions. These functions require your API key, a description or prompt for the metric, and the metric type.
+#### Function Reference: `evaluate_llm_judge_metric`
 
-#### Example For Calling LLM Judge Metrics
+The `evaluate_llm_judge_metric` function allows you to evaluate LLM Judge metrics directly from your Python code. This function sends your data and evaluation criteria to Cekura's LLM judge system and returns the evaluation result.
+
+**Function Signature:**
+
+```python
+def evaluate_llm_judge_metric(
+    data: Dict,
+    api_key: str,
+    description: str,
+    eval_type: str|None = None,
+    enum_values: List[str]|None = None,
+) -> Dict:
+```
+
+**Parameters:**
+
+<ParamField path="data" type="Dict" required>
+  This is the same `data` object available in your custom Python code with access to transcript, metadata, and other call data.
+</ParamField>
+
+<ParamField path="api_key" type="str" required>
+  Your Cekura API key for authentication.
+</ParamField>
+
+<ParamField path="description" type="str" required>
+  The evaluation prompt/description that guides the LLM judge on how to evaluate the metric.
+
+  You can use context variables in the description using `{{variable}}` syntax (e.g., `{{metadata.instructions}}`). See [LLM Judge Available Variables](/documentation/key-concepts/metrics/llm-judge-available-variables) for a complete list of available variables.
+</ParamField>
+
+<ParamField path="eval_type" type="str" default="None">
+  The type of evaluation to perform. Supported values:
+
+  - `"binary_workflow_adherence"` - Binary evaluation (returns 0 or 5)
+  - `"binary_qualitative"` - Binary qualitative assessment (returns 0 or 5)
+  - `"numeric"` - Numeric evaluation (returns integer or float)
+  - `"continuous_qualitative"` - Continuous scale from 0 to 5
+  - `"enum"` - Enumerated values (requires `enum_values` parameter)
+</ParamField>
+
+<ParamField path="enum_values" type="List[str]|None" default="None">
+  List of possible values when using `eval_type="enum"`. Only applicable for ENUM type evaluations.
+
+  Example: `["Excellent", "Good", "Fair", "Poor"]`
+</ParamField>
+
+**Return Value:**
+
+Returns a dictionary with two keys:
+
+```python
+{
+  "result": <evaluation_result>,  # Type depends on eval_type
+  "explanation": List[<string>]      # Explanation of the evaluation or error message
+}
+```
+
+- `result`: The evaluated metric value (type depends on `eval_type`)
+  - Binary types: `0` or `5`
+  - Numeric: `int` or `float`
+  - Continuous: `float` between 0 and 5
+  - Enum: `string` from `enum_values`
+
+- `explanation`: List of String explaining the evaluation result or error message
+
+<Tip>
+**Using Context Variables:** You can make your LLM judge evaluations dynamic by using context variables in the `description` parameter. For example, use `{{metadata.instructions}}` to reference specific scenario steps the agent was supposed to follow. See [LLM Judge Available Variables](/documentation/key-concepts/metrics/llm-judge-available-variables) for the complete list.
+</Tip>
+
+#### Example Usage
 
 ```python
 key = "<your_cekura_api_key>"

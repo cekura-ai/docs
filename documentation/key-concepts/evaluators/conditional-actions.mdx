@@ -1,0 +1,769 @@
+---
+title: "Conditional Actions"
+sidebarTitle: "Conditional Actions"
+icon: "code-branch"
+iconType: "regular"
+description: "Create dynamic, rule-based evaluators that respond to specific conversation conditions"
+---
+
+## What are Conditional Actions?
+
+Conditional Actions is a specialized evaluator type that allows you to create dynamic, rule-based test scenarios. Unlike traditional evaluators that follow a linear script, Conditional Actions evaluators can adapt their behavior based on what the agent says during the conversation.
+
+This makes them ideal for testing complex workflows where the conversation can take multiple paths depending on the agent's responses.
+
+## When to Use Conditional Actions
+
+Use Conditional Actions evaluators when you need to:
+
+- **Test branching conversations**: Handle different conversation paths based on agent responses
+- **Simulate decision trees**: Test scenarios where user responses depend on what the agent asks
+- **Create adaptive evaluators**: Build evaluators that can handle unexpected agent responses
+- **Test IVR (Interactive Voice Response) flows**: Simulate interactive voice response systems with menu options
+- **Validate error handling**: Test how agents handle various user inputs and edge cases
+
+<Card title="Example Use Case" icon="lightbulb" color="#A6A7EA">
+  Testing an appointment booking agent where the flow changes based on whether the agent offers available slots, asks for rescheduling, or cancels the appointment entirely.
+</Card>
+
+## Structure
+
+A Conditional Actions evaluator consists of two main components:
+
+### 1. Role
+
+The `role` defines who the testing agent is pretending to be.
+
+```json
+{
+  "role": "You are a customer calling to cancel an appointment"
+}
+```
+
+<Note>
+Keep the role concise and clear. It sets the context for the entire conversation.
+</Note>
+
+### 2. Conditions
+
+The `conditions` array defines the rules and actions for the evaluator. Each condition specifies:
+
+- **When** a certain situation occurs (the condition)
+- **What** the testing agent should do (the action)
+
+```json
+{
+  "role": "You are a customer calling to cancel an appointment",
+  "conditions": [
+    {
+      "id": 1,
+      "condition": "The agent asks for your name",
+      "action": "Provide your name as John Smith"
+    },
+    {
+      "id": 2,
+      "condition": "The agent asks for a reason",
+      "action": "Say you have a scheduling conflict"
+    }
+  ]
+}
+```
+
+## Condition Fields
+
+Each condition object has the following fields:
+
+<ParamField path="id" type="integer" required>
+  Unique identifier for the condition. Start with 0 for the first message.
+</ParamField>
+
+<ParamField path="condition" type="string | integer">
+  The trigger condition that determines when this action should be taken.
+
+  **Special cases**:
+  - When `id` is 0, the condition can be empty (represents the first message)
+  - When `type` is `action_followup`, the condition should be an integer referencing the previous condition ID
+  - For standard conditions, the condition is a string describing the trigger
+</ParamField>
+
+<ParamField path="action" type="string" required>
+  What the testing agent should say or do when the condition is met. The interpretation depends on the `fixed_message` field:
+  - When `fixed_message` is `false`: Contains instructions for the testing agent to interpret
+  - When `fixed_message` is `true`: Contains the exact message to send word-for-word
+</ParamField>
+
+<ParamField path="type" type="string" default="standard">
+  The condition type. Options:
+  - `standard`: Normal condition (default)
+  - `action_followup`: Action to take immediately after a previous action
+</ParamField>
+
+<ParamField path="fixed_message" type="boolean" default="false">
+  When set to `true`, the `action` field contains the exact message to send instead of instructions. Use this when you need precise, word-for-word control over what the testing agent says.
+
+  **Note**: For `id: 0` (first message), `fixed_message` is always `true`.
+</ParamField>
+
+## First Message (id: 0)
+
+The condition with `id: 0` is special—it represents the **first message** the testing agent sends to start the conversation. Unlike other conditions, the first message **always has `fixed_message: true`**, meaning the `action` field contains the exact message to send.
+
+```json
+{
+  "id": 0,
+  "condition": "",  // Empty for first message
+  "action": "Hi, I need to cancel my appointment",
+  "fixed_message": true
+}
+```
+
+<Tip>
+For `id: 0`, the condition field is typically empty. The `action` will always contain the exact message to send (fixed_message is always true for the first message).
+</Tip>
+
+## Condition Types
+
+### Standard Conditions
+
+Standard conditions are evaluated based on the conversation context. They trigger when the specified condition is met.
+
+```json
+{
+  "id": 1,
+  "type": "standard",
+  "condition": "The agent asks for your account number",
+  "action": "Provide your account number"
+}
+```
+
+### Action Followup Conditions
+
+Action followup conditions execute after a previous action has been taken, regardless of what the main agent responds. This is useful for multi-part responses or clarifications. The `condition` field should reference the previous condition ID as an integer.
+
+```json
+{
+  "id": 2,
+  "type": "action_followup",
+  "condition": 1,  // References the previous condition ID
+  "action": "Also mention that you need a confirmation email"
+}
+```
+
+<Note>
+Action followup conditions execute after the referenced action is taken, irrespective of the agent's response. The `condition` field should contain the ID (as an integer) of the previous condition.
+</Note>
+
+## Action vs Fixed Message
+
+The `action` field can be used in two ways, controlled by the `fixed_message` boolean:
+
+### Using `action` with `fixed_message: false` (Default)
+
+When `fixed_message` is `false` (or omitted), the `action` field provides instructions that the testing agent interprets to generate a natural response.
+
+```json
+{
+  "id": 1,
+  "condition": "The agent asks for your name",
+  "action": "Provide your name as John Smith",
+  "fixed_message": false  // Optional, false is the default
+}
+```
+
+The testing agent might say: "My name is John Smith" or "Sure, it's John Smith" or "John Smith"
+
+### Using `action` with `fixed_message: true`
+
+When `fixed_message` is `true`, the `action` field contains the exact text that the testing agent will say, word-for-word. Use this when you need precise control.
+
+```json
+{
+  "id": 1,
+  "condition": "The agent asks for your name",
+  "action": "My name is John Smith",
+  "fixed_message": true
+}
+```
+
+The testing agent will say exactly: "My name is John Smith"
+
+### When to Use Each
+
+<CardGroup cols={2}>
+  <Card title="Use fixed_message: false" icon="wand-magic-sparkles">
+    - Natural, varied responses
+    - Testing agent adaptability
+    - When exact wording doesn't matter
+  </Card>
+
+  <Card title="Use fixed_message: true" icon="lock">
+    - Exact phrases required
+    - Testing specific keywords
+    - Compliance testing
+    - Reproducible test cases
+    - First message (id: 0) - always uses this
+  </Card>
+</CardGroup>
+
+<Note>
+The `action` field is always required. The `fixed_message` boolean determines how to interpret it: as instructions (`false`) or as the exact message (`true`).
+</Note>
+
+## Supported Tags
+
+Conditional Actions supports a variety of special tags in the `action` field to control conversation flow and behavior.
+
+<Warning>
+**Important**: Tags are only supported when `fixed_message` is set to `true`. They will not work with `fixed_message: false` (instruction-based actions).
+</Warning>
+
+### Communication Tags
+
+<AccordionGroup>
+  <Accordion title="<ivr> - Interactive Voice Response" icon="volume-high">
+    Mark a message as an IVR (Interactive Voice Response) message that cannot be interrupted.
+
+    ```json
+    {
+      "id": 1,
+      "condition": "The call is answered",
+      "action": "<ivr text=\"Press 1 for sales, press 2 for support\" />",
+      "fixed_message": true
+    }
+    ```
+
+    The agent cannot interrupt while this message plays.
+  </Accordion>
+
+  <Accordion title="<voicemail> - Voicemail Greeting" icon="voicemail">
+    Play a voicemail greeting with beep.
+
+    ```json
+    {
+      "action": "<voicemail text=\"Hi, you've reached John. Leave a message.\" />"
+    }
+    ```
+
+    Or just a beep without greeting:
+
+    ```json
+    {
+      "action": "<voicemail />"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="<endcall> - End Call" icon="phone-slash">
+    End the call immediately.
+
+    ```json
+    {
+      "action": "Thank you for your help <endcall />"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Speech Control Tags
+
+<AccordionGroup>
+  <Accordion title="<silence> - Add Pauses" icon="clock">
+    Add silence/pauses in speech.
+
+    ```json
+    {
+      "id": 3,
+      "condition": "The agent offers time slots",
+      "action": "Let me think <silence time=\"2s\" /> I'll take the 3pm slot",
+      "fixed_message": true
+    }
+    ```
+
+    Supports providers: ElevenLabs turbo models, Cartesia
+  </Accordion>
+
+  <Accordion title="<hold> - Hold Between Messages" icon="pause">
+    Wait before sending the next message.
+
+    ```json
+    {
+      "action": "Please wait <hold time=\"5s\" /> Are you still there?"
+    }
+    ```
+
+    Can have multiple hold tags in one action:
+
+    ```json
+    {
+      "action": "First part <hold time=\"2s\" /> Second part <hold time=\"3s\" /> Final part"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="<spell> - Spell Out Text" icon="font">
+    Spell out text letter by letter (e.g., API → A—P—I).
+
+    ```json
+    {
+      "action": "My reference code is <spell>ABC123</spell>"
+    }
+    ```
+
+    - For Cartesia: keeps tags as-is (native support)
+    - For ElevenLabs: converts to em-dash separated letters
+  </Accordion>
+
+  <Accordion title="<speed> - Control Speech Speed" icon="gauge-high">
+    Control the speed of speech (ratio: multiplier of base speed).
+
+    ```json
+    {
+      "action": "<speed ratio=\"1.5\" /> I need to talk quickly about this"
+    }
+    ```
+
+    - `1.0` = normal speed
+    - `1.5` = 50% faster
+    - `0.8` = 20% slower
+
+    Must be at the start of the message.
+  </Accordion>
+
+  <Accordion title="<volume> - Control Volume" icon="volume-up">
+    Control the volume/loudness (ratio: multiplier of base volume).
+
+    ```json
+    {
+      "action": "<volume ratio=\"1.3\" /> This is important!"
+    }
+    ```
+
+    Supported on Cartesia. Must be at the start of the message.
+  </Accordion>
+</AccordionGroup>
+
+### Interaction Tags
+
+<AccordionGroup>
+  <Accordion title="<dtmf> - Send DTMF Tones" icon="grid">
+    Send DTMF (touch-tone) digits.
+
+    ```json
+    {
+      "id": 2,
+      "condition": "The agent asks for account number",
+      "action": "<dtmf digits=\"123\" /> I've entered my account number",
+      "fixed_message": true
+    }
+    ```
+
+    Simulates pressing phone keypad buttons.
+  </Accordion>
+
+  <Accordion title="<send_sms> - Send SMS" icon="message">
+    Trigger an SMS to be sent.
+
+    ```json
+    {
+      "action": "<send_sms text=\"Confirmation code: 123456\" /> I've sent the code"
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="<interruption> - Interrupt After Timeout" icon="hand">
+    Interrupt the main agent after a specified time and deliver the message.
+
+    ```json
+    {
+      "action": "<interruption time=\"3s\" /> Please listen carefully to these instructions"
+    }
+    ```
+
+    The testing agent will interrupt the main agent after 3 seconds and speak this message.
+  </Accordion>
+</AccordionGroup>
+
+### Environmental Tags
+
+<AccordionGroup>
+  <Accordion title="<background_noise> - Background Sounds" icon="waveform-lines">
+    Add background sounds during specific portions of speech.
+
+    ```json
+    {
+      "action": "Let me check <background_noise sound=\"office\" volume=\"0.05\">I'm looking at the system now</background_noise> found it"
+    }
+    ```
+
+    Available sounds: `office`, `cough`, etc.
+    Volume is optional (default applies if not specified).
+  </Accordion>
+
+  <Accordion title="<noise> - Play Sound Effects" icon="music">
+    Play a sound effect once without speech.
+
+    ```json
+    {
+      "action": "Hold on <noise sound=\"typing\" volume=\"0.8\" /> thanks for waiting"
+    }
+    ```
+
+    Attributes:
+    - `sound`: Sound name (required)
+    - `volume`: Volume level (optional)
+    - `time`: Duration in ms (optional)
+  </Accordion>
+
+  <Accordion title="<network_simulation> - Simulate Network Issues" icon="wifi">
+    Simulate network conditions like packet loss, jitter, or latency.
+
+    ```json
+    {
+      "action": "<network_simulation packet_loss=\"5\" jitter=\"50\" latency=\"100\" /> Testing under poor network"
+    }
+    ```
+
+    Attributes (all optional):
+    - `packet_loss`: Percentage (e.g., "5" = 5%)
+    - `jitter`: Milliseconds (e.g., "50")
+    - `latency`: Milliseconds (e.g., "100")
+  </Accordion>
+</AccordionGroup>
+
+## Complete Examples
+
+### Example 1: Appointment Cancellation
+
+<CodeGroup>
+
+```json Basic Cancellation
+{
+  "role": "You are a patient calling to cancel your appointment",
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "",
+      "action": "Hello, I need to cancel my appointment",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent asks for your name",
+      "action": "Provide your name"
+    },
+    {
+      "id": 2,
+      "condition": "The agent asks for your date of birth",
+      "action": "Provide your date of birth"
+    },
+    {
+      "id": 3,
+      "condition": "The agent confirms the cancellation",
+      "action": "Thank them and end the call"
+    }
+  ]
+}
+```
+
+```json With Reschedule Option
+{
+  "role": "You are a patient calling to cancel your appointment",
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "",
+      "action": "Hi, I need to cancel my appointment on Tuesday",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent offers to reschedule",
+      "action": "Accept and say you prefer next week"
+    },
+    {
+      "id": 2,
+      "condition": "The agent provides available time slots",
+      "action": "Select the first available option"
+    },
+    {
+      "id": 3,
+      "condition": "The agent asks if anything else is needed",
+      "action": "No, that's all. Thank you for your help. <endcall />",
+      "fixed_message": true
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+### Example 2: IVR (Interactive Voice Response) Navigation
+
+```json
+{
+  "role": "You are a customer calling support",
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "",
+      "action": "",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The IVR plays the menu options",
+      "action": "<dtmf digits=\"2\" />",
+      "fixed_message": true
+    },
+    {
+      "id": 2,
+      "condition": "The agent asks how they can help",
+      "action": "Explain your billing issue"
+    },
+    {
+      "id": 3,
+      "condition": "The agent asks for account number",
+      "action": "<dtmf digits=\"123456#\" />",
+      "fixed_message": true
+    }
+  ]
+}
+```
+
+### Example 3: Multi-Part Response with Followup
+
+```json
+{
+  "role": "You are a customer with a complex request",
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "",
+      "action": "Hi, I need help with my order",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "type": "action_followup",
+      "condition": 0,
+      "action": "Also mention you haven't received a confirmation email"
+    },
+    {
+      "id": 2,
+      "type": "action_followup",
+      "condition": 1,
+      "action": "And ask if you can get expedited shipping"
+    },
+    {
+      "id": 3,
+      "condition": "The agent responds to your requests",
+      "action": "Thank them and confirm the details"
+    }
+  ]
+}
+```
+
+### Example 4: Using Advanced Tags
+
+```json
+{
+  "role": "You are a customer in a noisy environment",
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "",
+      "action": "<background_noise sound=\"office\" volume=\"0.05\">Hi, I'm calling about my order</background_noise>",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent asks you to repeat",
+      "action": "<volume ratio=\"1.3\" />I said I'm calling about my order, <spell>ABC</spell> 123",
+      "fixed_message": true
+    },
+    {
+      "id": 2,
+      "condition": "The agent asks for more information",
+      "action": "Let me check <silence time=\"2s\" /> here's the reference number",
+      "fixed_message": true
+    }
+  ]
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Clear Conditions" icon="check">
+    Write conditions that clearly describe **when** they should trigger.
+
+    - ✅ "The agent asks for your email"
+    - ❌ "Email"
+  </Card>
+
+  <Card title="Specific Actions" icon="bullseye">
+    Make actions specific and actionable.
+
+    - ✅ "Provide your email address"
+    - ❌ "Answer the question"
+  </Card>
+
+  <Card title="Logical Flow" icon="arrow-right">
+    Order conditions in a logical conversation flow.
+
+    Start with `id: 0`, then follow natural conversation progression.
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+### Pattern 1: Conditional Branching
+
+Handle different paths based on agent response:
+
+```json
+{
+  "conditions": [
+    {
+      "id": 0,
+      "action": "I would like to request a refund for my order",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent approves the refund",
+      "action": "Thank them and confirm the details"
+    },
+    {
+      "id": 2,
+      "condition": "The agent denies the refund",
+      "action": "Ask to speak with a manager"
+    }
+  ]
+}
+```
+
+### Pattern 2: Information Gathering
+
+Progressively provide information as requested:
+
+```json
+{
+  "conditions": [
+    {
+      "id": 0,
+      "action": "Hi, I'm calling about my account",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent asks for your name",
+      "action": "Provide your name"
+    },
+    {
+      "id": 2,
+      "condition": "The agent asks for your account number",
+      "action": "Provide your account number"
+    },
+    {
+      "id": 3,
+      "condition": "The agent asks for verification",
+      "action": "Provide your date of birth"
+    }
+  ]
+}
+```
+
+### Pattern 3: Multi-Step Action
+
+Use `action_followup` for complex multi-part responses:
+
+```json
+{
+  "conditions": [
+    {
+      "id": 5,
+      "condition": "The agent asks about your preferences",
+      "action": "State your first preference"
+    },
+    {
+      "id": 6,
+      "type": "action_followup",
+      "condition": 5,
+      "action": "Add your second preference"
+    },
+    {
+      "id": 7,
+      "type": "action_followup",
+      "condition": 6,
+      "action": "Mention any special requirements"
+    }
+  ]
+}
+```
+
+## Tips
+
+<Tip>
+  **Start Simple**: Begin with basic conditions and add complexity as needed. Test frequently.
+</Tip>
+
+<Tip>
+  **Use Descriptive IDs**: While IDs must be integers, use sequential numbering (0, 1, 2, ...) for clarity.
+</Tip>
+
+<Tip>
+  **Test Edge Cases**: Include conditions for unexpected agent responses or errors.
+</Tip>
+
+<Warning>
+  **Tag Compatibility**: Some tags (like `<silence>`, `<speed>`) only work with specific TTS providers. Check compatibility before using.
+</Warning>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Condition Not Triggering" icon="triangle-exclamation">
+    **Issue**: A condition isn't triggering when expected.
+
+    **Solutions**:
+    - Make the condition more specific
+    - Check if a previous condition is matching instead
+    - Verify the condition describes what the agent says, not what the evaluator should do
+  </Accordion>
+
+  <Accordion title="Tags Not Working" icon="tag">
+    **Issue**: Special tags aren't producing the expected effect.
+
+    **Solutions**:
+    - Check tag syntax (spelling, attributes, closing format)
+    - Verify provider compatibility (e.g., Cartesia for `<volume>`)
+    - Check tag placement (some tags must be at the start)
+  </Accordion>
+
+  <Accordion title="First Message Not Sending" icon="message">
+    **Issue**: The conversation doesn't start.
+
+    **Solutions**:
+    - Ensure you have a condition with `id: 0`
+    - Verify the action field is not empty
+    - Check that the role is defined
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Test Profiles" icon="id-card" href="/documentation/key-concepts/evaluators/test-profile">
+    Add identity information to your conditional actions evaluator
+  </Card>
+  <Card title="Personalities" icon="user" href="/documentation/key-concepts/evaluators/personality">
+    Configure language and behavioral characteristics
+  </Card>
+  <Card title="Metrics" icon="chart-line" href="/documentation/key-concepts/metrics/overview">
+    Measure performance with custom metrics
+  </Card>
+  <Card title="Prompting Guide" icon="lightbulb" href="/documentation/guides/prompting">
+    Learn best practices for writing effective conditions
+  </Card>
+</CardGroup>

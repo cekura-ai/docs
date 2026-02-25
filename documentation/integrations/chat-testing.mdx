@@ -153,6 +153,30 @@ Use voice testing for ASR/TTS validation and final production checks.
     Update your OpenAI API key in `main.py` before starting the server.
     </Info>
 
+    **Authentication:**
+
+    When Cekura connects to your WebSocket server, it includes the following headers in the handshake request:
+
+    | Header | Description |
+    |--------|-------------|
+    | `X-VOCERA-SECRET` | Your Cekura API key. Use this to verify the connection is from Cekura. |
+    | `X-VOCERA-SCENARIO-ID` | The ID of the scenario being tested. |
+    | `X-VOCERA-RESULT-ID` | The result ID for this test run. |
+    | `X-VOCERA-RUN-ID` | The run ID for this test execution. |
+
+    Any custom headers configured in your agent's WebSocket header settings are also included.
+
+    To authenticate incoming connections, validate the `X-VOCERA-SECRET` header against your API key:
+
+    ```python
+    async def handle_websocket(websocket, path):
+        secret = websocket.request_headers.get("X-VOCERA-SECRET")
+        if secret != YOUR_API_KEY:
+            await websocket.close(1008, "Unauthorized")
+            return
+        # Handle messages...
+    ```
+
     **WebSocket Message Format:**
 
     **Messages your server sends to Cekura** (your agent's messages):

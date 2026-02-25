@@ -1,0 +1,200 @@
+---
+title: 'LiveKit Tracing'
+sidebarTitle: "LiveKit Tracing"
+icon: "radar"
+iconType: "regular"
+description: 'Enhanced observability for LiveKit agents using the Cekura Python SDK'
+---
+
+## Overview
+
+LiveKit Tracing provides deep observability into your LiveKit agent's performance by integrating the Cekura Python SDK directly into your LiveKit agent code. This integration captures detailed metrics, conversation transcripts, tool calls, and session data that enhance the information available in the Cekura platform.
+
+When you enable tracing and integrate the SDK, Cekura receives comprehensive data about each test run, including:
+
+- Complete conversation transcripts with full message history
+- Tool/function calls with inputs and outputs
+- Detailed performance metrics (STT, TTS, LLM, End-of-Utterance)
+- LiveKit room and session IDs
+- Job and room metadata
+
+This enhanced data appears in the Cekura UI, providing deeper insights into your agent's behavior during testing.
+
+## Prerequisites
+
+- A Cekura account with an API key
+- A LiveKit agent project
+
+## Setup
+
+<Steps>
+<Step title="Install the Cekura Python SDK">
+
+Install the SDK in your LiveKit agent project:
+
+```bash
+pip install cekura==1.0.0rc1
+```
+
+</Step>
+
+<Step title="Integrate the SDK in your LiveKit agent">
+
+Add the Cekura tracer to your LiveKit agent's entrypoint. Here's a complete example:
+
+```python
+import os
+from livekit import agents
+from cekura.livekit import LiveKitTracer
+
+# Initialize Cekura tracer
+cekura = LiveKitTracer(
+    api_key=os.getenv("CEKURA_API_KEY"),
+    agent_id=123  # Your agent ID from Cekura dashboard
+)
+
+@server.rtc_session(agent_name="my_agent")
+async def entrypoint(ctx: agents.JobContext):
+    # Create your LiveKit session
+    session = agents.AgentSession(...)
+
+    # Start Cekura session tracking
+    session_id = cekura.start_session(session)
+
+    # Add shutdown callback to export Cekura data
+    async def cekura_shutdown():
+        await cekura.export(session_id, ctx)
+
+    ctx.add_shutdown_callback(cekura_shutdown)
+
+    # Start your session
+    await session.start(room=ctx.room, agent=YourAssistant())
+```
+
+**Key integration points:**
+
+1. **Initialize the tracer**: Create a `LiveKitTracer` instance with your API key and agent ID
+2. **Start session tracking**: Call `start_session()` after creating your `AgentSession`
+3. **Add shutdown callback**: Register `cekura.export()` to send data when the session ends
+
+</Step>
+
+<Step title="Add environment variables to LiveKit">
+
+Add the following environment variables to your LiveKit agent:
+
+- `CEKURA_API_KEY`: Your Cekura API key from Settings → API Keys
+- `CEKURA_TRACING_ENABLED` (Optional): Set to `"true"` (default) or `"false"` to disable tracing
+
+<img src="/images/livekit/livekit-env-variables.png" alt="LiveKit Environment Variables" />
+
+</Step>
+
+<Step title="Configure LiveKit provider and enable tracing">
+
+Navigate to your agent settings in the Cekura dashboard, select **LiveKit** as the provider, and enable tracing:
+
+<img src="/images/livekit/livekit-tracing-config.png" alt="LiveKit Tracing Configuration" width="500"/>
+
+**Required configuration:**
+- **Provider**: Select "LiveKit" from the dropdown
+- **Enable Tracing**: Toggle this ON to receive enhanced data from the SDK
+
+**Testing approach:**
+
+**Option 1: Phone Number Testing**
+- **Contact Number**: Provide the phone number associated with your LiveKit agent
+- Use this if your LiveKit agent is connected to a phone system and you want to test via phone calls
+
+**Option 2: Automated LiveKit Testing**
+- **LiveKit API Key**: Your LiveKit API key
+- **LiveKit API Secret**: Your LiveKit API secret
+- **LiveKit URL**: Your LiveKit server URL (e.g., `wss://your-server.livekit.cloud`)
+- **Agent Name**: The specific agent name to dispatch in LiveKit
+- **LiveKit Config (JSON)** (Optional): Additional room configuration parameters
+
+Use this approach if you want Cekura to automatically create LiveKit rooms and manage test sessions. See the [LiveKit Automated Testing guide](/documentation/integrations/livekit/testing) for more details on these configuration options.
+
+<Note>
+You must provide at least one of the options above. Your choice determines which testing method you can use later (you can configure both to enable both testing methods).
+</Note>
+
+</Step>
+
+<Step title="Run tests with tracing">
+
+Once tracing is enabled and the SDK is integrated, run tests based on your configuration:
+- **If you configured Option 1 (Phone Number)**: Use **"Run with Voice"**
+- **If you configured Option 2 (LiveKit Credentials)**: Use **"Run with LiveKit"**
+
+The SDK will send enhanced data back to Cekura for each test run.
+
+<img src="/images/livekit/run-tests-options.png" alt="Run Tests with Tracing" width="500" />
+
+</Step>
+</Steps>
+
+## Enhanced Data in Cekura UI
+
+With tracing enabled, you'll see enriched information in the Cekura platform:
+
+The run now displays:
+- **Room Session ID**: Visible in the call provider ID field, allowing you to correlate Cekura test runs with specific LiveKit sessions
+- **Complete Transcript**: Full conversation history from the LiveKit agent, including tool/function call requests and responses
+- **Provider Call Data**: Detailed metadata accessible in the run details, including job information, room configuration, and raw performance metrics
+
+<img src="/images/livekit/tracing-enhanced-ui.png" alt="Enhanced Data Display" />
+
+**Provider Call Data** contains the following information:
+
+**Job Information:**
+- Job ID
+- Room name
+- Participant details
+- Agent dispatch metadata
+- Custom metadata passed to the session
+
+**Room Information:**
+- Room configuration
+- Participant count
+- Session duration
+- Connection details
+
+**Raw Metrics:**
+- **STT (Speech-to-Text)**: Latency, duration, and transcription timing
+- **TTS (Text-to-Speech)**: Generation time and audio synthesis metrics
+- **LLM**: Token usage, response time, and inference latency
+- **EOU (End-of-Utterance)**: Detection timing and accuracy
+
+## Configuration Options
+
+### SDK Parameters
+
+Configure the `LiveKitTracer` with these parameters:
+
+```python
+cekura = LiveKitTracer(
+    api_key="your_api_key",           # Required: Your Cekura API key
+    agent_id=123,                     # Required: Agent ID from dashboard
+    host="https://api.cekura.ai",     # Optional: Custom API host
+    enabled=True                      # Optional: Enable/disable tracing
+)
+```
+
+## Best Practices
+
+1. **Disable tracing in production**: Use `CEKURA_TRACING_ENABLED="false"` in your production environment. This feature is designed for simulation testing only. Observability integration for production calls is coming soon.
+
+2. **Always register the shutdown callback**: This ensures data is exported even if the session ends unexpectedly
+
+3. **Use environment variables for credentials**: Don't hardcode API keys in your code
+
+4. **Keep the SDK updated**: Run `pip install --upgrade cekura` periodically for the latest features
+
+5. **Review tool calls regularly**: Add the predefined metric **Tool Call Success** to your evaluators
+
+## Next Steps
+
+- [Create custom metrics](/documentation/key-concepts/metrics/custom-metrics) to evaluate based on provider call data
+- [Perform load testing](/documentation/guides/testing-agents/load-testing) with your LiveKit agent
+- Explore [predefined metrics](/documentation/key-concepts/metrics/pre-defined-metrics)

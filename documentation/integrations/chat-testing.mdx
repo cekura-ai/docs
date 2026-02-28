@@ -261,6 +261,57 @@ Use voice testing for ASR/TTS validation and final production checks.
   </Step>
 </Steps>
 
+### Test Profile Headers
+
+When test profile is attached on your Evaluator and run it as WebSocket Chat, any fields in the test profile starting with `X-` are automatically sent as HTTP headers to your WebSocket server during connection establishment. This allows your server to receive user context before the conversation begins.
+
+**Example Test Profile:**
+```json
+{
+  "name": "Sarah Johnson",
+  "email": "sarah.j@email.com",
+  "X-Customer-ID": "CUST-98765",
+  "X-Account-Tier": "premium"
+}
+```
+
+**Headers Your Server Receives:**
+```
+X-Customer-ID: CUST-98765
+X-Account-Tier: premium
+X-VOCERA-SECRET: <api-key>
+X-VOCERA-RUN-ID: <run-id>
+X-VOCERA-SCENARIO-ID: <scenario-id>
+X-VOCERA-RESULT-ID: <result-id>
+```
+
+**Python WebSocket Server Example:**
+```python
+async def handle_connection(websocket, path):
+    headers = websocket.request_headers
+
+    customer_id = headers.get('X-Customer-ID')
+    account_tier = headers.get('X-Account-Tier')
+
+    # Pre-load customer data before conversation starts
+    customer_data = await fetch_customer(customer_id)
+
+    # Customize behavior based on tier
+    if account_tier == 'premium':
+        enable_priority_support()
+
+    # Now handle the conversation...
+```
+
+<Info>
+Only fields starting with `X-` are sent as headers. Other fields remain available for use in evaluator instructions via template variables like `{{test_profile.name}}`.
+</Info>
+
+**Use Cases:**
+- Pre-load customer/user data before conversation starts
+- Route to specific handlers based on account tier or customer type
+- Initialize session context with user preferences
+
 </Tab>
 
   <Tab title="Code">

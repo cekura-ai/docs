@@ -10525,7 +10525,7 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/auto-fetch/": {
             "post": {
                 "operationId": "aiagents-tools-auto-fetch-create",
-                "description": "Auto-fetch tools from provider and enable mock mode.\n\nThis performs two operations:\n1. Fetch tools from provider and generate mock data (creates/updates Tool records)\n2. Update provider tool URLs to point to mock endpoints\n\nFor VAPI: Creates cloned tools with mock URLs (since tools are shared globally)\nFor Retell: Updates tool URLs directly in the LLM/Flow config\nFor ElevenLabs: Updates webhook tool URLs directly in agent config\n\nNote: The original configuration is stored so it can be restored with disable-mock.",
+                "description": "Auto-fetch tools from provider and enable mock mode.\n\nFetch tool configurations from the provider and generate mock input/output data.\nExisting tools with mock data are not regenerated — only new tools are processed.\nThis does NOT enable mock mode in the provider. Use the enable-mock endpoint for that.",
                 "parameters": [
                     {
                         "in": "path",
@@ -10581,7 +10581,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "aiagents-tools-auto-fetch-create",
-                        "description": "Auto-fetch tools from provider and enable mock mode.\n\nThis performs two operations:\n1. Fetch tools from provider and generate mock data (creates/updates Tool records)\n2. Update provider tool URLs to point to mock endpoints\n\nFor VAPI: Creates cloned tools with mock URLs (since tools are shared globally)\nFor Retell: Updates tool URLs directly in the LLM/Flow config\nFor ElevenLabs: Updates webhook tool URLs directly in agent config\n\nNote: The original configuration is stored so it can be restored with disable-mock."
+                        "description": "Auto-fetch tools from provider and enable mock mode.\n\nFetch tool configurations from the provider and generate mock input/output data.\nExisting tools with mock data are not regenerated — only new tools are processed.\nThis does NOT enable mock mode in the provider. Use the enable-mock endpoint for that."
                     }
                 }
             }
@@ -10589,7 +10589,7 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/disable-mock/": {
             "post": {
                 "operationId": "aiagents-tools-disable-mock-create",
-                "description": "Disable mock tools by restoring original provider tool URLs and deleting mock tools.\n\nThis performs two operations:\n1. Restore the tool configurations in the external provider to their original state\n2. Delete the auto-fetched mock tools from Cekura\n\nFor VAPI: Restores original tool IDs and deletes cloned mock tools\nFor Retell: Restores original tool URLs in the LLM/Flow config\nFor ElevenLabs: Restores original webhook tool URLs in agent config",
+                "description": "Disable mock tools by restoring original provider tool URLs.\nTool mock data is preserved in the DB and can be re-enabled at any time.\n\nFor VAPI: Restores original tool IDs and deletes cloned mock tools from VAPI (not from Cekura DB)\nFor Retell: Restores original tool URLs in the LLM/Flow config\nFor ElevenLabs: Restores original webhook tool URLs in agent config",
                 "parameters": [
                     {
                         "in": "path",
@@ -10645,7 +10645,71 @@
                     "mcp": {
                         "enabled": true,
                         "name": "aiagents-tools-disable-mock-create",
-                        "description": "Disable mock tools by restoring original provider tool URLs and deleting mock tools.\n\nThis performs two operations:\n1. Restore the tool configurations in the external provider to their original state\n2. Delete the auto-fetched mock tools from Cekura\n\nFor VAPI: Restores original tool IDs and deletes cloned mock tools\nFor Retell: Restores original tool URLs in the LLM/Flow config\nFor ElevenLabs: Restores original webhook tool URLs in agent config"
+                        "description": "Disable mock tools by restoring original provider tool URLs.\nTool mock data is preserved in the DB and can be re-enabled at any time.\n\nFor VAPI: Restores original tool IDs and deletes cloned mock tools from VAPI (not from Cekura DB)\nFor Retell: Restores original tool URLs in the LLM/Flow config\nFor ElevenLabs: Restores original webhook tool URLs in agent config"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/aiagents/{agent_id}/tools/enable-mock/": {
+            "post": {
+                "operationId": "aiagents-tools-enable-mock-create",
+                "description": "Enable mock tools by updating provider tool URLs to point to Cekura mock endpoints.\nAuto-fetch must be run first to populate tool mock data.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "agent_id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Tool"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Tool"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Tool"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Tool"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-tools-enable-mock-create",
+                        "description": "Enable mock tools by updating provider tool URLs to point to Cekura mock endpoints.\nAuto-fetch must be run first to populate tool mock data."
                     }
                 }
             }
@@ -13027,7 +13091,7 @@
         "/test_framework/v1/metrics/": {
             "get": {
                 "operationId": "metrics-list",
-                "description": "\nThis API is used to list all the metrics associated with an agent or a project or both.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n        ",
+                "description": "\nThis API is used to list all the metrics associated with an agent or a project or both.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n        ",
                 "parameters": [
                     {
                         "in": "query",
@@ -13060,6 +13124,14 @@
                             "type": "string"
                         },
                         "description": "\nFilter metrics by agent IDs. Supports comma-separated list.\nExample: `1,2,3` to filter metrics associated with any of these agents\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "\nFilter by metric slug\nExample: `latency_metric` or `customer_satisfaction`\n"
                     },
                     {
                         "in": "query",
@@ -13197,7 +13269,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metrics-list",
-                        "description": "\nThis API is used to list all the metrics associated with an agent or a project or both.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n        "
+                        "description": "\nThis API is used to list all the metrics associated with an agent or a project or both.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n        "
                     }
                 }
             },
@@ -13274,7 +13346,7 @@
         "/test_framework/v1/metrics-external/": {
             "get": {
                 "operationId": "metrics-external-list",
-                "description": "\nThis API is used to list all the metrics associated with an agent or a project or both.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n        ",
+                "description": "\nThis API is used to list all the metrics associated with an agent or a project or both.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n        ",
                 "parameters": [
                     {
                         "in": "query",
@@ -13307,6 +13379,14 @@
                             "type": "string"
                         },
                         "description": "\nFilter metrics by agent IDs. Supports comma-separated list.\nExample: `1,2,3` to filter metrics associated with any of these agents\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "slug",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "\nFilter by metric slug\nExample: `latency_metric` or `customer_satisfaction`\n"
                     },
                     {
                         "in": "query",
@@ -13507,15 +13587,15 @@
         "/test_framework/v1/metrics-external/{id}/": {
             "get": {
                 "operationId": "metrics-external-retrieve",
-                "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization.",
+                "description": "Retrieve a specific metric by ID or slug.",
                 "parameters": [
                     {
                         "in": "path",
                         "name": "id",
                         "schema": {
-                            "type": "integer"
+                            "type": "string"
                         },
-                        "description": "A unique integer value identifying this metric.",
+                        "description": "**ID or Slug** - Metric identifier. Can be either:\n- Numeric ID (e.g., `123`)\n- Slug (e.g., `latency_metric`, `customer_satisfaction`)",
                         "required": true
                     }
                 ],
@@ -14017,6 +14097,63 @@
                 "responses": {
                     "200": {
                         "description": "Returns progress_id for tracking progress"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics-external/{id}/validate_annotations/": {
+            "post": {
+                "operationId": "metrics-external-validate-annotations-create",
+                "description": "Validate failed annotations to identify potential mis-annotations.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidateAnnotationsResponse"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -14668,18 +14805,64 @@
                 }
             }
         },
+        "/test_framework/v1/metrics-external/simplify_prompt/": {
+            "post": {
+                "operationId": "metrics-external-simplify-prompt-create",
+                "description": "Simplify a verbose metric prompt into a minimal algorithmic version.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SimplifyPromptResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/metrics/{id}/": {
             "get": {
                 "operationId": "metrics-retrieve",
-                "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization.",
+                "description": "Retrieve a specific metric by ID or slug.",
                 "parameters": [
                     {
                         "in": "path",
                         "name": "id",
                         "schema": {
-                            "type": "integer"
+                            "type": "string"
                         },
-                        "description": "A unique integer value identifying this metric.",
+                        "description": "**ID or Slug** - Metric identifier. Can be either:\n- Numeric ID (e.g., `123`)\n- Slug (e.g., `latency_metric`, `customer_satisfaction`)",
                         "required": true
                     }
                 ],
@@ -14722,7 +14905,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metrics-retrieve",
-                        "description": "API view set for managing metrics.\nThis view set provides endpoints to create, retrieve, update, and delete\nmetrics associated with AI agents within a specific organization."
+                        "description": "Retrieve a specific metric by ID or slug."
                     }
                 }
             },
@@ -15244,6 +15427,70 @@
                         "enabled": true,
                         "name": "metrics-run-reviews-create",
                         "description": "Re-evaluate all test sets for this metric with optional overrides. Returns a progress_id to poll for completion."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics/{id}/validate_annotations/": {
+            "post": {
+                "operationId": "metrics-validate-annotations-create",
+                "description": "Validate failed annotations to identify potential mis-annotations.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidateAnnotationsResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metrics-validate-annotations-create",
+                        "description": "Validate failed annotations to identify potential mis-annotations."
                     }
                 }
             }
@@ -15996,6 +16243,59 @@
                         "enabled": true,
                         "name": "metrics-save-result-create",
                         "description": "Store metric result to be polled by celery task"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics/simplify_prompt/": {
+            "post": {
+                "operationId": "metrics-simplify-prompt-create",
+                "description": "Simplify a verbose metric prompt into a minimal algorithmic version.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SimplifyPromptResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metrics-simplify-prompt-create",
+                        "description": "Simplify a verbose metric prompt into a minimal algorithmic version."
                     }
                 }
             }
@@ -17171,6 +17471,74 @@
                 }
             }
         },
+        "/test_framework/v1/phone-numbers-external/check_occupancy/": {
+            "get": {
+                "operationId": "phone-numbers-external-check-occupancy-retrieve",
+                "description": "Check if a phone number is currently occupied by pending runs.\n\nA phone number is considered occupied when there are runs with PENDING status\nusing that phone number. This typically happens during outbound calls when\nthe phone is being configured or a call is being initiated.\n\nQuery Parameters:\n    phone_number (str): The phone number to check (e.g., +1234567890)\n\nReturns:\n    200: {\n        'phone_number': str,\n        'is_occupied': bool,\n        'message': str,\n        'pending_runs_count': int (optional, only if occupied)\n    }\n    400: {'detail': str} - If phone_number parameter is missing",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "phone_number",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Phone number to check (e.g., +1234567890)",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                },
+                                "examples": {
+                                    "Success-PhoneAvailable": {
+                                        "value": {
+                                            "phone_number": "+1234567890",
+                                            "is_occupied": false,
+                                            "message": "Phone number is available"
+                                        },
+                                        "summary": "Success - Phone Available"
+                                    },
+                                    "Success-PhoneOccupied": {
+                                        "value": {
+                                            "phone_number": "+1234567890",
+                                            "is_occupied": true,
+                                            "message": "Phone number is currently occupied by another run",
+                                            "pending_runs_count": 3
+                                        },
+                                        "summary": "Success - Phone Occupied"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/phone-numbers-external/inbound/": {
             "get": {
                 "operationId": "phone-numbers-external-inbound-list",
@@ -17398,6 +17766,81 @@
                         "enabled": true,
                         "name": "phone-numbers-destroy",
                         "description": "API view set for managing phone numbers.\nThis view set provides endpoints to list and manage phone numbers\nassociated with a specific organization."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/phone-numbers/check_occupancy/": {
+            "get": {
+                "operationId": "phone-numbers-check-occupancy-retrieve",
+                "description": "Check if a phone number is currently occupied by pending runs.\n\nA phone number is considered occupied when there are runs with PENDING status\nusing that phone number. This typically happens during outbound calls when\nthe phone is being configured or a call is being initiated.\n\nQuery Parameters:\n    phone_number (str): The phone number to check (e.g., +1234567890)\n\nReturns:\n    200: {\n        'phone_number': str,\n        'is_occupied': bool,\n        'message': str,\n        'pending_runs_count': int (optional, only if occupied)\n    }\n    400: {'detail': str} - If phone_number parameter is missing",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "phone_number",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Phone number to check (e.g., +1234567890)",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                },
+                                "examples": {
+                                    "Success-PhoneAvailable": {
+                                        "value": {
+                                            "phone_number": "+1234567890",
+                                            "is_occupied": false,
+                                            "message": "Phone number is available"
+                                        },
+                                        "summary": "Success - Phone Available"
+                                    },
+                                    "Success-PhoneOccupied": {
+                                        "value": {
+                                            "phone_number": "+1234567890",
+                                            "is_occupied": true,
+                                            "message": "Phone number is currently occupied by another run",
+                                            "pending_runs_count": 3
+                                        },
+                                        "summary": "Success - Phone Occupied"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "phone-numbers-check-occupancy-retrieve",
+                        "description": "Check if a phone number is currently occupied by pending runs.\n\nA phone number is considered occupied when there are runs with PENDING status\nusing that phone number. This typically happens during outbound calls when\nthe phone is being configured or a call is being initiated.\n\nQuery Parameters:\n    phone_number (str): The phone number to check (e.g., +1234567890)\n\nReturns:\n    200: {\n        'phone_number': str,\n        'is_occupied': bool,\n        'message': str,\n        'pending_runs_count': int (optional, only if occupied)\n    }\n    400: {'detail': str} - If phone_number parameter is missing"
                     }
                 }
             }
@@ -20758,8 +21201,9 @@
                         "in": "query",
                         "name": "agent_id",
                         "schema": {
-                            "type": "number"
-                        }
+                            "type": "integer"
+                        },
+                        "description": "Filter runs by agent ID"
                     },
                     {
                         "in": "query",
@@ -20818,6 +21262,20 @@
                         }
                     },
                     {
+                        "in": "query",
+                        "name": "created_at_range",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "duration_range",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "page",
                         "required": false,
                         "in": "query",
@@ -20834,6 +21292,22 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Filter runs by project ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "result_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Filter runs by result ID"
                     }
                 ],
                 "tags": [
@@ -21091,8 +21565,9 @@
                         "in": "query",
                         "name": "agent_id",
                         "schema": {
-                            "type": "number"
-                        }
+                            "type": "integer"
+                        },
+                        "description": "Filter runs by agent ID"
                     },
                     {
                         "in": "query",
@@ -21151,6 +21626,20 @@
                         }
                     },
                     {
+                        "in": "query",
+                        "name": "created_at_range",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "duration_range",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
                         "name": "page",
                         "required": false,
                         "in": "query",
@@ -21167,6 +21656,22 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Filter runs by project ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "result_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Filter runs by result ID"
                     }
                 ],
                 "tags": [
@@ -26046,6 +26551,52 @@
                 }
             }
         },
+        "/test_framework/v1/scenarios-external/run_scenarios_retell_webrtc/": {
+            "post": {
+                "operationId": "scenarios-external-run-scenarios-retell-webrtc-create",
+                "description": "Run scenarios with Retell WebRTC using LiveKit infrastructure.\nToken fetching happens in background task after capacity allocation.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Scenario"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Scenario"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Scenario"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Scenario"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/scenarios-external/run_scenarios_sip/": {
             "post": {
                 "operationId": "scenarios-external-run-scenarios-sip-create",
@@ -29546,6 +30097,59 @@
                 }
             }
         },
+        "/test_framework/v1/scenarios/run_scenarios_retell_webrtc/": {
+            "post": {
+                "operationId": "scenarios-run-scenarios-retell-webrtc-create",
+                "description": "Run scenarios with Retell WebRTC using LiveKit infrastructure.\nToken fetching happens in background task after capacity allocation.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Scenario"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Scenario"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Scenario"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Scenario"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-scenarios-retell-webrtc-create",
+                        "description": "Run scenarios with Retell WebRTC using LiveKit infrastructure.\nToken fetching happens in background task after capacity allocation."
+                    }
+                }
+            }
+        },
         "/test_framework/v1/scenarios/run_scenarios_sip/": {
             "post": {
                 "operationId": "scenarios-run-scenarios-sip-create",
@@ -30036,8 +30640,15 @@
                         "schema": {
                             "type": "integer"
                         },
-                        "description": "ID of the agent",
-                        "required": true
+                        "description": "ID of the agent. Either agent_id or project_id must be provided."
+                    },
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the project. Either agent_id or project_id must be provided."
                     }
                 ],
                 "tags": [
@@ -30098,7 +30709,7 @@
                                 "$ref": "#/components/schemas/SchemaPostAIAgentTestProfileExternal"
                             },
                             "examples": {
-                                "CreateTestProfile": {
+                                "CreateTestProfileWithAgent": {
                                     "value": {
                                         "agent": 123,
                                         "name": "<string>",
@@ -30107,7 +30718,18 @@
                                             "user_email": "<string>"
                                         }
                                     },
-                                    "summary": "Create Test Profile"
+                                    "summary": "Create Test Profile with Agent"
+                                },
+                                "CreateTestProfileWithProject": {
+                                    "value": {
+                                        "project": 456,
+                                        "name": "<string>",
+                                        "information": {
+                                            "user_name": "<string>",
+                                            "user_email": "<string>"
+                                        }
+                                    },
+                                    "summary": "Create Test Profile with Project"
                                 }
                             }
                         },
@@ -30140,7 +30762,8 @@
                                     "CreateTestProfileResponse": {
                                         "value": {
                                             "id": 123,
-                                            "agent": 123,
+                                            "project": 456,
+                                            "agent": null,
                                             "name": "<string>",
                                             "information": {
                                                 "user_name": "John Doe",
@@ -30192,8 +30815,15 @@
                         "schema": {
                             "type": "integer"
                         },
-                        "description": "ID of the agent",
-                        "required": true
+                        "description": "ID of the agent. Either agent_id or project_id must be provided."
+                    },
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "ID of the project. Either agent_id or project_id must be provided."
                     }
                 ],
                 "tags": [
@@ -30247,7 +30877,7 @@
                                 "$ref": "#/components/schemas/SchemaPostAIAgentTestProfileExternal"
                             },
                             "examples": {
-                                "CreateTestProfile": {
+                                "CreateTestProfileWithAgent": {
                                     "value": {
                                         "agent": 123,
                                         "name": "<string>",
@@ -30256,7 +30886,18 @@
                                             "user_email": "<string>"
                                         }
                                     },
-                                    "summary": "Create Test Profile"
+                                    "summary": "Create Test Profile with Agent"
+                                },
+                                "CreateTestProfileWithProject": {
+                                    "value": {
+                                        "project": 456,
+                                        "name": "<string>",
+                                        "information": {
+                                            "user_name": "<string>",
+                                            "user_email": "<string>"
+                                        }
+                                    },
+                                    "summary": "Create Test Profile with Project"
                                 }
                             }
                         },
@@ -30289,7 +30930,8 @@
                                     "CreateTestProfileResponse": {
                                         "value": {
                                             "id": 123,
-                                            "agent": 123,
+                                            "project": 456,
+                                            "agent": null,
                                             "name": "<string>",
                                             "information": {
                                                 "user_name": "John Doe",
@@ -34303,6 +34945,59 @@
                         "enabled": true,
                         "name": "test-framework-v2-scenarios-run-scenarios-pipecat-v2-create",
                         "description": "Run scenarios with Pipecat Cloud using project credentials.\nSessions are created in task layer after capacity is allocated."
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/scenarios/run_scenarios_retell_webrtc/": {
+            "post": {
+                "operationId": "test-framework-v2-scenarios-run-scenarios-retell-webrtc-create",
+                "description": "Run scenarios with Retell WebRTC using LiveKit infrastructure.\nToken fetching happens in background task after capacity allocation.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScenarioSerializerV2"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScenarioSerializerV2"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScenarioSerializerV2"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ScenarioSerializerV2"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "test-framework-v2-scenarios-run-scenarios-retell-webrtc-create",
+                        "description": "Run scenarios with Retell WebRTC using LiveKit infrastructure.\nToken fetching happens in background task after capacity allocation."
                     }
                 }
             }
@@ -39629,6 +40324,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -39663,9 +40359,9 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2451dcae3901faa3",
+                        "x-spec-enum-id": "71f88caf8da6d93e",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -39943,6 +40639,10 @@
                         "type": "boolean",
                         "default": false,
                         "description": "Enable automatic fetching of calls every 30 seconds (VAPI/Retell only)"
+                    },
+                    "auto_sync_prompt_enabled": {
+                        "type": "boolean",
+                        "description": "Enable automatic syncing of prompts from Retell API every 30 seconds"
                     }
                 }
             },
@@ -39992,6 +40692,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -40026,8 +40727,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2451dcae3901faa3",
-                        "description": "Primary language for this agent.\nExample: `\"en\"` or `\"es\"`\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "description": "Primary language for this agent.\nExample: `\"en\"` or `\"es\"`\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "created_at": {
                         "type": "string",
@@ -40419,7 +41120,78 @@
                         "description": "List of widget IDs to get data for"
                     },
                     "filters": {
-                        "description": "Optional override filters applied to all widgets"
+                        "type": "object",
+                        "description": "Optional override filters applied to all widgets. Filters as a single condition or a group of conditions.\n\n**Single condition format:** `{field, op, value}`\n\nA single filter condition.\n\n**Supported fields:**\n- Call log: `id`, `success`, `duration`, `call_id`, `customer_number`, `call_ended_reason`, `dropoff_point`, `topic`, `timestamp`, `created_at`, `updated_at`\n- Related: `agent.id`, `agent.agent_name`, `agent.assistant_id`, `agent.project.id`, `agent.project.name`\n- Metadata: `metadata.<key>` (top-level keys only, e.g. `metadata.region`)\n- Metric evaluations: `metric_evaluations.value`, `metric_evaluations.metric.id`, `metric_evaluations.metric.name`, `metric_evaluations.thumbs_up`, `metric_evaluations.created_at`\n\n**Supported operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `endswith`, `in`, `isnull`, `regex`\n\n**Relative datetime values:** `now`, `now-1d`, `now-7d`, `now-2h`, `today`, `today-7d`, etc.\n\n**Grouped conditions format:** `{operator, conditions}`\n\nA group of filter conditions combined with a logical operator.\n\nUse `same_row` when filtering on multiple metric evaluation fields to ensure conditions match the same evaluation row.\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#filters) for the full reference.",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "Field name to filter on",
+                                "examples": [
+                                    "success",
+                                    "duration",
+                                    "timestamp",
+                                    "metadata.region",
+                                    "metric_evaluations.value"
+                                ]
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq",
+                                    "neq",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "startswith",
+                                    "endswith",
+                                    "in",
+                                    "isnull",
+                                    "regex"
+                                ],
+                                "description": "Comparison operator"
+                            },
+                            "value": {
+                                "description": "Value to compare against. Type depends on the field and operator."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or",
+                                    "same_row"
+                                ],
+                                "description": "Logical operator to combine conditions"
+                            },
+                            "conditions": {
+                                "type": "array",
+                                "description": "List of filter conditions or nested groups",
+                                "items": {}
+                            }
+                        },
+                        "examples": [
+                            {
+                                "field": "success",
+                                "op": "eq",
+                                "value": true
+                            },
+                            {
+                                "operator": "and",
+                                "conditions": [
+                                    {
+                                        "field": "timestamp",
+                                        "op": "gte",
+                                        "value": "today-7d"
+                                    },
+                                    {
+                                        "field": "duration",
+                                        "op": "gte",
+                                        "value": 60
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 },
                 "required": [
@@ -41351,6 +42123,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -41385,8 +42158,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2451dcae3901faa3",
-                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -41735,13 +42508,81 @@
                         "description": "Project this dashboard belongs to"
                     },
                     "filters": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
+                        "type": [
+                            "object",
+                            "null"
                         ],
-                        "description": "Dashboard-level filters applied to all widgets (e.g., date range, agent_id)"
+                        "description": "Filters as a single condition or a group of conditions.\n\n**Single condition format:** `{field, op, value}`\n\nA single filter condition.\n\n**Supported fields:**\n- Call log: `id`, `success`, `duration`, `call_id`, `customer_number`, `call_ended_reason`, `dropoff_point`, `topic`, `timestamp`, `created_at`, `updated_at`\n- Related: `agent.id`, `agent.agent_name`, `agent.assistant_id`, `agent.project.id`, `agent.project.name`\n- Metadata: `metadata.<key>` (top-level keys only, e.g. `metadata.region`)\n- Metric evaluations: `metric_evaluations.value`, `metric_evaluations.metric.id`, `metric_evaluations.metric.name`, `metric_evaluations.thumbs_up`, `metric_evaluations.created_at`\n\n**Supported operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `endswith`, `in`, `isnull`, `regex`\n\n**Relative datetime values:** `now`, `now-1d`, `now-7d`, `now-2h`, `today`, `today-7d`, etc.\n\n**Grouped conditions format:** `{operator, conditions}`\n\nA group of filter conditions combined with a logical operator.\n\nUse `same_row` when filtering on multiple metric evaluation fields to ensure conditions match the same evaluation row.\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#filters) for the full reference.",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "Field name to filter on",
+                                "examples": [
+                                    "success",
+                                    "duration",
+                                    "timestamp",
+                                    "metadata.region",
+                                    "metric_evaluations.value"
+                                ]
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq",
+                                    "neq",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "startswith",
+                                    "endswith",
+                                    "in",
+                                    "isnull",
+                                    "regex"
+                                ],
+                                "description": "Comparison operator"
+                            },
+                            "value": {
+                                "description": "Value to compare against. Type depends on the field and operator."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or",
+                                    "same_row"
+                                ],
+                                "description": "Logical operator to combine conditions"
+                            },
+                            "conditions": {
+                                "type": "array",
+                                "description": "List of filter conditions or nested groups",
+                                "items": {}
+                            }
+                        },
+                        "examples": [
+                            {
+                                "field": "success",
+                                "op": "eq",
+                                "value": true
+                            },
+                            {
+                                "operator": "and",
+                                "conditions": [
+                                    {
+                                        "field": "timestamp",
+                                        "op": "gte",
+                                        "value": "today-7d"
+                                    },
+                                    {
+                                        "field": "duration",
+                                        "op": "gte",
+                                        "value": 60
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     "widgets": {
                         "type": "array",
@@ -41799,13 +42640,81 @@
                         "description": "Project this dashboard belongs to"
                     },
                     "filters": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
+                        "type": [
+                            "object",
+                            "null"
                         ],
-                        "description": "Dashboard-level filters applied to all widgets (e.g., date range, agent_id)"
+                        "description": "Filters as a single condition or a group of conditions.\n\n**Single condition format:** `{field, op, value}`\n\nA single filter condition.\n\n**Supported fields:**\n- Call log: `id`, `success`, `duration`, `call_id`, `customer_number`, `call_ended_reason`, `dropoff_point`, `topic`, `timestamp`, `created_at`, `updated_at`\n- Related: `agent.id`, `agent.agent_name`, `agent.assistant_id`, `agent.project.id`, `agent.project.name`\n- Metadata: `metadata.<key>` (top-level keys only, e.g. `metadata.region`)\n- Metric evaluations: `metric_evaluations.value`, `metric_evaluations.metric.id`, `metric_evaluations.metric.name`, `metric_evaluations.thumbs_up`, `metric_evaluations.created_at`\n\n**Supported operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `endswith`, `in`, `isnull`, `regex`\n\n**Relative datetime values:** `now`, `now-1d`, `now-7d`, `now-2h`, `today`, `today-7d`, etc.\n\n**Grouped conditions format:** `{operator, conditions}`\n\nA group of filter conditions combined with a logical operator.\n\nUse `same_row` when filtering on multiple metric evaluation fields to ensure conditions match the same evaluation row.\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#filters) for the full reference.",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "Field name to filter on",
+                                "examples": [
+                                    "success",
+                                    "duration",
+                                    "timestamp",
+                                    "metadata.region",
+                                    "metric_evaluations.value"
+                                ]
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq",
+                                    "neq",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "startswith",
+                                    "endswith",
+                                    "in",
+                                    "isnull",
+                                    "regex"
+                                ],
+                                "description": "Comparison operator"
+                            },
+                            "value": {
+                                "description": "Value to compare against. Type depends on the field and operator."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or",
+                                    "same_row"
+                                ],
+                                "description": "Logical operator to combine conditions"
+                            },
+                            "conditions": {
+                                "type": "array",
+                                "description": "List of filter conditions or nested groups",
+                                "items": {}
+                            }
+                        },
+                        "examples": [
+                            {
+                                "field": "success",
+                                "op": "eq",
+                                "value": true
+                            },
+                            {
+                                "operator": "and",
+                                "conditions": [
+                                    {
+                                        "field": "timestamp",
+                                        "op": "gte",
+                                        "value": "today-7d"
+                                    },
+                                    {
+                                        "field": "duration",
+                                        "op": "gte",
+                                        "value": 60
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     "widget_count": {
                         "type": "string",
@@ -41945,7 +42854,11 @@
                 "properties": {
                     "agent_id": {
                         "type": "integer",
-                        "description": "\nAgent ID, required\nExample: `224`\n"
+                        "description": "\nAgent ID. Either agent_id or project_id must be provided.\nExample: `224`\n"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "description": "\nProject ID. Either agent_id or project_id must be provided.\nExample: `456`\n"
                     },
                     "call_logs": {
                         "type": "array",
@@ -41963,7 +42876,6 @@
                     }
                 },
                 "required": [
-                    "agent_id",
                     "call_logs",
                     "metrics"
                 ]
@@ -42478,6 +43390,14 @@
                         "type": "integer",
                         "readOnly": true
                     },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "URL-friendly unique identifier in snake_case format. Example: \"customer_satisfaction_1562\"",
+                        "maxLength": 255
+                    },
                     "name": {
                         "type": "string",
                         "description": "\nName of the metric.\nExample: `\"Customer Satisfaction\"` or `\"Appointment Booking\"`\n        ",
@@ -42556,6 +43476,14 @@
                     "id": {
                         "type": "integer",
                         "readOnly": true
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "URL-friendly unique identifier in snake_case format. Example: \"customer_satisfaction_1562\"",
+                        "maxLength": 255
                     },
                     "project": {
                         "type": [
@@ -42688,6 +43616,30 @@
                         "x-spec-enum-id": "9e2661f1aeca64cf",
                         "default": "disabled"
                     },
+                    "alert_filters": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Filters to apply before computing alerts (CallLogQueryFilter format)"
+                    },
+                    "slack_workspace": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Slack workspace to send alerts to"
+                    },
+                    "slack_channel_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Override channel ID for this metric's alerts",
+                        "maxLength": 255
+                    },
                     "significant_change_alert_status": {
                         "enum": [
                             "enabled",
@@ -42767,6 +43719,14 @@
                     "id": {
                         "type": "integer",
                         "readOnly": true
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "URL-friendly unique identifier in snake_case format. Example: \"customer_satisfaction_1562\"",
+                        "maxLength": 255
                     },
                     "project": {
                         "type": [
@@ -42922,12 +43882,8 @@
                         "readOnly": true
                     },
                     "scenarios": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer",
-                            "writeOnly": true
-                        },
-                        "writeOnly": true
+                        "writeOnly": true,
+                        "description": "Either \"all\" or a list of scenario IDs to attach to this metric"
                     },
                     "custom_code": {
                         "type": "string",
@@ -42992,6 +43948,30 @@
                             "null"
                         ],
                         "description": "When enabled, this metric is automatically assigned to new agents created in the project."
+                    },
+                    "alert_filters": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Filters to apply before computing alerts (CallLogQueryFilter format)"
+                    },
+                    "slack_workspace": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Slack workspace to send alerts to"
+                    },
+                    "slack_channel_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Override channel ID for this metric's alerts",
+                        "maxLength": 255
                     }
                 }
             },
@@ -43538,6 +44518,13 @@
                         "type": "string",
                         "x-spec-enum-id": "2e4d8382426c5017",
                         "description": "Number of people/employees in the organization\n\n* `1` - 1\n* `<10` - Less than 10\n* `10-100` - 10 - 100\n* `100-500` - 100 - 500\n* `500+` - More than 500"
+                    },
+                    "discovery_source": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "How the user discovered the platform (e.g., LinkedIn, Google, ChatGPT, Friends, etc.)"
                     },
                     "outbound_timeout": {
                         "type": "integer",
@@ -44624,6 +45611,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -44658,9 +45646,9 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2451dcae3901faa3",
+                        "x-spec-enum-id": "71f88caf8da6d93e",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -44938,6 +45926,10 @@
                         "type": "boolean",
                         "default": false,
                         "description": "Enable automatic fetching of calls every 30 seconds (VAPI/Retell only)"
+                    },
+                    "auto_sync_prompt_enabled": {
+                        "type": "boolean",
+                        "description": "Enable automatic syncing of prompts from Retell API every 30 seconds"
                     }
                 }
             },
@@ -45180,6 +46172,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -45214,8 +46207,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2451dcae3901faa3",
-                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -45379,13 +46372,81 @@
                         "description": "Project this dashboard belongs to"
                     },
                     "filters": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
+                        "type": [
+                            "object",
+                            "null"
                         ],
-                        "description": "Dashboard-level filters applied to all widgets (e.g., date range, agent_id)"
+                        "description": "Filters as a single condition or a group of conditions.\n\n**Single condition format:** `{field, op, value}`\n\nA single filter condition.\n\n**Supported fields:**\n- Call log: `id`, `success`, `duration`, `call_id`, `customer_number`, `call_ended_reason`, `dropoff_point`, `topic`, `timestamp`, `created_at`, `updated_at`\n- Related: `agent.id`, `agent.agent_name`, `agent.assistant_id`, `agent.project.id`, `agent.project.name`\n- Metadata: `metadata.<key>` (top-level keys only, e.g. `metadata.region`)\n- Metric evaluations: `metric_evaluations.value`, `metric_evaluations.metric.id`, `metric_evaluations.metric.name`, `metric_evaluations.thumbs_up`, `metric_evaluations.created_at`\n\n**Supported operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `endswith`, `in`, `isnull`, `regex`\n\n**Relative datetime values:** `now`, `now-1d`, `now-7d`, `now-2h`, `today`, `today-7d`, etc.\n\n**Grouped conditions format:** `{operator, conditions}`\n\nA group of filter conditions combined with a logical operator.\n\nUse `same_row` when filtering on multiple metric evaluation fields to ensure conditions match the same evaluation row.\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#filters) for the full reference.",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "Field name to filter on",
+                                "examples": [
+                                    "success",
+                                    "duration",
+                                    "timestamp",
+                                    "metadata.region",
+                                    "metric_evaluations.value"
+                                ]
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq",
+                                    "neq",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "startswith",
+                                    "endswith",
+                                    "in",
+                                    "isnull",
+                                    "regex"
+                                ],
+                                "description": "Comparison operator"
+                            },
+                            "value": {
+                                "description": "Value to compare against. Type depends on the field and operator."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or",
+                                    "same_row"
+                                ],
+                                "description": "Logical operator to combine conditions"
+                            },
+                            "conditions": {
+                                "type": "array",
+                                "description": "List of filter conditions or nested groups",
+                                "items": {}
+                            }
+                        },
+                        "examples": [
+                            {
+                                "field": "success",
+                                "op": "eq",
+                                "value": true
+                            },
+                            {
+                                "operator": "and",
+                                "conditions": [
+                                    {
+                                        "field": "timestamp",
+                                        "op": "gte",
+                                        "value": "today-7d"
+                                    },
+                                    {
+                                        "field": "duration",
+                                        "op": "gte",
+                                        "value": 60
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     "widgets": {
                         "type": "array",
@@ -45786,6 +46847,13 @@
                         "type": "string",
                         "x-spec-enum-id": "2e4d8382426c5017",
                         "description": "Number of people/employees in the organization\n\n* `1` - 1\n* `<10` - Less than 10\n* `10-100` - 10 - 100\n* `100-500` - 100 - 500\n* `500+` - More than 500"
+                    },
+                    "discovery_source": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "How the user discovered the platform (e.g., LinkedIn, Google, ChatGPT, Friends, etc.)"
                     },
                     "outbound_timeout": {
                         "type": "integer",
@@ -46230,6 +47298,14 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "Unique code identifier for the metric"
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "URL-friendly unique identifier in snake_case format",
+                        "maxLength": 255
                     },
                     "type": {
                         "enum": [
@@ -47091,8 +48167,18 @@
                 "type": "object",
                 "properties": {
                     "agent": {
-                        "type": "integer",
-                        "description": "ID of the agent"
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the agent. Either agent or project must be provided."
+                    },
+                    "project": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the project. Either agent or project must be provided."
                     },
                     "name": {
                         "type": "string",
@@ -47128,7 +48214,7 @@
                     },
                     "agent": {
                         "type": "integer",
-                        "description": "\nRequired when tags are provided\nExample: `123`\n"
+                        "description": "\nAgent ID. Required when using tags to filter scenarios.\nExample: `123`\n"
                     },
                     "crontab_expression": {
                         "type": "string",
@@ -47277,19 +48363,9 @@
                         "type": "string",
                         "description": "The evaluation prompt used for this metric"
                     },
-                    "agent": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "description": "ID of the agent for agent-level metrics. Either agent or project must be provided."
-                    },
                     "project": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "description": "ID of the project for project-level metrics. Either agent or project must be provided."
+                        "type": "integer",
+                        "description": "ID of the project this metric belongs to."
                     },
                     "agents": {
                         "type": "array",
@@ -47350,10 +48426,21 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
+                "description": "Mixin for parsing restql query from request.\n\nNOTE: We are using `request.GET` instead of\n`request.query_params` because this might be\ncalled before DRF request is created(i.e from dispatch).\nThis means `request.query_params` might not be available\nwhen this mixin is used.",
                 "properties": {
                     "agent": {
-                        "type": "integer",
-                        "description": "\nAgent ID\nExample: `2142`\n"
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the agent. Either agent or project must be provided."
+                    },
+                    "project": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the project. Either agent or project must be provided."
                     },
                     "assistant_id": {
                         "type": "string",
@@ -47414,6 +48501,13 @@
                     "inbound_phone_number": {
                         "type": "integer",
                         "description": "(Deprecated) The inbound phone number ID to use for the evaluator. Use phone_number instead, which works for both inbound and outbound."
+                    },
+                    "folder_path": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Dot-separated folder path to assign the evaluator to (e.g. \"Sales.Inbound\")"
                     }
                 }
             },
@@ -47557,6 +48651,9 @@
                     },
                     "information": {
                         "description": "\nInformation of the tool - must be a list of input-output mappings.\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    }\n]\n```\n"
+                    },
+                    "freetext_params": {
+                        "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"
                     }
                 }
             },
@@ -47767,18 +48864,156 @@
                         "maxLength": 255
                     },
                     "filters": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
+                        "type": [
+                            "object",
+                            "null"
                         ],
-                        "description": "Widget-specific filters. If empty, uses dashboard filters."
+                        "description": "Filters as a single condition or a group of conditions.\n\n**Single condition format:** `{field, op, value}`\n\nA single filter condition.\n\n**Supported fields:**\n- Call log: `id`, `success`, `duration`, `call_id`, `customer_number`, `call_ended_reason`, `dropoff_point`, `topic`, `timestamp`, `created_at`, `updated_at`\n- Related: `agent.id`, `agent.agent_name`, `agent.assistant_id`, `agent.project.id`, `agent.project.name`\n- Metadata: `metadata.<key>` (top-level keys only, e.g. `metadata.region`)\n- Metric evaluations: `metric_evaluations.value`, `metric_evaluations.metric.id`, `metric_evaluations.metric.name`, `metric_evaluations.thumbs_up`, `metric_evaluations.created_at`\n\n**Supported operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `endswith`, `in`, `isnull`, `regex`\n\n**Relative datetime values:** `now`, `now-1d`, `now-7d`, `now-2h`, `today`, `today-7d`, etc.\n\n**Grouped conditions format:** `{operator, conditions}`\n\nA group of filter conditions combined with a logical operator.\n\nUse `same_row` when filtering on multiple metric evaluation fields to ensure conditions match the same evaluation row.\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#filters) for the full reference.",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "Field name to filter on",
+                                "examples": [
+                                    "success",
+                                    "duration",
+                                    "timestamp",
+                                    "metadata.region",
+                                    "metric_evaluations.value"
+                                ]
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq",
+                                    "neq",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "startswith",
+                                    "endswith",
+                                    "in",
+                                    "isnull",
+                                    "regex"
+                                ],
+                                "description": "Comparison operator"
+                            },
+                            "value": {
+                                "description": "Value to compare against. Type depends on the field and operator."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or",
+                                    "same_row"
+                                ],
+                                "description": "Logical operator to combine conditions"
+                            },
+                            "conditions": {
+                                "type": "array",
+                                "description": "List of filter conditions or nested groups",
+                                "items": {}
+                            }
+                        },
+                        "examples": [
+                            {
+                                "field": "success",
+                                "op": "eq",
+                                "value": true
+                            },
+                            {
+                                "operator": "and",
+                                "conditions": [
+                                    {
+                                        "field": "timestamp",
+                                        "op": "gte",
+                                        "value": "today-7d"
+                                    },
+                                    {
+                                        "field": "duration",
+                                        "op": "gte",
+                                        "value": 60
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     "effective_filters": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "Merged filters from dashboard and widget (read-only). Can be used with the call logs API filters_v2 parameter."
+                        "type": "object",
+                        "description": "Merged filters from dashboard and widget (read-only). Can be used with the call logs API filters_v2 parameter.",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "Field name to filter on",
+                                "examples": [
+                                    "success",
+                                    "duration",
+                                    "timestamp",
+                                    "metadata.region",
+                                    "metric_evaluations.value"
+                                ]
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq",
+                                    "neq",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "startswith",
+                                    "endswith",
+                                    "in",
+                                    "isnull",
+                                    "regex"
+                                ],
+                                "description": "Comparison operator"
+                            },
+                            "value": {
+                                "description": "Value to compare against. Type depends on the field and operator."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or",
+                                    "same_row"
+                                ],
+                                "description": "Logical operator to combine conditions"
+                            },
+                            "conditions": {
+                                "type": "array",
+                                "description": "List of filter conditions or nested groups",
+                                "items": {}
+                            }
+                        },
+                        "examples": [
+                            {
+                                "field": "success",
+                                "op": "eq",
+                                "value": true
+                            },
+                            {
+                                "operator": "and",
+                                "conditions": [
+                                    {
+                                        "field": "timestamp",
+                                        "op": "gte",
+                                        "value": "today-7d"
+                                    },
+                                    {
+                                        "field": "duration",
+                                        "op": "gte",
+                                        "value": 60
+                                    }
+                                ]
+                            }
+                        ],
+                        "readOnly": true
                     },
                     "chart_type": {
                         "enum": [
@@ -47809,7 +49044,14 @@
                     },
                     "field": {
                         "type": "string",
-                        "description": "Field name to plot (e.g., 'duration', 'success', 'metric_evaluations.value')",
+                        "description": "Field name to plot. Supported values:\n- `duration` (numeric) — call duration in seconds\n- `success` (boolean) — whether the call was successful\n- `is_reviewed` (boolean) — whether the call has been reviewed\n- `call_ended_reason` (string) — reason the call ended\n- `dropoff_point` (string) — point at which the caller dropped off\n- `topic` (string) — call topic\n- `agent_id` (string) — agent identifier\n- `metric_evaluations.value` (dynamic) — metric evaluation value (requires `metric` field)\n- `metadata.<key>` (string) — any top-level metadata key (e.g. `metadata.region`)",
+                        "examples": [
+                            "duration",
+                            "success",
+                            "call_ended_reason",
+                            "metric_evaluations.value",
+                            "metadata.region"
+                        ],
                         "maxLength": 255
                     },
                     "metric": {
@@ -48136,6 +49378,14 @@
                         "readOnly": true,
                         "description": "Unique code identifier for the metric"
                     },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "URL-friendly unique identifier in snake_case format",
+                        "maxLength": 255
+                    },
                     "type": {
                         "enum": [
                             "basic",
@@ -48273,6 +49523,10 @@
                         },
                         "description": "List of test set IDs to process feedbacks from",
                         "minItems": 1
+                    },
+                    "simplified_prompt": {
+                        "type": "string",
+                        "description": "Simplified prompt to use as initial prompt for optimization. If provided, the optimizer will start from this prompt instead of the metric's original description."
                     }
                 },
                 "required": [
@@ -49536,6 +50790,7 @@
             },
             "Scenario": {
                 "type": "object",
+                "description": "Mixin for parsing restql query from request.\n\nNOTE: We are using `request.GET` instead of\n`request.query_params` because this might be\ncalled before DRF request is created(i.e from dispatch).\nThis means `request.query_params` might not be available\nwhen this mixin is used.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -49622,7 +50877,7 @@
                             }
                         ],
                         "readOnly": true,
-                        "description": "\nPhone number used for inbound calls in this scenario\nExample: `\"+1234567890\"`\n"
+                        "description": "\n(Deprecated) Phone number used for inbound calls in this scenario. Use outbound_phone_number_data instead.\nAfter CEK-6517, both phone_number and inbound_phone_number fields are synced, so outbound_phone_number_data contains the unified phone number for both inbound and outbound calls.\nExample: `{\"id\": 123, \"number\": \"+1234567890\", \"phone_number_id\": \"abc123\"}`\n"
                     },
                     "instructions": {
                         "type": "string",
@@ -49654,6 +50909,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -49688,8 +50944,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2451dcae3901faa3",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -49734,6 +50990,7 @@
                     "folder_path": {
                         "type": [
                             "string",
+                            "null",
                             "null"
                         ],
                         "description": "Path of the folder this scenario belongs to"
@@ -50094,6 +51351,7 @@
             },
             "ScenarioList": {
                 "type": "object",
+                "description": "Mixin for parsing restql query from request.\n\nNOTE: We are using `request.GET` instead of\n`request.query_params` because this might be\ncalled before DRF request is created(i.e from dispatch).\nThis means `request.query_params` might not be available\nwhen this mixin is used.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -50141,6 +51399,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -50179,8 +51438,8 @@
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "2451dcae3901faa3",
-                        "description": "Language code for the scenario (ISO language code)\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "description": "Language code for the scenario (ISO language code)\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -50206,7 +51465,7 @@
                             "integer",
                             "null"
                         ],
-                        "description": "Foreign key reference to the phone number used for inbound calls"
+                        "description": "(Deprecated) Foreign key reference to the phone number. Use phone_number field instead. This field is maintained for backward compatibility and will be automatically synced with phone_number."
                     },
                     "inbound_phone_number_data": {
                         "type": "string",
@@ -50268,6 +51527,7 @@
                     "folder_path": {
                         "type": [
                             "string",
+                            "null",
                             "null"
                         ],
                         "description": "Path of the folder this scenario belongs to"
@@ -50276,6 +51536,7 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
+                "description": "Mixin for parsing restql query from request.\n\nNOTE: We are using `request.GET` instead of\n`request.query_params` because this might be\ncalled before DRF request is created(i.e from dispatch).\nThis means `request.query_params` might not be available\nwhen this mixin is used.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -50356,7 +51617,7 @@
                             "integer",
                             "null"
                         ],
-                        "description": "\n(Deprecated) Use phone_number instead. This field is maintained for backward compatibility only.\nWhen phone_number is set, this field will be automatically synced.\n"
+                        "description": "\n(Deprecated) Use phone_number instead. This field is maintained for backward compatibility only.\nWhen phone_number is set, this field will be automatically synced.\nExample: `123`\n"
                     },
                     "inbound_phone_number_data": {
                         "allOf": [
@@ -50365,7 +51626,7 @@
                             }
                         ],
                         "readOnly": true,
-                        "description": "\nPhone number used for inbound calls in this scenario\nExample: `\"+1234567890\"`\n"
+                        "description": "\n(Deprecated) Phone number used for inbound calls in this scenario. Use outbound_phone_number_data instead.\nAfter CEK-6517, both phone_number and inbound_phone_number fields are synced, so outbound_phone_number_data contains the unified phone number for both inbound and outbound calls.\nExample: `{\"id\": 123, \"number\": \"+1234567890\", \"phone_number_id\": \"abc123\"}`\n"
                     },
                     "instructions": {
                         "type": "string",
@@ -50397,6 +51658,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -50431,8 +51693,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2451dcae3901faa3",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -50477,6 +51739,7 @@
                     "folder_path": {
                         "type": [
                             "string",
+                            "null",
                             "null"
                         ],
                         "description": "Path of the folder this scenario belongs to"
@@ -50728,8 +51991,18 @@
                 "type": "object",
                 "properties": {
                     "agent": {
-                        "type": "integer",
-                        "description": "ID of the agent"
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the agent. Either agent or project must be provided."
+                    },
+                    "project": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the project. Either agent or project must be provided."
                     },
                     "name": {
                         "type": "string",
@@ -50742,7 +52015,6 @@
                     }
                 },
                 "required": [
-                    "agent",
                     "name"
                 ]
             },
@@ -50904,7 +52176,7 @@
                     },
                     "agent": {
                         "type": "integer",
-                        "description": "\nRequired when tags are provided\nExample: `123`\n"
+                        "description": "\nAgent ID. Required when using tags to filter scenarios.\nExample: `123`\n"
                     },
                     "crontab_expression": {
                         "type": "string",
@@ -51071,19 +52343,9 @@
                         "type": "string",
                         "description": "The evaluation prompt used for this metric"
                     },
-                    "agent": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "description": "ID of the agent for agent-level metrics. Either agent or project must be provided."
-                    },
                     "project": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "description": "ID of the project for project-level metrics. Either agent or project must be provided."
+                        "type": "integer",
+                        "description": "ID of the project this metric belongs to."
                     },
                     "agents": {
                         "type": "array",
@@ -51204,6 +52466,7 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
+                "description": "Mixin for parsing restql query from request.\n\nNOTE: We are using `request.GET` instead of\n`request.query_params` because this might be\ncalled before DRF request is created(i.e from dispatch).\nThis means `request.query_params` might not be available\nwhen this mixin is used.",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -51390,10 +52653,21 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
+                "description": "Mixin for parsing restql query from request.\n\nNOTE: We are using `request.GET` instead of\n`request.query_params` because this might be\ncalled before DRF request is created(i.e from dispatch).\nThis means `request.query_params` might not be available\nwhen this mixin is used.",
                 "properties": {
                     "agent": {
-                        "type": "integer",
-                        "description": "\nAgent ID\nExample: `2142`\n"
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the agent. Either agent or project must be provided."
+                    },
+                    "project": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the project. Either agent or project must be provided."
                     },
                     "assistant_id": {
                         "type": "string",
@@ -51454,6 +52728,13 @@
                     "inbound_phone_number": {
                         "type": "integer",
                         "description": "(Deprecated) The inbound phone number ID to use for the evaluator. Use phone_number instead, which works for both inbound and outbound."
+                    },
+                    "folder_path": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Dot-separated folder path to assign the evaluator to (e.g. \"Sales.Inbound\")"
                     }
                 },
                 "required": [
@@ -51510,6 +52791,7 @@
             },
             "SchemaScenario": {
                 "type": "object",
+                "description": "Mixin for parsing restql query from request.\n\nNOTE: We are using `request.GET` instead of\n`request.query_params` because this might be\ncalled before DRF request is created(i.e from dispatch).\nThis means `request.query_params` might not be available\nwhen this mixin is used.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -51603,7 +52885,7 @@
                             }
                         ],
                         "readOnly": true,
-                        "description": "\nPhone number used for inbound calls in this scenario\nExample: `\"+1234567890\"`\n"
+                        "description": "\n(Deprecated) Phone number used for inbound calls in this scenario. Use outbound_phone_number_data instead.\nAfter CEK-6517, both phone_number and inbound_phone_number fields are synced, so outbound_phone_number_data contains the unified phone number for both inbound and outbound calls.\nExample: `{\"id\": 123, \"number\": \"+1234567890\", \"phone_number_id\": \"abc123\"}`\n"
                     },
                     "instructions": {
                         "type": "string",
@@ -51637,6 +52919,7 @@
                             "da",
                             "nl",
                             "en",
+                            "et",
                             "fi",
                             "fr",
                             "de",
@@ -51671,8 +52954,8 @@
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2451dcae3901faa3",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -51717,6 +53000,7 @@
                     "folder_path": {
                         "type": [
                             "string",
+                            "null",
                             "null"
                         ],
                         "description": "Path of the folder this scenario belongs to"
@@ -51727,6 +53011,29 @@
                             "null"
                         ],
                         "description": "\nMax call duration in seconds for this scenario. If not provided or set to null, the scenario will use the project's max_call_duration setting.\nValid range: 10-3600 seconds (10 seconds to 60 minutes)\nExample: `600` (10 minutes)\n"
+                    }
+                }
+            },
+            "SimplifyPromptRequest": {
+                "type": "object",
+                "properties": {
+                    "original_prompt": {
+                        "type": "string",
+                        "description": "The verbose prompt to simplify"
+                    }
+                },
+                "required": [
+                    "original_prompt"
+                ]
+            },
+            "SimplifyPromptResponse": {
+                "type": "object",
+                "properties": {
+                    "simplified_prompt": {
+                        "type": "string"
+                    },
+                    "original_prompt": {
+                        "type": "string"
                     }
                 }
             },
@@ -52117,6 +53424,9 @@
                     },
                     "information": {
                         "description": "\nInformation of the tool - must be a list of input-output mappings.\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    }\n]\n```\n"
+                    },
+                    "freetext_params": {
+                        "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"
                     }
                 }
             },
@@ -52346,6 +53656,51 @@
                     }
                 }
             },
+            "ValidateAnnotationsRequest": {
+                "type": "object",
+                "properties": {
+                    "failed_reviews": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "description": "List of failed reviews with review_id, expected_value, actual_value, explanation"
+                    },
+                    "simplified_prompt": {
+                        "type": "string",
+                        "description": "The simplified prompt used during evaluation. If provided, will be used for validation instead of metric's original description."
+                    }
+                },
+                "required": [
+                    "failed_reviews"
+                ]
+            },
+            "ValidateAnnotationsResponse": {
+                "type": "object",
+                "properties": {
+                    "flagged_cases": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
+                    },
+                    "all_results": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
+                    },
+                    "total_validated": {
+                        "type": "integer"
+                    },
+                    "total_flagged": {
+                        "type": "integer"
+                    }
+                }
+            },
             "View": {
                 "type": "object",
                 "properties": {
@@ -52400,18 +53755,156 @@
                         "maxLength": 255
                     },
                     "filters": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
+                        "type": [
+                            "object",
+                            "null"
                         ],
-                        "description": "Widget-specific filters. If empty, uses dashboard filters."
+                        "description": "Filters as a single condition or a group of conditions.\n\n**Single condition format:** `{field, op, value}`\n\nA single filter condition.\n\n**Supported fields:**\n- Call log: `id`, `success`, `duration`, `call_id`, `customer_number`, `call_ended_reason`, `dropoff_point`, `topic`, `timestamp`, `created_at`, `updated_at`\n- Related: `agent.id`, `agent.agent_name`, `agent.assistant_id`, `agent.project.id`, `agent.project.name`\n- Metadata: `metadata.<key>` (top-level keys only, e.g. `metadata.region`)\n- Metric evaluations: `metric_evaluations.value`, `metric_evaluations.metric.id`, `metric_evaluations.metric.name`, `metric_evaluations.thumbs_up`, `metric_evaluations.created_at`\n\n**Supported operators:** `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `endswith`, `in`, `isnull`, `regex`\n\n**Relative datetime values:** `now`, `now-1d`, `now-7d`, `now-2h`, `today`, `today-7d`, etc.\n\n**Grouped conditions format:** `{operator, conditions}`\n\nA group of filter conditions combined with a logical operator.\n\nUse `same_row` when filtering on multiple metric evaluation fields to ensure conditions match the same evaluation row.\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#filters) for the full reference.",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "Field name to filter on",
+                                "examples": [
+                                    "success",
+                                    "duration",
+                                    "timestamp",
+                                    "metadata.region",
+                                    "metric_evaluations.value"
+                                ]
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq",
+                                    "neq",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "startswith",
+                                    "endswith",
+                                    "in",
+                                    "isnull",
+                                    "regex"
+                                ],
+                                "description": "Comparison operator"
+                            },
+                            "value": {
+                                "description": "Value to compare against. Type depends on the field and operator."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or",
+                                    "same_row"
+                                ],
+                                "description": "Logical operator to combine conditions"
+                            },
+                            "conditions": {
+                                "type": "array",
+                                "description": "List of filter conditions or nested groups",
+                                "items": {}
+                            }
+                        },
+                        "examples": [
+                            {
+                                "field": "success",
+                                "op": "eq",
+                                "value": true
+                            },
+                            {
+                                "operator": "and",
+                                "conditions": [
+                                    {
+                                        "field": "timestamp",
+                                        "op": "gte",
+                                        "value": "today-7d"
+                                    },
+                                    {
+                                        "field": "duration",
+                                        "op": "gte",
+                                        "value": 60
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     "effective_filters": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "Merged filters from dashboard and widget (read-only). Can be used with the call logs API filters_v2 parameter."
+                        "type": "object",
+                        "description": "Merged filters from dashboard and widget (read-only). Can be used with the call logs API filters_v2 parameter.",
+                        "properties": {
+                            "field": {
+                                "type": "string",
+                                "description": "Field name to filter on",
+                                "examples": [
+                                    "success",
+                                    "duration",
+                                    "timestamp",
+                                    "metadata.region",
+                                    "metric_evaluations.value"
+                                ]
+                            },
+                            "op": {
+                                "type": "string",
+                                "enum": [
+                                    "eq",
+                                    "neq",
+                                    "gt",
+                                    "gte",
+                                    "lt",
+                                    "lte",
+                                    "contains",
+                                    "startswith",
+                                    "endswith",
+                                    "in",
+                                    "isnull",
+                                    "regex"
+                                ],
+                                "description": "Comparison operator"
+                            },
+                            "value": {
+                                "description": "Value to compare against. Type depends on the field and operator."
+                            },
+                            "operator": {
+                                "type": "string",
+                                "enum": [
+                                    "and",
+                                    "or",
+                                    "same_row"
+                                ],
+                                "description": "Logical operator to combine conditions"
+                            },
+                            "conditions": {
+                                "type": "array",
+                                "description": "List of filter conditions or nested groups",
+                                "items": {}
+                            }
+                        },
+                        "examples": [
+                            {
+                                "field": "success",
+                                "op": "eq",
+                                "value": true
+                            },
+                            {
+                                "operator": "and",
+                                "conditions": [
+                                    {
+                                        "field": "timestamp",
+                                        "op": "gte",
+                                        "value": "today-7d"
+                                    },
+                                    {
+                                        "field": "duration",
+                                        "op": "gte",
+                                        "value": 60
+                                    }
+                                ]
+                            }
+                        ],
+                        "readOnly": true
                     },
                     "chart_type": {
                         "enum": [
@@ -52442,7 +53935,14 @@
                     },
                     "field": {
                         "type": "string",
-                        "description": "Field name to plot (e.g., 'duration', 'success', 'metric_evaluations.value')",
+                        "description": "Field name to plot. Supported values:\n- `duration` (numeric) — call duration in seconds\n- `success` (boolean) — whether the call was successful\n- `is_reviewed` (boolean) — whether the call has been reviewed\n- `call_ended_reason` (string) — reason the call ended\n- `dropoff_point` (string) — point at which the caller dropped off\n- `topic` (string) — call topic\n- `agent_id` (string) — agent identifier\n- `metric_evaluations.value` (dynamic) — metric evaluation value (requires `metric` field)\n- `metadata.<key>` (string) — any top-level metadata key (e.g. `metadata.region`)",
+                        "examples": [
+                            "duration",
+                            "success",
+                            "call_ended_reason",
+                            "metric_evaluations.value",
+                            "metadata.region"
+                        ],
                         "maxLength": 255
                     },
                     "metric": {
@@ -52534,9 +54034,9 @@
                     },
                     "data": {
                         "type": "array",
+                        "description": "Chart data. Format depends on `chart_type`:\n\n**Line chart** — individual data points:\n`[{\"id\": 1, \"timestamp\": \"2025-11-03T00:00:00Z\", \"value\": 45}, ...]`\n\n**Bar chart** — aggregated time buckets:\n`[{\"time_interval\": \"2025-11-03T00:00:00Z\", \"value\": 4.5, \"sample_count\": 10}, ...]`\n\n**Pie chart** — value distribution:\n`[{\"label\": \"customer_ended_call\", \"value\": 320, \"percentage\": 45.7}, ...]`",
                         "items": {
-                            "type": "object",
-                            "additionalProperties": {}
+                            "type": "object"
                         }
                     },
                     "aggregation_function": {
@@ -52553,7 +54053,28 @@
                     },
                     "metadata": {
                         "type": "object",
-                        "additionalProperties": {}
+                        "description": "Additional metadata about the plotted data",
+                        "properties": {
+                            "display_name": {
+                                "type": "string",
+                                "description": "Human-readable name of the field"
+                            },
+                            "data_type": {
+                                "type": "string",
+                                "enum": [
+                                    "numeric",
+                                    "boolean",
+                                    "string",
+                                    "datetime",
+                                    "dynamic"
+                                ],
+                                "description": "Resolved data type of the field"
+                            },
+                            "filter_value": {
+                                "description": "The filter value used (e.g. metric ID), or null",
+                                "nullable": true
+                            }
+                        }
                     }
                 }
             },

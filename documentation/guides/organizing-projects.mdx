@@ -1,0 +1,237 @@
+---
+title: "Organizing Projects, Agents & Evaluators"
+sidebarTitle: "Organizing Your Workspace"
+icon: "folder-tree"
+iconType: "regular"
+description: "Best practices for structuring projects, agents, and evaluators to maximize reusability and maintainability"
+---
+
+## Overview
+
+As your voice AI testing scales, how you organize projects, agents, and evaluators in Cekura has a direct impact on reusability, team collaboration, and metrics clarity. This guide covers recommended patterns and the key decisions to consider when structuring your workspace.
+
+## Projects
+
+Projects are the top-level organizational unit in Cekura. Everything — agents, evaluators, metrics, and results — lives within a project.
+
+### Key Properties of Projects
+
+- **Metrics are project-level.** Metrics defined at the project level are shared across all agents within that project. This means agents in the same project can reuse the same set of metrics without duplicating them.
+- **RBAC is project-scoped.** Cekura supports [role-based access control](/documentation/advanced/enterprise-setup) with Admin, Member, and Viewer roles. Members can be assigned to specific projects, and Viewers have read-only access. Use this to control who can see and modify what.
+- **Results can be filtered and scoped.** Simulation results within a project can be filtered by evaluator name, and the **Views** tab lets you create filtered views to see only test runs for specific agents.
+
+### How to Decide on Project Structure
+
+The primary question to ask yourself is: **how do I maximize reusability of components (metrics, evaluators, test profiles) that can be shared across agents?**
+
+There are two common patterns:
+
+<AccordionGroup>
+  <Accordion title="Separate by Agent Type" icon="robot" defaultOpen>
+    Create a different project for each distinct agent type or use case.
+
+    **Example:**
+    ```
+    Project: Inbound Call Booking Agent
+    Project: Outbound Patient Follow-Up Agent
+    Project: Customer Support Agent
+    ```
+
+    **When to use this:**
+    - Your agents serve fundamentally different purposes with different metrics
+    - Teams or business units own different agent types
+    - You want metrics, evaluators, and test profiles tightly scoped to a single agent's domain
+
+    **Benefit:** Clean separation — each project's metrics and evaluators are purpose-built for that agent type.
+  </Accordion>
+
+  <Accordion title="Separate by Environment" icon="layer-group">
+    Create projects to represent deployment environments.
+
+    **Example:**
+    ```
+    Project: Booking Agent - Staging
+    Project: Booking Agent - Production
+    ```
+
+    **When to use this:**
+    - You need to track metrics separately for staging vs. production
+    - Different team members should have access to different environments (e.g., devs access staging, leads access production)
+    - You want to isolate test results by environment
+
+    **Benefit:** Environment isolation with RBAC — staging engineers don't accidentally run tests against production agents.
+
+    <Tip>
+    Environment separation also applies across agent types. For example, you might have `Booking Agent - Staging`, `Follow-Up Agent - Staging`, `Booking Agent - Production`, and `Follow-Up Agent - Production` as four separate projects when you need both dimensions of separation.
+    </Tip>
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+There's no single "correct" structure — pick the pattern that best fits your organization's needs. You can always restructure later as your usage evolves.
+</Note>
+
+## Agents
+
+Agents in Cekura represent the voice or chat AI agent you are testing. Properly configuring your agents ensures accurate and reliable test results.
+
+### Provider API Keys
+
+We recommend **always providing your provider API keys** and properly configuring them for each agent, especially for first-class integrated providers:
+
+- [Vapi](/documentation/integrations/vapi/testing)
+- [Retell](/documentation/integrations/retell/testing)
+- [ElevenLabs](/documentation/integrations/elevenlabs/testing)
+- [LiveKit](/documentation/integrations/livekit/testing)
+
+Providing API keys enables provider-specific features and integrations (e.g., Retell agent autosync, ElevenLabs websocket-based testing) and allows Cekura to fetch richer call data — such as tool call logs — for more detailed analysis.
+
+<Warning>
+Without provider API keys configured, some features like outbound calling, detailed latency metrics, and provider-specific diagnostics may not be available.
+</Warning>
+
+For detailed agent setup instructions, see the [Agent Setup Guide](/documentation/key-concepts/agents/Agent_Setup_Guide).
+
+## Evaluators
+
+Evaluators are your test cases. As your test suite grows, organizing evaluators into folders becomes essential for maintainability and reusability.
+
+### Use Folders to Organize
+
+Evaluators should be organized into **folders** within each project. How you group them depends on what maximizes reusability for your organization.
+
+<AccordionGroup>
+  <Accordion title="Group by Flow Type / Workflow Node" icon="diagram-project" defaultOpen>
+    Group evaluators by the workflow or conversational flow they test, regardless of which agent uses them.
+
+    **Example:**
+    ```
+    Folders:
+      /Booking Flow
+        - Happy path booking
+        - Booking with date conflict
+        - Booking cancellation
+      /Identity Verification
+        - DOB verification success
+        - DOB verification failure
+        - Address verification
+      /Payment Processing
+        - Successful payment
+        - Declined card
+        - Refund request
+    ```
+
+    **When to use this:**
+    - Multiple agents share the same flows (e.g., several booking agents for different clients all have a booking flow)
+    - You want to reuse the same evaluators across agents that share common workflows
+
+    **Benefit:** Maximum reusability — write a booking evaluator once and use it across all your booking agents.
+  </Accordion>
+
+  <Accordion title="Group by Agent" icon="robot">
+    Group evaluators by the specific agent they are designed to test.
+
+    **Example:**
+    ```
+    Folders:
+      /Acme Corp Booking Agent
+        - Schedule appointment
+        - Cancel appointment
+        - Reschedule appointment
+      /Globex Patient Follow-Up
+        - Post-visit check-in
+        - Medication reminder
+        - Appointment scheduling
+    ```
+
+    **When to use this:**
+    - Each agent has unique flows with little overlap
+    - You want a clear 1:1 mapping between folders and agents for simplicity
+
+    **Benefit:** Clear ownership — easy to find all evaluators for a specific agent.
+  </Accordion>
+</AccordionGroup>
+
+### Duplicating and Moving Evaluators
+
+Cekura provides built-in tools to manage evaluators across projects and folders:
+
+<Steps>
+  <Step title="Bulk Duplicate Across Projects">
+    Select one or more evaluators, click **Actions** > **Duplicate**, then choose the target project and folder. This is useful when you want to reuse evaluators in a new project without modifying the originals.
+  </Step>
+  <Step title="Move to Different Folders">
+    Select evaluators and use **Actions** > **Move** to reorganize them into different folders as your structure evolves.
+  </Step>
+</Steps>
+
+<Tip>
+When you have multiple agents that share common flows (e.g., booking agents for different clients), duplicate the shared evaluators into each agent's project. This gives you a consistent baseline while allowing per-project customization.
+</Tip>
+
+## Filtering and Viewing Results
+
+Once you've run simulations, Cekura provides several ways to slice and review your results:
+
+- **Filter by evaluator name** — On the results page, filter simulation runs by specific evaluator names to focus on particular test cases.
+- **Views tab** — Use the **Views** dropdown to create saved views that show only test runs for specific agents. This is especially useful in projects that contain multiple agents.
+
+These features work together with your organizational structure — well-named evaluators and logical folder groupings make filtering and creating views much more effective.
+
+## Putting It All Together
+
+Here's an example of a well-organized workspace for a healthcare company with multiple booking agents:
+
+```
+Project: Booking Agents - Staging
+  Agents:
+    - Clinic A Booking Agent (Vapi, API key configured)
+    - Clinic B Booking Agent (Retell, API key configured)
+  Metrics:
+    - Booking Confirmation Rate (project-level, shared)
+    - Identity Verification Accuracy (project-level, shared)
+    - CSAT, Latency (pre-defined)
+  Evaluator Folders:
+    /Booking Flow
+      - Happy path booking
+      - Double booking attempt
+      - Booking with waitlist
+    /Identity Verification
+      - DOB verification
+      - Insurance ID verification
+    /Clinic A Specific
+      - Specialist referral booking
+    /Clinic B Specific
+      - Multi-location selection
+
+Project: Booking Agents - Production
+  (Same structure, duplicated evaluators, production API keys)
+
+Project: Patient Follow-Up Agent
+  Agents:
+    - Post-Visit Follow-Up Agent (ElevenLabs, API key configured)
+  Metrics:
+    - Follow-Up Completion Rate
+    - Patient Satisfaction Score
+  Evaluator Folders:
+    /Post-Visit Check-In
+      - Standard check-in
+      - Complication reported
+    /Medication Reminders
+      - Acknowledgment flow
+      - Refill request
+```
+
+This structure gives you:
+- **Shared metrics** across booking agents in the same project
+- **Reusable evaluators** for common booking flows, with agent-specific folders for unique scenarios
+- **Environment isolation** between staging and production
+- **Clear result filtering** — use Views to see runs for Clinic A vs. Clinic B within the same project
+
+## Related Resources
+
+- [Enterprise Setup & RBAC](/documentation/advanced/enterprise-setup)
+- [Agent Setup Guide](/documentation/key-concepts/agents/Agent_Setup_Guide)
+- [Evaluator Overview](/documentation/key-concepts/evaluators/overview)
+- [Metrics Overview](/documentation/key-concepts/metrics/overview)
+- [Suggested Testing Approach](/documentation/guides/testing-agents/suggested-testing-approach)

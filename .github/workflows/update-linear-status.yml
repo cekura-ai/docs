@@ -1,0 +1,123 @@
+name: Close Linear Issues on Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  close_linear_issues:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commits in this tag
+        id: commits
+        run: |
+          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+          PREV_TAG=$(git describe --tags --abbrev=0 ${CURRENT_TAG}^ 2>/dev/null || echo "")
+          COMMITS=$(git log --pretty=format:"%s" ${PREV_TAG}..${CURRENT_TAG})
+
+          echo "COMMITS<<EOF" >> $GITHUB_ENV
+          echo "$COMMITS" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Collect active PR tickets
+        id: tickets
+        run: |
+          echo "🔍 Parsing commit messages for PRs..."
+
+          # Split commits into PR blocks (1 per line)
+          PR_BLOCKS=$(echo "$COMMITS" | sed -E 's/\)\s+/\)\n/g' | grep -E '.+\(#[0-9]+\)')
+
+          declare -A ACTIVE_PRS
+
+          while IFS= read -r BLOCK; do
+            PR_NUM=$(echo "$BLOCK" | grep -oE '#[0-9]+' | tr -d '#()')
+            PR_TITLE=$(echo "$BLOCK" | sed -E 's/ \(#[0-9]+\)//')
+            if [ -z "$PR_NUM" ]; then
+              echo "⚠️  Skipping block with empty PR number: $BLOCK"
+              continue
+            fi
+            if [[ "$PR_TITLE" =~ ^Revert ]]; then
+              ORIGINAL_TITLE=$(echo "$PR_TITLE" | sed -E 's/^Revert "(.*)"/\1/')
+              echo "♻️  Detected revert of: $ORIGINAL_TITLE"
+              for NUM in "${!ACTIVE_PRS[@]}"; do
+                if [ "${ACTIVE_PRS[$NUM]}" = "$ORIGINAL_TITLE" ]; then
+                  echo "🗑️  Removing PR #$NUM ($ORIGINAL_TITLE) from active list"
+                  unset ACTIVE_PRS[$NUM]
+                fi
+              done
+            else
+              ACTIVE_PRS[$PR_NUM]="$PR_TITLE"
+              echo "✅ Adding PR #$PR_NUM: $PR_TITLE"
+            fi
+          done <<< "$PR_BLOCKS"
+
+          # Collect ticket IDs
+          ALL_IDS=""
+
+          for NUM in "${!ACTIVE_PRS[@]}"; do
+            TITLE=${ACTIVE_PRS[$NUM]}
+
+            # Extract IDs from title
+            TITLE_IDS=$(echo "$TITLE" | grep -ioE '(CEK|FRO)-[0-9]+' || true)
+            if [ -n "$TITLE_IDS" ]; then
+              echo "🎫 PR #$NUM title tickets: $TITLE_IDS"
+              ALL_IDS="$ALL_IDS $TITLE_IDS"
+            fi
+
+            # Fetch branch name
+            BRANCH_NAME=$(curl -s -H "Authorization: token ${{ github.token }}" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/$NUM" | \
+              jq -r '.head.ref // ""')
+            if [ -n "$BRANCH_NAME" ]; then
+              echo "🌿 PR #$NUM branch: $BRANCH_NAME"
+              BRANCH_IDS=$(echo "$BRANCH_NAME" | grep -ioE '(CEK|FRO)-[0-9]+' || true)
+              if [ -n "$BRANCH_IDS" ]; then
+                echo "🎫 PR #$NUM branch tickets: $BRANCH_IDS"
+                ALL_IDS="$ALL_IDS $BRANCH_IDS"
+              fi
+            fi
+          done
+
+          # Deduplicate ticket IDs
+          FINAL_IDS=$(echo "$ALL_IDS" | tr ' ' '\n' | grep -v '^$' | sort -u | tr '\n' ' ' | sed 's/ $//')
+
+          if [ -z "$FINAL_IDS" ]; then
+            echo "⚠️  No Linear issue IDs found."
+            exit 0
+          fi
+
+          echo "✅ Final tickets found: $FINAL_IDS"
+          echo "TICKETS=$FINAL_IDS" >> $GITHUB_ENV
+
+      - name: Mark tickets as Done in Linear
+        if: env.TICKETS != ''
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_DONE_STATE_ID: ${{ vars.LINEAR_DONE_STATE_ID }}
+        run: |
+          echo "🔄 Updating Linear tickets to Done..."
+
+          # Loop through tickets
+          for TICKET_ID in $TICKETS; do
+            echo "➡️ Updating $TICKET_ID to Done"
+
+            curl -s -X POST https://api.linear.app/graphql \
+              -H "Content-Type: application/json" \
+              -H "Authorization: $LINEAR_API_KEY" \
+              -d '{
+                "query": "mutation IssueUpdate($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success issue { id title state { id name } } } }",
+                "variables": {
+                  "id": "'"$TICKET_ID"'",
+                  "stateId": "'"$LINEAR_DONE_STATE_ID"'"
+                }
+              }'
+          done

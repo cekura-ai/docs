@@ -15,6 +15,7 @@ When you enable tracing and integrate the SDK, Cekura receives comprehensive dat
 - Complete conversation transcripts with full message history
 - Tool/function calls with inputs and outputs
 - Detailed performance metrics (STT, TTS, LLM, End-of-Utterance)
+- Mock tools support for testing with predictable tool responses
 - LiveKit room and session IDs
 - Job and room metadata
 
@@ -33,7 +34,7 @@ This enhanced data appears in the Cekura UI, providing deeper insights into your
 Install the SDK in your LiveKit agent project:
 
 ```bash
-pip install cekura==1.0.0rc1
+pip install cekura==1.0.0rc2
 ```
 
 </Step>
@@ -55,27 +56,21 @@ cekura = LiveKitTracer(
 
 @server.rtc_session(agent_name="my_agent")
 async def entrypoint(ctx: agents.JobContext):
-    # Create your LiveKit session
+    # Create your LiveKit session and agent
     session = agents.AgentSession(...)
+    agent = YourAgent()
 
     # Start Cekura session tracking
-    session_id = cekura.start_session(session)
-
-    # Add shutdown callback to export Cekura data
-    async def cekura_shutdown():
-        await cekura.export(session_id, ctx)
-
-    ctx.add_shutdown_callback(cekura_shutdown)
+    await cekura.track_session(ctx, session, agent)
 
     # Start your session
-    await session.start(room=ctx.room, agent=YourAssistant())
+    await session.start(room=ctx.room, agent=agent, ...)
 ```
 
 **Key integration points:**
 
 1. **Initialize the tracer**: Create a `LiveKitTracer` instance with your API key and agent ID
-2. **Start session tracking**: Call `start_session()` after creating your `AgentSession`
-3. **Add shutdown callback**: Register `cekura.export()` to send data when the session ends
+2. **Track the session**: Call `await cekura.track_session(ctx, session, assistant)` before starting the session - this automatically handles data collection and export
 
 </Step>
 
@@ -85,6 +80,7 @@ Add the following environment variables to your LiveKit agent:
 
 - `CEKURA_API_KEY`: Your Cekura API key from Settings → API Keys
 - `CEKURA_TRACING_ENABLED` (Optional): Set to `"true"` (default) or `"false"` to disable tracing
+- `CEKURA_MOCK_TOOLS_ENABLED` (Optional): Set to `"true"` (default) or `"false"` to disable mock tools
 
 <img src="/images/livekit/livekit-env-variables.png" alt="LiveKit Environment Variables" />
 
@@ -166,6 +162,18 @@ The run now displays:
 - **LLM**: Token usage, response time, and inference latency
 - **EOU (End-of-Utterance)**: Detection timing and accuracy
 
+## Using Mock Tools with LiveKit Tracing
+
+The SDK supports mock tools, allowing you to test your agent with predictable tool responses. This is useful for creating reproducible test scenarios without relying on live external services.
+
+**To use mock tools:**
+
+1. **Create mock tools in Cekura**: Set up your mock tool configurations in the Cekura dashboard. See the [Mock Tools guide](/documentation/guides/testing-agents/mock-tools) for detailed instructions.
+
+2. **SDK handles the rest**: Once mock tools are configured, the SDK automatically routes tool calls to Cekura's mock endpoints during testing - no additional code changes needed.
+
+3. **Test with predictable data**: Your agent will receive the mock responses you configured, making it easy to test specific scenarios and edge cases.
+
 ## Configuration Options
 
 ### SDK Parameters
@@ -185,16 +193,15 @@ cekura = LiveKitTracer(
 
 1. **Disable tracing in production**: Use `CEKURA_TRACING_ENABLED="false"` in your production environment. This feature is designed for simulation testing only. Observability integration for production calls is coming soon.
 
-2. **Always register the shutdown callback**: This ensures data is exported even if the session ends unexpectedly
+2. **Use environment variables for credentials**: Don't hardcode API keys in your code
 
-3. **Use environment variables for credentials**: Don't hardcode API keys in your code
+3. **Keep the SDK updated**: Run `pip install --upgrade cekura` periodically for the latest features
 
-4. **Keep the SDK updated**: Run `pip install --upgrade cekura` periodically for the latest features
-
-5. **Review tool calls regularly**: Add the predefined metric **Tool Call Success** to your evaluators
+4. **Review tool calls regularly**: Add the predefined metric **Tool Call Success** to your evaluators
 
 ## Next Steps
 
+- [Set up mock tools](/documentation/guides/testing-agents/mock-tools) for testing with predictable tool responses
 - [Create custom metrics](/documentation/key-concepts/metrics/custom-metrics) to evaluate based on provider call data
 - [Perform load testing](/documentation/guides/testing-agents/load-testing) with your LiveKit agent
 - Explore [predefined metrics](/documentation/key-concepts/metrics/pre-defined-metrics)

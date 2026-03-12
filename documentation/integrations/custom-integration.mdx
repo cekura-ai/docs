@@ -49,10 +49,14 @@ Your webhook POST request should send a JSON payload with the following structur
 
 ```json
 {
-  "agent_id": 123,  // Required: The ID of the AI agent in Cekura
+  "agent_id": 123,  // Conditionally required: The ID of the AI agent in Cekura (see note below)
   "calls": [...]    // Required: Array of call objects
 }
 ```
+
+<Note>
+`agent_id` is required **unless** every call object in `calls` includes a `run_id` field. If you already have a Cekura Run ID for each call before sending the webhook — for example, when using SIP integrations where run IDs are available from SIP headers — you can omit `agent_id` entirely and include `run_id` on each call object instead. In this case, Cekura will trust the provided run IDs and match transcripts directly to the existing runs.
+</Note>
 
 ### Call Object Structure
 
@@ -68,6 +72,7 @@ Each call in the `calls` array should include:
 | `from_phone_number` | string | No | Phone number that initiated the call (must start with + followed by digits, max 15 chars). Example: '+18005551234' |
 | `metadata` | object | No | Optional metadata as key-value pairs for additional call information |
 | `endedReason` | string | No | Reason call ended (default: "unknown", e.g., "assistant-ended-call", "customer-hungup") |
+| `run_id` | string | Conditionally required | Cekura Run ID for this call. Required on each call when `agent_id` is omitted at the top level. Intended for SIP integrations where run IDs are pre-known from SIP headers. |
 
 ### Message Object Structure
 
@@ -77,8 +82,8 @@ Each message in the `messages` array should include:
 |-------|------|----------|-------------|
 | `role` | string | Yes | Message role: "bot", "user", "system", "function_call", or "function_call_result" |
 | `content` | string | Yes | The message content or function description |
-| `start_time` | number | Yes | Start time in milliseconds from epoch |
-| `end_time` | number | Yes | End time in milliseconds from epoch |
+| `start_time` | number | No | Start time in milliseconds from epoch |
+| `end_time` | number | No | End time in milliseconds from epoch |
 | `data` | object | No | Additional data for function calls |
 
 ## Complete Example
@@ -157,6 +162,40 @@ Here's a complete example payload with two calls:
 }
 ```
 
+## SIP / Pre-known Run ID Example
+
+If you are using a SIP integration and already have Cekura Run IDs available from SIP headers before sending the webhook, you can omit `agent_id` at the top level and include `run_id` on each call instead. Cekura will trust the provided run IDs and attach the transcripts directly to the matching runs — no agent lookup needed.
+
+```json
+{
+  "calls": [
+    {
+      "id": "sip-call-abc123",
+      "run_id": "456789",
+      "startedAt": "2025-10-15T09:22:21.787Z",
+      "endedAt": "2025-10-15T09:24:30.229Z",
+      "to_phone_number": "+18646190758",
+      "from_phone_number": "+14155551234",
+      "messages": [
+        {
+          "role": "bot",
+          "content": "Hi there. How can I help you today?"
+        },
+        {
+          "role": "user",
+          "content": "I have a billing question."
+        }
+      ],
+      "endedReason": "customer-hungup"
+    }
+  ]
+}
+```
+
+<Note>
+When using `run_id` per call, every call in the `calls` array **must** include a `run_id`. Mixing calls with and without `run_id` in the same payload (when `agent_id` is absent) is not supported.
+</Note>
+
 ## Important Considerations
 
 For successful webhook integration, ensure:
@@ -166,7 +205,7 @@ For successful webhook integration, ensure:
 3. **Phone Numbers**: Phone numbers must start with + followed by digits (max 15 chars, e.g., '+14155551234'). The `to_phone_number` should match the scenario's inbound number for testing
 4. **Timestamps**: Use ISO 8601 format for `startedAt` and `endedAt`
 5. **Message Timing**: Use milliseconds from epoch for message `start_time` and `end_time` (optional fields)
-6. **Agent ID**: Use the correct agent ID from your Cekura dashboard
+6. **Agent ID**: Use the correct agent ID from your Cekura dashboard. If you have a Cekura Run ID available ahead of time (e.g. from SIP headers), you can omit `agent_id` and include `run_id` on each call object instead — Cekura will match transcripts directly to the existing runs
 7. **Unique Call IDs**: Each call should have a unique identifier (max 255 chars)
 8. **Metadata**: Use the `metadata` field to pass additional key-value pairs for call information
 
@@ -198,8 +237,8 @@ If your webhook integration isn't working as expected:
 ### Invalid payload errors
 
 - Validate your JSON payload structure
-- Ensure all required fields are present (`id`, `startedAt`, `endedAt`, `messages`)
-- Verify the `agent_id` is an integer, not a string
+- Ensure all required fields are present (`id`, `startedAt`, `endedAt`)
+- Verify the `agent_id` is an integer, not a string (required unless each call includes a `run_id`)
 - Check that phone numbers follow the correct format (+ followed by digits, max 15 chars)
 - Ensure `messages` is an array with dictionaries containing role and content fields
 

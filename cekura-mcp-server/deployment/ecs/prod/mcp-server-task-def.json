@@ -1,0 +1,61 @@
+{
+  "family": "mcp-server",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::891377126026:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::891377126026:role/BackendECSRole",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "volumes": [],
+  "placementConstraints": [],
+  "containerDefinitions": [
+    {
+      "name": "mcp-server",
+      "image": "891377126026.dkr.ecr.us-west-1.amazonaws.com/cekura/mcp-server:<IMAGE_TAG>",
+      "essential": true,
+      "portMappings": [
+        {
+          "name": "mcp-server-8001-port",
+          "containerPort": 8001,
+          "hostPort": 8001,
+          "protocol": "tcp",
+          "appProtocol": "http"
+        }
+      ],
+      "environment": [
+        {
+          "name": "CEKURA_BASE_URL",
+          "value": "https://api.cekura.ai"
+        },
+        {
+          "name": "CEKURA_OPENAPI_SPEC_PATH",
+          "value": "/app/openapi.json"
+        }
+      ],
+      "secrets": [],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/mcp-server",
+          "awslogs-region": "us-west-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:8001/mcp/healthz || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      }
+    }
+  ]
+}

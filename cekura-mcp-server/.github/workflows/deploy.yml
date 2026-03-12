@@ -1,0 +1,206 @@
+name: Build and deploy MCP server
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'openapi.json'
+      - 'cekura-mcp-server/**'
+      - 'mint.json'
+
+env:
+  AWS_REGION: us-west-1
+  ECR_REPOSITORY: cekura/mcp-server
+  ECS_CLUSTER: prod
+  SERVICE_NAME: mcp-server
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.construct-tag.outputs.image-tag }}
+      registry: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Construct Docker image tag
+        id: construct-tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH_NAME=${GITHUB_REF_NAME//\//-}
+          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build and push image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./cekura-mcp-server/Dockerfile
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.construct-tag.outputs.image-tag }}
+          cache-from: |
+            type=gha,scope=mcp-server-${{ github.ref_name }}
+            type=gha,scope=mcp-server-main
+          cache-to: type=gha,mode=max,scope=mcp-server-${{ github.ref_name }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Register new ECS task definition revision
+        id: register-task
+        run: |
+          TASK_DEF_FILE="cekura-mcp-server/deployment/ecs/prod/mcp-server-task-def.json"
+          TEMP_TASK_DEF=$(mktemp)
+          sed 's|<IMAGE_TAG>|${{ needs.build.outputs.image-tag }}|g' $TASK_DEF_FILE > $TEMP_TASK_DEF
+
+          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file://$TEMP_TASK_DEF \
+            --region ${{ env.AWS_REGION }} \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
+          echo "task-def-arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
+          rm -f $TEMP_TASK_DEF
+
+      - name: Update ECS service to new revision
+        id: update-service
+        run: |
+          DEPLOYMENT_ID=$(aws ecs update-service \
+            --cluster "${{ env.ECS_CLUSTER }}" \
+            --service "${{ env.SERVICE_NAME }}-service" \
+            --task-definition "${{ steps.register-task.outputs.task-def-arn }}" \
+            --query 'service.deployments[0].id' --output text)
+
+          echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for deployment to complete
+        run: |
+          DEPLOYMENT_ID="${{ steps.update-service.outputs.deployment-id }}"
+
+          echo "Waiting for deployment $DEPLOYMENT_ID to complete..."
+
+          TIMEOUT=480
+          INTERVAL=10
+          ELAPSED=0
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            echo "Checking deployment status... (${ELAPSED}s elapsed)"
+
+            DEPLOYMENT_STATUS=$(aws ecs describe-services \
+              --cluster "${{ env.ECS_CLUSTER }}" \
+              --services "${{ env.SERVICE_NAME }}-service" \
+              --query "services[0].deployments[?id=='$DEPLOYMENT_ID']" \
+              --output json)
+
+            if [ "$DEPLOYMENT_STATUS" = "[]" ] || [ -z "$DEPLOYMENT_STATUS" ]; then
+              echo "Deployment not found"
+              exit 1
+            fi
+
+            ROLLOUT_STATE=$(echo "$DEPLOYMENT_STATUS" | jq -r '.[0].rolloutState // "UNKNOWN"')
+            FAILED_TASKS=$(echo "$DEPLOYMENT_STATUS" | jq -r '.[0].failedTasks // 0')
+
+            echo "Rollout State: $ROLLOUT_STATE, Failed Tasks: $FAILED_TASKS"
+
+            if [ "$ROLLOUT_STATE" = "COMPLETED" ]; then
+              echo "Deployment completed successfully!"
+              exit 0
+            fi
+
+            if [ "$ROLLOUT_STATE" = "FAILED" ] || [ "$FAILED_TASKS" -gt 0 ]; then
+              echo "Deployment failed!"
+              exit 1
+            fi
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "Deployment did not complete within ${TIMEOUT} seconds"
+          exit 1
+
+  notify:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Build Slack message
+        id: message
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image-tag }}"
+          CLUSTER="${{ env.ECS_CLUSTER }}"
+          REGION="${{ env.AWS_REGION }}"
+
+          if [ "${{ needs.build.result }}" = "cancelled" ] || [ "${{ needs.deploy.result }}" = "cancelled" ]; then
+            echo "text=*Warning: MCP server deployment was cancelled!*" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "text=*MCP server build failed!*" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ "${{ needs.deploy.result }}" != "success" ]; then
+            AWS_LINK="https://${REGION}.console.aws.amazon.com/ecs/v2/clusters/${CLUSTER}/services"
+            echo "text=*MCP server deployment to prod failed!* - <${AWS_LINK}|AWS ECS>" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "text<<EOF" >> $GITHUB_OUTPUT
+          echo "*MCP server deployment to prod completed successfully!*" >> $GITHUB_OUTPUT
+          echo "Image Tag: \`${IMAGE_TAG}\`" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack
+        run: |
+          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          CONTEXT="Branch: ${{ github.ref_name }} | <${WORKFLOW_URL}|View Workflow>"
+
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_BEARER_TOKEN }}" \
+            -H "Content-type: application/json" \
+            --data "{
+              \"channel\": \"${{ vars.SLACK_DEPLOYMENTS_CHANNEL }}\",
+              \"blocks\": [
+                {
+                  \"type\": \"section\",
+                  \"text\": {\"type\": \"mrkdwn\", \"text\": \"${{ steps.message.outputs.text }}\"}
+                },
+                {
+                  \"type\": \"context\",
+                  \"elements\": [{\"type\": \"mrkdwn\", \"text\": \"${CONTEXT}\"}]
+                }
+              ]
+            }" \
+            https://slack.com/api/chat.postMessage

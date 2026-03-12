@@ -8,7 +8,7 @@ load_dotenv()
 
 class MCPServerConfig(BaseModel):
     base_url: str = Field(default_factory=lambda: os.getenv("CEKURA_BASE_URL", "https://api.cekura.ai"))
-    openapi_spec_path: str = Field(default="../openapi.json")
+    openapi_spec_path: str = Field(default_factory=lambda: os.getenv("CEKURA_OPENAPI_SPEC_PATH", "../openapi.json"))
     filter_tags: Optional[List[str]] = Field(default_factory=lambda: _parse_list_env("CEKURA_FILTER_TAGS"))
     exclude_operations: Optional[List[str]] = Field(default_factory=lambda: _parse_list_env("CEKURA_EXCLUDE_OPERATIONS"))
     max_tools: Optional[int] = Field(default_factory=lambda: _parse_int_env("CEKURA_MAX_TOOLS"))

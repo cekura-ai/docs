@@ -39,6 +39,7 @@ transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=True,
     allowed_hosts=[
         "api.cekura.ai",
+        "test.cekura.ai",
         "localhost",
         "localhost:8000",
         "localhost:8001",

@@ -1,0 +1,330 @@
+---
+title: "Dashboards"
+sidebarTitle: "Dashboards"
+icon: "chart-mixed"
+iconType: "regular"
+description: "Build custom dashboards with widgets to visualize and analyze your call data, metrics, and metadata."
+---
+
+## Overview
+
+Dashboards let you create custom visualizations of your call data. Each dashboard contains **widgets** — individual charts that plot a specific field using filters, chart types, and aggregation functions.
+
+Key concepts:
+- **Dashboard** — a container that holds widgets and defines shared filters applied to all widgets within it.
+- **Widget** — a single chart that plots one field (e.g. call duration, success rate, metric scores).
+- **Filters** — JSON-based query conditions applied at the dashboard level, widget level, or both.
+
+## Filters
+
+Filters are used on both dashboards and widgets to scope the data being visualized. Dashboard-level filters apply to all widgets, and widget-level filters apply only to that widget. When both are present, they are combined with AND logic.
+
+### Filter Structure
+
+A filter is a JSON object. It can be a single condition or a group of conditions combined with a logical operator.
+
+**Single condition:**
+
+```json
+{
+  "field": "success",
+  "op": "eq",
+  "value": true
+}
+```
+
+**Grouped conditions:**
+
+```json
+{
+  "operator": "and",
+  "conditions": [
+    { "field": "success", "op": "eq", "value": true },
+    { "field": "duration", "op": "gte", "value": 60 }
+  ]
+}
+```
+
+Groups can be nested to build complex queries:
+
+```json
+{
+  "operator": "and",
+  "conditions": [
+    { "field": "success", "op": "eq", "value": true },
+    {
+      "operator": "or",
+      "conditions": [
+        { "field": "duration", "op": "gte", "value": 120 },
+        { "field": "call_ended_reason", "op": "contains", "value": "timeout" }
+      ]
+    }
+  ]
+}
+```
+
+### Logical Operators
+
+| Operator | Description |
+|----------|-------------|
+| `and` | All conditions must match |
+| `or` | At least one condition must match |
+| `same_row` | All conditions must match on the **same** related row (see [Metric Evaluation Filters](#metric-evaluation-filters)) |
+
+### Comparison Operators
+
+| Operator | Description |
+|----------|-------------|
+| `eq` | Equals |
+| `neq` | Not equals |
+| `gt` | Greater than |
+| `gte` | Greater than or equal to |
+| `lt` | Less than |
+| `lte` | Less than or equal to |
+| `contains` | Case-insensitive substring match |
+| `startswith` | Case-insensitive prefix match |
+| `endswith` | Case-insensitive suffix match |
+| `in` | Value is in the provided list |
+| `isnull` | Field is null |
+| `regex` | Regex pattern match |
+
+### Supported Filter Fields
+
+#### Call Log Fields
+
+| Field | Type | Supported Operators |
+|-------|------|-------------------|
+| `id` | integer | `eq`, `in`, `gt`, `gte`, `lt`, `lte` |
+| `success` | boolean | `eq`, `neq`, `isnull` |
+| `duration` | number | `eq`, `gt`, `gte`, `lt`, `lte` |
+| `customer_number` | string | `eq`, `neq`, `contains`, `startswith`, `in` |
+| `call_ended_reason` | string | `eq`, `neq`, `contains`, `in` |
+| `dropoff_point` | string | `eq`, `neq`, `contains`, `in`, `isnull` |
+| `topic` | string | `eq`, `neq`, `contains`, `in`, `isnull` |
+| `timestamp` | datetime | `eq`, `gt`, `gte`, `lt`, `lte` |
+| `is_reviewed` | boolean | `eq` |
+
+#### Related Model Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `agent.id` | integer | Agent ID |
+| `agent.agent_name` | string | Agent name |
+
+#### Metadata Fields
+
+You can filter on top-level metadata keys using dot notation:
+
+```json
+{ "field": "metadata.org_name", "op": "eq", "value": "Acme Corp" }
+```
+
+```json
+{ "field": "metadata.region", "op": "in", "value": ["US", "EU"] }
+```
+
+<Note>
+Only top-level metadata keys are supported. Nested keys like `metadata.address.city` are not allowed.
+</Note>
+
+#### Metric Evaluation Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `metric_evaluations.value` | dynamic | Evaluation value |
+| `metric_evaluations.metric.id` | integer | Metric ID |
+| `metric_evaluations.metric.name` | string | Metric name |
+
+<Warning>
+When filtering on multiple metric evaluation fields (e.g. metric name AND value), use the `same_row` operator to ensure conditions apply to the same evaluation row:
+
+```json
+{
+  "operator": "same_row",
+  "conditions": [
+    { "field": "metric_evaluations.metric.name", "op": "eq", "value": "accuracy" },
+    { "field": "metric_evaluations.value", "op": "gte", "value": 0.9 }
+  ]
+}
+```
+
+Without `same_row`, an `and` operator could match a call where one evaluation has the right metric name and a *different* evaluation has the right value.
+</Warning>
+
+### Relative Datetime Values
+
+Datetime fields support relative values for dynamic time-based filtering:
+
+| Value | Description |
+|-------|-------------|
+| `now` | Current UTC time |
+| `now-1d` | 1 day ago |
+| `now-7d` | 7 days ago |
+| `now-2h` | 2 hours ago |
+| `now-30m` | 30 minutes ago |
+| `today` | Start of today (00:00:00 UTC) for `gte`/`gt`, end of today (23:59:59 UTC) for `lte`/`lt` |
+| `today-7d` | 7 days before today |
+
+Supported time units: `s` (seconds), `m` (minutes), `h` (hours), `d` (days), `w` (weeks), `M` (months), `y` (years).
+
+**Example — calls from the last 7 days:**
+
+```json
+{
+  "operator": "and",
+  "conditions": [
+    { "field": "timestamp", "op": "gte", "value": "today-7d" },
+    { "field": "timestamp", "op": "lte", "value": "now" }
+  ]
+}
+```
+
+## Widgets
+
+A widget plots a single field as a chart. You configure it with a field, chart type, and optional aggregation and time period.
+
+### Supported Fields
+
+| Field | Data Type | Description |
+|-------|-----------|-------------|
+| `duration` | numeric | Call duration in seconds |
+| `success` | boolean | Whether the call was successful |
+| `is_reviewed` | boolean | Whether the call has been reviewed |
+| `call_ended_reason` | string | Reason the call ended |
+| `dropoff_point` | string | Point at which the caller dropped off |
+| `topic` | string | Call topic |
+| `agent_id` | numeric | Agent identifier |
+| `metric_evaluations.value` | dynamic | Metric evaluation value (requires selecting a metric) |
+| `metadata.*` | string | Any top-level metadata key (e.g. `metadata.org_name`) |
+
+### Chart Types
+
+| Chart Type | Description | Best For |
+|------------|-------------|----------|
+| `line` | Individual data points plotted over time | Viewing trends for numeric or datetime fields |
+| `bar` | Data aggregated into time buckets | Comparing aggregated values across time periods |
+| `pie` | Distribution of categorical values | Showing proportions for boolean or string fields |
+
+### Aggregation Functions
+
+Used with `bar` charts to aggregate values within each time bucket.
+
+| Function | Description | Applicable Data Types |
+|----------|-------------|----------------------|
+| `count` | Count of records | All types |
+| `sum` | Sum of values | Numeric |
+| `avg` | Average of values | Numeric, Boolean |
+| `min` | Minimum value | Numeric, Datetime |
+| `max` | Maximum value | Numeric, Datetime |
+
+### Time Periods
+
+Used with `bar` charts to define the time bucket size.
+
+| Period | Description |
+|--------|-------------|
+| `hour` | Group by hour |
+| `day` | Group by day |
+| `week` | Group by week |
+| `month` | Group by month |
+
+### Valid Combinations
+
+Not all field + chart type + aggregation combinations are valid. The rules depend on the field's data type:
+
+| Data Type | Allowed Chart Types | Allowed Aggregations |
+|-----------|-------------------|---------------------|
+| Numeric | `line`, `bar` | `count`, `sum`, `avg`, `min`, `max` |
+| Boolean | `pie`, `bar` | `count`, `avg` |
+| String | `pie`, `bar` | `count` |
+| Datetime | `line`, `bar` | `count`, `min`, `max` |
+
+<Note>
+The `metric_evaluations.value` field is dynamic — its data type and allowed chart types depend on the selected metric's evaluation type. For example, an `ENUM` metric only supports `pie` charts, while a `NUMERIC` metric supports `line`, `bar`, and `pie`.
+</Note>
+
+### Chart Output Formats
+
+**Line chart** — individual data points:
+
+```json
+[
+  { "id": 1, "timestamp": "2025-11-03T00:00:00Z", "value": 45 },
+  { "id": 2, "timestamp": "2025-11-03T01:00:00Z", "value": 62 }
+]
+```
+
+**Bar chart** — aggregated time buckets:
+
+```json
+[
+  { "time_interval": "2025-11-03T00:00:00Z", "value": 4.5, "sample_count": 10 },
+  { "time_interval": "2025-11-04T00:00:00Z", "value": 3.2, "sample_count": 8 }
+]
+```
+
+**Pie chart** — value distribution (e.g. `call_ended_reason` with `pie` chart):
+
+```json
+[
+  { "label": "customer_ended_call", "value": 320, "percentage": 45.7 },
+  { "label": "agent_ended_call", "value": 210, "percentage": 30.0 },
+  { "label": "timeout", "value": 105, "percentage": 15.0 },
+  { "label": "error", "value": 65, "percentage": 9.3 }
+]
+```
+
+## Widget Data
+
+Use the [Get Widget Data](/api-reference/dashboards/get-widget-data) endpoint to fetch the plot data for a saved widget. You can optionally override the widget's filters by passing a `filters` query parameter as a JSON string.
+
+Use [Preview Widget Data](/api-reference/dashboards/preview-widget-data) to test a widget configuration before saving it — pass the full widget definition in the request body along with optional `dashboard_filters` to preview what the chart would look like.
+
+### How Filters Are Applied
+
+When fetching widget data, filters are merged in this order:
+
+1. **Dashboard filters** — applied to all widgets in the dashboard.
+2. **Widget filters** — applied to this specific widget only.
+3. **Override filters** (optional) — passed at request time via the `filters` parameter.
+
+If both dashboard and widget filters are present, they are combined using AND logic:
+
+```json
+{
+  "operator": "and",
+  "conditions": [
+    { /* dashboard filters */ },
+    { /* widget filters */ }
+  ]
+}
+```
+
+## Metadata in Widgets
+
+You can visualize any top-level metadata key as a widget field using the `metadata.*` prefix. For example, to chart the distribution of a custom `region` field you set on your calls:
+
+- **Field:** `metadata.region`
+- **Chart type:** `pie`
+
+Metadata fields are treated as strings, so they support `pie` and `bar` chart types with `count` aggregation.
+
+<Note>
+Only top-level metadata keys are supported for widget fields. Nested metadata keys are not supported.
+</Note>
+
+## API Reference
+
+- [List Dashboards](/api-reference/dashboards/list-dashboards)
+- [Create Dashboard](/api-reference/dashboards/create-dashboard)
+- [Get Dashboard](/api-reference/dashboards/get-dashboard)
+- [Update Dashboard](/api-reference/dashboards/update-dashboard)
+- [Delete Dashboard](/api-reference/dashboards/delete-dashboard)
+- [Duplicate Dashboard](/api-reference/dashboards/duplicate-dashboard)
+- [List Widgets](/api-reference/dashboards/list-widgets)
+- [Create Widget](/api-reference/dashboards/create-widget)
+- [Get Widget](/api-reference/dashboards/get-widget)
+- [Update Widget](/api-reference/dashboards/update-widget)
+- [Delete Widget](/api-reference/dashboards/delete-widget)
+- [Get Widget Data](/api-reference/dashboards/get-widget-data)
+- [Preview Widget Data](/api-reference/dashboards/preview-widget-data)

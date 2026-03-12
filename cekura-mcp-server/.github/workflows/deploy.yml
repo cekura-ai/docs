@@ -3,7 +3,7 @@ name: Build and deploy MCP server
 on:
   push:
     branches:
-      - main
+      - adarsh/cek-6670-automate-mcp-server-restart-on-api-spec-changes
     paths:
       - 'openapi.json'
       - 'cekura-mcp-server/**'
@@ -37,12 +37,21 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Regenerate documented_apis.json
+        working-directory: cekura-mcp-server
+        run: python3 extract_documented_apis.py
 
       - name: Construct Docker image tag
         id: construct-tag
@@ -74,7 +83,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Register new ECS task definition revision
@@ -92,14 +101,37 @@ jobs:
           echo "task-def-arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
           rm -f $TEMP_TASK_DEF
 
-      - name: Update ECS service to new revision
+      - name: Create or update ECS service
         id: update-service
         run: |
-          DEPLOYMENT_ID=$(aws ecs update-service \
+          SERVICE_EXISTS=$(aws ecs describe-services \
             --cluster "${{ env.ECS_CLUSTER }}" \
-            --service "${{ env.SERVICE_NAME }}-service" \
-            --task-definition "${{ steps.register-task.outputs.task-def-arn }}" \
-            --query 'service.deployments[0].id' --output text)
+            --services "${{ env.SERVICE_NAME }}-service" \
+            --region ${{ env.AWS_REGION }} \
+            --query "services[?status=='ACTIVE'] | length(@)" \
+            --output text)
+
+          if [ "$SERVICE_EXISTS" = "0" ] || [ -z "$SERVICE_EXISTS" ]; then
+            echo "Service does not exist — creating for the first time..."
+            DEPLOYMENT_ID=$(aws ecs create-service \
+              --cluster "${{ env.ECS_CLUSTER }}" \
+              --service-name "${{ env.SERVICE_NAME }}-service" \
+              --task-definition "${{ steps.register-task.outputs.task-def-arn }}" \
+              --desired-count 2 \
+              --launch-type FARGATE \
+              --network-configuration "${{ vars.AWS_NETWORK_CONFIGURATION_PROD }}" \
+              --deployment-configuration "minimumHealthyPercent=50,maximumPercent=200" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'service.deployments[0].id' --output text)
+          else
+            echo "Service exists — updating to new revision..."
+            DEPLOYMENT_ID=$(aws ecs update-service \
+              --cluster "${{ env.ECS_CLUSTER }}" \
+              --service "${{ env.SERVICE_NAME }}-service" \
+              --task-definition "${{ steps.register-task.outputs.task-def-arn }}" \
+              --region ${{ env.AWS_REGION }} \
+              --query 'service.deployments[0].id' --output text)
+          fi
 
           echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
@@ -109,7 +141,7 @@ jobs:
 
           echo "Waiting for deployment $DEPLOYMENT_ID to complete..."
 
-          TIMEOUT=480
+          TIMEOUT=600
           INTERVAL=10
           ELAPSED=0
 

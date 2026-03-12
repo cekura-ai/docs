@@ -101,37 +101,15 @@ jobs:
           echo "task-def-arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
           rm -f $TEMP_TASK_DEF
 
-      - name: Create or update ECS service
+      - name: Update ECS service to new revision
         id: update-service
         run: |
-          SERVICE_EXISTS=$(aws ecs describe-services \
+          DEPLOYMENT_ID=$(aws ecs update-service \
             --cluster "${{ env.ECS_CLUSTER }}" \
-            --services "${{ env.SERVICE_NAME }}-service" \
+            --service "${{ env.SERVICE_NAME }}-service" \
+            --task-definition "${{ steps.register-task.outputs.task-def-arn }}" \
             --region ${{ env.AWS_REGION }} \
-            --query "services[?status=='ACTIVE'] | length(@)" \
-            --output text)
-
-          if [ "$SERVICE_EXISTS" = "0" ] || [ -z "$SERVICE_EXISTS" ]; then
-            echo "Service does not exist — creating for the first time..."
-            DEPLOYMENT_ID=$(aws ecs create-service \
-              --cluster "${{ env.ECS_CLUSTER }}" \
-              --service-name "${{ env.SERVICE_NAME }}-service" \
-              --task-definition "${{ steps.register-task.outputs.task-def-arn }}" \
-              --desired-count 2 \
-              --launch-type FARGATE \
-              --network-configuration "${{ vars.AWS_NETWORK_CONFIGURATION_PROD }}" \
-              --deployment-configuration "minimumHealthyPercent=50,maximumPercent=200" \
-              --region ${{ env.AWS_REGION }} \
-              --query 'service.deployments[0].id' --output text)
-          else
-            echo "Service exists — updating to new revision..."
-            DEPLOYMENT_ID=$(aws ecs update-service \
-              --cluster "${{ env.ECS_CLUSTER }}" \
-              --service "${{ env.SERVICE_NAME }}-service" \
-              --task-definition "${{ steps.register-task.outputs.task-def-arn }}" \
-              --region ${{ env.AWS_REGION }} \
-              --query 'service.deployments[0].id' --output text)
-          fi
+            --query 'service.deployments[0].id' --output text)
 
           echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
@@ -194,23 +172,23 @@ jobs:
           REGION="${{ env.AWS_REGION }}"
 
           if [ "${{ needs.build.result }}" = "cancelled" ] || [ "${{ needs.deploy.result }}" = "cancelled" ]; then
-            echo "text=*Warning: MCP server deployment was cancelled!*" >> $GITHUB_OUTPUT
+            echo "text=*⚠️ MCP server deployment was cancelled!*" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           if [ "${{ needs.build.result }}" != "success" ]; then
-            echo "text=*MCP server build failed!*" >> $GITHUB_OUTPUT
+            echo "text=*❌ MCP server build failed!*" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           if [ "${{ needs.deploy.result }}" != "success" ]; then
             AWS_LINK="https://${REGION}.console.aws.amazon.com/ecs/v2/clusters/${CLUSTER}/services"
-            echo "text=*MCP server deployment to prod failed!* - <${AWS_LINK}|AWS ECS>" >> $GITHUB_OUTPUT
+            echo "text=*❌ MCP server deployment to prod failed!* - <${AWS_LINK}|AWS ECS>" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           echo "text<<EOF" >> $GITHUB_OUTPUT
-          echo "*MCP server deployment to prod completed successfully!*" >> $GITHUB_OUTPUT
+          echo "*✅ MCP server deployment to prod completed successfully!*" >> $GITHUB_OUTPUT
           echo "Image Tag: \`${IMAGE_TAG}\`" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 

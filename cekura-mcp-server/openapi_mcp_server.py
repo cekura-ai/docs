@@ -64,12 +64,56 @@ operations_registry = {}
 MINTLIFY_MCP_URL = "https://docs.cekura.ai/mcp"
 MINTLIFY_SEARCH_TIMEOUT = 15.0
 MINTLIFY_MAX_RETRIES = 2
+MINTLIFY_TOOL_NAME = "search_cekura"  # Fallback, will be dynamically fetched
+
+
+async def fetch_mintlify_tool_name():
+    """Fetch the search tool name from Mintlify's MCP server dynamically."""
+    global MINTLIFY_TOOL_NAME
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0, connect=2.0)) as client:
+            response = await client.post(
+                MINTLIFY_MCP_URL,
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream"
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/list"
+                }
+            )
+            response.raise_for_status()
+
+            # Parse SSE response
+            for line in response.text.split('\n'):
+                if line.startswith('data: '):
+                    data = json.loads(line[6:])
+
+                    if 'result' in data and 'tools' in data['result']:
+                        # Find search tool (contains "search" and "cekura")
+                        for tool in data['result']['tools']:
+                            name = tool.get('name', '').lower()
+                            if 'search' in name and 'cekura' in name:
+                                MINTLIFY_TOOL_NAME = tool['name']
+                                logger.info(f"Discovered Mintlify tool name: {MINTLIFY_TOOL_NAME}")
+                                return
+
+            logger.warning(f"Mintlify search tool not found in response, using fallback: {MINTLIFY_TOOL_NAME}")
+
+    except Exception as e:
+        logger.warning(f"Failed to fetch Mintlify tool name (using fallback '{MINTLIFY_TOOL_NAME}'): {e}")
 
 
 async def initialize_server():
     global server_config, openapi_parser, operations_registry
 
     try:
+        # Fetch Mintlify's actual tool name
+        await fetch_mintlify_tool_name()
+
         server_config = load_config()
         logger.info(f"Loaded config: Base URL={server_config.base_url}")
 
@@ -126,7 +170,8 @@ async def initialize_server():
 
 def register_mintlify_search_tool():
     """Register Mintlify documentation search tool as a proxy."""
-    operations_registry['SearchCekura'] = {
+    # Use the dynamically fetched tool name
+    operations_registry[MINTLIFY_TOOL_NAME] = {
         'operation': None,
         'schema': {
             "type": "object",
@@ -167,7 +212,7 @@ async def call_mintlify_search(query: str) -> List[Dict[str, str]]:
                         "id": 1,
                         "method": "tools/call",
                         "params": {
-                            "name": "SearchCekura",
+                            "name": MINTLIFY_TOOL_NAME,
                             "arguments": {"query": query.strip()}
                         }
                     }

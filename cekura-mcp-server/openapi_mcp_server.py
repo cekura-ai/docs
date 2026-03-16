@@ -33,6 +33,7 @@ class HealthCheckFilter(logging.Filter):
         return not any(path in message for path in ['/mcp/health', '/mcp/healthz', '/favicon.ico'])
 
 request_api_key: ContextVar[str] = ContextVar('request_api_key', default=None)
+request_base_url: ContextVar[str] = ContextVar('request_base_url', default=None)
 
 # Configure transport security to allow api.cekura.ai as Host header
 transport_security = TransportSecuritySettings(
@@ -319,7 +320,8 @@ def setup_dynamic_tool_handlers():
                 api_key = get_request_api_key()
                 op = tool_data['operation']
 
-                user_api_client = create_client(server_config.base_url, api_key)
+                base_url = request_base_url.get() or server_config.base_url
+                user_api_client = create_client(base_url, api_key)
 
                 result = await user_api_client.execute_request(
                     method=op.method,
@@ -369,10 +371,15 @@ def main():
                 return response
 
             api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
+            base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
 
             if api_key:
                 request_api_key.set(api_key)
                 logger.debug(f"API key set for request: {api_key[:20]}...")
+
+            if base_url_override:
+                request_base_url.set(base_url_override.rstrip("/"))
+                logger.debug(f"Base URL override set: {base_url_override}")
 
             response = await call_next(request)
             return response

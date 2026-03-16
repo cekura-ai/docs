@@ -3,37 +3,359 @@ title: "Pre-Defined Metrics"
 sidebarTitle: "Pre-Defined Metrics"
 icon: "list-check"
 iconType: "solid"
-description: "Standard metrics applicable across domains for evaluating voice agent performance including latency, sentiment, CSAT, and more"
+description: "Standard metrics for evaluating voice agent performance across accuracy, conversation quality, customer experience, and speech quality"
 ---
 
-These are standard metrics applicable across domains defined by Cekura. Below is a list of supported pre-defined metrics.
+These are standard metrics applicable across domains defined by Cekura. They are organized into four categories based on what aspect of your voice agent they evaluate.
 
-* **AI Interrupting User**: Tells if the AI (main agent) interrupted the user (testing agent) during the interaction. NOTE: This only works on stereo recordings.
+## Key Concepts
 
-* **Average Latency (in ms)**: Tells the average response latency for the AI agent in milliseconds.
+Before diving into the metrics, here are some important terms:
 
-* **Average Pitch (in Hz)**: Returns the average pitch of the AI Agent (Main agent) during the call in Hertz.
+- **Stereo audio**: Recording with separate audio channels for each speaker. Required for accurate speaker separation in interruption and timing metrics.
+- **VAD (Voice Activity Detection)**: Algorithm that detects when speech is occurring, enabling precise timing measurements.
+- **Knowledge Base**: Files uploaded to the agent containing reference information for fact-checking.
+- **Interruption**: When one speaker begins talking while the other is still speaking.
+- **Latency**: Time between user finishing speaking and AI beginning its response.
 
-* **Instruction Following Metric**: Checks critical deviations from the expected workflows and tells where it deviated.
+---
 
-* **CSAT**: Gives a score for customer satisfaction and tells the reason for dissatisfaction.
+## Accuracy Metrics
 
-* **Not Early Termination**: Checks if the call was ended early by the user, indicating poor user experience or unresolved issues. This metric is True if...
+These metrics evaluate whether your agent provides correct and consistent information.
 
-* **Sentiment**: Determines whether the human's overall sentiment towards the AI agent during the conversation was "happy"...
+<AccordionGroup>
+  <Accordion title="Expected Outcome">
+    **Result**: Pass / Review Required / Failed
 
-* **Signal to Noise Ratio (SNR)**: Signal to Noise Ratio when the AI agent (Main agent) is speaking. Compares the noise level of Main Agent against Testing Agent.
+    Evaluates whether the AI agent achieved the goal specified in the evaluator's expected outcome prompt. An LLM analyzes the conversation to determine if the intended outcome was reached.
 
-* **Transcription Accuracy**: Evaluates the accuracy of speech-to-text transcription by comparing the transcript against reference transcriptions. Returns a score from 1-5 where higher scores indicate better transcription accuracy. For simulations/runs, compares the Cekura transcript against the provider's transcript using Word Error Rate (WER), with the final score based on weighted errors involving significant words (proper nouns, common nouns, and numbers at full weight; verbs at half weight). For call logs, transcribes the testing agent's audio channel using Gemini and ElevenLabs, then uses an LLM to compare against the candidate transcript.
+    **Requirements**: Set `expected_outcome_prompt` in your evaluator configuration describing what success looks like.
 
-* **Talk Ratio**: The ratio of time duration the AI Agent (Main agent) is speaking compared to the duration the User (Test Agent) is speaking.
+    **Interpretation**:
+    - **Pass**: Agent achieved the expected outcome
+    - **Review Required**: Outcome unclear, manual review recommended
+    - **Failed**: Agent did not achieve the expected outcome
+  </Accordion>
 
-* **User Interrupting AI**: Tells if the user (testing agent) interrupted the AI (main agent) during the interaction. NOTE: This only works on stereo recordings.
+  <Accordion title="Hallucination">
+    **Result**: True/False
 
-* **Voice Quality Index**: Evaluates the overall voice quality of the AI agent based on three key factors: clarity (how clear and understandable the voice is), tone (appropriateness of tone for the context), and appropriateness (whether the speech fits the context and intent). Returns a score from 0-5 where higher scores indicate better voice quality. NOTE: This metric requires audio recordings for analysis.
+    Detects when the AI agent provides information that contradicts or isn't supported by the uploaded Knowledge Base files. An LLM compares agent responses against the Knowledge Base content.
 
-* **Response Consistency**: Checks if the responses of your AI Agent are consistent across the duration of a call. This metric detects two specific cases:
-  * When a user provides information (like their name) and the AI agent repeats it back incorrectly
-  * When the AI agent provides contradictory information during the same call (e.g., saying X at the start and Y at the end which contradicts the earlier statement)
+    **Requirements**: Upload Knowledge Base files to your agent containing the source of truth.
 
-* **Words Per Minute (WPM)**: Monitors speech speed of AI Agent (Main Agent) to ensure natural and understandable delivery.
+    **Interpretation**:
+    - **True**: No hallucinations detected (agent stayed factual)
+    - **False**: Agent provided unsupported or contradictory information
+  </Accordion>
+
+  <Accordion title="Relevancy">
+    **Result**: True/False
+
+    Evaluates whether the AI agent's responses were relevant and appropriate to the conversation context. An LLM analyzes each response to determine if it addressed what the user was asking.
+
+    **Interpretation**:
+    - **True**: Responses were relevant and on-topic
+    - **False**: Agent gave off-topic or inappropriate responses
+  </Accordion>
+
+  <Accordion title="Response Consistency">
+    **Result**: True/False
+
+    Detects inconsistencies in the AI agent's responses during a call. An LLM checks for two specific issues:
+    1. User provides information (e.g., their name) and the agent repeats it back incorrectly
+    2. Agent makes contradictory statements (e.g., says one thing early in the call, then contradicts it later)
+
+    **Interpretation**:
+    - **True**: Agent maintained consistent information throughout
+    - **False**: Inconsistencies or contradictions detected
+  </Accordion>
+
+  <Accordion title="Tool Call Success">
+    **Result**: True/False
+
+    Checks whether any tool calls made by the agent resulted in errors.
+
+    **Interpretation**:
+    - **True**: All tool calls succeeded
+    - **False**: One or more tool calls returned an error
+  </Accordion>
+
+  <Accordion title="Transcription Accuracy">
+    **Result**: Score (0-100)
+
+    Evaluates speech-to-text accuracy by comparing transcripts using Word Error Rate (WER). The score focuses on errors involving significant words like proper nouns, common nouns, and numbers.
+
+    For simulations, compares the Cekura transcript against the provider's transcript. For call logs, generates a reference transcription and compares it against the candidate transcript using an LLM.
+
+    **Interpretation**: Higher scores indicate better transcription accuracy. Scores above 80 are generally good.
+  </Accordion>
+
+  <Accordion title="Voicemail Detection (Beta)">
+    **Result**: True/False
+
+    Detects whether the call reached a voicemail system instead of a live person. An LLM analyzes the transcript for voicemail indicators (greeting messages, beeps, recording prompts).
+
+    **Interpretation**:
+    - **True**: Call reached voicemail
+    - **False**: Call connected to a live person
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Conversation Quality Metrics
+
+These metrics evaluate the flow and dynamics of the conversation.
+
+<AccordionGroup>
+  <Accordion title="AI Interrupting User">
+    **Result**: Count (number of interruptions)
+
+    Counts how many times the AI agent started speaking while the user was still talking. Uses Voice Activity Detection (VAD) to precisely detect overlapping speech.
+
+    **Requirements**: Stereo audio recording with separate channels for each speaker.
+
+    **Interpretation**: Lower is better. Frequent interruptions indicate the agent isn't properly waiting for the user to finish speaking.
+  </Accordion>
+
+  <Accordion title="Stop Time After User Interruption (ms)">
+    **Result**: Numeric (milliseconds)
+
+    Measures how long it takes for the AI agent to stop speaking after the user interrupts. Uses VAD to detect when the user starts speaking over the agent.
+
+    **Requirements**: Stereo audio recording with separate channels for each speaker.
+
+    **Interpretation**: Lower is better. A responsive agent should stop quickly (under 500ms) when interrupted.
+  </Accordion>
+
+  <Accordion title="User Interrupting AI">
+    **Result**: Count (number of interruptions)
+
+    Counts how many times the user started speaking while the AI agent was still talking. Uses VAD to detect overlapping speech.
+
+    **Requirements**: Stereo audio recording with separate channels for each speaker.
+
+    **Interpretation**: High counts may indicate user frustration, agent speaking too long, or poor turn-taking.
+  </Accordion>
+
+  <Accordion title="Latency (in ms)">
+    **Result**: Numeric (average milliseconds)
+
+    Measures the average response time between the user finishing speaking and the AI agent starting its response. With stereo audio and VAD, measurements are more precise.
+
+    **Requirements**: Audio recording. Stereo audio provides more accurate measurements.
+
+    **Interpretation**: Lower is better. Latency under 1000ms feels natural; above 2000ms may feel slow.
+  </Accordion>
+
+  <Accordion title="Unnecessary Repetition Count">
+    **Result**: Count (number of repetitions)
+
+    Identifies instances where the AI agent unnecessarily repeated information it had already provided. An LLM analyzes the conversation for redundant statements.
+
+    **Interpretation**: Lower is better. Repetition wastes time and can frustrate users.
+  </Accordion>
+
+  <Accordion title="Detect Silence in Conversation">
+    **Result**: True/False
+
+    Detects prolonged silence periods during the conversation that may indicate technical issues or agent problems.
+
+    **Requirements**: Audio recording.
+
+    **Configuration**: Set `silence_duration` in the metric configuration (default: 10 seconds).
+
+    **Interpretation**:
+    - **True**: No problematic silence detected
+    - **False**: Extended silence exceeding the threshold was detected
+  </Accordion>
+
+  <Accordion title="Infrastructure Issues">
+    **Result**: True/False
+
+    Detects when the AI agent fails to respond within the expected timeframe, indicating potential infrastructure or connectivity problems.
+
+    **Requirements**: Audio recording.
+
+    **Configuration**: Set `infra_issues_timeout` in the metric configuration (default: 10 seconds).
+
+    **Interpretation**:
+    - **True**: No infrastructure issues detected
+    - **False**: Agent failed to respond within timeout threshold
+  </Accordion>
+
+  <Accordion title="Appropriate Termination by Main Agent">
+    **Result**: True/False
+
+    Evaluates whether the AI agent ended the call appropriately. An LLM analyzes whether the agent wrapped up the conversation properly before ending.
+
+    **Interpretation**:
+    - **True**: Call was ended appropriately by the agent
+    - **False**: Agent ended call abruptly or inappropriately
+  </Accordion>
+
+  <Accordion title="Appropriate Termination by Testing Agent">
+    **Result**: True/False
+
+    Evaluates whether the user (testing agent) ended the call early, which may indicate poor experience or unresolved issues. An LLM analyzes the conversation to determine if the call ended prematurely.
+
+    **Interpretation**:
+    - **True**: Call ended at a natural conclusion point
+    - **False**: User ended call early, suggesting dissatisfaction
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Customer Experience Metrics
+
+These metrics evaluate the user's experience and satisfaction with the conversation.
+
+<AccordionGroup>
+  <Accordion title="CSAT">
+    **Result**: Score (0-100)
+
+    Evaluates overall customer satisfaction based on the conversation. An LLM analyzes the interaction considering factors like problem resolution, agent helpfulness, and conversation flow. Includes both a satisfaction score and sentiment analysis.
+
+    **Interpretation**: Higher is better. Scores above 70 indicate good customer satisfaction.
+  </Accordion>
+
+  <Accordion title="Dropoff Node">
+    **Result**: Enum (one of your configured stages)
+
+    Identifies at which stage of the conversation the call dropped or ended. An LLM maps the conversation endpoint to one of your predefined stages.
+
+    **Requirements**: Configure `dropoff_nodes` on your agent with the conversation stages you want to track (e.g., "greeting", "information_gathering", "resolution", "closing").
+
+    **Interpretation**: Helps identify where in your conversation flow users are dropping off, enabling targeted improvements.
+  </Accordion>
+
+  <Accordion title="Sentiment">
+    **Result**: Enum (positive / neutral / negative)
+
+    Determines the user's overall sentiment toward the AI agent based on the conversation transcript. An LLM analyzes the user's language, tone, and responses.
+
+    **Interpretation**:
+    - **Positive**: User seemed satisfied or pleased
+    - **Neutral**: User showed no strong emotion
+    - **Negative**: User seemed frustrated or dissatisfied
+  </Accordion>
+
+  <Accordion title="Topic of Call">
+    **Result**: Enum (one of your configured topics)
+
+    Categorizes the call into one of your predefined topics. An LLM analyzes the conversation to determine the primary subject matter.
+
+    **Requirements**: Configure `topic_nodes` on your agent with the topics you want to track (e.g., "billing", "technical_support", "sales", "general_inquiry").
+
+    **Interpretation**: Helps understand call volume distribution across different topics for resource planning and analysis.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Speech Quality Metrics
+
+These metrics evaluate the audio and speech characteristics of the AI agent.
+
+<AccordionGroup>
+  <Accordion title="Average Pitch (in Hz)">
+    **Result**: Numeric (Hertz)
+
+    Measures the average pitch frequency of the AI agent's voice during the call using pitch extraction algorithms.
+
+    **Requirements**: Audio recording.
+
+    **Interpretation**: Typical human speech pitch ranges from 85-180 Hz for male voices and 165-255 Hz for female voices. Unusual values may indicate audio issues.
+  </Accordion>
+
+  <Accordion title="Gibberish Detection (Beta)">
+    **Result**: True/False
+
+    Detects nonsensical or garbled speech from the AI agent. An LLM analyzes the agent's audio to identify unintelligible segments.
+
+    **Requirements**: Stereo audio recording with separate channels.
+
+    **Interpretation**:
+    - **True**: Speech was clear and intelligible
+    - **False**: Gibberish or garbled speech detected
+  </Accordion>
+
+  <Accordion title="Letterwise Pronunciation">
+    **Result**: True/False
+
+    Checks whether certain words were spelled out letter-by-letter correctly in the audio (e.g., spelling out "J-O-H-N" for a name).
+
+    **Requirements**: Audio recording. Configure `spelling_word_types` on your agent specifying which types of words should be spelled out (e.g., "name", "email", "confirmation_code").
+
+    **Interpretation**:
+    - **True**: Words were spelled correctly when required
+    - **False**: Spelling errors detected
+  </Accordion>
+
+  <Accordion title="Pronunciation Check (Beta)">
+    **Result**: Score (0-100)
+
+    Evaluates pronunciation accuracy for specific words you define.
+
+    **Requirements**: Audio recording. Configure `pronunciation_words` on your agent as a list of word-phoneme pairs (e.g., `[["Cekura", "suh-KYUR-uh"]]`).
+
+    **Interpretation**: Higher scores indicate better pronunciation accuracy. Useful for brand names or technical terms.
+  </Accordion>
+
+  <Accordion title="Speaking Rate (Beta)">
+    **Result**: True/False
+
+    Detects abrupt or unnatural changes in the AI agent's speaking rate during the call.
+
+    **Requirements**: Audio recording. Currently supports English only.
+
+    **Interpretation**:
+    - **True**: Speaking rate was consistent and natural
+    - **False**: Unnatural speaking rate changes detected
+  </Accordion>
+
+  <Accordion title="Talk Ratio">
+    **Result**: Numeric (0.0 to 1.0)
+
+    Calculates the ratio of AI agent speaking time to total call duration using VAD for accurate speaker separation.
+
+    **Requirements**: Stereo audio recording with separate channels.
+
+    **Interpretation**: A ratio around 0.4-0.6 is typical. Very high ratios may indicate the agent is dominating the conversation; very low ratios may indicate the agent isn't being helpful enough.
+  </Accordion>
+
+  <Accordion title="Voice Change Detection (Beta)">
+    **Result**: True/False
+
+    Detects unexpected speaker changes during the AI agent's speaking turns using ML-based voice analysis.
+
+    **Requirements**: Audio recording.
+
+    **Interpretation**:
+    - **True**: Consistent speaker throughout agent turns
+    - **False**: Unexpected voice change detected (may indicate system issues)
+  </Accordion>
+
+  <Accordion title="Voice Tone + Clarity">
+    **Result**: Score (0-100)
+
+    Evaluates the overall voice quality including clarity (how clear and understandable) and tone (appropriateness for conversation) using a neural network assessment (NISQA).
+
+    **Requirements**: Audio recording.
+
+    **Interpretation**: Higher is better. Scores above 70 indicate good voice quality. Low scores may indicate audio issues, background noise, or voice synthesis problems.
+  </Accordion>
+
+  <Accordion title="Words Per Minute (WPM)">
+    **Result**: Numeric (words per minute)
+
+    Calculates the AI agent's speaking speed based on transcript word count and speaking duration.
+
+    **Requirements**: Audio recording.
+
+    **Interpretation**: Natural conversational speech is typically 120-150 WPM. Below 100 may feel too slow; above 180 may be difficult to follow.
+  </Accordion>
+</AccordionGroup>

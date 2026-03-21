@@ -3,37 +3,382 @@ title: "Pre-Defined Metrics"
 sidebarTitle: "Pre-Defined Metrics"
 icon: "list-check"
 iconType: "solid"
-description: "Standard metrics applicable across domains for evaluating voice agent performance including latency, sentiment, CSAT, and more"
+description: "Standard metrics for evaluating voice agent performance across accuracy, conversation quality, customer experience, and speech quality"
 ---
 
-These are standard metrics applicable across domains defined by Cekura. Below is a list of supported pre-defined metrics.
+These are standard metrics applicable across domains defined by Cekura. They are organized into four categories based on what aspect of your voice agent they evaluate.
 
-* **AI Interrupting User**: Tells if the AI (main agent) interrupted the user (testing agent) during the interaction. NOTE: This only works on stereo recordings.
+---
 
-* **Average Latency (in ms)**: Tells the average response latency for the AI agent in milliseconds.
+## Accuracy Metrics
 
-* **Average Pitch (in Hz)**: Returns the average pitch of the AI Agent (Main agent) during the call in Hertz.
+These metrics evaluate whether your agent provides correct and consistent information.
 
-* **Instruction Following Metric**: Checks critical deviations from the expected workflows and tells where it deviated.
+<AccordionGroup>
+  <Accordion title="Expected Outcome">
+    **Result**: Pass / Review Required / Failed | **Cost**: 0 credits
 
-* **CSAT**: Gives a score for customer satisfaction and tells the reason for dissatisfaction.
+    Evaluates whether the Main Agent achieved the goal specified in the evaluator's expected outcome prompt. An LLM analyzes the conversation to determine if the intended outcome was reached.
 
-* **Not Early Termination**: Checks if the call was ended early by the user, indicating poor user experience or unresolved issues. This metric is True if...
+    **Requirements**: Set `expected_outcome_prompt` in your evaluator configuration describing what success looks like.
 
-* **Sentiment**: Determines whether the human's overall sentiment towards the AI agent during the conversation was "happy"...
+    **Interpretation**:
+    - **Pass**: Main Agent achieved the expected outcome
+    - **Review Required**: Outcome unclear, manual review recommended
+    - **Failed**: Main Agent did not achieve the expected outcome
+  </Accordion>
 
-* **Signal to Noise Ratio (SNR)**: Signal to Noise Ratio when the AI agent (Main agent) is speaking. Compares the noise level of Main Agent against Testing Agent.
+  <Accordion title="Hallucination">
+    **Result**: True/False | **Cost**: 0.2 credits per call
 
-* **Transcription Accuracy**: Evaluates the accuracy of speech-to-text transcription by comparing the transcript against reference transcriptions. Returns a score from 1-5 where higher scores indicate better transcription accuracy. For simulations/runs, compares the Cekura transcript against the provider's transcript using Word Error Rate (WER), with the final score based on weighted errors involving significant words (proper nouns, common nouns, and numbers at full weight; verbs at half weight). For call logs, transcribes the testing agent's audio channel using Gemini and ElevenLabs, then uses an LLM to compare against the candidate transcript.
+    Detects when the Main Agent provides information that contradicts or isn't supported by the uploaded Knowledge Base files. A Knowledge Base is a collection of files uploaded to the agent containing reference information for fact-checking. An LLM compares Main Agent responses against the Knowledge Base content.
 
-* **Talk Ratio**: The ratio of time duration the AI Agent (Main agent) is speaking compared to the duration the User (Test Agent) is speaking.
+    **Requirements**: Upload Knowledge Base files to your agent containing the source of truth.
 
-* **User Interrupting AI**: Tells if the user (testing agent) interrupted the AI (main agent) during the interaction. NOTE: This only works on stereo recordings.
+    **Interpretation**:
+    - **True**: No hallucinations detected (Main Agent stayed factual)
+    - **False**: Main Agent provided unsupported or contradictory information
+  </Accordion>
 
-* **Voice Quality Index**: Evaluates the overall voice quality of the AI agent based on three key factors: clarity (how clear and understandable the voice is), tone (appropriateness of tone for the context), and appropriateness (whether the speech fits the context and intent). Returns a score from 0-5 where higher scores indicate better voice quality. NOTE: This metric requires audio recordings for analysis.
+  <Accordion title="Relevancy">
+    **Result**: True/False | **Cost**: 0.2 credits per call
 
-* **Response Consistency**: Checks if the responses of your AI Agent are consistent across the duration of a call. This metric detects two specific cases:
-  * When a user provides information (like their name) and the AI agent repeats it back incorrectly
-  * When the AI agent provides contradictory information during the same call (e.g., saying X at the start and Y at the end which contradicts the earlier statement)
+    Evaluates whether the Main Agent's responses were relevant and appropriate to the conversation context. An LLM analyzes each response to determine if it addressed what the Testing Agent was asking.
 
-* **Words Per Minute (WPM)**: Monitors speech speed of AI Agent (Main Agent) to ensure natural and understandable delivery.
+    **Interpretation**:
+    - **True**: Responses were relevant and on-topic
+    - **False**: Main Agent gave off-topic or inappropriate responses
+  </Accordion>
+
+  <Accordion title="Response Consistency">
+    **Result**: True/False | **Cost**: 0.2 credits per call
+
+    Detects inconsistencies in the Main Agent's responses during a call. An LLM checks for two specific issues:
+    1. Testing Agent provides information (e.g., their name) and the Main Agent repeats it back incorrectly
+    2. Main Agent makes contradictory statements (e.g., says one thing early in the call, then contradicts it later)
+
+    **Interpretation**:
+    - **True**: Main Agent maintained consistent information throughout
+    - **False**: Inconsistencies or contradictions detected
+  </Accordion>
+
+  <Accordion title="Tool Call Success">
+    **Result**: True/False | **Cost**: 0 credits
+
+    Checks whether any tool calls made by the Main Agent resulted in errors.
+
+    **Interpretation**:
+    - **True**: All tool calls succeeded
+    - **False**: One or more tool calls returned an error
+  </Accordion>
+
+  <Accordion title="Transcription Accuracy">
+    **Result**: Score (0-100) | **Cost**: 0 credits (Runs) / 1.0 credits per minute (Call Logs)
+
+    Evaluates speech-to-text accuracy differently depending on the context:
+
+    **For Call Logs**: Uses two separate state-of-the-art transcription models to generate ground truth transcriptions. Compares these against the candidate transcript to find inconsistencies, with the score based on the number of errors found.
+
+    **For Runs/Simulations**: Scores based on the number of transcription errors made by the Testing Agent. Errors in names, nouns, and numbers count as 1.0. Verb errors count as 0.5. Other words are ignored. Scoring: 5 = 0 errors, 4 = 1-3 errors, 3 = 4-6 errors, 2 = 7-12 errors, 1 = 13+ errors.
+
+    The explanation also includes the standard Word Error Rate (WER) percentage.
+
+    **Interpretation**: Higher scores indicate better transcription accuracy.
+  </Accordion>
+
+  <Accordion title="Voicemail Detection (Beta)">
+    **Result**: True/False | **Cost**: 0.2 credits per call
+
+    Detects whether the call reached a voicemail system instead of a live person. An LLM analyzes the transcript for voicemail indicators (greeting messages, beeps, recording prompts).
+
+    **Interpretation**:
+    - **True**: Call reached voicemail
+    - **False**: Call connected to a live person
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Conversation Quality Metrics
+
+These metrics evaluate the flow and dynamics of the conversation.
+
+<AccordionGroup>
+  <Accordion title="AI Interrupting User">
+    **Result**: Count (number of interruptions) | **Cost**: 0 credits
+
+    Counts how many times the Main Agent started speaking while the Testing Agent was still talking. An interruption is when one speaker begins talking while the other is still speaking. Uses Voice Activity Detection (VAD) to find the timestamps for each turn of each speaker and precisely detect overlapping speech.
+
+    **Requirements**: Stereo audio recording with separate channels for each speaker.
+
+    **Interpretation**: Lower is better. Frequent interruptions indicate the Main Agent isn't properly waiting for the Testing Agent to finish speaking.
+  </Accordion>
+
+  <Accordion title="Stop Time After User Interruption (ms)">
+    **Result**: Numeric (milliseconds) | **Cost**: 0 credits
+
+    Measures how long it takes for the Main Agent to stop speaking after the Testing Agent interrupts. Uses VAD to find the timestamps for each turn and detect when the Testing Agent starts speaking over the Main Agent.
+
+    **Requirements**: Stereo audio recording with separate channels for each speaker.
+
+    **Interpretation**: Lower is better. A responsive Main Agent should stop quickly (under 500ms) when interrupted.
+  </Accordion>
+
+  <Accordion title="User Interrupting AI">
+    **Result**: Count (number of interruptions) | **Cost**: 0 credits
+
+    Counts how many times the Testing Agent started speaking while the Main Agent was still talking. Uses VAD to find the timestamps for each turn and detect overlapping speech.
+
+    **Requirements**: Stereo audio recording with separate channels for each speaker.
+
+    **Interpretation**: High counts may indicate Testing Agent frustration, Main Agent speaking too long, or poor turn-taking.
+  </Accordion>
+
+  <Accordion title="Latency (in ms)">
+    **Result**: Numeric (average milliseconds) | **Cost**: 0 credits
+
+    Measures the response time between the Testing Agent finishing speaking and the Main Agent starting its response. Latency is calculated for every Main Agent turn throughout the call. With stereo audio, VAD is used to find precise timestamps for each speaker turn.
+
+    We compute and display percentile statistics: P25, P50, P75, P90, P95, and P99.
+
+    **Requirements**: Audio recording. Stereo audio provides more accurate measurements.
+
+    **Interpretation**: Lower is better. Latency under 2000ms is generally good.
+  </Accordion>
+
+  <Accordion title="Unnecessary Repetition Count">
+    **Result**: Count (number of repetitions) | **Cost**: 0.2 credits per call
+
+    Identifies instances where the Main Agent unnecessarily repeated information it had already provided. An LLM analyzes the conversation for redundant statements.
+
+    **Interpretation**: Lower is better. Repetition wastes time and can frustrate the Testing Agent.
+  </Accordion>
+
+  <Accordion title="Detect Silence in Conversation">
+    **Result**: True/False | **Cost**: 0 credits
+
+    Detects prolonged silence periods where both the Main Agent and Testing Agent are silent, which may indicate technical issues or agent problems.
+
+    **Requirements**: Audio recording.
+
+    **Configuration**: Set `silence_duration` in the metric configuration (default: 10 seconds).
+
+    **Interpretation**:
+    - **True**: No problematic silence detected
+    - **False**: Extended mutual silence exceeding the threshold was detected
+  </Accordion>
+
+  <Accordion title="Infrastructure Issues">
+    **Result**: True/False | **Cost**: 0 credits
+
+    Detects when the Main Agent fails to respond within the configured timeout after the Testing Agent finishes their turn, indicating potential infrastructure or connectivity problems.
+
+    **Requirements**: Audio recording.
+
+    **Configuration**: Set `infra_issues_timeout` in the metric configuration (default: 10 seconds).
+
+    **Interpretation**:
+    - **True**: No infrastructure issues detected
+    - **False**: Main Agent failed to respond within the timeout after the Testing Agent finished speaking
+  </Accordion>
+
+  <Accordion title="Appropriate Termination by Main Agent">
+    **Result**: True/False | **Cost**: 0.2 credits per call
+
+    Evaluates whether the Main Agent ended the call appropriately. An LLM analyzes whether the Main Agent wrapped up the conversation properly before ending.
+
+    **Interpretation**:
+    - **True**: Call was ended appropriately by the Main Agent
+    - **False**: Main Agent ended call abruptly or inappropriately
+  </Accordion>
+
+  <Accordion title="Appropriate Termination by Testing Agent">
+    **Result**: True/False | **Cost**: 0.2 credits per call
+
+    Evaluates whether the Testing Agent ended the call early, which may indicate poor experience or unresolved issues. An LLM analyzes the conversation to determine if the call ended prematurely.
+
+    **Interpretation**:
+    - **True**: Call ended at a natural conclusion point
+    - **False**: Testing Agent ended call early, suggesting dissatisfaction
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Customer Experience Metrics
+
+These metrics evaluate the Testing Agent's experience and satisfaction with the conversation.
+
+<AccordionGroup>
+  <Accordion title="CSAT">
+    **Result**: Score (0-100) | **Cost**: 0.2 credits per call
+
+    Evaluates overall customer satisfaction based on two dimensions:
+
+    **1. Customer Sentiment** - Evaluates the Testing Agent's (customer's) tone throughout the call:
+    - Positive: Clear expressions of gratitude like "Thank you so much for your help" = 5 points
+    - Neutral: Simple thanks, cooperative tone, matter-of-fact responses = 5 points
+    - Negative: Explicit frustration, harsh language, complaints = 1 point
+
+    **2. Cooperation** - Evaluates whether the Main Agent helped the Testing Agent:
+    - Fully cooperative / No issues = 5 points
+    - Somewhat uncooperative = 3 points
+    - Refused to help / Obstructed = 1 point
+
+    The final score is the average of both dimensions, scaled to 0-100.
+
+    **Interpretation**: Higher is better. Scores above 70 indicate good customer satisfaction.
+  </Accordion>
+
+  <Accordion title="Dropoff Node">
+    **Result**: Enum (one of your configured stages) | **Cost**: 0.2 credits per call
+
+    Identifies at which stage of the conversation the call dropped or ended. An LLM maps the conversation endpoint to one of your predefined stages.
+
+    **Requirements**: Configure `dropoff_nodes` on your agent with the conversation stages you want to track (e.g., "greeting", "information_gathering", "resolution", "closing").
+
+    **Interpretation**: Helps identify where in your conversation flow Testing Agents are dropping off, enabling targeted improvements.
+  </Accordion>
+
+  <Accordion title="Sentiment">
+    **Result**: Enum (positive / neutral / negative) | **Cost**: 0.2 credits per call
+
+    Determines the Testing Agent's overall sentiment toward the Main Agent based on the conversation transcript. An LLM analyzes the Testing Agent's language, tone, and responses.
+
+    **Classification criteria**:
+    - **Positive**: Only when the Testing Agent is clearly very grateful with phrases like "Thank you so much for your help", "I really appreciate this", "You've been so helpful"
+    - **Negative**: Explicit frustration, harsh language, complaints, or aggressive tone
+    - **Neutral**: Simple "thanks", cooperative tone, matter-of-fact responses, or when sentiment is unclear
+
+    **Note**: Neutral is the default value when sentiment is uncertain.
+
+    **Interpretation**:
+    - **Positive**: Testing Agent seemed very satisfied or grateful
+    - **Neutral**: Testing Agent showed no strong emotion
+    - **Negative**: Testing Agent seemed frustrated or dissatisfied
+  </Accordion>
+
+  <Accordion title="Topic of Call">
+    **Result**: Enum (one of your configured topics) | **Cost**: 0.2 credits per call
+
+    Categorizes the call into one of your predefined topics. An LLM analyzes the conversation to determine the primary subject matter.
+
+    **Requirements**: Configure `topic_nodes` on your agent with the topics you want to track (e.g., "billing", "technical_support", "sales", "general_inquiry").
+
+    **Interpretation**: Helps understand call volume distribution across different topics for resource planning and analysis.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Speech Quality Metrics
+
+These metrics evaluate the audio and speech characteristics of the Main Agent.
+
+<AccordionGroup>
+  <Accordion title="Average Pitch (in Hz)">
+    **Result**: Numeric (Hertz) | **Cost**: 0 credits
+
+    Measures the average pitch frequency of the Main Agent's voice during the call using pitch extraction algorithms.
+
+    **Requirements**: Audio recording.
+  </Accordion>
+
+  <Accordion title="Gibberish Detection (Beta)">
+    **Result**: True/False | **Cost**: 0.2 credits per minute
+
+    Detects nonsensical or garbled speech from the Main Agent. A multimodal LLM analyzes the Main Agent's audio to identify unintelligible segments, nonsense sounds, or garbled speech.
+
+    **Requirements**: Stereo audio recording with separate channels.
+
+    **Interpretation**:
+    - **True**: Speech was clear and intelligible
+    - **False**: Gibberish or garbled speech detected
+  </Accordion>
+
+  <Accordion title="Letterwise Pronunciation">
+    **Result**: True/False | **Cost**: 0.2 credits per call
+
+    Checks whether certain words were spelled out letter-by-letter correctly in the audio (e.g., spelling out "J-O-H-N" for a name). A multimodal LLM analyzes the Main Agent's audio to verify spelling.
+
+    **Requirements**: Audio recording. Configure `spelling_word_types` on your agent specifying which types of words should be spelled out (e.g., "name", "email", "confirmation_code").
+
+    **Interpretation**:
+    - **True**: Every instance of every word of the selected category was correctly spelled out in the audio
+    - **False**: Spelling errors detected or words not spelled out when required
+  </Accordion>
+
+  <Accordion title="Pronunciation Check (Beta)">
+    **Result**: Score (0-100) | **Cost**: 0.2 credits per call
+
+    Evaluates pronunciation accuracy for specific words you define.
+
+    **Requirements**: Audio recording. Configure `pronunciation_words` on your agent as a list of word-phoneme pairs (e.g., `[["Cekura", "suh-KYUR-uh"]]`).
+
+    **Interpretation**: Higher scores indicate better pronunciation accuracy. Useful for brand names or technical terms.
+  </Accordion>
+
+  <Accordion title="Speaking Rate (Beta)">
+    **Result**: True/False | **Cost**: 0.2 credits per call
+
+    Detects abrupt or unnatural changes in the Main Agent's speaking rate during the call using an ML model.
+
+    **Requirements**: Audio recording. Currently supports English only.
+
+    **Interpretation**:
+    - **True**: Speaking rate was consistent and natural
+    - **False**: Unnatural speaking rate changes detected
+  </Accordion>
+
+  <Accordion title="Talk Ratio">
+    **Result**: Numeric (0.0 to 1.0) | **Cost**: 0 credits
+
+    Calculates the ratio of Main Agent speaking time to total call duration. Uses VAD to find the timestamps for each turn of each speaker for accurate speaker separation.
+
+    **Requirements**: Stereo audio recording with separate channels.
+
+    **Interpretation**: A ratio around 0.4-0.6 is typical. Very high ratios may indicate the Main Agent is dominating the conversation; very low ratios may indicate the Main Agent isn't being helpful enough.
+  </Accordion>
+
+  <Accordion title="Voice Change Detection (Beta)">
+    **Result**: True/False | **Cost**: 0.2 credits per call
+
+    Detects unexpected speaker changes during the Main Agent's speaking turns using an ML model for voice analysis.
+
+    **Requirements**: Audio recording.
+
+    **Interpretation**:
+    - **True**: Consistent speaker throughout Main Agent turns
+    - **False**: Unexpected voice change detected (may indicate system issues)
+  </Accordion>
+
+  <Accordion title="Voice Tone + Clarity">
+    **Result**: Score (0-100) | **Cost**: 0.2 credits per call
+
+    Evaluates the overall voice quality of the Main Agent's audio using an ML model. Specifically analyzes clarity (how clear and understandable the voice is) and jitter (variations in audio timing that can affect quality) on the Main Agent's audio channel.
+
+    **Requirements**: Audio recording.
+
+    **Example of low voice clarity**:
+    <div style={{ display: 'flex', justifyContent: 'center', margin: '0px 0' }}>
+      <iframe
+        src="https://drive.google.com/file/d/12Y8IvjxUQQoEOSW4-BJ4bYVALKXI-9Xr/preview"
+        width="65%"
+        height="70"
+        frameBorder="0"
+        allow="autoplay"
+        style={{ borderRadius: '8px' }}
+      ></iframe>
+    </div>
+
+    **Interpretation**: Higher is better. Scores above 70 indicate good voice quality. Low scores may indicate audio issues, background noise, or voice synthesis problems.
+  </Accordion>
+
+  <Accordion title="Words Per Minute (WPM)">
+    **Result**: Numeric (words per minute) | **Cost**: 0 credits
+
+    Calculates the Main Agent's speaking speed based on transcript word count and speaking duration.
+
+    **Requirements**: Audio recording.
+  </Accordion>
+</AccordionGroup>

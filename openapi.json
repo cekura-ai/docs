@@ -2604,6 +2604,34 @@
         "/observability/v1/call-logs-external/export_call_logs/": {
             "get": {
                 "operationId": "call-logs-external-export-call-logs-retrieve",
+                "description": "Export call logs to Excel format asynchronously.\nReturns a progress_id immediately for tracking export progress via the export_call_logs_progress endpoint.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "num_records",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 10000
+                        },
+                        "description": "Maximum number of records to export. Cannot exceed 10,000."
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Filter by agent ID."
+                    },
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Filter by project ID."
+                    }
+                ],
                 "tags": [
                     "observability"
                 ],
@@ -2617,11 +2645,202 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Status message confirming export started"
+                                        },
+                                        "progress_id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "description": "Unique identifier for tracking export progress"
+                                        },
+                                        "total_records": {
+                                            "type": "integer",
+                                            "description": "Total number of records to be exported"
+                                        }
+                                    }
+                                },
+                                "examples": {
+                                    "Export-started": {
+                                        "value": {
+                                            "message": "Export started successfully",
+                                            "progress_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "total_records": 1500
+                                        },
+                                        "summary": "export-started"
+                                    }
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Export initiated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "num_records": {
+                                            "type": "string",
+                                            "description": "Error message when num_records exceeds limit"
+                                        }
+                                    }
+                                },
+                                "examples": {
+                                    "Exceeds-limit": {
+                                        "value": {
+                                            "num_records": "num_records cannot exceed 10,000"
+                                        },
+                                        "summary": "exceeds-limit"
+                                    }
+                                }
+                            }
+                        },
+                        "description": "num_records exceeds maximum limit of 10,000"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "No call logs found"
+                    }
+                }
+            }
+        },
+        "/observability/v1/call-logs-external/export_call_logs_progress/": {
+            "get": {
+                "operationId": "call-logs-external-export-call-logs-progress-retrieve",
+                "description": "Get the progress of a call log export by progress_id.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Progress ID returned from export_call_logs endpoint",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Project ID for authentication",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": ["started", "processing", "completed", "error"],
+                                            "description": "Current status of the export"
+                                        },
+                                        "file_url": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "description": "URL to download the exported file (available when status is 'completed')"
+                                        },
+                                        "total_records": {
+                                            "type": "integer",
+                                            "description": "Total number of records being exported"
+                                        },
+                                        "processed": {
+                                            "type": "integer",
+                                            "description": "Number of records processed so far"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "description": "Error message (available when status is 'error')"
+                                        }
+                                    }
+                                },
+                                "examples": {
+                                    "Export-in-progress": {
+                                        "value": {
+                                            "status": "processing",
+                                            "total_records": 1500,
+                                            "processed": 500
+                                        },
+                                        "summary": "export-in-progress"
+                                    },
+                                    "Export-completed": {
+                                        "value": {
+                                            "status": "completed",
+                                            "file_url": "https://storage.example.com/call_logs_20260331_103000.xlsx",
+                                            "total_records": 1500,
+                                            "records_exported": 1500
+                                        },
+                                        "summary": "export-completed"
+                                    },
+                                    "Export-error": {
+                                        "value": {
+                                            "status": "error",
+                                            "error": "Failed to export call logs"
+                                        },
+                                        "summary": "export-error"
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Export progress status"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Missing required parameters"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Invalid progress_id"
                     }
                 }
             }
@@ -3817,6 +4036,34 @@
         "/observability/v1/call-logs/export_call_logs/": {
             "get": {
                 "operationId": "call-logs-export-call-logs-retrieve",
+                "description": "Export call logs to Excel format asynchronously.\nReturns a progress_id immediately for tracking export progress via the export_call_logs_progress endpoint.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "num_records",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 10000
+                        },
+                        "description": "Maximum number of records to export. Cannot exceed 10,000."
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Filter by agent ID."
+                    },
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Filter by project ID."
+                    }
+                ],
                 "tags": [
                     "observability"
                 ],
@@ -3830,11 +4077,75 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Status message confirming export started"
+                                        },
+                                        "progress_id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "description": "Unique identifier for tracking export progress"
+                                        },
+                                        "total_records": {
+                                            "type": "integer",
+                                            "description": "Total number of records to be exported"
+                                        }
+                                    }
+                                },
+                                "examples": {
+                                    "Export-started": {
+                                        "value": {
+                                            "message": "Export started successfully",
+                                            "progress_id": "550e8400-e29b-41d4-a716-446655440000",
+                                            "total_records": 1500
+                                        },
+                                        "summary": "export-started"
+                                    }
                                 }
                             }
                         },
-                        "description": ""
+                        "description": "Export initiated successfully"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "num_records": {
+                                            "type": "string",
+                                            "description": "Error message when num_records exceeds limit"
+                                        }
+                                    }
+                                },
+                                "examples": {
+                                    "Exceeds-limit": {
+                                        "value": {
+                                            "num_records": "num_records cannot exceed 10,000"
+                                        },
+                                        "summary": "exceeds-limit"
+                                    }
+                                }
+                            }
+                        },
+                        "description": "num_records exceeds maximum limit of 10,000"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "No call logs found"
                     }
                 },
                 "x-mint": {
@@ -3842,6 +4153,140 @@
                         "enabled": true,
                         "name": "call-logs-export-call-logs-retrieve",
                         "description": "GET /observability/v1/call-logs/export_call_logs/"
+                    }
+                }
+            }
+        },
+        "/observability/v1/call-logs/export_call_logs_progress/": {
+            "get": {
+                "operationId": "call-logs-export-call-logs-progress-retrieve",
+                "description": "Get the progress of a call log export by progress_id.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Progress ID returned from export_call_logs endpoint",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Project ID for authentication",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": ["started", "processing", "completed", "error"],
+                                            "description": "Current status of the export"
+                                        },
+                                        "file_url": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "description": "URL to download the exported file (available when status is 'completed')"
+                                        },
+                                        "total_records": {
+                                            "type": "integer",
+                                            "description": "Total number of records being exported"
+                                        },
+                                        "processed": {
+                                            "type": "integer",
+                                            "description": "Number of records processed so far"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "description": "Error message (available when status is 'error')"
+                                        }
+                                    }
+                                },
+                                "examples": {
+                                    "Export-in-progress": {
+                                        "value": {
+                                            "status": "processing",
+                                            "total_records": 1500,
+                                            "processed": 500
+                                        },
+                                        "summary": "export-in-progress"
+                                    },
+                                    "Export-completed": {
+                                        "value": {
+                                            "status": "completed",
+                                            "file_url": "https://storage.example.com/call_logs_20260331_103000.xlsx",
+                                            "total_records": 1500,
+                                            "records_exported": 1500
+                                        },
+                                        "summary": "export-completed"
+                                    },
+                                    "Export-error": {
+                                        "value": {
+                                            "status": "error",
+                                            "error": "Failed to export call logs"
+                                        },
+                                        "summary": "export-error"
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Export progress status"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Missing required parameters"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": "Invalid progress_id"
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "call-logs-export-call-logs-progress-retrieve",
+                        "description": "Get the progress of a call log export by progress_id."
                     }
                 }
             }

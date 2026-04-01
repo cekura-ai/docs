@@ -1,0 +1,224 @@
+---
+title: "Mock Tools"
+sidebarTitle: "Mock Tools"
+icon: "wrench"
+iconType: "regular"
+description: "Learn how to create and manage mock tools for testing AI agents with predictable tool responses"
+---
+
+## Overview
+
+Mock tools allow you to simulate external tool calls during agent testing by providing predefined input-output mappings. This ensures consistent, predictable responses during testing scenarios, making it easier to evaluate your agent's performance and behavior.
+
+Mock tools are particularly useful when:
+- Testing agents that rely on external APIs or databases
+- Creating reproducible test scenarios
+- Avoiding dependencies on live third-party services
+- Testing edge cases with specific response data
+- Ensuring consistent test results across multiple runs
+
+## How to Attach Mock Tool Data to Your Agent
+
+There are two ways to set up mock tools for your agent:
+1. **Auto-Fetch (Recommended)**: Automatically fetch tool configurations and generate mock data from your provider
+2. **Manual Setup**: Manually add tool configurations and mock data
+
+### Option 1: Auto-Fetch Tools (Recommended)
+
+Auto-fetch reads your tool configurations from your provider (VAPI, Retell, or ElevenLabs) and uses AI to generate realistic sample input/output data based on your agent's context and recent call transcripts.
+
+<Note>
+  Auto-fetch is a **read-only** operation — it fetches tool definitions and populates mock data, but does not change any URLs or settings on your provider. Use the **Mock Enable/Disable toggle** (described below) to redirect your provider's tools to Cekura's mock endpoints.
+</Note>
+
+**Prerequisites:**
+- Your agent must have a provider configured (VAPI, Retell, or ElevenLabs)
+- You must have entered an Assistant ID in your agent's provider settings
+
+**To use Auto-Fetch:**
+
+1. **Configure Your Provider Settings**
+   - Go to the Cekura Dashboard and select your agent
+   - In the agent settings, configure your provider (VAPI, Retell, or ElevenLabs)
+   - Enter your Assistant ID (or Squad ID for VAPI squads) in the provider settings
+
+2. **Open Mock Tools Section**
+   - Scroll to the right-hand panel of the agent settings page
+   - Click on **Mock Tools** to expand the section
+
+3. **Click Auto-Fetch**
+   - Click the **"Auto-Fetch"** button
+   - A confirmation dialog will appear explaining what will happen
+   - Click **"Auto-Fetch"** to confirm
+
+4. **What Happens:**
+   - Cekura fetches all tool configurations from your provider
+   - AI generates realistic sample input/output data based on your agent's context and recent call transcripts
+   - The generated mock data is saved to your agent in Cekura — your provider's configuration is not changed at this point
+
+<Note>
+  Auto-fetch supports VAPI (including squads), Retell, and ElevenLabs providers. For VAPI squads, tools from all member assistants are fetched and prefixed with the assistant name to avoid naming conflicts (e.g., `SalesAssistant_check_availability`).
+
+  **LiveKit**: Auto-fetch is not supported for LiveKit. To use mock tools with LiveKit, you can manually create mock tools and integrate the Cekura SDK in your LiveKit agent. See the [LiveKit Tracing guide](/documentation/integrations/livekit/tracing) for setup instructions.
+</Note>
+
+#### Enabling and Disabling Mock Mode
+
+After running Auto-Fetch, use the **Mock** toggle to control whether your provider's tools are redirected to Cekura's mock endpoints.
+
+**Mock toggle is disabled by default** — your provider's tools continue using their original URLs until you explicitly enable it.
+
+**To enable mock mode:**
+1. In the Mock Tools section, flip the **Mock** toggle to enabled
+2. A confirmation dialog will describe what will change
+3. Confirm to activate — Cekura will update your provider's tool configuration:
+   - **VAPI**: Creates cloned tools with Cekura mock URLs (original tools are preserved since VAPI tools are shared globally)
+   - **Retell**: Updates tool URLs directly in your LLM/Flow configuration
+   - **ElevenLabs**: Updates webhook tool URLs directly in your agent configuration
+
+**To disable mock mode:**
+1. Flip the **Mock** toggle back to disabled
+2. Confirm the dialog — Cekura will restore your provider's original tool configuration:
+   - **VAPI**: Deletes the cloned mock tools
+   - **Retell/ElevenLabs**: Restores the original tool URLs
+
+<Warning>
+  When mock mode is disabled, your provider's tools revert to their original endpoints. Run Auto-Fetch again if you need to refresh the mock data, then re-enable the toggle.
+</Warning>
+
+### Option 2: Manual Setup
+
+If you prefer to manually configure your mock tools, or need more control over the mock data, you can add tools manually.
+
+**Provide Agent tool details with mock tool data:**
+
+1. **Navigate to Agent Settings**
+   - Go to the Cekura Dashboard
+   - Select the agent for which you want to add mock tools
+
+2. **Add Mock Tool Data**
+   - On the right-hand panel, click on **Mock Tools**
+   - Click **"+ Add Tool"** button to add mock tool data
+   - For each tool you need to add:
+     - **Tool Name**: Must be the same as mentioned in the agent description
+     - **Tool Description**: Describe what the tool does
+     - **Input/Output Mock Data**: Provide sample data to define the format for keys and values (this also serves as initial test data)
+
+<Frame>
+  <img
+    src="/images/mock-tools-agent-settings.png"
+    alt="Mock Tools section in Agent Settings showing the interface for adding mock tool data"
+    style={{ borderRadius: '0.5rem' }}
+  />
+</Frame>
+
+<Note>
+  The tool name must exactly match what's mentioned in your agent description. Any mismatch will result in the mock tool not being triggered during testing.
+</Note>
+
+#### Example Mock Tool Configurations
+
+<CodeGroup>
+
+```json User Data Tool
+[
+  {
+    "input": {"user_id": 1},
+    "output": {
+      "name": "John Doe",
+      "age": 30,
+      "email": "john@example.com",
+      "status": "active"
+    }
+  },
+  {
+    "input": {"user_id": 2},
+    "output": {
+      "name": "Jane Smith",
+      "age": 25,
+      "email": "jane@example.com",
+      "status": "premium"
+    }
+  }
+]
+```
+
+```json Inventory Check Tool
+[
+  {
+    "input": {"product_id": "SKU123", "quantity": 5},
+    "output": {
+      "available": true,
+      "in_stock": 50,
+      "can_fulfill": true,
+      "estimated_delivery": "2-3 business days"
+    }
+  },
+  {
+    "input": {"product_id": "SKU456", "quantity": 100},
+    "output": {
+      "available": false,
+      "in_stock": 10,
+      "can_fulfill": false,
+      "message": "Insufficient stock"
+    }
+  }
+]
+```
+
+```json Weather API Tool
+[
+  {
+    "input": {"city": "New York", "unit": "celsius"},
+    "output": {
+      "temperature": 22,
+      "conditions": "partly cloudy",
+      "humidity": 65,
+      "wind_speed": 10
+    }
+  },
+  {
+    "input": {"city": "London", "unit": "celsius"},
+    "output": {
+      "temperature": 15,
+      "conditions": "rainy",
+      "humidity": 80,
+      "wind_speed": 15
+    }
+  }
+]
+```
+
+</CodeGroup>
+
+### Step 2: Create New Evaluators
+
+After setting up your mock tools, create evaluators to test your agent:
+
+1. **Navigate to Evaluators Section**
+   - Go to the Evaluators tab in your Cekura dashboard
+   - Click on **"Create New Workflow Evaluator"**
+
+
+### Step 3: Run the Evaluators
+
+Execute your evaluators to test the agent with mock tools:
+
+1. **Enable Mock Mode**
+   - If you used Auto-Fetch: make sure the **Mock** toggle is enabled so your provider's tools are redirected to Cekura's mock endpoints
+   - If you used Manual Setup: configure your agent with Cekura's mock tool endpoints instead of the actual tool URLs on your provider. Check the [Mock Tool API documentation](/api-reference/test_framework/post-mock-tool) for endpoint details
+
+2. **Start Test Execution**
+   - Select the evaluators you created
+   - Click **"Run Evaluator"** to start testing
+   - Choose the number of test iterations if needed
+
+## API Reference
+
+For programmatic access to mock tools:
+
+- [Create Mock Tool](/api-reference/test_framework/create-mock-tool)
+- [Update Mock Tool](/api-reference/test_framework/update-mock-tool)
+- [Delete Mock Tool](/api-reference/test_framework/delete-mock-tool)
+- [List Mock Tools](/api-reference/test_framework/list-mock-tools)
+- [Execute Mock Tool](/api-reference/test_framework/post-mock-tool)

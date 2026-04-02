@@ -3,12 +3,14 @@ title: 'Test Profile'
 sidebarTitle: "Test Profile"
 icon: "id-card"
 iconType: "regular"
-description: 'Using test profiles to provide identity information for evaluators'
+description: 'Using test profiles to provide identity information for evaluators and dynamic variables for your main agent'
 ---
 
 ## What is a Test Profile?
 
 A test profile gives your evaluator a specific identity with personal information such as name, date of birth, address, phone number, and other relevant details. This allows the evaluator to provide consistent, realistic identity information during conversations with your AI agent.
+
+Beyond identity, test profiles serve a second critical purpose: for [outbound](/documentation/guides/testing-agents/outbound-auto-call), [WebSocket](/documentation/integrations/chat-testing), [SIP](/documentation/integrations/sip-integration), and [LiveKit](/documentation/integrations/livekit/testing) testing, **test profile fields are sent to your main agent as dynamic variables**, mimicking what production systems provide when initiating calls. This lets you test the full end-to-end flow where the agent receives caller context before the conversation begins.
 
 ## When to Use Test Profiles
 
@@ -173,9 +175,187 @@ Template variables are especially useful when:
 - You're testing multiple scenarios with **different test profiles** but the same instruction structure
 - You want to ensure **consistency** between your backend system and what the evaluator says
 
+## Test Profiles as Dynamic Variables for the Main Agent
+
+Test profiles don't just provide data to the testing agent — for outbound, WebSocket, SIP, and LiveKit testing modes, test profile fields are also **sent to your main agent as dynamic variables**. This is the mechanism for passing caller context to the main agent, mimicking what happens in production when your system initiates a call with pre-populated customer data.
+
+### Why This Matters
+
+In production, when your system makes an outbound call or opens a WebSocket session, it typically passes context about the caller — their name, account ID, appointment details, etc. Without test profiles, your main agent has no context about who it's talking to during testing, which means:
+
+- Tool calls that depend on caller data will fail or return unexpected results
+- You can't test the production flow where the agent receives pre-populated caller info
+- The agent's personalization and routing logic goes untested
+
+### How It Works
+
+Test profiles flow data in **two directions** simultaneously:
+
+1. **To the testing agent** — via template variable substitution in evaluator instructions, so the simulated caller knows what to say
+2. **To the main agent** — via dynamic variables sent through the integration's native mechanism (HTTP headers, SIP headers, room metadata, or webhook payload), so the main agent has caller context
+
+This dual flow enables true end-to-end testing: the main agent receives caller context, uses it to perform lookups and personalize the conversation, and the testing agent validates the results.
+
+<Warning>
+**Inbound telephony is the exception.** When testing via inbound phone calls (PSTN), test profile data is **not** sent to the main agent as dynamic variables. In inbound mode, the testing agent provides profile data verbally during the conversation (e.g., stating their name and date of birth when asked), and the main agent queries its own backend to verify — just like a real caller would. This tests the actual verification flow.
+</Warning>
+
+### Integration-Specific Behavior
+
+How test profile data reaches your main agent depends on which testing mode you use:
+
+<Tabs>
+  <Tab title="Outbound">
+
+  For outbound testing, test profile fields are sent as `dynamic_variables` in the webhook payload to your trigger URL, or passed directly to your voice provider (Vapi, Retell, ElevenLabs) when using auto outbound.
+
+  **Webhook payload example:**
+  ```json
+  {
+    "from_number": "+1234567890",
+    "to_number": "+14159976447",
+    "dynamic_variables": {
+      "customer_name": "Sarah Johnson",
+      "account_id": "ACC-98765",
+      "appointment_date": "March 15, 2025"
+    }
+  }
+  ```
+
+  All fields from the test profile's `information` object are included in `dynamic_variables`. Your agent receives these as it would any production outbound call context.
+
+  See [Auto Outbound Calls](/documentation/guides/testing-agents/outbound-auto-call) and [Manual Outbound Testing](/documentation/guides/testing-agents/outbound-evaluators) for full setup details.
+
+  </Tab>
+
+  <Tab title="WebSocket / Chat">
+
+  For WebSocket and chat-based testing, test profile fields starting with `X-` are sent as **HTTP headers** during the WebSocket connection handshake. Other fields remain available for template variable substitution in evaluator instructions.
+
+  **Example test profile:**
+  ```json
+  {
+    "name": "Sarah Johnson",
+    "email": "sarah.j@email.com",
+    "X-Customer-ID": "CUST-98765",
+    "X-Account-Tier": "premium"
+  }
+  ```
+
+  **Headers your server receives:**
+  ```
+  X-Customer-ID: CUST-98765
+  X-Account-Tier: premium
+  X-VOCERA-SECRET: <api-key>
+  X-VOCERA-RUN-ID: <run-id>
+  ```
+
+  Your WebSocket server can use these headers to pre-load customer data and customize behavior before the conversation starts.
+
+  <Info>
+  Only fields starting with `X-` are sent as headers. Fields like `name` and `email` above are still available in evaluator instructions via `{{test_profile.name}}` and `{{test_profile.email}}`.
+  </Info>
+
+  See [Chat-Based Testing](/documentation/integrations/chat-testing) for full setup details including a Python server example.
+
+  </Tab>
+
+  <Tab title="SIP">
+
+  For SIP testing, test profile fields starting with `X-` are injected as **custom SIP headers** in the SIP INVITE request, alongside Cekura's default headers (`X-Run-Id`, `X-Scenario-Id`, `X-Result-Id`).
+
+  **Example test profile:**
+  ```json
+  {
+    "name": "Premium Customer Profile",
+    "information": {
+      "customer_name": "Jane Smith",
+      "X-Auth-Token": "abc123xyz",
+      "X-Customer-Tier": "premium",
+      "X-Account-Type": "business"
+    }
+  }
+  ```
+
+  **SIP INVITE headers:**
+  ```
+  X-Auth-Token: abc123xyz
+  X-Customer-Tier: premium
+  X-Account-Type: business
+  X-Run-Id: <run-id>
+  X-Scenario-Id: <scenario-id>
+  X-Result-Id: <result-id>
+  ```
+
+  Your SIP infrastructure extracts these headers during call setup to route calls, authenticate sessions, or pre-load customer context.
+
+  <Info>
+  Only keys with the `X-` prefix are included as SIP headers. Other fields (like `customer_name` above) are not sent in the INVITE but remain available for evaluator instruction template variables.
+  </Info>
+
+  See [SIP Testing](/documentation/integrations/sip-integration) for full setup details.
+
+  </Tab>
+
+  <Tab title="LiveKit">
+
+  For LiveKit testing, test profile fields are passed as **job metadata** when Cekura dispatches your agent. Your agent can access this data in its entrypoint.
+
+  **Example — accessing test profile data in your LiveKit agent:**
+  ```python
+  import json
+  from livekit.agents import JobContext
+
+  async def entrypoint(ctx: JobContext):
+      await ctx.connect()
+
+      # Access test profile data from job metadata
+      job_metadata = json.loads(ctx.job.metadata) if ctx.job.metadata else {}
+      customer_name = job_metadata.get("customer_name")
+      account_id = job_metadata.get("account_id")
+
+      # Use the data to personalize the conversation
+      if customer_name:
+          greeting = f"Hello {customer_name}, how can I help you today?"
+  ```
+
+  This mirrors production flows where your system passes caller context via job metadata when dispatching LiveKit agents.
+
+  See [LiveKit Automated Testing](/documentation/integrations/livekit/testing) for full setup details.
+
+  </Tab>
+</Tabs>
+
+### Choosing Test Profile Field Names
+
+Since the `X-` prefix determines which fields are sent as headers (for WebSocket, SIP, and chat modes), name your fields intentionally:
+
+| Field naming | Behavior | Use for |
+|-------------|----------|---------|
+| `X-Customer-ID`, `X-Auth-Token` | Sent as HTTP/SIP headers to the main agent | Data your agent needs before the conversation starts |
+| `name`, `date_of_birth`, `email` | Available in evaluator instructions via template variables | Data the testing agent provides verbally during the call |
+
+For outbound and LiveKit modes, **all** test profile fields are sent to the main agent regardless of naming convention.
+
 ## Best Practices
 
-### 1. Synchronize Test Data
+### 1. Never Hardcode Identity Data in Instructions
+
+Names, dates of birth, account IDs, addresses, and phone numbers belong in test profiles, **not** in evaluator instructions. When identity data is hardcoded in instructions, the testing agent can lose track of it during long conversations and hallucinate incorrect values. This is the single most common mistake in evaluator design.
+
+```
+❌ Bad — hardcoded in instructions:
+"Say your name is John Smith and your date of birth is January 1, 1990.
+Provide account number ACC-12345 when asked."
+
+✅ Good — uses test profile:
+"Provide your name and date of birth when asked for verification.
+Give your account number when the agent requests it for lookup."
+```
+
+The actual values come from the test profile, keeping instructions reusable and preventing hallucinations.
+
+### 2. Synchronize Test Data
 
 Ensure your test profile information matches exactly what exists in your backend system. Mismatches will cause verification failures.
 
@@ -190,7 +370,7 @@ System DOB: 01/01/2000
 Profile DOB: 01/01/2000
 ```
 
-### 2. Create Multiple Test Profiles
+### 3. Create Multiple Test Profiles
 
 Build a library of test profiles for different scenarios:
 
@@ -198,7 +378,11 @@ Build a library of test profiles for different scenarios:
 - Edge cases (partial information, multiple matches)
 - Negative scenarios (wrong information, no matches)
 
-### 3. Update Profiles Regularly
+### 4. One Profile Per Scenario
+
+Start with a dedicated test profile for every scenario, even if it feels like overkill. Sharing profiles between scenarios introduces ambiguity about which data the testing agent should use and can cause unexpected backend behavior if two scenarios need different states for the same identity.
+
+### 5. Update Profiles Regularly
 
 When your system's data structure changes, update your test profiles accordingly. Outdated profiles lead to failed tests that don't reflect real issues.
 

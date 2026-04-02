@@ -10,6 +10,11 @@ description: 'Run evaluator scenarios by manually providing LiveKit room URL and
 
 Use this flow to test your agent by joining a LiveKit room via WebRTC for each evaluator run. Each item you submit will create a run that connects using your provided LiveKit room URL and access token.
 
+<Tabs>
+<Tab title="Voice Mode">
+
+Run scenarios using voice-based WebRTC communication.
+
 <Note>
   Each array element you send creates a separate run. To run the same scenario multiple times in parallel, repeat that scenario object multiple times in the payload.
 </Note>
@@ -126,4 +131,136 @@ Get Runs with IDs: [API Doc](/api-reference/test_framework/list-runs-with-ids)
 - Learn about [custom metrics](/documentation/key-concepts/metrics/custom-metrics)
 - Explore [predefined metrics](/documentation/key-concepts/metrics/pre-defined-metrics)
 - Set up [instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)
-- Perform [load testing](/documentation/guides/testing-agents/load-testing) 
+- Perform [load testing](/documentation/guides/testing-agents/load-testing)
+
+</Tab>
+
+<Tab title="Chat Mode">
+
+Run scenarios using text-based chat communication via LiveKit data channels.
+
+<Note>
+  Each array element you send creates a separate run. To run the same scenario multiple times in parallel, repeat that scenario object multiple times in the payload.
+</Note>
+
+## Prerequisites
+- A Cekura account
+- One or more scenarios created for your agent
+- LiveKit room URL and a valid access token for each run you intend to start
+
+## API Endpoint
+
+- **Method**: POST
+- **URL**: `https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit_chat/`
+- **Headers**:
+  - `X-CEKURA-API-KEY`: your API key
+  - `Content-Type`: `application/json`
+
+### Request Body
+
+- **agent** (number, required): Your agent ID
+- **scenarios**: Array of objects. Each object fields:
+  - **scenario** (number, required): Scenario ID
+  - **livekit_room_url** (string, required): Your LiveKit room URL
+  - **access_token** (string, required): LiveKit access token
+
+### Example: Single Run (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit_chat/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agent": 123,
+    "scenarios": [
+      {
+        "scenario": 30,
+        "livekit_room_url": "wss://<LK_ROOM_URL>",
+        "access_token": "<LK_TOKEN>"
+      }
+    ]
+  }'
+```
+
+### Example: Multiple Runs (JSON)
+
+```json
+{
+  "agent": 123,
+  "scenarios": [
+    {
+      "scenario": 30,
+      "livekit_room_url": "wss://<LK_ROOM_URL>",
+      "access_token": "<LK_TOKEN_1>"
+    },
+    {
+      "scenario": 31,
+      "livekit_room_url": "wss://<LK_ROOM_URL>",
+      "access_token": "<LK_TOKEN_2>"
+    }
+  ]
+}
+```
+
+### Example: Python
+
+```python
+import requests
+
+API_KEY = "<YOUR_API_KEY>"
+BASE_URL = "https://api.cekura.ai/test_framework"
+
+headers = {
+    "X-CEKURA-API-KEY": API_KEY,
+    "Content-Type": "application/json",
+}
+
+payload = {
+    "agent": 123,
+    "scenarios": [
+        {
+            "scenario": 30,
+            "livekit_room_url": "wss://<LK_ROOM_URL>",
+            "access_token": "<LK_TOKEN_1>",
+        },
+        {
+            "scenario": 31,
+            "livekit_room_url": "wss://<LK_ROOM_URL>",
+            "access_token": "<LK_TOKEN_2>",
+        },
+    ],
+}
+
+resp = requests.post(
+    f"{BASE_URL}/v1/scenarios-external/run_scenarios_livekit_chat/",
+    headers=headers,
+    json=payload,
+)
+result = resp.json()
+print(result)
+```
+
+## Expected Behavior
+- A result is created and a run is queued for each item in `scenarios`
+- Each run connects to the provided LiveKit room URL using the given access token
+- Runs execute in text/chat mode (`run_as_text: true`)
+- You can poll run statuses using the Bulk Runs API:
+
+<Card title="API Reference" icon="link">
+Get Runs with IDs: [API Doc](/api-reference/test_framework/list-runs-with-ids)
+</Card>
+
+## Troubleshooting
+- **401/403 errors**: Check your `X-CEKURA-API-KEY`
+- **Room connection failures**: Verify `livekit_room_url` and `access_token`
+- **No runs created**: Ensure the `scenarios` array is not empty and scenario IDs are valid
+
+## Next Steps
+- Learn about [custom metrics](/documentation/key-concepts/metrics/custom-metrics)
+- Explore [predefined metrics](/documentation/key-concepts/metrics/pre-defined-metrics)
+- Set up [instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)
+- Perform [load testing](/documentation/guides/testing-agents/load-testing)
+
+</Tab>
+</Tabs> 

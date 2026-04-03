@@ -3,12 +3,12 @@ title: 'LiveKit (Manual)'
 sidebarTitle: "LiveKit Manual"
 icon: "hand-pointer"
 iconType: "regular"
-description: 'Run evaluator scenarios by manually providing LiveKit room URL and access token'
+description: 'Run evaluator scenarios by manually providing LiveKit room URL and access token (voice and chat modes)'
 ---
 
 ## Overview
 
-Use this flow to test your agent by joining a LiveKit room via WebRTC for each evaluator run. Each item you submit will create a run that connects using your provided LiveKit room URL and access token.
+Use this flow to test your agent by joining a LiveKit room via WebRTC for each evaluator run. Each item you submit will create a run that connects using your provided LiveKit room URL and access token. This page covers both **voice** and **chat (text mode)** flows.
 
 <Note>
   Each array element you send creates a separate run. To run the same scenario multiple times in parallel, repeat that scenario object multiple times in the payload.
@@ -117,10 +117,125 @@ print(result)
 Get Runs with IDs: [API Doc](/api-reference/test_framework/list-runs-with-ids)
 </Card>
 
+---
+
+## Chat Flow (Text Mode)
+
+Use this endpoint to test your LiveKit agent using text-based chat instead of voice. The same manual approach applies (you provide room URL and token), but the evaluator communicates via data messages rather than audio.
+
+### Dispatching Your Agent with Text Mode
+
+<Warning>
+Before calling the Cekura chat endpoint, you must create the room and dispatch your LiveKit agent with `text_mode: true` in the agent dispatch metadata. This tells your agent to operate in text/chat mode rather than voice mode.
+</Warning>
+
+```python
+from livekit.api import LiveKitAPI, CreateAgentDispatchRequest
+import json
+
+livekit_api = LiveKitAPI(
+    url="wss://<YOUR_LIVEKIT_URL>",
+    api_key="<YOUR_API_KEY>",
+    api_secret="<YOUR_API_SECRET>",
+)
+
+dispatch_metadata = {
+    "text_mode": True,
+    # ... any other metadata your agent needs
+}
+
+await livekit_api.agent_dispatch.create_dispatch(
+    CreateAgentDispatchRequest(
+        agent_name="your-agent-name",
+        room="your-room-name",
+        metadata=json.dumps(dispatch_metadata),
+    )
+)
+```
+
+### API Endpoint
+
+- **Method**: POST
+- **URL**: `https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit_chat/`
+- **Headers**:
+  - `X-CEKURA-API-KEY`: your API key
+  - `Content-Type`: `application/json`
+
+### Request Body
+
+- **scenarios**: Array of objects. Each object fields:
+  - **scenario** (number, required): Scenario ID
+  - **livekit_room_url** (string, required): Your LiveKit room URL
+  - **access_token** (string, required): LiveKit access token
+  - **publish_data_message** (object, optional): Additional data message payload
+- **agent** (number, optional): Agent ID. Not required if scenarios already have agents assigned.
+
+### Example: cURL
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_livekit_chat/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [
+      {
+        "scenario": 30,
+        "livekit_room_url": "wss://<LK_ROOM_URL>",
+        "access_token": "<LK_TOKEN>"
+      }
+    ]
+  }'
+```
+
+### Example: Python
+
+```python
+import requests
+
+API_KEY = "<YOUR_API_KEY>"
+BASE_URL = "https://api.cekura.ai/test_framework"
+
+headers = {
+    "X-CEKURA-API-KEY": API_KEY,
+    "Content-Type": "application/json",
+}
+
+payload = {
+    "scenarios": [
+        {
+            "scenario": 30,
+            "livekit_room_url": "wss://<LK_ROOM_URL>",
+            "access_token": "<LK_TOKEN>",
+        },
+    ],
+}
+
+resp = requests.post(
+    f"{BASE_URL}/v1/scenarios-external/run_scenarios_livekit_chat/",
+    headers=headers,
+    json=payload,
+)
+result = resp.json()
+print(result)
+```
+
+### Expected Behavior
+- A result is created and a run is queued for each item in `scenarios`
+- Each run connects to the provided LiveKit room and communicates via text data messages
+- The webhook flow works the same as voice — Cekura matches the webhook transcript to the run using similarity matching and temporal alignment
+
+### Billing
+
+<Info>
+Chat runs are billed at **text simulation rates**, not voice simulation rates.
+</Info>
+
 ## Troubleshooting
 - **401/403 errors**: Check your `X-CEKURA-API-KEY`
 - **Room connection failures**: Verify `livekit_room_url` and `access_token`
 - **No runs created**: Ensure the `scenarios` array is not empty and scenario IDs are valid
+- **Chat messages not received**: Ensure your agent was dispatched with `text_mode: true` in dispatch metadata
 
 ## Next Steps
 - Learn about [custom metrics](/documentation/key-concepts/metrics/custom-metrics)

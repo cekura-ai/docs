@@ -238,6 +238,58 @@ Poll for results using the [List Runs with IDs API](/api-reference/test_framewor
 </Tab>
 </Tabs>
 
+## Accessing Test Profile and Run Metadata in Your Agent
+
+In the automated flow (both voice and chat endpoints), Cekura creates the LiveKit room **and** dispatches your agent. During dispatch, Cekura populates the agent's **job metadata** with test context that your agent code can use at runtime.
+
+### Dispatch Metadata Structure
+
+```json
+{
+  "scenario_id": 123,
+  "run_id": 456,
+  "test_profile_data": {
+    "user_name": "John Doe",
+    "user_email": "john@example.com",
+    "account_id": "ACC-12345"
+  },
+  "text_mode": true
+}
+```
+
+| Field | Type | Included When |
+|-------|------|---------------|
+| `scenario_id` | number | Always |
+| `run_id` | number | Always |
+| `test_profile_data` | object | Only when a [test profile](/documentation/key-concepts/evaluators/test-profile) is assigned to the scenario or run |
+| `text_mode` | boolean | Only for chat runs. |
+
+### Extracting Job Metadata in Your Agent
+
+Access the dispatch metadata via `ctx.job.metadata` in your LiveKit agent's entrypoint:
+
+```python
+import json
+from livekit.agents import JobContext
+
+async def entrypoint(ctx: JobContext):
+    await ctx.connect()
+
+    # Access job/dispatch metadata (set by Cekura in automated flows)
+    job_metadata = json.loads(ctx.job.metadata) if ctx.job.metadata else {}
+
+    scenario_id = job_metadata.get("scenario_id")
+    run_id = job_metadata.get("run_id")
+    test_profile_data = job_metadata.get("test_profile_data", {})
+    is_text_mode = job_metadata.get("text_mode", False)
+
+    # Use the variables as per your needs
+```
+
+<Note>
+**`ctx.job.metadata`** contains test context from Cekura (scenario ID, run ID, test profile data, text mode flag). This is different from **`ctx.room.metadata`** which contains the LiveKit Config JSON — see the [room metadata example above](#configure-livekit-credentials).
+</Note>
+
 ## Next Steps
 
 - [Custom metrics](/documentation/key-concepts/metrics/custom-metrics)

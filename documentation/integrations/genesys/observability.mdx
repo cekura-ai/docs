@@ -1,0 +1,118 @@
+---
+title: "Observability"
+sidebarTitle: "Genesys Observability"
+icon: "chart-pie"
+iconType: "regular"
+description: "Connect Genesys Cloud to fetch transcripts, summaries, and wrap-up codes from your contact center"
+---
+
+## Overview
+
+This guide walks you through connecting Genesys Cloud to Cekura's observability suite. Once configured, Cekura automatically fetches conversation data—transcripts, AI-generated summaries, wrap-up codes, and knowledge base article suggestions—directly from your contact center using OAuth credentials.
+
+## Prerequisites
+
+- A Cekura account
+- A Genesys Cloud account with API access
+- OAuth credentials from Genesys Cloud (Client ID and Client Secret)
+- Your Genesys Cloud region
+
+## Setup
+
+<Steps>
+  <Step title="Create OAuth credentials in Genesys Cloud">
+    In your Genesys Cloud Admin console:
+
+    1. Navigate to **Admin > Integrations > OAuth**
+    2. Click **Add Client**
+    3. Enter a name for your OAuth client (e.g., "Cekura Integration")
+    4. Select **Client Credentials** as the grant type
+    5. Add the following roles to the client:
+       - `analytics:conversationDetail:view`
+       - `speechAndTextAnalytics:data:view`
+       - `assistants:copilot:view`
+    6. Save and note down the **Client ID** and **Client Secret**
+  </Step>
+  <Step title="Identify your Genesys Cloud region">
+    Genesys Cloud uses region-specific API endpoints. Common regions include:
+
+    | Region | Domain |
+    |--------|--------|
+    | US East (N. Virginia) | `mypurecloud.com` |
+    | US West (Oregon) | `usw2.pure.cloud` |
+    | Canada | `cac1.pure.cloud` |
+    | Europe (Ireland) | `mypurecloud.ie` |
+    | Europe (Frankfurt) | `mypurecloud.de` |
+    | Europe (London) | `euw2.pure.cloud` |
+    | Asia Pacific (Sydney) | `mypurecloud.com.au` |
+    | Asia Pacific (Tokyo) | `mypurecloud.jp` |
+
+    For a complete list, see the [Genesys Cloud regions documentation](https://developer.genesys.cloud/platform/api/).
+  </Step>
+  <Step title="Add credentials to Cekura">
+    In your Cekura Agent Settings page:
+
+    1. Set the **Transcript Provider** to **Genesys**
+    2. Enter your Genesys **Client Secret**
+    3. In the additional data fields, provide:
+       - `client_id`: Your OAuth client ID
+       - `region`: Your Genesys Cloud region domain (e.g., `cac1.pure.cloud`)
+    4. Click **Save**
+  </Step>
+  <Step title="Test your integration">
+    Run a test call. Cekura automatically matches the conversation in Genesys Cloud and fetches the transcript data.
+  </Step>
+</Steps>
+
+## Data Retrieved
+
+When Cekura matches a conversation in Genesys Cloud, it retrieves:
+
+| Data Type | Description |
+|-----------|-------------|
+| **Transcript** | Full conversation transcript with speaker roles, timestamps, and confidence scores |
+| **Summary** | AI-generated conversation summary including reason for contact and resolution |
+| **Wrap-up Codes** | Predicted wrap-up codes with confidence scores |
+| **Knowledge Articles** | KB article suggestions surfaced during the conversation |
+| **Extracted Entities** | Entities extracted from the conversation (e.g., account numbers) |
+
+## How Conversation Matching Works
+
+Cekura matches test calls to Genesys Cloud conversations using:
+
+1. **Duration matching** — Conversations with similar duration (within tolerance)
+2. **Phone number similarity** — Matching ANI/DNIS numbers from the call
+3. **Transcript similarity** — Comparing conversation content when multiple matches exist
+
+The system uses a similarity threshold to ensure accurate matching. If no match meets the threshold, Cekura falls back to its standard transcript format.
+
+## Known Limitations
+
+<Warning>
+Genesys Cloud analytics data may take up to 90 seconds to become available after a call ends. Cekura automatically retries with delays to account for this processing time.
+</Warning>
+
+- OAuth client credentials must have the appropriate API permissions
+- Transcript data requires Genesys Cloud's speech-to-text processing to be enabled
+- Summary and wrap-up code features require Genesys Cloud AI to be enabled for your organization
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Transcript not appearing">
+    - Verify your OAuth credentials have the required permissions
+    - Check that your region domain is correct
+    - Ensure speech-to-text is enabled in your Genesys Cloud organization
+    - Wait at least 2 minutes after a call ends for analytics to process
+  </Accordion>
+  <Accordion title="Authentication errors">
+    - Confirm your Client ID and Client Secret are correct
+    - Verify the region domain matches your Genesys Cloud instance
+    - Check that the OAuth client hasn't been disabled or deleted
+  </Accordion>
+  <Accordion title="No conversation match found">
+    - Verify the phone numbers used in testing match those in Genesys Cloud
+    - Check that the call duration is long enough to match
+    - Ensure the call was processed by Genesys Cloud (not filtered by queues or IVR)
+  </Accordion>
+</AccordionGroup>

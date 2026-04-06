@@ -1,0 +1,126 @@
+---
+title: "Conditional Actions"
+sidebarTitle: "Conditional Actions"
+icon: "code-branch"
+iconType: "regular"
+description: "Build dynamic, rule-based evaluators that adapt their behavior based on what your agent says"
+---
+
+## What You'll Learn
+
+How to create Conditional Actions evaluators — evaluators that branch and respond differently based on your agent's responses, rather than following a linear script.
+
+## When to Use Conditional Actions
+
+Standard evaluators follow a single set of instructions. Conditional Actions evaluators can handle **branching conversations**:
+
+- Test decision trees (e.g., refund approved vs. denied)
+- Simulate IVR navigation with DTMF tones
+- Handle multi-path workflows where the next step depends on the agent's response
+- Test error handling with specific edge case inputs
+
+## Structure
+
+A Conditional Actions evaluator has two parts:
+
+### 1. Role
+
+Who the evaluator is pretending to be:
+
+```json
+{
+  "role": "You are a customer calling to cancel an appointment"
+}
+```
+
+### 2. Conditions
+
+An array of if-then rules. Each condition has:
+- **When** (condition) — what triggers this action
+- **What** (action) — what the evaluator should do
+
+```json
+{
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "",
+      "action": "Hi, I need to cancel my appointment",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent asks for your name",
+      "action": "Provide your name"
+    },
+    {
+      "id": 2,
+      "condition": "The agent confirms the cancellation",
+      "action": "Thank them and end the call"
+    }
+  ]
+}
+```
+
+## Key Concepts
+
+### First Message (id: 0)
+
+The `id: 0` condition is always the opening message. It always uses `fixed_message: true` — the exact text is sent as-is.
+
+### Fixed Message vs. Instructions
+
+| `fixed_message` | Behavior | Use When |
+|-----------------|----------|----------|
+| `false` (default) | Evaluator interprets the action as instructions and generates a natural response | Most conditions — you want natural, varied responses |
+| `true` | Evaluator sends the exact text word-for-word | You need precise wording, DTMF tones, or special tags |
+
+### Action Followups
+
+Chain multiple actions after a single trigger using `type: "action_followup"`:
+
+```json
+{
+  "id": 2,
+  "type": "action_followup",
+  "condition": 1,
+  "action": "Also mention you need a confirmation email"
+}
+```
+
+### Special Tags
+
+With `fixed_message: true`, you can use tags to control the conversation:
+
+| Tag | Purpose | Example |
+|-----|---------|---------|
+| `<dtmf digits="2" />` | Send DTMF tones | IVR menu selection |
+| `<endcall />` | End the call | Concluding the conversation |
+| `<silence time="2s" />` | Add a pause | Simulating thinking |
+| `<ivr text="..." />` | Play non-interruptible audio | IVR greetings |
+| `<voicemail />` | Play voicemail with beep | Voicemail testing |
+| `<send_sms text="..." />` | Trigger an SMS | Multi-channel flows |
+
+## Example: IVR Navigation
+
+```json
+{
+  "role": "You are a customer calling support",
+  "conditions": [
+    { "id": 0, "condition": "", "action": "", "fixed_message": true },
+    { "id": 1, "condition": "The IVR plays the menu", "action": "<dtmf digits=\"2\" />", "fixed_message": true },
+    { "id": 2, "condition": "The agent asks how they can help", "action": "Explain your billing issue" },
+    { "id": 3, "condition": "The agent asks for account number", "action": "<dtmf digits=\"123456#\" />", "fixed_message": true }
+  ]
+}
+```
+
+## What's Next
+
+<Card title="Infra & Red Teaming" icon="shield-halved" href="/documentation/university/testing/infra-red-teaming" horizontal>
+  Validate infrastructure reliability and test against adversarial attacks →
+</Card>
+
+<Note>
+For the full reference including all supported tags and patterns, see [Conditional Actions](/documentation/key-concepts/evaluators/conditional-actions).
+</Note>

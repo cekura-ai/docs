@@ -245,6 +245,50 @@ Poll for results using the [List Runs with IDs API](/api-reference/test_framewor
 </Tab>
 </Tabs>
 
+## Accessing Test Profile Data in Your Agent
+
+In the automated flow, Cekura creates the Pipecat session on your behalf. When a [test profile](/documentation/key-concepts/evaluators/test-profile) is assigned to the scenario, Cekura injects the test profile data into the **session configuration** (Agent Configuration JSON) under the `test_profile_data` key.
+
+### Session Data Structure
+
+Your agent receives the Agent Configuration JSON via `SessionParams.data`. When a test profile is attached, the data includes:
+
+```json
+{
+  "your_existing_config_key": "value",
+  "test_profile_data": {
+    "user_name": "John Doe",
+    "user_email": "john@example.com",
+    "account_id": "ACC-12345"
+  }
+}
+```
+
+| Field | Type | Included When |
+|-------|------|---------------|
+| `test_profile_data` | object | Only when a [test profile](/documentation/key-concepts/evaluators/test-profile) is assigned to the scenario |
+
+### Extracting Test Profile Data in Your Agent
+
+Access the test profile data from the session configuration in your Pipecat agent:
+
+```python
+from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIProcessor
+
+async def main(session_data: dict):
+    # session_data is the Agent Configuration JSON passed by Cekura
+    test_profile_data = session_data.get("test_profile_data", {})
+
+    user_name = test_profile_data.get("user_name", "")
+    account_id = test_profile_data.get("account_id", "")
+
+    # Use the variables to customize your agent behavior
+```
+
+<Note>
+The `test_profile_data` key is added to the same Agent Configuration JSON you configure in your agent settings. Your existing configuration keys are preserved — Cekura only adds the `test_profile_data` key alongside them.
+</Note>
+
 ## Key Terminology
 
 - **Pipecat Cloud**: The hosted platform for deploying and managing Pipecat agents. Get your API key at [pipecat.daily.co](https://pipecat.daily.co/)

@@ -18,21 +18,382 @@ Follow these steps to set up custom observability for your voice agents:
     \
     **Home > Settings > API**
 
-    ![Navigate to API Keys](/images/settings-api.png)
+    <img src="/images/settings-api.png" alt="Navigate to API Keys" width="400" />
   </Step>
   <Step title="Create an agent">
     Navigate to the dashboard and create an agent. This agent will be responsible for collecting and sending data to the observability platform.
 
-    ![Create Agent](/images/createanagent.png)
+    <img src="/images/createanagent.png" alt="Create Agent" width="500" />
   </Step>
   <Step title="Define metrics">
     Go to [dashboard.cekura.ai](https://dashboard.cekura.ai) and select your agent to start creating metrics. These metrics will help you monitor and analyze the performance of your systems.
 
-    ![Create Metric](/images/create-metric.png)
+    <img src="/images/create-metric.png" alt="Create Metric" width="500" />
   </Step>
   <Step title="Start pushing logs">
-    Use our API to start pushing logs to the observability platform. This will allow you to track and analyze log data in real-time, providing deeper insights into your system's operations.
+    Choose your voice provider below to forward call data to Cekura's observability suite.
+
+## Connect your Providers
+
+<Tabs>
+  <Tab title="Custom API">
+    <CodeGroup>
+      ```python Python
+      import requests
+
+      # Send call data to Cekura observability
+      url = 'https://api.cekura.ai/observability/v1/observe/'
+      headers = {
+          'X-CEKURA-API-KEY': '<your_cekura_api_key>',
+          'Content-Type': 'application/json'
+      }
+      data = {
+          'agent': '<agent_id_in_cekura>',
+          'voice_recording_url': '<url_to_call_recording>',
+          'transcript_type': 'custom',
+          'transcript_json': [
+              {
+                  'role': 'user',
+                  'content': 'Hello, I want to book an appointment.',
+                  'start_time': 0.5,
+                  'end_time': 2.3
+              },
+              {
+                  'role': 'assistant',
+                  'content': 'Sure, what time works for you?',
+                  'start_time': 2.5,
+                  'end_time': 4.1
+              }
+          ],
+          'call_id': '<unique_call_identifier>',
+          'call_ended_reason': '<reason_for_call_end>'
+      }
+
+      response = requests.post(url, headers=headers, json=data)
+      ```
+
+      ```javascript Node.js
+      const axios = require('axios');
+
+      // Send call data to Cekura observability
+      const url = 'https://api.cekura.ai/observability/v1/observe/';
+      const headers = {
+        'X-CEKURA-API-KEY': '<your_cekura_api_key>',
+        'Content-Type': 'application/json'
+      };
+      const data = {
+        agent: '<agent_id_in_cekura>',
+        voice_recording_url: '<url_to_call_recording>',
+        transcript_type: 'custom',
+        transcript_json: [
+          {
+            role: 'user',
+            content: 'Hello, I want to book an appointment.',
+            start_time: 0.5,
+            end_time: 2.3
+          },
+          {
+            role: 'assistant',
+            content: 'Sure, what time works for you?',
+            start_time: 2.5,
+            end_time: 4.1
+          }
+        ],
+        call_id: '<unique_call_identifier>',
+        call_ended_reason: '<reason_for_call_end>'
+      };
+
+      const response = await axios.post(url, data, { headers });
+      ```
+    </CodeGroup>
+  </Tab>
+
+  <Tab title="Vapi">
+    <Tabs>
+      <Tab title="Code">
+        <CodeGroup>
+          ```python Python
+          import requests
+
+          # Forward VAPI webhook response to Cekura
+          url = 'https://api.cekura.ai/observability/v1/observe/'
+          headers = {
+              'X-CEKURA-API-KEY': '<your_cekura_api_key>',
+              'Content-Type': 'application/json'
+          }
+          data = {
+              'agent': '<agent_id_in_cekura>',
+              'voice_recording_url': vapi_response["stereoRecordingUrl"],
+              'transcript_type': 'vapi',
+              'transcript_json': vapi_response["messages"],
+              'call_id': vapi_response["id"],
+              'call_ended_reason': vapi_response["endedReason"]
+          }
+
+          response = requests.post(url, headers=headers, json=data)
+          ```
+
+          ```javascript Node.js
+          const axios = require('axios');
+
+          // Forward VAPI webhook response to Cekura
+          const url = 'https://api.cekura.ai/observability/v1/observe/';
+          const headers = {
+            'X-CEKURA-API-KEY': '<your_cekura_api_key>',
+            'Content-Type': 'application/json'
+          };
+          const data = {
+            agent: '<agent_id_in_cekura>',
+            voice_recording_url: vapiResponse.stereoRecordingUrl,
+            transcript_type: 'vapi',
+            transcript_json: vapiResponse.messages,
+            call_id: vapiResponse.id,
+            call_ended_reason: vapiResponse.endedReason
+          };
+
+          const response = await axios.post(url, data, { headers });
+          ```
+        </CodeGroup>
+      </Tab>
+
+      <Tab title="No Code">
+        <Steps>
+          <Step title="Get your Cekura API Key">
+            Navigate to the [API keys](https://dashboard.cekura.ai/dashboard/settings/org/api-key) section in your Cekura dashboard settings. If you don't have an API key yet, create a new one. Copy the API key value as you'll need it to authenticate your requests to Cekura's observability API.
+
+            ![Cekura API Key Configuration](/images/Cekura_credentials.png)
+          </Step>
+          <Step title="Add Cekura credentials to VAPI">
+            In your VAPI dashboard, navigate to [integrations](https://dashboard.vapi.ai/settings/integrations/custom-credential) in your account settings and add custom integration with the following details:
+            - Auth type: Bearer token
+            - Credential name: Cekura API key
+            - Token: Your Cekura API key
+            - Header name: X-CEKURA-API-KEY
+            - Include bearer prefix: No
+
+            ![VAPI Cekura Credentials Configuration](/images/Vapi_custom_credentials.png)
+          </Step>
+          <Step title="Configure Server URL in VAPI">
+            In your VAPI dashboard, navigate to your agent settings and configure the Server URL and authorization header you created in the previous step. This URL is used for all communication between your application and VAPI, including context retrieval, function calls, and end-of-call reporting.
+
+            Set the Server URL to:
+
+            ```
+            https://api.cekura.ai/observability/v1/vapi/observe/?agent_id=YOUR_AGENT_ID
+            ```
+
+            ![VAPI Server URL Configuration](/images/Vapi_observability.png)
+          </Step>
+          <Step title="Get your Assistant ID">
+            Each VAPI agent has a unique Assistant ID that identifies your specific implementation. Copy your Assistant ID from the VAPI dashboard:
+
+            ![VAPI Assistant ID](/images/vapi-assistant-id.png)
+          </Step>
+          <Step title="Add credentials to Cekura">
+            In your Cekura Agent Settings page:
+
+            1. Add the API key from VAPI with the tag `webhook`
+            2. Copy and add your `agent ID` from VAPI
+
+            ![Navigate to API Keys](/images/vapi_agentsettings.png)
+          </Step>
+          <Step title="Test your integration">
+            Make a test call from VAPI (phone number based or webcall). Your calls should now appear in the Cekura observability `Calls` section.
+          </Step>
+        </Steps>
+      </Tab>
+    </Tabs>
+  </Tab>
+
+  <Tab title="ElevenLabs">
+    <Tabs>
+      <Tab title="Code">
+        <CodeGroup>
+          ```python Python
+          import requests
+          import json
+
+          # Download audio from ElevenLabs
+          ELEVENLABS_API_KEY = "your_elevenlabs_api_key"
+          ELEVENLABS_API_BASE_URL = "https://api.elevenlabs.io/v1"
+          conversation_id = "your_conversation_id"
+
+          url_audio = f"{ELEVENLABS_API_BASE_URL}/convai/conversations/{conversation_id}/audio"
+          headers_audio = {"xi-api-key": ELEVENLABS_API_KEY}
+          audio_response = requests.get(url_audio, headers=headers_audio)
+          audio_content = audio_response.content if audio_response.status_code == 200 else None
+
+          # Send to Cekura
+          CEKURA_API_KEY = "your_cekura_api_key"
+          CEKURA_AGENT_ID = "your_cekura_agent_id"
+          url_cekura = "https://api.cekura.ai/observability/v1/observe/"
+          headers_cekura = {"X-CEKURA-API-KEY": CEKURA_API_KEY}
+          data = {
+              "agent": CEKURA_AGENT_ID,
+              "call_id": conversation_id,
+              "transcript_type": "elevenlabs",
+              "transcript_json": json.dumps(transcript_data)
+          }
+          files = {
+              "voice_recording": (f"elevenlabs_recording_{conversation_id}.mp3", audio_content, "audio/mpeg")
+          }
+          response = requests.post(url_cekura, headers=headers_cekura, data=data, files=files)
+          ```
+
+          ```javascript Node.js
+          const axios = require('axios');
+          const FormData = require('form-data');
+
+          // Download audio from ElevenLabs
+          const ELEVENLABS_API_KEY = 'your_elevenlabs_api_key';
+          const ELEVENLABS_API_BASE_URL = 'https://api.elevenlabs.io/v1';
+          const conversationId = 'your_conversation_id';
+
+          const audioResponse = await axios.get(
+            `${ELEVENLABS_API_BASE_URL}/convai/conversations/${conversationId}/audio`,
+            { headers: { 'xi-api-key': ELEVENLABS_API_KEY }, responseType: 'arraybuffer' }
+          );
+          const audioContent = audioResponse.status === 200 ? audioResponse.data : null;
+
+          // Send to Cekura
+          const CEKURA_API_KEY = 'your_cekura_api_key';
+          const CEKURA_AGENT_ID = 'your_cekura_agent_id';
+          const form = new FormData();
+          form.append('agent', CEKURA_AGENT_ID);
+          form.append('call_id', conversationId);
+          form.append('transcript_type', 'elevenlabs');
+          form.append('transcript_json', JSON.stringify(transcriptData));
+          form.append('voice_recording', Buffer.from(audioContent), {
+            filename: `elevenlabs_recording_${conversationId}.mp3`,
+            contentType: 'audio/mpeg'
+          });
+
+          const response = await axios.post(
+            'https://api.cekura.ai/observability/v1/observe/',
+            form,
+            { headers: { 'X-CEKURA-API-KEY': CEKURA_API_KEY, ...form.getHeaders() } }
+          );
+          ```
+        </CodeGroup>
+      </Tab>
+
+      <Tab title="No Code">
+        <Steps>
+          <Step title="Configure webhook URL in ElevenLabs">
+            In your ElevenLabs dashboard, navigate to your agent settings and configure the observability webhook URL:
+
+            ```
+            https://api.cekura.ai/observability/v1/elevenlabs/observe/
+            ```
+
+            ![ElevenLabs Observability Configuration](/images/elevenlabs-observe.png)
+          </Step>
+          <Step title="Verify ElevenLabs API key and Agent ID">
+            Go to the API keys section in your ElevenLabs dashboard and ensure you have at least one API key configured. Also note your Agent ID from the dashboard:
+
+            ![ElevenLabs API Key Configuration](/images/elevenlabs-api-key.png)
+            ![ElevenLabs Agent ID](/images/elevenlabs-agent.png)
+          </Step>
+          <Step title="Add credentials to Cekura">
+            In your Cekura Agent Settings page, add the API key from ElevenLabs and ensure you have copied your `agent ID` from ElevenLabs:
+
+            ![ElevenLabs Agent Settings](/images/elevenlabs-agent-setting.png)
+          </Step>
+          <Step title="Test your integration">
+            Make a test call from ElevenLabs (phone number based or webcall). Your calls should now appear in the Cekura observability `Calls` section.
+          </Step>
+        </Steps>
+      </Tab>
+    </Tabs>
+  </Tab>
+
+  <Tab title="Retell">
+    <Tabs>
+      <Tab title="Code">
+        <CodeGroup>
+          ```python Python
+          import requests
+
+          # Forward Retell webhook response to Cekura
+          url = 'https://api.cekura.ai/observability/v1/observe/'
+          headers = {
+              'X-CEKURA-API-KEY': '<your_cekura_api_key>',
+              'Content-Type': 'application/json'
+          }
+          data = {
+              'agent': '<agent_id_in_cekura>',
+              'voice_recording_url': retell_response['recording_multi_channel_url'],
+              'transcript_type': 'retell',
+              'transcript_json': retell_response['transcript_with_tool_calls'],
+              'call_id': retell_response['call_id'],
+              'call_ended_reason': retell_response['disconnection_reason']
+          }
+
+          response = requests.post(url, headers=headers, json=data)
+          ```
+
+          ```javascript Node.js
+          const axios = require('axios');
+
+          // Forward Retell webhook response to Cekura
+          const url = 'https://api.cekura.ai/observability/v1/observe/';
+          const headers = {
+            'X-CEKURA-API-KEY': '<your_cekura_api_key>',
+            'Content-Type': 'application/json'
+          };
+          const data = {
+            agent: '<agent_id_in_cekura>',
+            voice_recording_url: retellResponse.recording_multi_channel_url,
+            transcript_type: 'retell',
+            transcript_json: retellResponse.transcript_with_tool_calls,
+            call_id: retellResponse.call_id,
+            call_ended_reason: retellResponse.disconnection_reason
+          };
+
+          const response = await axios.post(url, data, { headers });
+          ```
+        </CodeGroup>
+      </Tab>
+
+      <Tab title="No Code">
+        <Steps>
+          <Step title="Configure webhook URL in Retell">
+            In your Retell dashboard, add the observability webhook URL:
+
+            ```
+            https://api.cekura.ai/observability/v1/retell/observe/
+            ```
+
+            You can configure the webhook at either level:
+            - **Setting Webhook at Agent level:** Navigate to your agent settings and add the webhook URL for a specific agent.
+
+              ![Retell Observability Configuration - Agent Level](/images/retell-observe.png)
+
+            - **Setting Webhook at Workspace level:** Navigate to your workspace settings and add the webhook URL for all agents in the workspace.
+
+              ![Retell Observability Configuration - Workspace Level](/images/retell/retell-workspace-webhook-configuration.png)
+          </Step>
+          <Step title="Verify Retell API key">
+            Go to the API keys section in your Retell dashboard. Create/ensure you have at least one API key configured with the webhook tag set.
+
+            ![Retell API Key Configuration](/images/retell/retell-api-key-with-webhook-tag.png)
+          </Step>
+          <Step title="Add credentials to Cekura">
+            In your Cekura Agent Settings page:
+
+            1. Add the API key from Retell with the tag `webhook`
+            2. Copy and add your `agent ID` from Retell
+
+            ![images/Screenshot2025-03-17at11.35.20AM.png](/images/Screenshot2025-03-17at11.35.20AM.png)
+          </Step>
+          <Step title="Test your integration">
+            Make a test call from Retell (phone number based or webcall). Your calls should now appear in the Cekura observability `Calls` section.
+          </Step>
+        </Steps>
+      </Tab>
+    </Tabs>
+  </Tab>
+</Tabs>
+
   </Step>
 </Steps>
-
-For detailed implementation examples and API specifications, refer to our [API Introduction](/api-reference/observability/post-observabilityv1observe).

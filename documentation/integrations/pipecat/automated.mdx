@@ -247,46 +247,38 @@ Poll for results using the [List Runs with IDs API](/api-reference/test_framewor
 
 ## Accessing Test Profile Data in Your Agent
 
-In the automated flow, Cekura creates the Pipecat session on your behalf. When a [test profile](/documentation/key-concepts/evaluators/test-profile) is assigned to the scenario, Cekura injects the test profile data into the **session configuration** (Agent Configuration JSON) under the `test_profile_data` key.
+In the automated flow, Cekura creates the Pipecat session on your behalf. When a [test profile](/documentation/key-concepts/evaluators/test-profile) is assigned to the scenario, Cekura **flattens** the test profile fields directly into the **Agent Configuration JSON** (`SessionParams.data`). This means your agent can access test profile values as top-level keys — no custom extraction needed.
 
 ### Session Data Structure
 
-Your agent receives the Agent Configuration JSON via `SessionParams.data`. When a test profile is attached, the data includes:
+Your agent receives the Agent Configuration JSON via `SessionParams.data`. When a test profile is attached, its fields are merged directly into the config:
 
 ```json
 {
   "your_existing_config_key": "value",
-  "test_profile_data": {
-    "user_name": "John Doe",
-    "user_email": "john@example.com",
-    "account_id": "ACC-12345"
-  }
+  "user_name": "John Doe",
+  "user_email": "john@example.com",
+  "account_id": "ACC-12345"
 }
 ```
 
-| Field | Type | Included When |
-|-------|------|---------------|
-| `test_profile_data` | object | Only when a [test profile](/documentation/key-concepts/evaluators/test-profile) is assigned to the scenario |
+If a test profile key matches an existing key in the Agent Configuration, the test profile value takes precedence.
 
-### Extracting Test Profile Data in Your Agent
+### Accessing Test Profile Fields in Your Agent
 
-Access the test profile data from the session configuration in your Pipecat agent:
+Since test profile fields are top-level keys, access them directly from the session data:
 
 ```python
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIProcessor
-
 async def main(session_data: dict):
-    # session_data is the Agent Configuration JSON passed by Cekura
-    test_profile_data = session_data.get("test_profile_data", {})
-
-    user_name = test_profile_data.get("user_name", "")
-    account_id = test_profile_data.get("account_id", "")
+    # Test profile fields are merged directly into session_data
+    user_name = session_data.get("user_name", "")
+    account_id = session_data.get("account_id", "")
 
     # Use the variables to customize your agent behavior
 ```
 
 <Note>
-The `test_profile_data` key is added to the same Agent Configuration JSON you configure in your agent settings. Your existing configuration keys are preserved — Cekura only adds the `test_profile_data` key alongside them.
+Test profile fields are flattened into the same Agent Configuration JSON you configure in your agent settings. If a test profile key has the same name as an existing config key, the test profile value will override it. This lets you use your Agent Configuration as defaults that get overridden per-scenario via test profiles.
 </Note>
 
 ## Key Terminology

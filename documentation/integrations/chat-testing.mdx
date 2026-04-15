@@ -188,6 +188,27 @@ Use voice testing for ASR/TTS validation and final production checks.
     }
     ```
 
+    Message with metadata:
+    ```json
+    {
+      "content": "Hello! How can I help you today?",
+      "metadata": {
+        "customer_id": "cust_123",
+        "session_type": "support"
+      }
+    }
+    ```
+
+    Metadata-only message (no conversation response triggered):
+    ```json
+    {
+      "metadata": {
+        "internal_call_id": "abc-123",
+        "region": "us-west-2"
+      }
+    }
+    ```
+
     Function call:
     ```json
     {
@@ -257,8 +278,6 @@ Use voice testing for ASR/TTS validation and final production checks.
     <Info>
     When your server receives a message with `"type": "end_call"`, the conversation is ending. Your server can handle cleanup and connection closure gracefully.
     </Info>
-
-    See [Custom Integration Guide](/documentation/integrations/custom-integration) for complete message format details.
   </Step>
 
   <Step title="Expose Server">
@@ -337,6 +356,65 @@ Only fields starting with `X-` are sent as headers. Other fields remain availabl
 - Pre-load customer/user data before conversation starts
 - Route to specific handlers based on account tier or customer type
 - Initialize session context with user preferences
+
+### Metadata
+
+Your WebSocket server can attach metadata to a run by including a `metadata` field in any message sent to Cekura. Metadata is useful for passing contextual information like internal IDs, environment details, or customer attributes that you want associated with the test run.
+
+**Sending metadata with a message:**
+```json
+{
+  "content": "Hello! How can I help you today?",
+  "metadata": {
+    "customer_id": "cust_123",
+    "session_type": "support"
+  }
+}
+```
+
+**Sending metadata without a message:**
+
+You can send a metadata-only message (no `role` or `content`) at any point during the conversation. This attaches the metadata to the run without triggering a response from the testing agent:
+
+```json
+{
+  "metadata": {
+    "internal_call_id": "abc-123",
+    "region": "us-west-2"
+  }
+}
+```
+
+**Behavior:**
+- Metadata must be a JSON object. Non-object values are ignored.
+- Metadata is merged across messages using **last-write-wins** — if you send the same key in multiple messages, the latest value is kept.
+
+**Python example:**
+```python
+import json
+
+async def handle_connection(websocket, path):
+    # Send metadata at the start of the conversation
+    await websocket.send(json.dumps({
+        "metadata": {
+            "internal_session_id": "sess_abc",
+            "environment": "staging"
+        }
+    }))
+
+    async for message in websocket:
+        data = json.loads(message)
+        response = generate_response(data["content"])
+
+        # Send response with additional metadata
+        await websocket.send(json.dumps({
+            "content": response,
+            "metadata": {
+                "model_used": "gpt-4o",
+                "response_latency_ms": 342
+            }
+        }))
+```
 
 </Tab>
 

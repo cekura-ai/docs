@@ -1,0 +1,124 @@
+---
+title: "Triggers & Python Metrics"
+sidebarTitle: "Triggers & Python"
+icon: "code"
+iconType: "regular"
+description: "Control when metrics run with triggers, and write custom evaluation logic in Python"
+---
+
+## What You'll Learn
+
+How to use triggers to run metrics conditionally, and how to write Python metrics for evaluation logic that goes beyond natural language descriptions.
+
+## Metric Triggers
+
+By default, metrics run on every call. Triggers let you control **when** a metric runs.
+
+### Setting Triggers
+
+In the metric builder, under **Evaluation Trigger**:
+
+- **Always** (default) — runs on every call
+- **Custom** — define a condition that must be true for the metric to run
+
+Custom triggers can be:
+
+1. **Natural language** — describe when the metric should run (e.g., "Only run when the agent attempts to book an appointment")
+2. **Python code** — write code that returns `True` or `False`
+
+**Example Python trigger:**
+```python
+# Only run this metric on calls longer than 60 seconds
+return data["call_duration"] > 60
+```
+
+Triggers save cost and reduce noise by skipping metrics that aren't relevant to a particular call.
+
+## Python Metrics
+
+When LLM Judge descriptions aren't enough, write evaluation logic directly in Python.
+
+### How It Works
+
+Your Python code runs in a secure environment with access to all call data. You must set two output variables:
+
+- **`_result`** — the evaluation outcome (boolean, number, string, etc.)
+- **`_explanation`** — why the result is what it is
+
+### Simple Example
+
+```python
+# Check if the agent mentioned "Premium Plan"
+transcript = data["transcript"].lower()
+if "premium plan" in transcript:
+    _result = True
+    _explanation = "Agent mentioned the Premium Plan"
+else:
+    _result = False
+    _explanation = "Agent did not mention the Premium Plan"
+```
+
+### Latency Threshold Example
+
+```python
+THRESHOLD = 2000  # ms
+
+latency_data = data["latency_data"]
+violations = [item for item in latency_data if item["latency"] > THRESHOLD]
+
+if not violations:
+    _result = True
+    _explanation = f"All responses under {THRESHOLD}ms"
+else:
+    _result = False
+    _explanation = f"{len(violations)} responses exceeded {THRESHOLD}ms"
+```
+
+### Available Data
+
+Your Python code has access to everything via the `data` dictionary:
+
+| Variable | Description |
+|----------|-------------|
+| `data["transcript"]` | Full transcript as formatted string |
+| `data["transcript_json"]` | Structured transcript with timing |
+| `data["call_duration"]` | Duration in seconds |
+| `data["call_end_reason"]` | Why the call ended |
+| `data["metadata"]` | Metadata dictionary |
+| `data["latency_data"]` | Per-turn latency information |
+| `data["Average Latency (in ms)"]` | Average response latency |
+| `data["Metric Name"]` | Result of any previously evaluated metric |
+
+### Calling LLM Judge from Python
+
+Combine Python logic with LLM evaluation:
+
+```python
+key = "your_api_key"
+
+# Use Python to filter, then LLM to evaluate
+if "main" not in data["call_end_reason"].lower():
+    _result = 5
+    _explanation = "Call ended by customer, not agent"
+else:
+    description = "Did the Main Agent end the call prematurely?"
+    response = evaluate_llm_judge_metric(
+        data, key, description, "binary_workflow_adherence"
+    )
+    _result = response.get("result")
+    _explanation = response.get("explanation")
+```
+
+<Note>
+Python metrics execute **after** all LLM Judge metrics. This means you can access the results of other metrics in your Python code via `data["Metric Name"]`.
+</Note>
+
+## What's Next
+
+<Card title="Dashboards & Alerting" icon="chart-mixed" href="/university/observability/dashboards-alerting" horizontal>
+  Visualize trends and get notified when things go wrong →
+</Card>
+
+<Note>
+For the full Python metric reference, see [Python Metric](/documentation/key-concepts/metrics/python-metric).
+</Note>

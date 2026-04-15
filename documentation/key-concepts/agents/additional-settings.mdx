@@ -1,0 +1,129 @@
+---
+title: "Additional Settings"
+sidebarTitle: "Additional Settings"
+icon: "sliders"
+iconType: "regular"
+description: "Configure transcript enrichment, knowledge base, mock tools, dynamic variables, and inbound/outbound mode"
+---
+
+These settings are optional but can significantly improve your testing and observability experience.
+
+## Enriching Transcripts with Tool Calls
+
+By default, Cekura captures the conversation transcript between the caller and your agent. To also capture **tool calls** (function calls your agent makes to external APIs and databases during the conversation), you need to configure your provider's integration.
+
+Tool call data in your transcripts lets you:
+- Verify that your agent called the right tools with the right arguments
+- See what data the tools returned and how the agent used it
+- Create metrics that evaluate tool call behavior (e.g., "did the agent look up the patient before booking?")
+
+<Tabs>
+  <Tab title="Provider Integration (Recommended)">
+    If you use Retell, VAPI, or ElevenLabs, their native integrations automatically include tool calls in the transcript. No extra setup needed beyond configuring the provider in [Integration Settings](/documentation/key-concepts/agents/configure-agent).
+  </Tab>
+
+  <Tab title="Custom Integration">
+    For custom setups, send tool call data alongside your transcript via the webhook. Include `function_call` and `function_call_result` message roles in your transcript payload.
+
+    Go to **Voice Integration** -> Choose **Custom** -> Copy the **Webhook URL** -> Note your **API key** for authentication.
+
+    ![Custom tool call configuration](/images/Customtoolcall.png)
+
+    See [Custom Integration](/documentation/integrations/custom-integration) for the full message format including tool calls.
+  </Tab>
+
+  <Tab title="LiveKit">
+    For LiveKit agents, install the Cekura Python SDK to capture tool calls and send enriched transcripts.
+
+    See [LiveKit Tracing](/documentation/integrations/livekit/tracing) for setup instructions.
+  </Tab>
+</Tabs>
+
+## Agent's Knowledge Base
+
+Upload files that your agent uses as a knowledge base. This allows Cekura to generate more accurate evaluators by understanding the information your agent can reference.
+
+Go to **Agent's Knowledge** -> **Upload** knowledge base files.
+
+<img
+  src="/images/KnowledgeBase.png"
+  alt="Knowledge base upload"
+  style={{ width: "100%" }}
+/>
+
+Supported file types include PDFs, text files, and other document formats. The knowledge base is used by Cekura's evaluator generation to create scenarios that test whether your agent correctly retrieves and uses information from these sources.
+
+## Mock Tools
+
+Mock tools let you simulate external tool call responses during testing. Instead of hitting your real APIs or databases, your agent receives predefined responses — making tests repeatable, faster, and independent of external systems.
+
+**When to use mock tools:**
+- Testing agents that rely on external APIs or databases
+- Creating reproducible test scenarios with predictable tool responses
+- Testing edge cases (e.g., "what happens when the payment API returns declined?")
+- Avoiding dependencies on live third-party services during testing
+
+**Supported modalities:** Mock tools work with **voice**, **chat/WebSocket**, and **SIP** testing modes. For LiveKit, mock tools require manual setup with the Cekura SDK.
+
+**How to enable:**
+
+1. Go to your agent settings and scroll to the **Mock Tools** section
+2. Choose **Auto-Fetch** (recommended) to automatically pull tool configurations from your provider, or **Add Tool** to manually define mock data
+3. Configure your evaluators and run tests — your agent will receive mock responses instead of calling real endpoints
+
+See [Mock Tools](/documentation/guides/testing-agents/mock-tools) for the full setup guide, including auto-fetch, manual configuration, and restoring original tools.
+
+## Dynamic Variables
+
+Dynamic variables allow you to pass per-call context to your agent and have Cekura evaluate against it. This is useful when your agent's behavior changes based on runtime data — for example, different system prompts for different call types, or caller-specific configuration injected at call time.
+
+**Common use cases:**
+- **Multi-agent flows** — different system prompts active at different points in the call, passed as dynamic variables
+- **Per-call configuration** — feature flags, employment types, customer tiers injected at runtime
+- **Caller context** — prior call summaries, account status, or onboarding state
+
+Dynamic variables appear in your call data and can be referenced in [LLM judge metric prompts](/documentation/key-concepts/metrics/llm-judge-available-variables) using `{{dynamic_variables.keyName}}` syntax. This lets you create metrics that evaluate your agent against the specific instructions that were active for each call.
+
+See [Dynamic Agent Description](/documentation/guides/observability/dynamic-prompting) for setup details on passing dynamic variables through your provider's integration.
+
+<Info>
+Dynamic variables for observability (production call data) are different from [test profile dynamic variables](/documentation/key-concepts/evaluators/test-profile#test-profiles-as-dynamic-variables-for-the-main-agent), which pass caller context to your agent during testing. Both use the same underlying mechanism but serve different purposes.
+</Info>
+
+## Inbound vs Outbound Agents
+
+Cekura supports both inbound and outbound testing configurations. The mode determines how calls are initiated and how test profile data flows to your agent.
+
+### Inbound Agents
+
+Inbound mode is the default. Cekura **calls your agent** — the testing agent initiates a call to your agent's phone number, SIP endpoint, or WebRTC connection.
+
+- Your agent answers and the testing agent follows the evaluator instructions
+- Test profile data is provided verbally by the testing agent (e.g., stating name and DOB when asked)
+- The agent queries its own backend to verify identity — just like a real caller
+
+**Setup:** Ensure **Inbound** is set to `true` in your agent settings (this is the default).
+
+### Outbound Agents
+
+Outbound mode is for agents that **initiate calls to customers** (e.g., appointment reminders, collections, outbound sales). In this mode, your agent calls Cekura's testing agent.
+
+- Cekura provisions a phone number for the testing agent to receive the call
+- Your system initiates the outbound call to that number
+- [Test profile fields are sent to your agent as dynamic variables](/documentation/key-concepts/evaluators/test-profile#test-profiles-as-dynamic-variables-for-the-main-agent), mimicking production caller context
+
+**Setup:**
+1. Set **Inbound** to `false` in your agent settings
+2. Choose between [Auto Outbound](/documentation/guides/testing-agents/outbound-auto-call) (Cekura triggers the call via your provider) or [Manual Outbound](/documentation/guides/testing-agents/outbound-evaluators) (your script triggers the call)
+
+<Warning>
+Before running outbound tests, ensure your agent is set to outbound mode (`inbound: false`). Running outbound evaluators on an inbound agent will fail.
+</Warning>
+
+## Next Steps
+
+Your agent is fully configured. Start testing:
+
+- [Create Evaluators](/documentation/key-concepts/evaluators/overview) to define test scenarios
+- [Run Tests](/documentation/guides/testing-agents/overview) to execute evaluators against your agent
+- [Set Up Metrics](/documentation/key-concepts/metrics/overview) to evaluate call quality

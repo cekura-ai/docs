@@ -1,0 +1,105 @@
+---
+title: "RAG & Dynamic Descriptions"
+sidebarTitle: "RAG & Dynamic Descriptions"
+icon: "wand-magic-sparkles"
+iconType: "regular"
+description: "Use dynamic variables, metadata, and call context to make metrics context-aware"
+---
+
+## What You'll Learn
+
+How to make your metrics and agent descriptions context-aware by using dynamic variables, metadata, and call-specific data — a RAG-like approach where evaluation is augmented with retrieved context.
+
+## The Idea
+
+Static metric descriptions evaluate every call the same way. But in practice, your agent's behavior depends on context — which customer is calling, what instructions the agent was given, what data it has access to. Dynamic descriptions let you inject this context into your metrics.
+
+## Dynamic Agent Description
+
+Your agent description on Cekura can include `{{variable}}` placeholders that get replaced with call-specific values at evaluation time.
+
+**Example:**
+
+Agent description in Cekura:
+```
+{{prompt}}
+```
+
+When you send a call via the Observe API, include the actual prompt in `dynamic_variables`:
+
+```json
+{
+  "call_id": "call-123",
+  "dynamic_variables": {
+    "prompt": "You are a helpful customer service agent for Acme Corp..."
+  }
+}
+```
+
+Now each call is evaluated against the prompt that was actually used — not a static description.
+
+### Use Cases
+
+- **A/B testing prompts** — evaluate different prompt versions under the same agent
+- **Multi-tenant agents** — one agent with different instructions per customer
+- **Dynamic workflows** — agent behavior changes based on caller context
+
+## Dynamic Metric Descriptions
+
+Metrics can also use context variables. Use `{{variable}}` syntax in your metric description:
+
+```
+Check if the Main Agent completed all steps in
+{{metadata.instructions}} as provided by the caller.
+```
+
+### Available Variables
+
+| Variable | Source | Example |
+|----------|--------|---------|
+| `{{transcript}}` | Call transcript | Full conversation text |
+| `{{agent_description}}` | Agent's system prompt (after dynamic substitution) | The resolved prompt |
+| `{{metadata.key}}` | Metadata sent with the observe request | `{{metadata.customer_tier}}` |
+| `{{dynamic_variables.key}}` | Dynamic variables from the API | `{{dynamic_variables.prompt}}` |
+| `{{call_duration}}` | Call duration in seconds | `125.5` |
+| `{{call_end_reason}}` | Why the call ended | `customer_ended_call` |
+
+## Practical Example
+
+You have a customer service agent that follows different scripts for different departments. Instead of creating separate metrics per department:
+
+**Agent description:**
+```
+{{prompt}}
+```
+
+**Metric description:**
+```
+Evaluate whether the Main Agent followed the workflow defined in
+{{metadata.instructions}}. Check that each step was completed in order.
+```
+
+**Observe API call:**
+```json
+{
+  "call_id": "call-456",
+  "dynamic_variables": {
+    "prompt": "You are a billing support agent..."
+  },
+  "metadata": {
+    "instructions": "1. Verify identity 2. Pull up account 3. Explain charges 4. Offer payment plan"
+  }
+}
+```
+
+Now the metric evaluates each call against its specific workflow — one metric definition, infinite flexibility.
+
+## What's Next
+
+<Card title="Triggers & Python Metrics" icon="code" href="/university/observability/triggers-python-metrics" horizontal>
+  Control when metrics run and write custom evaluation logic in Python →
+</Card>
+
+<Note>
+For full details, see [Dynamic Agent Description](/documentation/guides/observability/dynamic-prompting) and [LLM Judge Available Variables](/documentation/key-concepts/metrics/llm-judge-available-variables).
+</Note>

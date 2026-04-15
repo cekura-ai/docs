@@ -1,0 +1,117 @@
+---
+title: "Test Profiles & Mock Tools"
+sidebarTitle: "Test Profiles & Mock Tools"
+icon: "id-card"
+iconType: "regular"
+description: "Give evaluators identity data and control external tool responses for predictable, end-to-end testing"
+---
+
+## What You'll Learn
+
+How to use test profiles to give evaluators a realistic identity, and mock tools to control what your agent's external tools return during testing.
+
+## Test Profiles
+
+A test profile gives your evaluator a specific identity — name, date of birth, account number, etc. This is essential when your agent needs to verify identity or look up records.
+
+### When You Need Them
+
+- Your agent asks for name, DOB, or account number
+- Your agent looks up records based on caller information
+- Your agent personalizes responses based on caller context
+
+### How to Set Up
+
+<Steps>
+  <Step title="Create Test Data in Your System">
+    Add a mock record (appointment, account, order) with specific test data.
+
+    Example: Patient "John Smith", DOB: January 1, 2000, Appointment: March 15, 2025
+  </Step>
+  <Step title="Create Matching Test Profile in Cekura">
+    Go to **Test Profiles** and create a profile with the same data.
+  </Step>
+  <Step title="Attach to Evaluator">
+    When creating or editing an evaluator, assign the test profile.
+  </Step>
+</Steps>
+
+### Template Variables
+
+Reference test profile fields directly in evaluator instructions:
+
+```
+Call to cancel the appointment scheduled for {{test_profile.appointment_date}}.
+When asked, provide your DOB: {{test_profile.date_of_birth}}.
+```
+
+<Warning>
+**Never hardcode identity data in instructions.** Names, dates, and IDs belong in test profiles. Hardcoding causes the evaluator to hallucinate incorrect values during long conversations.
+</Warning>
+
+### Test Profiles as Dynamic Variables
+
+For outbound, WebSocket, SIP, and LiveKit testing, test profile fields are automatically **sent to your main agent as dynamic variables** — mimicking what happens in production when your system passes caller context.
+
+| Testing Mode | How Data Reaches Your Agent |
+|-------------|----------------------------|
+| Outbound | `dynamic_variables` in webhook payload |
+| WebSocket | `X-` prefixed fields sent as HTTP headers |
+| SIP | `X-` prefixed fields as custom SIP headers |
+| LiveKit | All fields as job metadata |
+| Inbound (PSTN) | Evaluator speaks data verbally (like a real caller) |
+
+## Mock Tools
+
+Mock tools let you control what your agent's external tools return during testing. Instead of hitting live APIs, you define input/output mappings.
+
+### Auto-Fetch (Recommended)
+
+If you use Retell, VAPI, or ElevenLabs:
+
+<Steps>
+  <Step title="Open Mock Tools Section">
+    In Agent Settings, scroll to **Mock Tools** in the right panel.
+  </Step>
+  <Step title="Click Auto-Fetch">
+    Cekura fetches your tool configurations from your provider and generates realistic sample data.
+  </Step>
+  <Step title="Enable Mock Mode">
+    Flip the **Mock** toggle to redirect your provider's tools to Cekura's mock endpoints during testing.
+  </Step>
+</Steps>
+
+### Manual Setup
+
+For other providers or more control:
+
+1. Click **+ Add Tool** in the Mock Tools section
+2. Enter the **Tool Name** (must match your agent's tool name exactly)
+3. Add input/output mappings:
+
+```json
+[
+  {
+    "input": {"user_id": 1},
+    "output": {"name": "John Doe", "status": "active"}
+  },
+  {
+    "input": {"user_id": 2},
+    "output": {"name": "Jane Smith", "status": "premium"}
+  }
+]
+```
+
+<Tip>
+When you generate evaluators with Autogen, Cekura creates matching test profiles, dynamic variable values, and mock tool data that are all internally consistent.
+</Tip>
+
+## What's Next
+
+<Card title="Auto Improve" icon="arrow-up-right-dots" href="/university/testing/auto-improve" horizontal>
+  Use AI to automatically improve your agent prompts from test results →
+</Card>
+
+<Note>
+For full details, see [Test Profiles](/documentation/key-concepts/evaluators/test-profile) and [Mock Tools](/documentation/key-concepts/evaluators/mock-tools).
+</Note>

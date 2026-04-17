@@ -25,7 +25,11 @@ There are two ways to set up mock tools for your agent:
 
 ### Option 1: Auto-Fetch Tools (Recommended)
 
-Auto-fetch automatically retrieves your tool configurations from your provider (VAPI, Retell, or ElevenLabs), generates realistic sample mock input/output data using AI, and configures your provider's tools to use Cekura's mock endpoints—all in one click.
+Auto-fetch reads your tool configurations from your provider (VAPI, Retell, or ElevenLabs) and uses AI to generate realistic sample input/output data based on your agent's context and recent call transcripts.
+
+<Note>
+  Auto-fetch is a **read-only** operation — it fetches tool definitions and populates mock data, but does not change any URLs or settings on your provider. Use the **Mock Enable/Disable toggle** (described below) to redirect your provider's tools to Cekura's mock endpoints.
+</Note>
 
 **Prerequisites:**
 - Your agent must have a provider configured (VAPI, Retell, or ElevenLabs)
@@ -39,7 +43,7 @@ Auto-fetch automatically retrieves your tool configurations from your provider (
    - Enter your Assistant ID (or Squad ID for VAPI squads) in the provider settings
 
 2. **Open Mock Tools Section**
-   - Scroll to the bottom of the agent settings page
+   - Scroll to the right-hand panel of the agent settings page
    - Click on **Mock Tools** to expand the section
 
 3. **Click Auto-Fetch**
@@ -47,13 +51,10 @@ Auto-fetch automatically retrieves your tool configurations from your provider (
    - A confirmation dialog will appear explaining what will happen
    - Click **"Auto-Fetch"** to confirm
 
-4. **What Happens Automatically:**
+4. **What Happens:**
    - Cekura fetches all tool configurations from your provider
    - AI generates realistic sample input/output data based on your agent's context and recent call transcripts
-   - Your provider's tools are updated to point to Cekura's mock endpoints:
-     - **VAPI**: Creates cloned tools with mock URLs (original tools are preserved since VAPI tools are shared globally)
-     - **Retell**: Updates tool URLs directly in your LLM/Flow configuration
-     - **ElevenLabs**: Updates webhook tool URLs directly in your agent configuration
+   - The generated mock data is saved to your agent in Cekura — your provider's configuration is not changed at this point
 
 <Note>
   Auto-fetch supports VAPI (including squads), Retell, and ElevenLabs providers. For VAPI squads, tools from all member assistants are fetched and prefixed with the assistant name to avoid naming conflicts (e.g., `SalesAssistant_check_availability`).
@@ -61,23 +62,28 @@ Auto-fetch automatically retrieves your tool configurations from your provider (
   **LiveKit**: Auto-fetch is not supported for LiveKit. To use mock tools with LiveKit, you can manually create mock tools and integrate the Cekura SDK in your LiveKit agent. See the [LiveKit Tracing guide](/documentation/integrations/livekit/tracing) for setup instructions.
 </Note>
 
-#### Restoring Original Tools
+#### Enabling and Disabling Mock Mode
 
-After using auto-fetch, you can restore your provider's tools to their original configuration at any time:
+After running Auto-Fetch, use the **Mock** toggle to control whether your provider's tools are redirected to Cekura's mock endpoints.
 
-1. **Navigate to Mock Tools Section**
-   - Go to your agent's settings and click on **Mock Tools**
+**Mock toggle is disabled by default** — your provider's tools continue using their original URLs until you explicitly enable it.
 
-2. **Click Restore Original Tools**
-   - Click the **"Restore Original Tools"** button
-   - This will:
-     - Restore all tool URLs in your provider to their original endpoints
-     - For VAPI: Delete the cloned mock tools
-     - For Retell/ElevenLabs: Restore the original tool URLs in your configuration
-   - Your mock tool data in Cekura will be removed
+**To enable mock mode:**
+1. In the Mock Tools section, flip the **Mock** toggle to enabled
+2. A confirmation dialog will describe what will change
+3. Confirm to activate — Cekura will update your provider's tool configuration:
+   - **VAPI**: Creates cloned tools with Cekura mock URLs (original tools are preserved since VAPI tools are shared globally)
+   - **Retell**: Updates tool URLs directly in your LLM/Flow configuration
+   - **ElevenLabs**: Updates webhook tool URLs directly in your agent configuration
+
+**To disable mock mode:**
+1. Flip the **Mock** toggle back to disabled
+2. Confirm the dialog — Cekura will restore your provider's original tool configuration:
+   - **VAPI**: Deletes the cloned mock tools
+   - **Retell/ElevenLabs**: Restores the original tool URLs
 
 <Warning>
-  Restoring original tools will disconnect your provider's tools from Cekura's mock endpoints. You'll need to run auto-fetch again if you want to re-enable mock tools.
+  When mock mode is disabled, your provider's tools revert to their original endpoints. Run Auto-Fetch again if you need to refresh the mock data, then re-enable the toggle.
 </Warning>
 
 ### Option 2: Manual Setup
@@ -91,7 +97,7 @@ If you prefer to manually configure your mock tools, or need more control over t
    - Select the agent for which you want to add mock tools
 
 2. **Add Mock Tool Data**
-   - On the bottom of the right-hand side, click on **Mock Tools**
+   - On the right-hand panel, click on **Mock Tools**
    - Click **"+ Add Tool"** button to add mock tool data
    - For each tool you need to add:
      - **Tool Name**: Must be the same as mentioned in the agent description
@@ -198,9 +204,9 @@ After setting up your mock tools, create evaluators to test your agent:
 
 Execute your evaluators to test the agent with mock tools:
 
-1. **Configure Mock Tool Endpoints**
-   - **If you used Auto-Fetch**: Your provider's tools are already configured to use Cekura's mock endpoints. Skip to step 2.
-   - **If you used Manual Setup**: Configure your agent with Cekura's mock tool endpoints instead of the actual tool URLs on VAPI, Retell, or your provider. Check the [Mock Tool API documentation](/api-reference/test_framework/post-mock-tool) for endpoint details.
+1. **Enable Mock Mode**
+   - If you used Auto-Fetch: make sure the **Mock** toggle is enabled so your provider's tools are redirected to Cekura's mock endpoints
+   - If you used Manual Setup: configure your agent with Cekura's mock tool endpoints instead of the actual tool URLs on your provider. Check the [Mock Tool API documentation](/api-reference/test_framework/post-mock-tool) for endpoint details
 
 2. **Start Test Execution**
    - Select the evaluators you created

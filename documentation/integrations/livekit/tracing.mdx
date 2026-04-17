@@ -8,18 +8,17 @@ description: 'Enhanced observability for LiveKit agents using the Cekura Python 
 
 ## Overview
 
-LiveKit Tracing provides deep observability into your LiveKit agent's performance by integrating the Cekura Python SDK directly into your LiveKit agent code. This integration captures detailed metrics, conversation transcripts, tool calls, and session data that enhance the information available in the Cekura platform.
+LiveKit Tracing provides deep observability into your LiveKit agent's performance by integrating the Cekura Python SDK directly into your agent code. This integration significantly enhances the information available in the Cekura platform for end-to-end visibility over agent execution.
 
-When you integrate the SDK, Cekura receives comprehensive data about each call, including:
+**What you get:**
 
 - Complete conversation transcripts with full message history
 - Tool/function calls with inputs and outputs
 - Detailed performance metrics (STT, TTS, LLM, End-of-Utterance)
+- Session logs captured automatically from your application
 - Mock tools support for testing with predictable tool responses
 - Dual-channel audio recording for monitoring production calls
 - LiveKit job and room metadata
-
-This enhanced data appears in the Cekura UI, providing deeper insights into your agent's behavior.
 
 ## Video Tutorial
 
@@ -48,7 +47,7 @@ Use this setup in your test agents while running simulation calls from the Cekur
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install cekura==1.0.0
+pip install cekura==1.1.0rc1
 ```
 
 </Step>
@@ -80,19 +79,10 @@ async def entrypoint(ctx: agents.JobContext):
 ```
 
 **What this does:**
-- Captures transcripts, tool calls, and metrics
+- Captures transcripts, tool calls, metrics, and session logs
 - Automatically injects mock tools configured in Cekura
+- Automatically configures chat/text mode when running text-based tests
 - Exports data to Cekura for test analysis
-
-</Step>
-
-<Step title="Add environment variables to LiveKit">
-
-Add the following environment variables to your LiveKit agent:
-
-- `CEKURA_API_KEY`: Your Cekura API key from Settings → API Keys
-- `CEKURA_TRACING_ENABLED` (Optional): Set to `"true"` (default) or `"false"` to disable tracing
-- `CEKURA_MOCK_TOOLS_ENABLED` (Optional): Set to `"true"` (default) or `"false"` to disable mock tools
 
 </Step>
 
@@ -100,43 +90,43 @@ Add the following environment variables to your LiveKit agent:
 
 Navigate to your agent settings in the Cekura dashboard, select **LiveKit** as the provider, and enable tracing:
 
-<img src="/images/livekit/livekit-tracing-config.png" alt="LiveKit Tracing Configuration" width="500"/>
+<img src="/images/livekit/livekit-agent-settings.png" alt="LiveKit Agent Settings" width="500"/>
 
 **Required configuration:**
-- **Provider**: Select "LiveKit" from the dropdown
-- **Enable Tracing**: Toggle this ON to receive enhanced data from the SDK
-
-**Testing approach - Choose one:**
-
-**Option 1: Phone Number Testing**
-- **Contact Number**: Provide the phone number associated with your LiveKit agent
-- Use this if your LiveKit agent is connected to a phone system
-
-**Option 2: Automated LiveKit Testing**
 - **LiveKit API Key**: Your LiveKit API key
 - **LiveKit API Secret**: Your LiveKit API secret
 - **LiveKit URL**: Your LiveKit server URL (e.g., `wss://your-server.livekit.cloud`)
 - **Agent Name**: The specific agent name to dispatch in LiveKit
-- **LiveKit Config (JSON)** (Optional): Additional room configuration parameters
+- **LiveKit Config (JSON)** (Optional): Additional room configuration parameters (accessible in agent code via [`get_simulation_data()`](#get_simulation_data))
 
-Use this if you want Cekura to automatically create LiveKit rooms. See the [LiveKit Automated Testing guide](/documentation/integrations/livekit/testing) for more details.
+**Testing connection types:**
 
-<Note>
-You must provide at least one of the options above (you can configure both to enable both testing methods).
-</Note>
+<img src="/images/livekit/livekit-connections.png" alt="LiveKit Connection Types" width="500" />
+
+Configure at least one connection type for voice-based testing:
+- **WebRTC**: Direct LiveKit room connection using the credentials configured above
+- **Telephony**: Phone-based testing if your LiveKit agent is connected to a phone system (requires Contact Number)
+
+For text-based testing:
+- **Chat**: Select LiveKit to enable chat-based testing (uses the same WebRTC configuration, no additional setup required)
 
 </Step>
 
 <Step title="Run tests">
 
-Run tests based on your configuration:
+Run tests using your preferred connection type:
 
-<img src="/images/livekit/run-tests-options.png" alt="Run Tests with Tracing" width="500" />
+- **Run with LiveKit**: For WebRTC-based testing
+- **Run with Voice**: For telephony-based testing
+- **Run with Text**: For chat-based testing
 
-- **If you configured Option 1 (Phone Number)**: Use **"Run with Voice"**
-- **If you configured Option 2 (LiveKit Credentials)**: Use **"Run with LiveKit"**
+<img src="/images/livekit/run-tests-options.png" alt="Run Tests Options" width="500" />
 
-The SDK will send enhanced data back to Cekura for each test run.
+</Step>
+
+<Step title="Analyze the call">
+
+Navigate to the Runs section to view your test results with enhanced data including transcripts, tool calls, session logs, and detailed performance metrics.
 
 </Step>
 </Steps>
@@ -151,7 +141,7 @@ Use this setup in your production agents for monitoring live calls with audio re
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install cekura==1.0.0
+pip install cekura==1.1.0rc1
 ```
 
 </Step>
@@ -183,18 +173,9 @@ async def entrypoint(ctx: agents.JobContext):
 ```
 
 **What this does:**
-- Captures transcripts, tool calls, and metrics
+- Captures transcripts, tool calls, metrics, and session logs
 - Records dual-channel audio (agent + user) for analysis
 - Exports data to Cekura observability endpoint
-
-</Step>
-
-<Step title="Add environment variables to LiveKit">
-
-Add the following environment variables to your LiveKit agent:
-
-- `CEKURA_API_KEY`: Your Cekura API key from Settings → API Keys
-- `CEKURA_OBSERVABILITY_ENABLED` (Optional): Set to `"true"` (default) or `"false"` to disable observability
 
 </Step>
 
@@ -202,10 +183,9 @@ Add the following environment variables to your LiveKit agent:
 
 Navigate to your agent settings in the Cekura dashboard, select **LiveKit** as the provider:
 
-<img src="/images/livekit/livekit-tracing-config.png" alt="LiveKit Configuration" width="500"/>
+<img src="/images/livekit/livekit-agent-settings.png" alt="LiveKit Agent Settings" width="500"/>
 
 **Required configuration for audio recording:**
-- **Provider**: Select "LiveKit" from the dropdown
 - **LiveKit API Key**: Your LiveKit API key
 - **LiveKit API Secret**: Your LiveKit API secret
 - **LiveKit URL**: Your LiveKit server URL (e.g., `wss://your-server.livekit.cloud`)
@@ -234,7 +214,7 @@ With tracing enabled, you'll see enriched information in the Cekura platform:
 The run now displays:
 - **Room Session ID**: Visible in the call provider ID field, allowing you to correlate Cekura test runs with specific LiveKit sessions
 - **Complete Transcript**: Full conversation history from the LiveKit agent, including tool/function call requests and responses
-- **Provider Call Data**: Detailed metadata accessible in the run details, including job information, room configuration, and raw performance metrics
+- **Provider Call Data**: Detailed metadata accessible in the run details, including job information, room configuration, session logs, and raw performance metrics
 
 <img src="/images/livekit/tracing-enhanced-ui.png" alt="Enhanced Data Display" />
 
@@ -242,12 +222,25 @@ The run now displays:
 
 - **Job Information**: Job ID, room name, participant details, and agent dispatch metadata
 - **Room Information**: Room configuration, participant count, session duration, and connection details
+- **Session Logs**: Captured agent session logs with timestamps, log levels, and messages for debugging
 - **Raw Metrics**:
   - **STT (Speech-to-Text)**: Latency, duration, and transcription timing
   - **TTS (Text-to-Speech)**: Generation time and audio synthesis metrics
   - **LLM**: Token usage, response time, and inference latency
   - **EOU (End-of-Utterance)**: Detection timing and accuracy
 - **Custom Metadata**: Additional metadata passed to the SDK via `**metadata` parameters
+
+## Automatic Chat Mode Support
+
+The SDK automatically handles chat/text mode configuration when you run scenarios using "Run with Text" — **no code changes required**.
+
+When you run a text-based test, the SDK automatically patches your session to disable audio processing, enabling pure text-based interactions with your agent. This provides:
+
+- **Targeted testing** of your agent's conversational logic without audio overhead
+- **Cost savings** by eliminating STT/TTS provider costs and reducing Cekura credit usage
+- **Faster simulations** compared to voice-based tests
+
+Your `track_session()` integration works seamlessly for both voice and text modes.
 
 ## Using Mock Tools with LiveKit Tracing
 
@@ -279,7 +272,7 @@ The SDK supports mock tools, allowing you to test your agent with predictable to
 from cekura.livekit import LiveKitTracer
 
 cekura = LiveKitTracer(
-    api_key="your_api_key",        # Required: Your Cekura API key
+    api_key="your_api_key",         # Required: Your Cekura API key
     agent_id=123,                   # Required: Agent ID from dashboard
     host="https://api.cekura.ai",   # Optional: Custom API host
     enabled=True                    # Optional: Enable/disable tracer
@@ -288,32 +281,37 @@ cekura = LiveKitTracer(
 
 ### track_session()
 
-Tracks simulation/test calls with automatic mock tool injection. Collects transcripts, tool calls, metrics, and injects mock tools.
+Tracks simulation/test calls with automatic mock tool injection and chat mode support. Collects transcripts, tool calls, session logs, and metrics.
 
 ```python
 await cekura.track_session(
-    ctx,          # Required: LiveKit JobContext
-    session,      # Required: LiveKit AgentSession
-    agent,        # Optional: Agent instance for mock tool injection
-    **metadata    # Optional: Custom metadata
+    ctx,               # Required: LiveKit JobContext
+    session,           # Required: LiveKit AgentSession
+    agent,             # Optional: Agent instance for mock tool injection
+    capture_logs=True, # Optional: Capture session logs (default: True)
+    **metadata         # Optional: Custom metadata
 )
 ```
 
-Disable with environment variable: `CEKURA_TRACING_ENABLED="false"`
+**Environment variables:**
+- `CEKURA_TRACING_ENABLED="false"`: Disable tracking entirely
+- `CEKURA_MOCK_TOOLS_ENABLED="false"`: Disable only mock tool injection
 
 ### observe_session()
 
-Monitors production calls with dual-channel audio recording. Collects transcripts, tool calls, metrics, and records audio. Requires LiveKit credentials configured in Cekura.
+Monitors production calls with dual-channel audio recording. Collects transcripts, tool calls, session logs, and metrics. Requires LiveKit credentials configured in Cekura.
 
 ```python
 await cekura.observe_session(
-    ctx,          # Required: LiveKit JobContext
-    session,      # Required: LiveKit AgentSession
-    **metadata    # Optional: Custom metadata
+    ctx,               # Required: LiveKit JobContext
+    session,           # Required: LiveKit AgentSession
+    capture_logs=True, # Optional: Capture session logs (default: True)
+    **metadata         # Optional: Custom metadata
 )
 ```
 
-Disable with environment variable: `CEKURA_OBSERVABILITY_ENABLED="false"`
+**Environment variables:**
+- `CEKURA_OBSERVABILITY_ENABLED="false"`: Disable observability entirely
 
 ### get_simulation_data()
 

@@ -1,0 +1,105 @@
+---
+title: "Dynamic Variables"
+sidebarTitle: "Dynamic Variables"
+icon: "code"
+iconType: "regular"
+description: "Define agent-level variables that are automatically populated with scenario-specific values during workflow evaluator generation"
+---
+
+## Overview
+
+Dynamic variables are `{{variableName}}` placeholders in your agent's system prompt that get replaced with realistic, caller-specific values at call time. When Cekura generates workflow evaluators, it produces appropriate values for each dynamic variable so the evaluator knows exactly what information to provide during the conversation.
+
+Dynamic variables are useful when your agent:
+- Addresses callers by name or account details pulled from a CRM (`{{firstName}}`, `{{accountId}}`)
+- References call-specific data like policy numbers, order IDs, or member numbers
+- Uses contextual information that changes per caller (`{{planType}}`, `{{memberSince}}`)
+
+## How Dynamic Variables Work
+
+### 1. Auto-Detection
+
+When you create an agent or save changes to its description, Cekura automatically scans for `{{variableName}}` patterns and generates a description for each variable based on how it is used in the prompt. These detected variables appear in the **Dynamic Variables** section of your agent settings.
+
+### 2. Scenario Generation
+
+When a workflow evaluator is generated, Cekura runs a single coordinated generation pass that produces:
+- A **test profile** with persona facts (name, address, etc.)
+- **Dynamic variable values** — one value per variable, consistent with the test profile
+- **Mock tool entries** — tool input/output pairs that use the same identity (only if mock tools are configured for the agent)
+
+This ensures all three data sources are internally consistent. For example, if `firstName=Sarah` and `accountId=ACC-4521` are generated, the mock tool entries will also reference Sarah's account so the agent's tool calls return matching data.
+
+### 3. Value Injection at Call Time
+
+The generated variable values are passed to the evaluator before the call starts. The evaluator uses them to answer questions the agent asks during the conversation (e.g., providing the correct account number when prompted).
+
+## Managing Dynamic Variables
+
+Dynamic variables are managed in **Agent Settings**, in the **Dynamic Variables** accordion on the right-hand panel.
+
+<Note>
+  Variables are auto-populated when the agent is created or whenever the description is saved. You do not need to add them manually unless you want to define variables that are not derived from `{{...}}` placeholders.
+</Note>
+
+### View Variables
+
+Open the **Dynamic Variables** section in agent settings. Each variable shows its name and, when expanded, its description — which tells the generation system what kind of value to produce.
+
+### Edit a Variable
+
+Click the **pencil icon** on any variable to update its name or description. Improving the description helps Cekura generate more accurate and realistic values.
+
+### Add Variables
+
+Click **"Add Variables"** to add one or more variables manually:
+- **Form mode**: Fill in a name and description for each variable. Use the **"Add another variable"** button to add multiple at once.
+- **JSON mode**: Paste a JSON array of `{"name": "...", "description": "..."}` objects for bulk import.
+
+Variable names must use only letters, digits, and underscores, and must start with a letter or underscore (e.g., `firstName`, `account_id`).
+
+### Delete a Variable
+
+Click the **trash icon** on any variable to remove it. Deleting a variable means it will no longer be generated during scenario creation. Evaluators that have already been generated are not affected.
+
+## Example
+
+**Agent description snippet:**
+
+```
+Hello {{firstName}}, I see your account number is {{accountId}}.
+How can I help you today?
+```
+
+**Auto-detected variables:**
+
+| Name | Auto-generated Description |
+|------|---------------------------|
+| `firstName` | The caller's first name as it appears on their account |
+| `accountId` | The unique account identifier for the caller |
+
+**At evaluator generation, Cekura produces consistent values across all three outputs:**
+
+```
+Test profile:    { "firstName": "Sarah", "accountId": "ACC-4521", ... }
+Dynamic vars:    [ { "name": "firstName", "value": "Sarah" },
+                   { "name": "accountId",  "value": "ACC-4521" } ]
+Mock tool entry: { "input": { "account_id": "ACC-4521" },
+                   "output": { "name": "Sarah Johnson", "balance": 1240.00 } }
+```
+
+## Relationship to Test Profiles and Mock Tools
+
+Dynamic variables, test profiles, and mock tools are generated together as a coordinated set:
+
+| Concept | Purpose |
+|---------|---------|
+| **Test Profile** | Static persona facts the evaluator can reference in its instructions |
+| **Dynamic Variables** | Per-call values injected into the agent's system prompt via `{{...}}` placeholders |
+| **Mock Tools** | Predefined tool responses that return data consistent with the persona |
+
+All three are kept in sync so that the agent's system prompt, tool responses, and evaluator behavior all reflect the same fictional caller identity.
+
+<Tip>
+Write detailed descriptions for your dynamic variables. The generation system uses these descriptions to produce realistic, contextually correct values. For example, instead of "Account ID", write "The 8-digit numeric account ID in the format ACCT-XXXXXXXX used to look up the caller's record."
+</Tip>

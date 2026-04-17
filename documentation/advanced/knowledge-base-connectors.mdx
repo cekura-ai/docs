@@ -38,11 +38,9 @@ To use the Website Scraper connector, you need to configure it with the followin
 |-----------|------|---------|-------------|
 | `timeout` | integer | 30 | Request timeout in seconds |
 | `selectors` | object | null | Custom CSS or tag selectors for targeted content extraction |
-| `sync_enabled` | boolean | false | Whether automatic periodic syncing is enabled for this connector |
-| `sync_interval_hours` | integer | 24 | Interval in hours between automatic syncs (e.g., 1 for hourly, 2 for every 2 hours, 24 for daily). Note: The API uses `sync_interval_minutes` internally. Only applies when `sync_enabled` is true. |
 
 <Note>
-Website scraper connectors have auto-sync **disabled by default**. The dashboard does not display sync settings for website connectors. To enable automatic periodic syncing, use the API to explicitly set `sync_enabled` to `true` when creating or updating the connector. Other connector types (like BigQuery) have auto-sync enabled by default.
+Website scraper connectors **do not support automatic syncing**. The API rejects any attempt to enable auto-sync for website connectors. To update content, use the manual sync endpoint (`POST /v1/knowledge-base-connectors/{id}/sync/`) instead. Other connector types (like BigQuery) support auto-sync and have it enabled by default.
 </Note>
 
 ##### Credentials (Optional)
@@ -63,21 +61,15 @@ Website scraper connectors have auto-sync **disabled by default**. The dashboard
 }
 ```
 
-#### Example with Auto-Sync Enabled
+#### Manual Sync
 
-To enable automatic periodic syncing for a website connector:
+Website connectors receive an initial sync when created. To update content afterward, trigger a manual sync:
 
-```json
-{
-  "connector_type": "website",
-  "sync_enabled": true,
-  "sync_interval_hours": 24,
-  "config": {
-    "url": "https://docs.example.com/api-guide"
-  },
-  "credentials": {}
-}
+```bash
+POST /v1/knowledge-base-connectors/{id}/sync/
 ```
+
+This returns HTTP 202 and queues the sync operation.
 
 #### Advanced Example with Selectors
 
@@ -156,11 +148,12 @@ The Website Scraper includes built-in protections against SSRF (Server-Side Requ
 
 #### Limitations
 
+- **No automatic syncing**: Website connectors do not support automatic periodic syncing. Use the manual sync endpoint to update content.
+- **100-page limit**: Website scraping is limited to 100 pages maximum per sync operation.
 - Minimum content length: 100 characters (pages with less content will fail)
 - Does not execute JavaScript (static HTML only)
 - Cannot handle pages requiring complex authentication flows
 - Cannot scrape content behind CAPTCHAs or bot protection
-- Sync intervals must be configured in whole hours (minimum 1 hour)
 
 ### BigQuery Connector
 
@@ -185,7 +178,7 @@ Documentation for the BigQuery connector coming soon.
 2. **Test Selectors**: Use browser dev tools to test CSS selectors before configuring
 3. **Set Appropriate Timeouts**: Increase timeout for slow-loading pages
 4. **Monitor Content Length**: Ensure scraped content meets the 100-character minimum
-5. **Enable Auto-Sync for Website Connectors**: Remember to set `sync_enabled: true` for website connectors if you want automatic periodic syncing
+5. **Schedule Manual Syncs**: Since website connectors do not support auto-sync, schedule manual sync calls as needed to keep content updated
 6. **Use Specific Selectors**: Target main content areas to avoid extracting navigation and footers
 
 ## Troubleshooting
@@ -209,18 +202,11 @@ Documentation for the BigQuery connector coming soon.
 - Check if the website requires authentication headers
 - Verify the URL is accessible from your network
 
-### "Invalid sync interval"
+### "Website connectors do not support automatic syncing"
 
-- Website scraper connectors require sync intervals in whole hours
-- Enter values like 1 (hourly), 2 (every 2 hours), or 24 (daily)
-- This restriction does not apply to other connector types like BigQuery
-
-### "Auto-sync not running for website connector"
-
-- Website scraper connectors have auto-sync disabled by default
-- The dashboard does not display sync settings for website connectors
-- Enable auto-sync using the API by setting `sync_enabled` to `true` when creating or updating the connector
-- Verify the connector was created with auto-sync enabled, or update it via API to enable syncing
+- This is expected behavior. Website scraper connectors do not support automatic periodic syncing.
+- Use the manual sync endpoint (`POST /v1/knowledge-base-connectors/{id}/sync/`) to update content when needed.
+- If you need automatic syncing, consider other connector types like BigQuery.
 
 ## API Reference
 
@@ -231,6 +217,6 @@ For programmatic access to knowledge base management, see:
 ## Next Steps
 
 - Set up your first connector
-- Schedule automated syncs
+- Trigger manual syncs to update content
 - Monitor sync status and errors
 - Combine multiple connectors for comprehensive knowledge bases

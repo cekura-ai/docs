@@ -8,6 +8,7 @@ on:
       - 'openapi.json'
       - 'cekura-mcp-server/**'
       - 'mint.json'
+      - 'scripts/**'
       - '.github/workflows/deploy-mcp-server.yml'
 
 env:
@@ -50,9 +51,36 @@ jobs:
         with:
           python-version: '3.10'
 
+      - name: Sync API descriptions from OpenAPI spec to MDX pages
+        run: python3 scripts/sync_descriptions.py --write
+
+      - name: Generate structured llms.txt
+        run: python3 scripts/generate_llms_txt.py --write
+
       - name: Regenerate documented_apis.json
         working-directory: cekura-mcp-server
         run: python3 extract_documented_apis.py
+
+      - name: Validate API reference descriptions
+        run: |
+          python3 -c "
+          import os
+          missing = []
+          api_ref = 'api-reference'
+          for dirpath, _, filenames in os.walk(api_ref):
+              for f in sorted(filenames):
+                  if not f.endswith('.mdx'):
+                      continue
+                  path = os.path.join(dirpath, f)
+                  with open(path) as fh:
+                      content = fh.read()
+                  if 'description:' not in content.split('---')[1] if '---' in content else '':
+                      missing.append(os.path.relpath(path))
+          if missing:
+              print(f'INFO: {len(missing)} API reference pages still lack description frontmatter')
+          else:
+              print('All API reference pages have description frontmatter.')
+          "
 
       - name: Construct Docker image tag
         id: construct-tag

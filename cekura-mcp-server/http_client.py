@@ -12,6 +12,7 @@ class CekuraAPIClient:
             headers={
                 "X-CEKURA-API-KEY": api_key,
                 "Content-Type": "application/json",
+                "X-Client-Source": "mcp",
             },
             timeout=timeout,
         )

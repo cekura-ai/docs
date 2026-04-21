@@ -1,0 +1,106 @@
+---
+title: "Tool Call Testing"
+sidebarTitle: "Tool Call Testing"
+icon: "wrench"
+iconType: "regular"
+description: "Validate that your agent calls the right tools, with the right arguments, at the right time."
+---
+
+## Overview
+
+Most real voice agents don't just talk — they call tools: look up a customer, schedule an appointment, transfer to a human, end the call. If your agent says "I've booked your appointment" but never actually invoked the booking tool, the call is a failure no matter how good the transcript sounds.
+
+Tool call testing on Cekura is about making sure:
+
+1. Cekura can **see** the tool calls your agent made (names, arguments, results, latency).
+2. You can **assert** against those tool calls — both "did it happen" and "did it happen correctly."
+
+## Step 1 — Make Tool Calls Visible to Cekura
+
+Before you can evaluate tool calls, Cekura needs the tool call events in the transcript and metadata for each call. There are two ways to get this:
+
+### Option A — Use a Native Integration (Recommended)
+
+If you're on one of our supported providers, you don't need to do anything special to capture tool calls from simulated test runs — once your agent is connected to Cekura via the provider integration, we automatically fetch the tool call names, arguments, results, and latency from the provider after each simulation and attach them to the transcript.
+
+Supported providers:
+
+- [VAPI](/documentation/integrations/vapi/testing)
+- [Retell](/documentation/integrations/retell/testing)
+- [ElevenLabs](/documentation/integrations/elevenlabs/testing)
+- [LiveKit](/documentation/integrations/livekit/testing)
+- [Pipecat](/documentation/integrations/pipecat/automated)
+
+### Option B — Send the Transcript Yourself
+
+If you're on a custom stack or a provider we don't natively support, send the call transcript (including tool call invocations and results) to Cekura directly via the observability API. See:
+
+- [Custom Integration](/documentation/integrations/custom-integration) — how to send calls programmatically
+- [Transcript Format](/documentation/advanced/transcript-format) — the exact shape of `tool_call`, `tool_call_invocation`, and `tool_call_result` entries Cekura expects
+
+<Note>
+  The transcript format supports both OpenAI-style (`toolCalls` / `tool_call_result`) and generic (`tool_calls` / `tool_results`) representations. As long as tool names, arguments, and results are included, Cekura can evaluate against them.
+</Note>
+
+## Step 2 — Test Tool Calls in Evaluators
+
+Once tool calls are flowing into Cekura, you can validate them in two ways.
+
+### Assertion Approach 1 — Expected Outcome
+
+The simplest way to test a tool call is to write the expectation into the evaluator's **expected outcome**. For example:
+
+> The agent must call the `book_appointment` tool with the caller's requested date and time before confirming the booking verbally.
+
+Cekura's expected-outcome judge has access to the full transcript including tool calls, and will fail the evaluator if the tool wasn't invoked (or was invoked with the wrong arguments).
+
+**Use this when:**
+
+- The tool call is part of a specific workflow scenario
+- You want a single pass/fail signal per evaluator
+- The assertion is naturally expressible in prose
+
+### Assertion Approach 2 — Custom Metrics
+
+For assertions you want to run across **many** evaluators, or that need structured logic (exact argument matching, ordering, counting, etc.), use a custom metric instead:
+
+- [LLM-Judge Metric](/documentation/key-concepts/metrics/llm-judge-metric) — write a prompt that inspects the tool calls and returns pass/fail or a score
+- [Python Metric](/documentation/key-concepts/metrics/python-metric) — write code that parses `tool_calls` out of the transcript and makes deterministic assertions
+
+**Use this when:**
+
+- You want to enforce "never call `transfer_to_human` before verifying identity" across every call
+- You need exact matching on tool arguments
+- You want to track tool-call reliability as a metric over time on a [Dashboard](/documentation/guides/dashboards)
+
+## Putting It Together
+
+<Steps>
+  <Step title="Wire up visibility">
+    Either connect a native integration or start sending transcripts via the custom integration. Confirm you can see tool call entries in the Cekura transcript viewer for a sample call.
+  </Step>
+  <Step title="Pick the right assertion mechanism">
+    For per-scenario checks, put the tool call requirement into the evaluator's expected outcome. For cross-cutting rules, build a custom LLM-judge or Python metric.
+  </Step>
+  <Step title="Run and iterate">
+    Run the evaluators, inspect failing transcripts, and refine either the agent prompt or the assertion as needed.
+  </Step>
+</Steps>
+
+## Recommended: Set Up Mock Tools
+
+For reliable tool call testing, we strongly recommend configuring [Mock Tools](/documentation/key-concepts/evaluators/mock-tools) before running evaluators at scale. Mock tools let you return predefined responses for each tool call during a simulation, which gives you:
+
+- **Deterministic tests** — the same evaluator produces the same tool responses on every run, so a failure is a real agent failure and not a flaky backend
+- **No backend dependency** — your tests don't hit production systems, don't burn quota on third-party APIs, and don't require network access to internal services
+- **Edge-case coverage** — you can force a tool to return an error, a timeout, or an unusual payload to test how the agent handles it
+
+Without mock tools, tool call testing still works, but every failure becomes ambiguous — was it the agent, or was it the backend? Mocking removes that ambiguity.
+
+## Related Resources
+
+- [Mock Tools](/documentation/key-concepts/evaluators/mock-tools) — Stub tool responses for reproducible tests
+- [Transcript Format](/documentation/advanced/transcript-format) — How tool calls appear in the transcript
+- [LLM-Judge Metric](/documentation/key-concepts/metrics/llm-judge-metric) — Prompt-based assertions over tool calls
+- [Python Metric](/documentation/key-concepts/metrics/python-metric) — Deterministic assertions over tool calls
+- [Custom Integration](/documentation/integrations/custom-integration) — Send transcripts from any stack

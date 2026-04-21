@@ -42,6 +42,173 @@
                 "description": "A8c8aef15013e2e52ccf6000350258a1eab6cd2a11e62f592c5e19092d7204d7"
             }
         },
+        "/app/v1/product-chat/": {
+            "post": {
+                "operationId": "app-v1-product-chat-create",
+                "description": "Queue a Cekura AI Assistant request. Returns a progress_id immediately; poll the progress endpoint for incremental response chunks.",
+                "tags": [
+                    "app"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProductChatRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProductChatRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ProductChatRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "{\"progress_id\": \"<uuid>\"}  — poll /product-chat/progress/?progress_id=<id> for results."
+                    },
+                    "401": {
+                        "description": "Authentication required (Supabase JWT only)."
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded."
+                    }
+                }
+            }
+        },
+        "/app/v1/product-chat/cancel/": {
+            "post": {
+                "operationId": "app-v1-product-chat-cancel-create",
+                "description": "Cancel an in-progress AI assistant task. The Celery worker stops on its next iteration.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"cancelled\": true}"
+                    },
+                    "400": {
+                        "description": "progress_id is required."
+                    }
+                }
+            }
+        },
+        "/app/v1/product-chat/progress/": {
+            "get": {
+                "operationId": "app-v1-product-chat-progress-retrieve",
+                "description": "Poll for incremental chunks from a queued AI assistant task.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "UUID returned by POST /app/v1/product-chat/",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"status\": \"in_progress|completed|failed\", \"chunks\": [...], \"session_id\": \"...\", \"error\": null}"
+                    },
+                    "400": {
+                        "description": "progress_id query param is missing."
+                    },
+                    "404": {
+                        "description": "Progress not found (expired or invalid ID)."
+                    }
+                }
+            }
+        },
+        "/app/v1/product-chat/sessions/": {
+            "get": {
+                "operationId": "app-v1-product-chat-sessions-list",
+                "description": "Return all persisted chat sessions for the authenticated user, ordered by most recently updated.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ProductChatSession"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/app/v1/product-chat/sessions/{session_id}/": {
+            "delete": {
+                "operationId": "app-v1-product-chat-sessions-destroy",
+                "description": "Terminate a product chatbot sandbox. The conversation history is kept in the database.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "session_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Session terminated and deleted."
+                    },
+                    "401": {
+                        "description": "Authentication required."
+                    },
+                    "500": {
+                        "description": "Failed to terminate the sandbox session."
+                    }
+                }
+            }
+        },
         "/dashboards/dashboards/": {
             "get": {
                 "operationId": "dashboards-dashboards-list",
@@ -398,6 +565,32 @@
                 ],
                 "responses": {
                     "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Dashboard"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/dashboards/dashboards/predefined_widgets/": {
+            "get": {
+                "operationId": "dashboards-dashboards-predefined-widgets-retrieve",
+                "description": "Return a list of predefined widget configurations for quick-add.\nResolves project-specific details like metric IDs for latency.",
+                "tags": [
+                    "dashboards"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14432,7 +14625,6 @@
                                         "value": [
                                             {
                                                 "id": 123,
-                                                "agent": 123,
                                                 "name": "<string>",
                                                 "description": "<string>",
                                                 "function_name": "<string>",
@@ -14476,7 +14668,6 @@
                                         "value": [
                                             {
                                                 "id": "<integer>",
-                                                "agent": "<integer>",
                                                 "name": "<string>",
                                                 "description": "<string>",
                                                 "function_name": "<string>",
@@ -14687,7 +14878,6 @@
                                         "value": [
                                             {
                                                 "id": 123,
-                                                "agent": 123,
                                                 "name": "<string>",
                                                 "description": "<string>",
                                                 "function_name": "<string>",
@@ -14731,7 +14921,6 @@
                                         "value": [
                                             {
                                                 "id": "<integer>",
-                                                "agent": "<integer>",
                                                 "name": "<string>",
                                                 "description": "<string>",
                                                 "function_name": "<string>",
@@ -43618,7 +43807,12 @@
                         ],
                         "description": "Whether the main agent (not the testing agent) will give the first message. True = agent speaks first (testing agent won't generate a first message). False = testing agent speaks first (first message will be generated). None = preference not yet set."
                     }
-                }
+                },
+                "required": [
+                    "agent_name",
+                    "description",
+                    "inbound"
+                ]
             },
             "AIAgentList": {
                 "type": "object",
@@ -43723,7 +43917,11 @@
                         ],
                         "description": "Whether the main agent (not the testing agent) will give the first message. True = agent speaks first (testing agent won't generate a first message). False = testing agent speaks first (first message will be generated). None = preference not yet set."
                     }
-                }
+                },
+                "required": [
+                    "agent_name",
+                    "organization"
+                ]
             },
             "AIAgentTestProfile": {
                 "type": "object",
@@ -43755,7 +43953,10 @@
                         },
                         "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "AlertCreate": {
                 "type": "object",
@@ -43804,7 +44005,12 @@
                     "notifications": {
                         "description": "Notification config. Slack: {\"slack\": {\"workspace_id\": 10, \"channel_id\": \"C123\"}}. Empty = all project workspaces"
                     }
-                }
+                },
+                "required": [
+                    "name",
+                    "project",
+                    "source_type"
+                ]
             },
             "AlertDetail": {
                 "type": "object",
@@ -43903,7 +44109,12 @@
                         "type": "string",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "name",
+                    "project",
+                    "source_type"
+                ]
             },
             "AlertList": {
                 "type": "object",
@@ -43989,7 +44200,12 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "name",
+                    "project",
+                    "source_type"
+                ]
             },
             "AlertUpdate": {
                 "type": "object",
@@ -44013,7 +44229,10 @@
                     "notifications": {
                         "description": "Notification config. Slack: {\"slack\": {\"workspace_id\": 10, \"channel_id\": \"C123\"}}. Empty = all project workspaces"
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "AskAboutFailuresReportsRequest": {
                 "type": "object",
@@ -44301,7 +44520,10 @@
                         "readOnly": true,
                         "description": "Timestamp when the billing record was last updated.\nExample: `2025-11-22T14:25:30Z`"
                     }
-                }
+                },
+                "required": [
+                    "balance_expiry"
+                ]
             },
             "BulkAgentAssignment": {
                 "type": "object",
@@ -44352,7 +44574,11 @@
                         "type": "string",
                         "description": "Success message"
                     }
-                }
+                },
+                "required": [
+                    "message",
+                    "updated_count"
+                ]
             },
             "BulkImportPlivoNumber": {
                 "type": "object",
@@ -44396,7 +44622,12 @@
                         "type": "object",
                         "additionalProperties": {}
                     }
-                }
+                },
+                "required": [
+                    "failed",
+                    "successful",
+                    "summary"
+                ]
             },
             "BulkImportResponse": {
                 "type": "object",
@@ -44413,7 +44644,12 @@
                         "type": "object",
                         "additionalProperties": {}
                     }
-                }
+                },
+                "required": [
+                    "failed",
+                    "successful",
+                    "summary"
+                ]
             },
             "BulkImportTelnyxNumber": {
                 "type": "object",
@@ -44452,7 +44688,12 @@
                         "type": "object",
                         "additionalProperties": {}
                     }
-                }
+                },
+                "required": [
+                    "failed",
+                    "successful",
+                    "summary"
+                ]
             },
             "BulkImportTwilioNumber": {
                 "type": "object",
@@ -44633,7 +44874,12 @@
                         },
                         "description": "List of errors that occurred during operations"
                     }
-                }
+                },
+                "required": [
+                    "created",
+                    "deleted",
+                    "updated"
+                ]
             },
             "CallLogCriticalCategories": {
                 "type": "object",
@@ -44669,7 +44915,15 @@
                         "x-spec-enum-id": "6b5f38576e0a1903",
                         "description": "Priority\n\n* `critical` - Critical\n* `non-critical` - Non Critical\n* `not_a_bug` - Not A Bug"
                     }
-                }
+                },
+                "required": [
+                    "category",
+                    "category_id",
+                    "deviation",
+                    "feedback",
+                    "priority",
+                    "wrongly_marked"
+                ]
             },
             "CallLogDetail": {
                 "type": "object",
@@ -44852,7 +45106,10 @@
                         ],
                         "description": "Project ID (denormalized from agent for query performance)"
                     }
-                }
+                },
+                "required": [
+                    "call_id"
+                ]
             },
             "CallLogList": {
                 "type": "object",
@@ -44978,7 +45235,10 @@
                         "readOnly": true,
                         "description": "Evaluation of the call"
                     }
-                }
+                },
+                "required": [
+                    "call_id"
+                ]
             },
             "CallLogListSerializerMetrics": {
                 "type": "object",
@@ -45008,7 +45268,15 @@
                         "type": "string",
                         "description": "Evaluated metric value, Present if metric type is enum"
                     }
-                }
+                },
+                "required": [
+                    "enum",
+                    "id",
+                    "name",
+                    "score",
+                    "type",
+                    "value"
+                ]
             },
             "CallLogListSerializerMetricsWithExplanation": {
                 "type": "object",
@@ -45050,7 +45318,17 @@
                         "additionalProperties": {},
                         "description": "Evaluated metric extra data"
                     }
-                }
+                },
+                "required": [
+                    "enum",
+                    "explanation",
+                    "extra",
+                    "id",
+                    "name",
+                    "score",
+                    "type",
+                    "value"
+                ]
             },
             "CallLogTranscriptObject": {
                 "type": "object",
@@ -45068,7 +45346,12 @@
                         "format": "double",
                         "description": "Timestamp of the message"
                     }
-                }
+                },
+                "required": [
+                    "content",
+                    "role",
+                    "timestamp"
+                ]
             },
             "ChatMessage": {
                 "type": "object",
@@ -45097,7 +45380,11 @@
                         "readOnly": true,
                         "description": "When this record was created.\nExample: `2024-03-15T10:30:45Z`"
                     }
-                }
+                },
+                "required": [
+                    "content",
+                    "role"
+                ]
             },
             "ChatSessionCreate": {
                 "type": "object",
@@ -45372,8 +45659,7 @@
                     }
                 },
                 "required": [
-                    "call_id",
-                    "id"
+                    "call_id"
                 ]
             },
             "CreateFromRunsRequest": {
@@ -45551,7 +45837,12 @@
                         "x-spec-enum-id": "82a968d406c39bf3",
                         "description": "\nProvider of the voice\n\n\n* `11labs` - Elevenlabs\n* `cartesia` - Cartesia"
                     }
-                }
+                },
+                "required": [
+                    "background_noise",
+                    "name",
+                    "voice_model"
+                ]
             },
             "CriticalMetricCategory": {
                 "type": "object",
@@ -45748,7 +46039,10 @@
                         "readOnly": true,
                         "description": "\nTimestamp when the cron job was last updated\nExample: `2021-01-01 00:00:00`\n"
                     }
-                }
+                },
+                "required": [
+                    "crontab_expression"
+                ]
             },
             "CustomDomainDetail": {
                 "type": "object",
@@ -45777,7 +46071,10 @@
                         ],
                         "format": "uri"
                     }
-                }
+                },
+                "required": [
+                    "domain"
+                ]
             },
             "CustomDomainList": {
                 "type": "object",
@@ -45806,7 +46103,10 @@
                         ],
                         "format": "uri"
                     }
-                }
+                },
+                "required": [
+                    "domain"
+                ]
             },
             "CustomTokenObtainPair": {
                 "type": "object",
@@ -45817,7 +46117,11 @@
                     "agent_id": {
                         "type": "integer"
                     }
-                }
+                },
+                "required": [
+                    "agent_id",
+                    "api_key"
+                ]
             },
             "Dashboard": {
                 "type": "object",
@@ -46143,7 +46447,12 @@
                         "type": "boolean",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "channel_id",
+                    "project",
+                    "server_name"
+                ]
             },
             "DuplicateDashboardRequest": {
                 "type": "object",
@@ -46180,7 +46489,11 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "source_node",
+                    "target_node"
+                ]
             },
             "EvaluateMetrics": {
                 "type": "object",
@@ -46222,7 +46535,10 @@
                             "$ref": "#/components/schemas/CallLogListSerializerMetricsWithExplanation"
                         }
                     }
-                }
+                },
+                "required": [
+                    "metrics"
+                ]
             },
             "ExpectedOutcome": {
                 "type": "object",
@@ -46245,7 +46561,12 @@
                             "$ref": "#/components/schemas/OutcomeAlignment"
                         }
                     }
-                }
+                },
+                "required": [
+                    "explanation",
+                    "outcome_alignments",
+                    "score"
+                ]
             },
             "ImportPlivoNumber": {
                 "type": "object",
@@ -46360,7 +46681,11 @@
                     "project_id": {
                         "type": "integer"
                     }
-                }
+                },
+                "required": [
+                    "progress_id",
+                    "project_id"
+                ]
             },
             "Invite": {
                 "type": "object",
@@ -46511,7 +46836,11 @@
                         "readOnly": true,
                         "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
                     }
-                }
+                },
+                "required": [
+                    "agent",
+                    "name"
+                ]
             },
             "KnowledgeBaseConnectorList": {
                 "type": "object",
@@ -46645,7 +46974,11 @@
                         "readOnly": true,
                         "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
                     }
-                }
+                },
+                "required": [
+                    "agent",
+                    "file"
+                ]
             },
             "LiveKitEgressCredentialsResponse": {
                 "type": "object",
@@ -46681,7 +47014,19 @@
                     "livekit_api_secret": {
                         "type": "string"
                     }
-                }
+                },
+                "required": [
+                    "access_key",
+                    "bucket",
+                    "expires_at",
+                    "key",
+                    "livekit_api_key",
+                    "livekit_api_secret",
+                    "livekit_url",
+                    "region",
+                    "secret_key",
+                    "session_token"
+                ]
             },
             "MembershipInline": {
                 "type": "object",
@@ -46762,7 +47107,10 @@
                         "minimum": -2147483648,
                         "description": "\nDisplay order for the metric.\nExample: `1`\n"
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "MetricBasicList": {
                 "type": "object",
@@ -46849,7 +47197,11 @@
                             "null"
                         ]
                     }
-                }
+                },
+                "required": [
+                    "alert_type",
+                    "name"
+                ]
             },
             "MetricDetailV2": {
                 "type": "object",
@@ -46872,11 +47224,14 @@
                             "null"
                         ]
                     },
-                    "agent": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
+                    "agents": {
+                        "type": "array",
+                        "items": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
                     },
                     "name": {
                         "type": "string",
@@ -47092,7 +47447,10 @@
                         ],
                         "description": "When enabled, this metric is automatically assigned to new agents created in the project."
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "MetricList": {
                 "type": "object",
@@ -47114,17 +47472,6 @@
                             "integer",
                             "null"
                         ]
-                    },
-                    "agent": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "agent_name": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "\nName of the AI agent that was tested\nExample: `\"Test Agent 1\"`\n"
                     },
                     "agents": {
                         "type": "array",
@@ -47353,7 +47700,10 @@
                         "description": "Override channel ID for this metric's alerts",
                         "maxLength": 255
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "MetricPreview": {
                 "type": "object",
@@ -47543,7 +47893,10 @@
                         "readOnly": true,
                         "description": "\nTimestamp when the metric review was last updated\nExample: `\"2021-01-01T00:00:00Z\"`\n"
                     }
-                }
+                },
+                "required": [
+                    "metric"
+                ]
             },
             "MetricReviewInline": {
                 "type": "object",
@@ -47591,7 +47944,10 @@
                         "type": "string",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "id"
+                ]
             },
             "MetricRollingStats": {
                 "type": "object",
@@ -47813,7 +48169,11 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "metric",
+                    "workflow"
+                ]
             },
             "NodeInline": {
                 "type": "object",
@@ -47842,7 +48202,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "workflow"
+                ]
             },
             "NodeMetric": {
                 "type": "object",
@@ -47908,7 +48271,11 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "metric",
+                    "node"
+                ]
             },
             "Organization": {
                 "type": "object",
@@ -48262,7 +48629,11 @@
                         "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
                         "description": "Maximum total amount that can be auto-refilled in a billing cycle. None for no limit."
                     }
-                }
+                },
+                "required": [
+                    "limit_to_exclusive_numbers",
+                    "name"
+                ]
             },
             "OrganizationInline": {
                 "type": "object",
@@ -48292,7 +48663,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "OutcomeAlignment": {
                 "type": "object",
@@ -48309,7 +48683,12 @@
                         "type": "boolean",
                         "description": "Whether the outcome aligns with the prompt part"
                     }
-                }
+                },
+                "required": [
+                    "aligned",
+                    "outcome",
+                    "prompt_part"
+                ]
             },
             "OverallEvaluation": {
                 "type": "object",
@@ -48337,7 +48716,10 @@
                         "type": "integer",
                         "description": "Agent ID"
                     }
-                }
+                },
+                "required": [
+                    "agent"
+                ]
             },
             "Pack": {
                 "type": "object",
@@ -48481,7 +48863,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "price"
+                ]
             },
             "PackAccessRequest": {
                 "type": "object",
@@ -48564,7 +48949,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "organization"
+                ]
             },
             "PackInline": {
                 "type": "object",
@@ -48606,6 +48994,16 @@
                         "x-spec-enum-id": "31820255025544ce",
                         "description": "Billing type for the pack\n\n* `subscription` - Subscription\n* `self_serve` - Self Serve"
                     },
+                    "interval": {
+                        "enum": [
+                            "month",
+                            "quarter",
+                            "year"
+                        ],
+                        "type": "string",
+                        "description": "* `month` - Monthly\n* `quarter` - Quarterly\n* `year` - Yearly",
+                        "x-spec-enum-id": "493dc6126f399b59"
+                    },
                     "max_members_limit": {
                         "type": "integer",
                         "maximum": 2147483647,
@@ -48629,10 +49027,17 @@
                         "type": "string",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "price"
+                ]
             },
             "PaginatedAIAgentList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48660,6 +49065,10 @@
             },
             "PaginatedAIAgentListList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48687,6 +49096,10 @@
             },
             "PaginatedAuditLogList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48714,6 +49127,10 @@
             },
             "PaginatedCallLogListList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48741,6 +49158,10 @@
             },
             "PaginatedChatSessionListList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48768,6 +49189,10 @@
             },
             "PaginatedCriticalMetricCategoryList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48795,6 +49220,10 @@
             },
             "PaginatedCriticalMetricScenarioList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48822,6 +49251,10 @@
             },
             "PaginatedDashboardListList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48849,6 +49282,10 @@
             },
             "PaginatedKnowledgeBaseFileList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48876,6 +49313,10 @@
             },
             "PaginatedMetricRollingStatsList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48903,6 +49344,10 @@
             },
             "PaginatedResultList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48930,6 +49375,10 @@
             },
             "PaginatedRunListList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48957,6 +49406,10 @@
             },
             "PaginatedScenarioFolderList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -48984,6 +49437,10 @@
             },
             "PaginatedScenarioListList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -49011,6 +49468,10 @@
             },
             "PaginatedUserConfigurationList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -49038,6 +49499,10 @@
             },
             "PaginatedViewList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -49065,6 +49530,10 @@
             },
             "PaginatedWidgetDataResponseList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -49092,6 +49561,10 @@
             },
             "PaginatedWidgetList": {
                 "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
                 "properties": {
                     "count": {
                         "type": "integer",
@@ -52825,11 +53298,12 @@
                         "enum": [
                             "line",
                             "bar",
-                            "pie"
+                            "pie",
+                            "stat"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "52e139f99edda304",
-                        "description": "Type of chart to display\n\n* `line` - Line\n* `bar` - Bar\n* `pie` - Pie"
+                        "x-spec-enum-id": "458699e47c376d15",
+                        "description": "Type of chart to display\n\n* `line` - Line\n* `bar` - Bar\n* `pie` - Pie\n* `stat` - Stat"
                     },
                     "data_type": {
                         "enum": [
@@ -52858,6 +53332,7 @@
                             "metric_evaluations.value",
                             "metadata.region"
                         ],
+                        "default": "",
                         "maxLength": 255
                     },
                     "metric": {
@@ -53057,7 +53532,11 @@
                             "null"
                         ]
                     }
-                }
+                },
+                "required": [
+                    "number",
+                    "phone_number_id"
+                ]
             },
             "PhoneNumberDetail": {
                 "type": "object",
@@ -53144,7 +53623,11 @@
                             "null"
                         ]
                     }
-                }
+                },
+                "required": [
+                    "number",
+                    "phone_number_id"
+                ]
             },
             "PhoneNumberInbound": {
                 "type": "object",
@@ -53161,7 +53644,11 @@
                         "type": "string",
                         "maxLength": 255
                     }
-                }
+                },
+                "required": [
+                    "number",
+                    "phone_number_id"
+                ]
             },
             "PredefinedMetric": {
                 "type": "object",
@@ -53302,7 +53789,11 @@
                         ],
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "description",
+                    "name"
+                ]
             },
             "ProcessFeedbacksRequest": {
                 "type": "object",
@@ -53388,7 +53879,62 @@
                         },
                         "description": "Evaluation results for each test set"
                     }
-                }
+                },
+                "required": [
+                    "improved_evaluation_trigger",
+                    "improved_metric_description"
+                ]
+            },
+            "ProductChatRequest": {
+                "type": "object",
+                "description": "Request body for POST /app/v1/product-chat/.\n\nThe frontend is responsible for managing conversation history and sending\nit on every request. This ensures context is preserved even after a sandbox\nrestart without requiring the sandbox to persist state between sessions.",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "maxLength": 10000
+                    },
+                    "session_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "history": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 50000
+                    }
+                },
+                "required": [
+                    "message"
+                ]
+            },
+            "ProductChatSession": {
+                "type": "object",
+                "description": "Read serializer for the product chat session list and detail endpoints.\nReturned to the frontend so it can restore sessions after a page refresh.",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "history": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "session_id"
+                ]
             },
             "Project": {
                 "type": "object",
@@ -53635,7 +54181,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "ProjectDefaultMetrics": {
                 "type": "object",
@@ -53665,7 +54214,10 @@
                         "readOnly": true,
                         "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
                     }
-                }
+                },
+                "required": [
+                    "project"
+                ]
             },
             "ProjectInline": {
                 "type": "object",
@@ -53695,7 +54247,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "ProviderCredentialDetail": {
                 "type": "object",
@@ -53745,7 +54300,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "key"
+                ]
             },
             "ProviderCredentialList": {
                 "type": "object",
@@ -53963,7 +54521,10 @@
                         "readOnly": true,
                         "description": "Timestamp when this test result was last updated"
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "ResultDetailV2": {
                 "type": "object",
@@ -54141,7 +54702,10 @@
                         "readOnly": true,
                         "description": "\nTimestamp when this test result was last updated\nExample: `2021-01-01 00:00:00`\n"
                     }
-                }
+                },
+                "required": [
+                    "agent"
+                ]
             },
             "ReviewResult": {
                 "type": "object",
@@ -54177,7 +54741,12 @@
                             "null"
                         ]
                     }
-                }
+                },
+                "required": [
+                    "review_id",
+                    "success",
+                    "test_set_id"
+                ]
             },
             "Run": {
                 "type": "object",
@@ -54588,7 +55157,15 @@
                         "x-spec-enum-id": "6b5f38576e0a1903",
                         "description": "Priority\n\n* `critical` - Critical\n* `non-critical` - Non Critical\n* `not_a_bug` - Not A Bug"
                     }
-                }
+                },
+                "required": [
+                    "category",
+                    "category_id",
+                    "deviation",
+                    "feedback",
+                    "priority",
+                    "wrongly_marked"
+                ]
             },
             "RunListTranscriptObject": {
                 "type": "object",
@@ -54606,7 +55183,12 @@
                         "format": "double",
                         "description": "Timestamp of the message"
                     }
-                }
+                },
+                "required": [
+                    "content",
+                    "role",
+                    "timestamp"
+                ]
             },
             "RunReviewsRequest": {
                 "type": "object",
@@ -54917,7 +55499,10 @@
                         ],
                         "description": "\nMax call duration in seconds for this scenario. If not provided or set to null, the scenario will use the project's max_call_duration setting.\nValid range: 10-3600 seconds (10 seconds to 60 minutes)\nExample: `600` (10 minutes)\n"
                     }
-                }
+                },
+                "required": [
+                    "personality"
+                ]
             },
             "ScenarioAgentProgress": {
                 "type": "object",
@@ -54955,7 +55540,13 @@
                         ],
                         "description": "Error message when status is failed"
                     }
-                }
+                },
+                "required": [
+                    "mode",
+                    "progress_id",
+                    "session_id",
+                    "status"
+                ]
             },
             "ScenarioAgentRequest": {
                 "type": "object",
@@ -55068,7 +55659,11 @@
                         "type": "integer",
                         "description": "Session tracking ID"
                     }
-                }
+                },
+                "required": [
+                    "progress_id",
+                    "session_id"
+                ]
             },
             "ScenarioFolder": {
                 "type": "object",
@@ -55082,11 +55677,6 @@
                         "readOnly": true,
                         "description": "Human-readable path with case preservation"
                     },
-                    "is_infrastructure_suite": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "Whether this folder contains infrastructure suite scenarios"
-                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -55097,7 +55687,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "ScenarioFolderCreate": {
                 "type": "object",
@@ -55485,6 +56078,11 @@
                         "readOnly": true,
                         "description": "Timestamp when the scenario was last updated"
                     },
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "ID of the user who created this scenario"
+                    },
                     "last_updated_by": {
                         "type": "integer",
                         "readOnly": true,
@@ -55498,7 +56096,12 @@
                         ],
                         "description": "Path of the folder this scenario belongs to"
                     }
-                }
+                },
+                "required": [
+                    "agent",
+                    "instructions",
+                    "name"
+                ]
             },
             "ScenarioSerializerV2": {
                 "type": "object",
@@ -55730,7 +56333,10 @@
                         ],
                         "description": "\nMax call duration in seconds for this scenario. If not provided or set to null, the scenario will use the project's max_call_duration setting.\nValid range: 10-3600 seconds (10 seconds to 60 minutes)\nExample: `600` (10 minutes)\n"
                     }
-                }
+                },
+                "required": [
+                    "personality"
+                ]
             },
             "ScenarioWithWebsocket": {
                 "type": "object",
@@ -55780,7 +56386,13 @@
                         },
                         "description": "List of errors encountered during scenario creation"
                     }
-                }
+                },
+                "required": [
+                    "agent_id",
+                    "completed_scenarios",
+                    "failed_scenarios",
+                    "total_scenarios"
+                ]
             },
             "SchemaCreateShareableLinkTokenResponse": {
                 "type": "object",
@@ -55801,7 +56413,13 @@
                         "type": "boolean",
                         "description": "Whether the organization has whitelabel custom domain enabled for branded links"
                     }
-                }
+                },
+                "required": [
+                    "custom_domain",
+                    "custom_link",
+                    "shareable_link",
+                    "token"
+                ]
             },
             "GenerateMetricsProgressResponse": {
                 "type": "object",
@@ -55928,12 +56546,45 @@
                         "enum": [
                             "workflow",
                             "red_teaming_voice",
-                            "red_teaming_text"
+                            "red_teaming_text",
+                            "knowledge_base"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "42aa0beee566f1ba",
+                        "x-spec-enum-id": "4ef5c62a43e5fdd9",
                         "default": "workflow",
-                        "description": "Type of scenarios to generate: workflow (standard scenarios), red_teaming_voice (red teaming with voice-suitable prompts only), or red_teaming_text (red teaming with all prompts)\n\n* `workflow` - workflow\n* `red_teaming_voice` - red_teaming_voice\n* `red_teaming_text` - red_teaming_text"
+                        "description": "Type of scenarios to generate: workflow (standard scenarios), red_teaming_voice (red teaming with voice-suitable prompts only), red_teaming_text (red teaming with all prompts), or knowledge_base (knowledge base scenarios)\n\n* `workflow` - workflow\n* `red_teaming_voice` - red_teaming_voice\n* `red_teaming_text` - red_teaming_text\n* `knowledge_base` - knowledge_base"
+                    },
+                    "attack_type": {
+                        "enum": [
+                            "",
+                            "system_prompt_leak",
+                            "data_leak",
+                            "harmful_content",
+                            "biased_output",
+                            "unauthorized_actions",
+                            "off_task",
+                            null
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "x-spec-enum-id": "70525e347169b18e",
+                        "description": "Attack category for red teaming scenarios. Required when scenario_type is red_teaming_voice or red_teaming_text. Categories: system_prompt_leak (attempts to extract the system prompt), data_leak (attempts to extract sensitive data), harmful_content (attempts to generate harmful output), biased_output (attempts to generate biased responses), unauthorized_actions (attempts to trigger unauthorized tool calls or actions), off_task (attempts to derail the conversation away from the agent's purpose)\n\n* `` - \n* `system_prompt_leak` - system_prompt_leak\n* `data_leak` - data_leak\n* `harmful_content` - harmful_content\n* `biased_output` - biased_output\n* `unauthorized_actions` - unauthorized_actions\n* `off_task` - off_task"
+                    },
+                    "expected_outcome": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Custom expected outcome for the scenario. If not provided, a default is generated based on the attack type."
+                    },
+                    "knowledge_base": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of Knowledge Base file IDs for the agent to reference during scenario generation"
                     },
                     "extra_instructions": {
                         "type": "string",
@@ -56474,7 +57125,18 @@
                         "type": "boolean",
                         "description": "Enable sampling for this metric using project-level sample rate"
                     }
-                }
+                },
+                "required": [
+                    "assistant_id",
+                    "audio_enabled",
+                    "configuration",
+                    "description",
+                    "display_order",
+                    "enum_values",
+                    "name",
+                    "project",
+                    "prompt"
+                ]
             },
             "SchemaPostReRunResultDetail": {
                 "type": "object",
@@ -56869,7 +57531,11 @@
                         "type": "string",
                         "description": "Summary of changes made to the prompt"
                     }
-                }
+                },
+                "required": [
+                    "improved_prompt",
+                    "summary_of_changes"
+                ]
             },
             "SchemaScenario": {
                 "type": "object",
@@ -57123,7 +57789,10 @@
                     "error": {
                         "type": "string"
                     }
-                }
+                },
+                "required": [
+                    "status"
+                ]
             },
             "SimplifyPromptRequest": {
                 "type": "object",
@@ -57193,8 +57862,7 @@
                     }
                 },
                 "required": [
-                    "role",
-                    "time"
+                    "role"
                 ]
             },
             "SlackWorkspace": {
@@ -57290,7 +57958,12 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "expire_at",
+                    "last_payment_at",
+                    "stripe_subscription_id"
+                ]
             },
             "TestProfileData": {
                 "type": "object",
@@ -57308,7 +57981,12 @@
                         "additionalProperties": {},
                         "description": "\nInformation of the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
                     }
-                }
+                },
+                "required": [
+                    "id",
+                    "information",
+                    "name"
+                ]
             },
             "TestSetDetail": {
                 "type": "object",
@@ -57391,7 +58069,11 @@
                         "readOnly": true,
                         "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
                     }
-                }
+                },
+                "required": [
+                    "agent",
+                    "voice_recording"
+                ]
             },
             "TestSetInline": {
                 "type": "object",
@@ -57451,7 +58133,10 @@
                         "readOnly": true,
                         "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
                     }
-                }
+                },
+                "required": [
+                    "agent"
+                ]
             },
             "TestSetList": {
                 "type": "object",
@@ -57513,7 +58198,10 @@
                         "readOnly": true,
                         "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
                     }
-                }
+                },
+                "required": [
+                    "agent"
+                ]
             },
             "TokenRefresh": {
                 "type": "object",
@@ -57526,7 +58214,10 @@
                         "type": "string",
                         "writeOnly": true
                     }
-                }
+                },
+                "required": [
+                    "refresh"
+                ]
             },
             "Tool": {
                 "type": "object",
@@ -57550,7 +58241,10 @@
                     "freetext_params": {
                         "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"
                     }
-                }
+                },
+                "required": [
+                    "name"
+                ]
             },
             "TranscriptFunctionCallData": {
                 "type": "object",
@@ -57605,7 +58299,15 @@
                         "type": "object",
                         "additionalProperties": {}
                     }
-                }
+                },
+                "required": [
+                    "aggregation_function",
+                    "chart_type",
+                    "data",
+                    "field_name",
+                    "metadata",
+                    "time_period"
+                ]
             },
             "UserAPIKey": {
                 "type": "object",
@@ -57685,7 +58387,13 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "configuration_type",
+                    "data",
+                    "name",
+                    "project"
+                ]
             },
             "UserInline": {
                 "type": "object",
@@ -57703,7 +58411,11 @@
                         "format": "email",
                         "maxLength": 254
                     }
-                }
+                },
+                "required": [
+                    "email",
+                    "name"
+                ]
             },
             "UserMembership": {
                 "type": "object",
@@ -57770,7 +58482,10 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "project"
+                ]
             },
             "ValidateAnnotationsRequest": {
                 "type": "object",
@@ -57815,7 +58530,13 @@
                     "total_flagged": {
                         "type": "integer"
                     }
-                }
+                },
+                "required": [
+                    "all_results",
+                    "flagged_cases",
+                    "total_flagged",
+                    "total_validated"
+                ]
             },
             "View": {
                 "type": "object",
@@ -57845,7 +58566,11 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "name",
+                    "project"
+                ]
             },
             "Widget": {
                 "type": "object",
@@ -58025,11 +58750,12 @@
                         "enum": [
                             "line",
                             "bar",
-                            "pie"
+                            "pie",
+                            "stat"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "52e139f99edda304",
-                        "description": "Type of chart to display\n\n* `line` - Line\n* `bar` - Bar\n* `pie` - Pie"
+                        "x-spec-enum-id": "458699e47c376d15",
+                        "description": "Type of chart to display\n\n* `line` - Line\n* `bar` - Bar\n* `pie` - Pie\n* `stat` - Stat"
                     },
                     "data_type": {
                         "enum": [
@@ -58058,6 +58784,7 @@
                             "metric_evaluations.value",
                             "metadata.region"
                         ],
+                        "default": "",
                         "maxLength": 255
                     },
                     "metric": {
@@ -58132,7 +58859,10 @@
                         "readOnly": true,
                         "description": "When the widget was last updated"
                     }
-                }
+                },
+                "required": [
+                    "chart_type"
+                ]
             },
             "WidgetDataResponse": {
                 "type": "object",
@@ -58228,7 +58958,16 @@
                             }
                         }
                     }
-                }
+                },
+                "required": [
+                    "aggregation_function",
+                    "chart_type",
+                    "data",
+                    "field_name",
+                    "metadata",
+                    "time_period",
+                    "widget_id"
+                ]
             },
             "Workflow": {
                 "type": "object",
@@ -58254,7 +58993,11 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "agent",
+                    "name"
+                ]
             },
             "WorkflowDetail": {
                 "type": "object",
@@ -58291,7 +59034,11 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "agent",
+                    "name"
+                ]
             }
         },
         "securitySchemes": {

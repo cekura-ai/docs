@@ -5,15 +5,15 @@ import json
 
 
 class CekuraAPIClient:
-    def __init__(self, base_url: str, api_key: str, timeout: int = 30):
+    def __init__(self, base_url: str, credential: str, credential_type: str = "api_key", timeout: int = 30):
         self.base_url = base_url
-        self.api_key = api_key
+        auth_header = (
+            {"Authorization": f"Bearer {credential}"}
+            if credential_type == "bearer"
+            else {"X-CEKURA-API-KEY": credential}
+        )
         self.client = httpx.AsyncClient(
-            headers={
-                "X-CEKURA-API-KEY": api_key,
-                "Content-Type": "application/json",
-                "X-Client-Source": "mcp",
-            },
+            headers={**auth_header, "Content-Type": "application/json", "X-Client-Source": "mcp"},
             timeout=timeout,
         )
 
@@ -117,5 +117,5 @@ class CekuraAPIClient:
             raise Exception(f"Request failed ({response.status_code}): {response.text[:200]}")
 
 
-def create_client(base_url: str, api_key: str, timeout: int = 30) -> CekuraAPIClient:
-    return CekuraAPIClient(base_url, api_key, timeout)
+def create_client(base_url: str, credential: str, credential_type: str = "api_key", timeout: int = 30) -> CekuraAPIClient:
+    return CekuraAPIClient(base_url, credential, credential_type, timeout)

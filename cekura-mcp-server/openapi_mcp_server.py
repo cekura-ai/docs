@@ -42,16 +42,20 @@ request_base_url: ContextVar[str] = ContextVar('request_base_url', default=None)
 _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower() in ("1", "true", "yes")
 
 # Derive allowed hosts from MCP_ISSUER_URL (covers prod, ngrok, local).
-# Localhost variants are always included for health checks and local dev.
+# Localhost variants and known Cekura hosts are always included.
 from urllib.parse import urlparse as _urlparse
 _issuer_host = _urlparse(MCP_ISSUER_URL).netloc
 _allowed_hosts = [
+    "api.cekura.ai",
+    "test.cekura.ai",
     "localhost",
     "localhost:8000",
     "localhost:8001",
     "localhost:8002",
     "127.0.0.1",
     "127.0.0.1:8001",
+    "0.0.0.0",
+    "0.0.0.0:8001",
 ]
 if _issuer_host and _issuer_host not in _allowed_hosts:
     _allowed_hosts.append(_issuer_host)

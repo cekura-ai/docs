@@ -1,3 +1,4 @@
+import os
 import sys
 import asyncio
 import logging
@@ -33,7 +34,11 @@ class HealthCheckFilter(logging.Filter):
         return not any(path in message for path in ['/mcp/health', '/mcp/healthz', '/favicon.ico'])
 
 request_api_key: ContextVar[str] = ContextVar('request_api_key', default=None)
+request_bearer_token: ContextVar[str] = ContextVar('request_bearer_token', default=None)
 request_base_url: ContextVar[str] = ContextVar('request_base_url', default=None)
+
+# X-CEKURA-BASE-URL override is only allowed when explicitly enabled (dev/staging only)
+_ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower() in ("1", "true", "yes")
 
 # Configure transport security to allow api.cekura.ai as Host header
 transport_security = TransportSecuritySettings(
@@ -279,14 +284,17 @@ async def test_simple_tool(message: str) -> str:
     return f"Hello from Cekura MCP Server! You said: {message}"
 
 
-def get_request_api_key():
-    """Get API key from current request context."""
+def get_request_credential() -> tuple[str, str]:
+    """Return (credential, type) from request context. Type is 'bearer' or 'api_key'."""
+    bearer = request_bearer_token.get()
+    if bearer:
+        return bearer, "bearer"
     api_key = request_api_key.get()
-    if not api_key:
-        raise ValueError(
-            "No API key found. Please provide API key via X-CEKURA-API-KEY header when connecting to the MCP server."
-        )
-    return api_key
+    if api_key:
+        return api_key, "api_key"
+    raise ValueError(
+        "No credential found. Connect via X-CEKURA-API-KEY header or Authorization: Bearer <token>."
+    )
 
 def setup_dynamic_tool_handlers():
     from mcp.types import Tool as MCPTool
@@ -317,11 +325,11 @@ def setup_dynamic_tool_handlers():
                     query = arguments.get('query', '')
                     return await call_mintlify_search(query)
 
-                api_key = get_request_api_key()
+                credential, credential_type = get_request_credential()
                 op = tool_data['operation']
 
                 base_url = request_base_url.get() or server_config.base_url
-                user_api_client = create_client(base_url, api_key)
+                user_api_client = create_client(base_url, credential, credential_type=credential_type)
 
                 result = await user_api_client.execute_request(
                     method=op.method,
@@ -334,7 +342,6 @@ def setup_dynamic_tool_handlers():
                 return [{"type": "text", "text": str(result)}]
 
             except ValueError as e:
-                # API key not found error
                 error_msg = f"Authentication Error: {str(e)}"
                 return [{"type": "text", "text": error_msg}]
             except Exception as e:
@@ -349,7 +356,6 @@ def setup_dynamic_tool_handlers():
 
 def main():
     import argparse
-    import os
     import uvicorn
     from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -364,25 +370,30 @@ def main():
 
     logger.info(f"Server initialized successfully. Running on http://{args.host}:{args.port}/mcp")
 
-    class APIKeyMiddleware(BaseHTTPMiddleware):
+    class CredentialMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request, call_next):
             if request.url.path in ["/mcp/health", "/mcp/healthz"]:
-                response = await call_next(request)
-                return response
+                return await call_next(request)
 
+            # Bearer token — agent/CLI JWT passthrough
+            auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
+            if auth_header and auth_header.lower().startswith('bearer '):
+                request_bearer_token.set(auth_header[7:])
+                logger.debug("Bearer token credential set for request")
+
+            # API key header — legacy mcp-remote / Claude Desktop
             api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
-            base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
-
             if api_key:
                 request_api_key.set(api_key)
-                logger.debug(f"API key set for request: {api_key[:20]}...")
+                logger.debug("API key credential set for request")
 
-            if base_url_override:
-                request_base_url.set(base_url_override.rstrip("/"))
-                logger.debug(f"Base URL override set: {base_url_override}")
+            # Base URL override — only honoured when ALLOW_BASE_URL_OVERRIDE=true (dev/staging)
+            if _ALLOW_BASE_URL_OVERRIDE:
+                base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
+                if base_url_override:
+                    request_base_url.set(base_url_override.rstrip("/"))
 
-            response = await call_next(request)
-            return response
+            return await call_next(request)
 
     from starlette.responses import JSONResponse
     from starlette.routing import Route
@@ -399,8 +410,8 @@ def main():
     app.router.routes.insert(0, Route("/mcp/health", health_check))
     app.router.routes.insert(1, Route("/mcp/healthz", health_check))
 
-    app.add_middleware(APIKeyMiddleware)
-    logger.info("API Key middleware added")
+    app.add_middleware(CredentialMiddleware)
+    logger.info("Credential middleware added (API key + Bearer token support)")
     logger.info("Health check endpoints: /mcp/health, /mcp/healthz")
 
     logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())

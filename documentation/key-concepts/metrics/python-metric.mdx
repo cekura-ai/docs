@@ -660,6 +660,9 @@ def evaluate_llm_judge_metric(
     description: str,
     eval_type: str|None = None,
     enum_values: List[str]|None = None,
+    audio: bool = False,
+    audio_start_time: float|None = None,
+    audio_end_time: float|None = None,
 ) -> Dict:
 ```
 
@@ -693,6 +696,18 @@ def evaluate_llm_judge_metric(
   List of possible values when using `eval_type="enum"`. Only applicable for ENUM type evaluations.
 
   Example: `["Excellent", "Good", "Fair", "Poor"]`
+</ParamField>
+
+<ParamField path="audio" type="bool" default="False">
+  Enable audio-based evaluation using Gemini multimodal. When `True`, the voice recording is analyzed rather than just the transcript. The recording is retrieved from the associated call log or run.
+</ParamField>
+
+<ParamField path="audio_start_time" type="float|None" default="None">
+  Start time in seconds for evaluating a specific segment of the recording. Only applies when `audio=True`. Values exceeding the recording duration are clamped to the valid range.
+</ParamField>
+
+<ParamField path="audio_end_time" type="float|None" default="None">
+  End time in seconds for evaluating a specific segment of the recording. Only applies when `audio=True`. Must be greater than `audio_start_time`. Values exceeding the recording duration are clamped to the valid range.
 </ParamField>
 
 **Return Value:**
@@ -736,6 +751,44 @@ if "main" not in call_end_reason.lower():
 description = get_not_early_end_call_description()
 
 response = evaluate_llm_judge_metric(data, key, description, "binary_workflow_adherence")
+_result = response.get("result")
+_explanation = response.get("explanation")
+```
+
+#### Example: Audio Evaluation
+
+Evaluate the voice recording rather than just the transcript:
+
+```python
+key = "<your_cekura_api_key>"
+
+# Evaluate the full audio recording
+response = evaluate_llm_judge_metric(
+    data,
+    key,
+    description="Was the agent's greeting professional and warm?",
+    eval_type="binary_qualitative",
+    audio=True
+)
+_result = response.get("result")
+_explanation = response.get("explanation")
+```
+
+To evaluate a specific segment of the recording, specify start and end times:
+
+```python
+key = "<your_cekura_api_key>"
+
+# Evaluate only the first 30 seconds (e.g., the greeting)
+response = evaluate_llm_judge_metric(
+    data,
+    key,
+    description="Did the agent introduce themselves and the company?",
+    eval_type="binary_workflow_adherence",
+    audio=True,
+    audio_start_time=0.0,
+    audio_end_time=30.0
+)
 _result = response.get("result")
 _explanation = response.get("explanation")
 ```

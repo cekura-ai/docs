@@ -9,6 +9,14 @@ from contextvars import ContextVar
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
+# Load secrets from AWS Secrets Manager before any env var is read
+if os.getenv("AWS_SECRET_NAME"):
+    import boto3
+    _sm_client = boto3.client("secretsmanager")
+    _secret_value = _sm_client.get_secret_value(SecretId=os.getenv("AWS_SECRET_NAME"))
+    _config = json.loads(_secret_value["SecretString"])
+    os.environ.update({key: str(value) for key, value in _config.items()})
+
 from config import load_config
 from openapi_parser import load_openapi_spec
 from http_client import create_client

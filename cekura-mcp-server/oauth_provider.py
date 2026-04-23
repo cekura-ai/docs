@@ -7,6 +7,7 @@ import logging
 from urllib.parse import urlencode
 
 from joserfc import jwe
+from joserfc import jwt as jose_jwt
 from joserfc.jwk import OctKey
 from pydantic import AnyUrl
 from mcp.server.auth.provider import (
@@ -22,10 +23,10 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
 logger = logging.getLogger(__name__)
 
-OAUTH_JWT_SECRET = os.environ.get("OAUTH_JWT_SECRET", "")
-if not OAUTH_JWT_SECRET:
-    OAUTH_JWT_SECRET = secrets.token_urlsafe(32)
-    logger.warning("OAUTH_JWT_SECRET not set — generated temporary secret; tokens will be invalid after restart")
+MCP_JWT_SECRET = os.environ.get("MCP_JWT_SECRET", "")
+if not MCP_JWT_SECRET:
+    MCP_JWT_SECRET = secrets.token_urlsafe(32)
+    logger.warning("MCP_JWT_SECRET not set — generated temporary secret; tokens will be invalid after restart")
 
 ACCESS_TOKEN_TTL = 3600              # 1 hour
 REFRESH_TOKEN_TTL = 30 * 24 * 3600  # 30 days
@@ -33,10 +34,14 @@ REFRESH_TOKEN_TTL = 30 * 24 * 3600  # 30 days
 DASHBOARD_URL = os.environ.get("DASHBOARD_URL", "https://app.cekura.ai")
 MCP_ISSUER_URL = os.environ.get("MCP_ISSUER_URL", "https://api.cekura.ai")
 
-# Derive 32-byte AES-256 key from the JWT secret
-_raw_key = hashlib.sha256(OAUTH_JWT_SECRET.encode()).digest()
-JWE_KEY = OctKey.import_key(_raw_key)
+# JWE key (AES-256-GCM) — used only for mcp_exchange_code URL transit
+_raw_jwe_key = hashlib.sha256(MCP_JWT_SECRET.encode()).digest()
+JWE_KEY = OctKey.import_key(_raw_jwe_key)
 JWE_HEADER = {"alg": "dir", "enc": "A256GCM"}
+
+# JWS key (HS256) — used for access and refresh tokens (header/body transit only)
+JWS_KEY = OctKey.import_key(MCP_JWT_SECRET.encode())
+JWS_HEADER = {"alg": "HS256"}
 
 
 def _jwe_encode(claims: dict) -> str:
@@ -55,24 +60,40 @@ def _jwe_decode(token: str) -> dict | None:
         return None
 
 
+def _jwt_encode(claims: dict) -> str:
+    return jose_jwt.encode(JWS_HEADER, claims, JWS_KEY)
+
+
+def _jwt_decode(token: str) -> dict | None:
+    """Verify and decode a JWS token. Returns claims dict or None if invalid/expired."""
+    try:
+        obj = jose_jwt.decode(token, JWS_KEY)
+        claims = obj.claims
+        if claims.get("exp") and claims["exp"] < time.time():
+            return None
+        return claims
+    except Exception:
+        return None
+
+
 class CekuraAuthCode(AuthorizationCode):
-    api_key: str
+    mcp_jwt: str
 
 
 class CekuraAccessToken(AccessToken):
-    api_key: str
+    mcp_jwt: str
 
 
 def decode_bearer_credential(bearer_token: str) -> tuple[str, str]:
     """
     Extract the backend credential from a Bearer token.
-    Returns (credential, type) where type is "api_key" or "bearer".
-    - Our JWE access token → ("api_key_value", "api_key")
-    - Raw Cekura JWT (agent/CLI passthrough) → (token, "bearer")
+    Returns (credential, type) where type is always "bearer".
+    - Our JWS access token → extracts mcp_jwt, forwards as Bearer to backend
+    - Raw Cekura JWT (agent/CLI passthrough) → forwarded as-is
     """
-    claims = _jwe_decode(bearer_token)
-    if claims and claims.get("type") == "access" and claims.get("api_key"):
-        return claims["api_key"], "api_key"
+    claims = _jwt_decode(bearer_token)
+    if claims and claims.get("type") == "access" and claims.get("mcp_jwt"):
+        return claims["mcp_jwt"], "bearer"
     return bearer_token, "bearer"
 
 
@@ -113,8 +134,8 @@ class CekuraMCPOAuthProvider(OAuthAuthorizationServerProvider):
     async def handle_callback(self, mcp_exchange_code: str, session_id: str) -> str:
         """
         Invoked by /oauth/callback after dashboard redirects back.
-        mcp_exchange_code is a JWE token (exp: 60s, encrypted with OAUTH_JWT_SECRET)
-        containing {api_key, type: "mcp_code"} — created by the dashboard server-side.
+        mcp_exchange_code is a JWE token (exp: 60s, encrypted with MCP_JWT_SECRET)
+        containing {mcp_jwt, type: "mcp_code"} — created by the dashboard server-side.
         Returns the redirect URL back to the OAuth client.
         """
         session = self._pending_sessions.pop(session_id, None)
@@ -122,10 +143,17 @@ class CekuraMCPOAuthProvider(OAuthAuthorizationServerProvider):
             raise ValueError("Invalid or expired OAuth session")
 
         claims = _jwe_decode(mcp_exchange_code)
-        if not claims or claims.get("type") != "mcp_code" or not claims.get("api_key"):
+        if not claims:
+            logger.error("handle_callback: JWE decrypt failed — check MCP_JWT_SECRET matches dashboard")
+            raise ValueError("Invalid or expired mcp_exchange_code")
+        if claims.get("type") != "mcp_code":
+            logger.error(f"handle_callback: unexpected token type={claims.get('type')!r}, expected 'mcp_code'")
+            raise ValueError("Invalid or expired mcp_exchange_code")
+        if not claims.get("mcp_jwt"):
+            logger.error("handle_callback: mcp_jwt missing from exchange code payload")
             raise ValueError("Invalid or expired mcp_exchange_code")
 
-        api_key = claims["api_key"]
+        mcp_jwt = claims["mcp_jwt"]
         code = secrets.token_urlsafe(32)
         self._auth_codes[code] = CekuraAuthCode(
             code=code,
@@ -136,7 +164,7 @@ class CekuraMCPOAuthProvider(OAuthAuthorizationServerProvider):
             redirect_uri=AnyUrl(session["redirect_uri"]),
             redirect_uri_provided_explicitly=session["redirect_uri_provided_explicitly"],
             resource=session["resource"],
-            api_key=api_key,
+            mcp_jwt=mcp_jwt,
         )
         return construct_redirect_uri(session["redirect_uri"], code=code, state=session["state"])
 
@@ -155,13 +183,13 @@ class CekuraMCPOAuthProvider(OAuthAuthorizationServerProvider):
         return self._issue_token_pair(
             client.client_id,
             authorization_code.scopes,
-            authorization_code.api_key,
+            authorization_code.mcp_jwt,
         )
 
     async def load_refresh_token(
         self, client: OAuthClientInformationFull, refresh_token: str
     ) -> RefreshToken | None:
-        claims = _jwe_decode(refresh_token)
+        claims = _jwt_decode(refresh_token)
         if not claims or claims.get("type") != "refresh" or claims.get("client_id") != client.client_id:
             return None
         return RefreshToken(
@@ -174,55 +202,55 @@ class CekuraMCPOAuthProvider(OAuthAuthorizationServerProvider):
     async def exchange_refresh_token(
         self, client: OAuthClientInformationFull, refresh_token: RefreshToken, scopes: list[str]
     ) -> OAuthToken:
-        claims = _jwe_decode(refresh_token.token)
+        claims = _jwt_decode(refresh_token.token)
         if not claims or claims.get("type") != "refresh":
             raise TokenError(error="invalid_grant", error_description="Invalid refresh token")
 
-        api_key = claims.get("api_key")
-        if not api_key:
-            raise TokenError(error="invalid_grant", error_description="Missing API key in refresh token")
+        mcp_jwt = claims.get("mcp_jwt")
+        if not mcp_jwt:
+            raise TokenError(error="invalid_grant", error_description="Missing MCP JWT in refresh token")
 
         use_scopes = scopes or claims.get("scopes", [])
-        return self._issue_token_pair(client.client_id, use_scopes, api_key)
+        return self._issue_token_pair(client.client_id, use_scopes, mcp_jwt)
 
     async def load_access_token(self, token: str) -> CekuraAccessToken | None:
-        claims = _jwe_decode(token)
-        if claims and claims.get("type") == "access" and claims.get("api_key"):
+        claims = _jwt_decode(token)
+        if claims and claims.get("type") == "access" and claims.get("mcp_jwt"):
             return CekuraAccessToken(
                 token=token,
                 client_id=claims.get("client_id", "oauth"),
                 scopes=claims.get("scopes", []),
                 expires_at=claims.get("exp"),
-                api_key=claims["api_key"],
+                mcp_jwt=claims["mcp_jwt"],
             )
 
-        # Not our JWE — treat as raw Cekura JWT (agent/CLI passthrough)
+        # Not our JWS token — treat as raw Cekura JWT (agent/CLI passthrough)
         return CekuraAccessToken(
             token=token,
             client_id="passthrough",
             scopes=[],
             expires_at=None,
-            api_key=token,
+            mcp_jwt=token,
         )
 
     async def revoke_token(self, token) -> None:
         pass
 
-    def _issue_token_pair(self, client_id: str, scopes: list[str], api_key: str) -> OAuthToken:
+    def _issue_token_pair(self, client_id: str, scopes: list[str], mcp_jwt: str) -> OAuthToken:
         now = int(time.time())
-        access_token = _jwe_encode({
+        access_token = _jwt_encode({
             "type": "access",
             "sub": "cekura_user",
-            "api_key": api_key,
+            "mcp_jwt": mcp_jwt,
             "client_id": client_id,
             "scopes": scopes,
             "iat": now,
             "exp": now + ACCESS_TOKEN_TTL,
         })
-        refresh_token = _jwe_encode({
+        refresh_token = _jwt_encode({
             "type": "refresh",
             "sub": "cekura_user",
-            "api_key": api_key,
+            "mcp_jwt": mcp_jwt,
             "client_id": client_id,
             "scopes": scopes,
             "iat": now,

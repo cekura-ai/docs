@@ -88,7 +88,10 @@ class CekuraAPIClient:
         return value
 
     def _handle_response(self, response: httpx.Response) -> Dict[str, Any]:
-        if response.status_code == 200 or response.status_code == 201:
+        if 200 <= response.status_code < 300:
+            # 204 No Content (common for DELETE) and other empty 2xx bodies.
+            if response.status_code == 204 or not response.content:
+                return {"status": "ok", "status_code": response.status_code}
             try:
                 return response.json()
             except Exception:

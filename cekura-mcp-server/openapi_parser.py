@@ -102,6 +102,8 @@ class OpenAPIParser:
             if param_required and param_in != "path":
                 required.append(param_name)
 
+        openapi_examples: List[Dict[str, Any]] = []
+
         if operation.request_body:
             content = operation.request_body.get("content", {})
             json_content = content.get("application/json", {})
@@ -115,11 +117,36 @@ class OpenAPIParser:
                 if "required" in schema:
                     required.extend(schema["required"])
 
-        return {
+            # drf-spectacular puts @extend_schema(examples=[OpenApiExample(...)])
+            # under requestBody.content.application/json.examples as a dict keyed by
+            # a CamelCased version of the example name. Each entry has:
+            #   { value, summary, description }
+            # We flatten into a list so downstream precedence (filter / cap) is simple.
+            examples_dict = json_content.get("examples", {})
+            if isinstance(examples_dict, dict):
+                for key, entry in examples_dict.items():
+                    if not isinstance(entry, dict):
+                        continue
+                    if "value" not in entry:
+                        continue
+                    openapi_examples.append({
+                        "name": key,
+                        "summary": entry.get("summary", ""),
+                        "description": entry.get("description", ""),
+                        "value": entry["value"],
+                    })
+
+        result: Dict[str, Any] = {
             "type": "object",
             "properties": properties,
-            "required": list(set(required))
+            "required": list(set(required)),
         }
+        if openapi_examples:
+            # Private key — overlay-apply layer reads this, filters/caps, and
+            # replaces it with the canonical `examples` array before the schema
+            # is registered. Consumers never see this key.
+            result["_openapi_examples"] = openapi_examples
+        return result
 
     def _extract_schema_properties(self, schema: Dict[str, Any]) -> Dict[str, Any]:
         if "$ref" in schema:

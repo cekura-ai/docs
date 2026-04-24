@@ -27,6 +27,8 @@ from tool_generator import (
     build_input_schema,
     should_include_operation,
     load_documented_apis_whitelist,
+    apply_overlay_to_description,
+    apply_overlay_to_schema,
 )
 
 logging.basicConfig(
@@ -148,7 +150,10 @@ async def initialize_server():
         else:
             logger.warning("No whitelist found - using all operations (filtered by tags/excludes)")
 
+        blocked_tools = server_config.resolve_blocked_tools()
+
         tools_registered = 0
+        blocked_hits = []
         for operation in operations:
             if not should_include_operation(
                 operation,
@@ -164,8 +169,16 @@ async def initialize_server():
 
             try:
                 tool_name = generate_tool_name(operation)
+
+                if tool_name in blocked_tools:
+                    blocked_hits.append(tool_name)
+                    continue
+
                 tool_description = generate_tool_description(operation)
                 input_schema = build_input_schema(operation, openapi_parser)
+
+                tool_description = apply_overlay_to_description(tool_name, tool_description)
+                input_schema = apply_overlay_to_schema(tool_name, input_schema)
 
                 register_tool(tool_name, tool_description, input_schema, operation)
                 tools_registered += 1
@@ -173,7 +186,32 @@ async def initialize_server():
                 logger.error(f"Error registering tool for {operation.path}: {e}", exc_info=True)
                 continue
 
-        logger.info(f"Registered {tools_registered} MCP tools")
+        if blocked_hits:
+            logger.info(f"Registered {tools_registered} MCP tools (blocked: {sorted(blocked_hits)})")
+        else:
+            logger.info(f"Registered {tools_registered} MCP tools")
+
+        # Non-fatal drift check: log a warning for each overlay that has diverged
+        # from the live openapi.json + whitelist. Keeps production booting while
+        # making divergence immediately visible in logs / dashboards.
+        try:
+            from validate_overlays import run_checks as _overlay_checks
+            drift = _overlay_checks()
+            if drift:
+                errs = [f for f in drift if f.level == "error"]
+                warns = [f for f in drift if f.level == "warning"]
+                if errs:
+                    logger.warning(
+                        f"Overlay drift: {len(errs)} error(s), {len(warns)} warning(s) — "
+                        "run `python3 validate_overlays.py` for details. Overlays are still "
+                        "applied; these tools may render with stale or inaccurate descriptions."
+                    )
+                    for f in errs[:5]:
+                        logger.warning(f"  overlay[{f.category}] {f.tool}: {f.message[:200]}")
+                elif warns:
+                    logger.info(f"Overlay drift: {len(warns)} warning(s) — non-blocking.")
+        except Exception as e:
+            logger.warning(f"Overlay drift check skipped: {e}")
 
         # Register Mintlify documentation search tool
         register_mintlify_search_tool()
@@ -351,7 +389,7 @@ def setup_dynamic_tool_handlers():
                 )
 
                 await user_api_client.close()
-                return [{"type": "text", "text": str(result)}]
+                return [{"type": "text", "text": json.dumps(result, default=str, ensure_ascii=False)}]
 
             except ValueError as e:
                 error_msg = f"Authentication Error: {str(e)}"

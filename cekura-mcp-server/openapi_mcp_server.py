@@ -20,7 +20,6 @@ if os.getenv("AWS_SECRET_NAME"):
 from config import load_config
 from openapi_parser import load_openapi_spec
 from http_client import create_client
-from oauth_provider import oauth_provider, decode_bearer_credential, MCP_ISSUER_URL
 from tool_generator import (
     generate_tool_name,
     generate_tool_description,
@@ -51,8 +50,10 @@ request_base_url: ContextVar[str] = ContextVar('request_base_url', default=None)
 # X-CEKURA-BASE-URL override is only allowed when explicitly enabled (dev/staging only)
 _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower() in ("1", "true", "yes")
 
+MCP_ISSUER_URL = os.environ.get("MCP_ISSUER_URL", "https://api.cekura.ai")
+MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "https://api.cekura.ai/mcp")
+
 # Derive allowed hosts from MCP_ISSUER_URL (covers prod, ngrok, local).
-# Localhost variants and known Cekura hosts are always included.
 from urllib.parse import urlparse as _urlparse
 _issuer_host = _urlparse(MCP_ISSUER_URL).netloc
 _allowed_hosts = [
@@ -408,11 +409,8 @@ def main():
     import argparse
     import uvicorn
     from starlette.middleware.base import BaseHTTPMiddleware
-    from starlette.responses import JSONResponse, RedirectResponse, HTMLResponse
+    from starlette.responses import JSONResponse
     from starlette.routing import Route
-    from mcp.server.auth.routes import create_auth_routes
-    from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
-    from pydantic import AnyHttpUrl
 
     parser = argparse.ArgumentParser(description="Cekura OpenAPI MCP Server")
     parser.add_argument("--port", type=int, default=8001, help="Port to run the HTTP server on (default: 8001)")
@@ -433,14 +431,8 @@ def main():
             # Bearer token — OAuth web users or agent/CLI JWT passthrough
             auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
             if auth_header and auth_header.lower().startswith('bearer '):
-                raw_token = auth_header[7:]
-                credential, cred_type = decode_bearer_credential(raw_token)
-                if cred_type == "api_key":
-                    request_api_key.set(credential)
-                    logger.debug("OAuth API key credential set for request")
-                else:
-                    request_bearer_token.set(credential)
-                    logger.debug("Bearer token credential set for request")
+                request_bearer_token.set(auth_header[7:])
+                logger.debug("Bearer token credential set for request")
 
             # API key header — legacy mcp-remote / Claude Desktop
             api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
@@ -463,41 +455,34 @@ def main():
             "tools_registered": len(operations_registry)
         })
 
-    async def oauth_callback(request):
-        mcp_exchange_code = request.query_params.get("mcp_exchange_code", "")
-        state = request.query_params.get("state", "")
-        if not mcp_exchange_code or not state:
-            return HTMLResponse("<h1>Error</h1><p>Missing required parameters.</p>", status_code=400)
-        try:
-            redirect_url = await oauth_provider.handle_callback(mcp_exchange_code, state)
-            return RedirectResponse(url=redirect_url, status_code=302, headers={"Cache-Control": "no-store"})
-        except ValueError as e:
-            logger.warning(f"OAuth callback error: {e}")
-            return HTMLResponse(f"<h1>Error</h1><p>{e}</p>", status_code=400)
+    async def oauth_protected_resource(request):
+        # RFC 9728 — resource server advertises its authorization server
+        return JSONResponse({
+            "resource": MCP_SERVER_URL,
+            "authorization_servers": [MCP_ISSUER_URL],
+        })
+
+    async def oauth_as_metadata(request):
+        # Convenience fallback for clients that check AS metadata directly on resource server
+        return JSONResponse({
+            "issuer": MCP_ISSUER_URL,
+            "authorization_endpoint": f"{MCP_ISSUER_URL}/user/oauth/mcp/authorize",
+            "token_endpoint": f"{MCP_ISSUER_URL}/user/oauth/mcp/token",
+            "revocation_endpoint": f"{MCP_ISSUER_URL}/user/oauth/mcp/revoke",
+            "response_types_supported": ["code"],
+            "code_challenge_methods_supported": ["S256"],
+        })
 
     app = mcp.streamable_http_app()
 
-    # OAuth routes (/.well-known/oauth-authorization-server, /authorize, /token, /register, /revoke)
-    oauth_routes = create_auth_routes(
-        provider=oauth_provider,
-        issuer_url=AnyHttpUrl(MCP_ISSUER_URL),
-        client_registration_options=ClientRegistrationOptions(enabled=True),
-        revocation_options=RevocationOptions(enabled=True),
-    )
-    for i, route in enumerate(oauth_routes):
-        app.router.routes.insert(i, route)
-
-    # OAuth callback (dashboard redirects here after user login)
-    insert_at = len(oauth_routes)
-    app.router.routes.insert(insert_at, Route("/oauth/callback", oauth_callback, methods=["GET"]))
-
-    # Health checks
-    app.router.routes.insert(insert_at + 1, Route("/mcp/health", health_check))
-    app.router.routes.insert(insert_at + 2, Route("/mcp/healthz", health_check))
+    app.router.routes.insert(0, Route("/.well-known/oauth-protected-resource", oauth_protected_resource))
+    app.router.routes.insert(1, Route("/.well-known/oauth-authorization-server", oauth_as_metadata))
+    app.router.routes.insert(2, Route("/mcp/health", health_check))
+    app.router.routes.insert(3, Route("/mcp/healthz", health_check))
 
     app.add_middleware(CredentialMiddleware)
     logger.info("Credential middleware added (API key + Bearer token support)")
-    logger.info(f"OAuth server: {MCP_ISSUER_URL}/.well-known/oauth-authorization-server")
+    logger.info(f"OAuth discovery: {MCP_SERVER_URL}/.well-known/oauth-protected-resource → {MCP_ISSUER_URL}")
     logger.info("Health check endpoints: /mcp/health, /mcp/healthz")
 
     logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())

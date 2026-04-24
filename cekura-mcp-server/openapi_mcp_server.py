@@ -9,9 +9,18 @@ from contextvars import ContextVar
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
+# Load secrets from AWS Secrets Manager before any env var is read
+if os.getenv("AWS_SECRET_NAME"):
+    import boto3
+    _sm_client = boto3.client("secretsmanager")
+    _secret_value = _sm_client.get_secret_value(SecretId=os.getenv("AWS_SECRET_NAME"))
+    _config = json.loads(_secret_value["SecretString"])
+    os.environ.update({key: str(value) for key, value in _config.items()})
+
 from config import load_config
 from openapi_parser import load_openapi_spec
 from http_client import create_client
+from oauth_provider import oauth_provider, decode_bearer_credential, MCP_ISSUER_URL
 from tool_generator import (
     generate_tool_name,
     generate_tool_description,
@@ -42,25 +51,28 @@ request_base_url: ContextVar[str] = ContextVar('request_base_url', default=None)
 # X-CEKURA-BASE-URL override is only allowed when explicitly enabled (dev/staging only)
 _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower() in ("1", "true", "yes")
 
-# Configure transport security to allow api.cekura.ai as Host header
+# Derive allowed hosts from MCP_ISSUER_URL (covers prod, ngrok, local).
+# Localhost variants and known Cekura hosts are always included.
+from urllib.parse import urlparse as _urlparse
+_issuer_host = _urlparse(MCP_ISSUER_URL).netloc
+_allowed_hosts = [
+    "api.cekura.ai",
+    "test.cekura.ai",
+    "localhost",
+    "localhost:8000",
+    "localhost:8001",
+    "localhost:8002",
+    "127.0.0.1",
+    "127.0.0.1:8001",
+    "0.0.0.0",
+    "0.0.0.0:8001",
+]
+if _issuer_host and _issuer_host not in _allowed_hosts:
+    _allowed_hosts.append(_issuer_host)
+
 transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=True,
-    allowed_hosts=[
-        "api.cekura.ai",
-        "test.cekura.ai",
-        "localhost",
-        "localhost:8000",
-        "localhost:8001",
-        "localhost:8002",
-        "127.0.0.1",
-        "127.0.0.1:8000",
-        "127.0.0.1:8001",
-        "127.0.0.1:8002",
-        "0.0.0.0",
-        "0.0.0.0:8000",
-        "0.0.0.0:8001",
-        "0.0.0.0:8002"
-    ]
+    allowed_hosts=_allowed_hosts,
 )
 
 mcp = FastMCP("Cekura API", transport_security=transport_security)
@@ -331,7 +343,7 @@ def get_request_credential() -> tuple[str, str]:
     if api_key:
         return api_key, "api_key"
     raise ValueError(
-        "No credential found. Connect via X-CEKURA-API-KEY header or Authorization: Bearer <token>."
+        "No credential found. Connect via X-CEKURA-API-KEY header, Bearer token, or OAuth."
     )
 
 def setup_dynamic_tool_handlers():
@@ -396,6 +408,11 @@ def main():
     import argparse
     import uvicorn
     from starlette.middleware.base import BaseHTTPMiddleware
+    from starlette.responses import JSONResponse, RedirectResponse, HTMLResponse
+    from starlette.routing import Route
+    from mcp.server.auth.routes import create_auth_routes
+    from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
+    from pydantic import AnyHttpUrl
 
     parser = argparse.ArgumentParser(description="Cekura OpenAPI MCP Server")
     parser.add_argument("--port", type=int, default=8001, help="Port to run the HTTP server on (default: 8001)")
@@ -413,11 +430,17 @@ def main():
             if request.url.path in ["/mcp/health", "/mcp/healthz"]:
                 return await call_next(request)
 
-            # Bearer token — agent/CLI JWT passthrough
+            # Bearer token — OAuth web users or agent/CLI JWT passthrough
             auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
             if auth_header and auth_header.lower().startswith('bearer '):
-                request_bearer_token.set(auth_header[7:])
-                logger.debug("Bearer token credential set for request")
+                raw_token = auth_header[7:]
+                credential, cred_type = decode_bearer_credential(raw_token)
+                if cred_type == "api_key":
+                    request_api_key.set(credential)
+                    logger.debug("OAuth API key credential set for request")
+                else:
+                    request_bearer_token.set(credential)
+                    logger.debug("Bearer token credential set for request")
 
             # API key header — legacy mcp-remote / Claude Desktop
             api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
@@ -433,9 +456,6 @@ def main():
 
             return await call_next(request)
 
-    from starlette.responses import JSONResponse
-    from starlette.routing import Route
-
     async def health_check(request):
         return JSONResponse({
             "status": "healthy",
@@ -443,13 +463,41 @@ def main():
             "tools_registered": len(operations_registry)
         })
 
+    async def oauth_callback(request):
+        mcp_exchange_code = request.query_params.get("mcp_exchange_code", "")
+        state = request.query_params.get("state", "")
+        if not mcp_exchange_code or not state:
+            return HTMLResponse("<h1>Error</h1><p>Missing required parameters.</p>", status_code=400)
+        try:
+            redirect_url = await oauth_provider.handle_callback(mcp_exchange_code, state)
+            return RedirectResponse(url=redirect_url, status_code=302, headers={"Cache-Control": "no-store"})
+        except ValueError as e:
+            logger.warning(f"OAuth callback error: {e}")
+            return HTMLResponse(f"<h1>Error</h1><p>{e}</p>", status_code=400)
+
     app = mcp.streamable_http_app()
 
-    app.router.routes.insert(0, Route("/mcp/health", health_check))
-    app.router.routes.insert(1, Route("/mcp/healthz", health_check))
+    # OAuth routes (/.well-known/oauth-authorization-server, /authorize, /token, /register, /revoke)
+    oauth_routes = create_auth_routes(
+        provider=oauth_provider,
+        issuer_url=AnyHttpUrl(MCP_ISSUER_URL),
+        client_registration_options=ClientRegistrationOptions(enabled=True),
+        revocation_options=RevocationOptions(enabled=True),
+    )
+    for i, route in enumerate(oauth_routes):
+        app.router.routes.insert(i, route)
+
+    # OAuth callback (dashboard redirects here after user login)
+    insert_at = len(oauth_routes)
+    app.router.routes.insert(insert_at, Route("/oauth/callback", oauth_callback, methods=["GET"]))
+
+    # Health checks
+    app.router.routes.insert(insert_at + 1, Route("/mcp/health", health_check))
+    app.router.routes.insert(insert_at + 2, Route("/mcp/healthz", health_check))
 
     app.add_middleware(CredentialMiddleware)
     logger.info("Credential middleware added (API key + Bearer token support)")
+    logger.info(f"OAuth server: {MCP_ISSUER_URL}/.well-known/oauth-authorization-server")
     logger.info("Health check endpoints: /mcp/health, /mcp/healthz")
 
     logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())

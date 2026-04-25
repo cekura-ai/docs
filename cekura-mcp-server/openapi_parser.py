@@ -14,6 +14,7 @@ class Operation:
     request_body: Optional[Dict[str, Any]]
     responses: Dict[str, Any]
     tags: List[str]
+    deprecated: bool = False
 
 
 class OpenAPIParser:
@@ -44,7 +45,8 @@ class OpenAPIParser:
                         parameters=operation_data.get("parameters", []),
                         request_body=operation_data.get("requestBody"),
                         responses=operation_data.get("responses", {}),
-                        tags=operation_data.get("tags", [])
+                        tags=operation_data.get("tags", []),
+                        deprecated=operation_data.get("deprecated", False),
                     )
                     operations.append(operation)
 
@@ -110,12 +112,35 @@ class OpenAPIParser:
             schema = json_content.get("schema", {})
 
             if schema:
-                body_props = self._extract_schema_properties(schema)
-                for prop_name, prop_schema in body_props.items():
-                    properties[prop_name] = prop_schema
+                # Top-level array schema (e.g. bulk_create endpoints that accept a JSON array).
+                # Expose as a single `items` parameter typed as array so the agent can pass
+                # the array directly rather than seeing an empty properties object.
+                resolved = schema
+                if "$ref" in resolved:
+                    resolved = self.resolve_schema_ref(resolved["$ref"])
+                if resolved.get("type") == "array":
+                    item_schema = resolved.get("items", {})
+                    item_desc = "Array items"
+                    if "$ref" in item_schema:
+                        ref_name = item_schema["$ref"].split("/")[-1]
+                        item_desc = f"{ref_name} object"
+                    properties["items"] = {
+                        "type": "array",
+                        "description": (
+                            resolved.get("description") or
+                            f"List of {item_desc}s to submit. Each element has the same shape as a single create request."
+                        ),
+                    }
+                    required.append("items")
+                else:
+                    body_props = self._extract_schema_properties(schema)
+                    for prop_name, prop_schema in body_props.items():
+                        properties[prop_name] = prop_schema
 
-                if "required" in schema:
-                    required.extend(schema["required"])
+                    if "required" in schema:
+                        required.extend(schema["required"])
+                    elif "required" in resolved:
+                        required.extend(resolved["required"])
 
             # drf-spectacular puts @extend_schema(examples=[OpenApiExample(...)])
             # under requestBody.content.application/json.examples as a dict keyed by
@@ -154,13 +179,41 @@ class OpenAPIParser:
 
         properties = {}
         for prop_name, prop_schema in schema.get("properties", {}).items():
-            prop_type = prop_schema.get("type", "string")
             prop_description = prop_schema.get("description", "")
 
-            properties[prop_name] = {
-                "type": self._convert_openapi_type(prop_type),
+            # Resolve oneOf/anyOf to a concrete type. When one option is {} (any-type),
+            # the field accepts multiple JSON types — omit the type constraint so the MCP
+            # client passes values natively instead of coercing to string.
+            prop_type = prop_schema.get("type")
+            if prop_type is None:
+                entries = prop_schema.get("oneOf") or prop_schema.get("anyOf") or []
+                non_null = [e for e in entries if e and e.get("type") != "null"]
+                if len(non_null) == 1 and non_null[0].get("type"):
+                    prop_type = non_null[0]["type"]
+                # else: leave prop_type None → no type constraint (any JSON value)
+
+            # Resolve allOf: [{$ref: ...}] — a property typed as a named schema object.
+            # Pull the description from the referenced schema if the property has none.
+            if prop_type is None and prop_schema.get("allOf"):
+                all_of_entries = prop_schema["allOf"]
+                # Common pattern: allOf with a single $ref (possibly alongside a description).
+                refs = [e for e in all_of_entries if "$ref" in e]
+                if len(refs) == 1:
+                    try:
+                        ref_schema = self.resolve_schema_ref(refs[0]["$ref"])
+                        prop_type = "object"
+                        if not prop_description:
+                            prop_description = ref_schema.get("description", "")
+                    except (ValueError, KeyError):
+                        pass
+
+            prop_entry: Dict[str, Any] = {
                 "description": prop_description or f"Property: {prop_name}",
             }
+            if prop_type is not None:
+                prop_entry["type"] = self._convert_openapi_type(prop_type)
+
+            properties[prop_name] = prop_entry
 
             if "enum" in prop_schema:
                 properties[prop_name]["enum"] = prop_schema["enum"]

@@ -60,13 +60,22 @@ class CekuraAPIClient:
 
         return resolved_path, query_params
 
-    def _build_request_body(self, body_schema: Optional[Dict[str, Any]], params: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_request_body(self, body_schema: Optional[Dict[str, Any]], params: Dict[str, Any]) -> Any:
         if not body_schema:
             body = {}
             for k, v in params.items():
                 if v is not None:
                     body[k] = self._parse_json_field(k, v)
             return body
+
+        # Detect top-level array schemas (e.g. bulk_create endpoints).
+        # The parser exposes these as a single `items` parameter; unwrap it
+        # and send the array directly as the JSON body.
+        content = body_schema.get("content", {})
+        json_schema = content.get("application/json", {}).get("schema", {})
+        if json_schema.get("type") == "array" and "items" in params:
+            raw = params["items"]
+            return self._parse_json_field("items", raw) if isinstance(raw, str) else raw
 
         body = {}
         for k, v in params.items():
@@ -77,6 +86,15 @@ class CekuraAPIClient:
     def _parse_json_field(self, key: str, value: Any) -> Any:
         if not isinstance(value, str):
             return value
+
+        # Auto-parse any string that looks like a JSON array or object.
+        # Claude sometimes serializes array/object arguments as strings even when the
+        # schema says type:array/object. Safely try to recover here.
+        if value.startswith(('[', '{')):
+            try:
+                return json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                return value
 
         json_field_patterns = ['_json', 'metadata', 'dynamic_variables', 'context', '_data', 'information']
         if any(pattern in key.lower() for pattern in json_field_patterns):

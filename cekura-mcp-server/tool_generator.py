@@ -214,6 +214,9 @@ def should_include_operation(
     exclude_ops: list = None,
     whitelist: Optional[Set[Tuple[str, str]]] = None
 ) -> bool:
+    if operation.deprecated:
+        return False
+
     if whitelist is not None:
         method = operation.method.upper()
         path = operation.path.rstrip('/')

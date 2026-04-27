@@ -53,10 +53,9 @@ _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower()
 MCP_ISSUER_URL = os.environ.get("MCP_ISSUER_URL", "https://api.cekura.ai")
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "https://api.cekura.ai/mcp")
 
-# Derive allowed hosts from MCP_ISSUER_URL and MCP_SERVER_URL (covers prod, ngrok, local).
+# Derive allowed hosts from MCP_ISSUER_URL (covers prod, ngrok, local).
 from urllib.parse import urlparse as _urlparse
 _issuer_host = _urlparse(MCP_ISSUER_URL).netloc
-_server_host = _urlparse(MCP_SERVER_URL).netloc
 _allowed_hosts = [
     "api.cekura.ai",
     "test.cekura.ai",
@@ -71,8 +70,6 @@ _allowed_hosts = [
 ]
 if _issuer_host and _issuer_host not in _allowed_hosts:
     _allowed_hosts.append(_issuer_host)
-if _server_host and _server_host not in _allowed_hosts:
-    _allowed_hosts.append(_server_host)
 
 transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=True,
@@ -469,9 +466,9 @@ def main():
         # Convenience fallback for clients that check AS metadata directly on resource server
         return JSONResponse({
             "issuer": MCP_ISSUER_URL,
-            "authorization_endpoint": f"{MCP_ISSUER_URL}/user/oauth/authorize",
-            "token_endpoint": f"{MCP_ISSUER_URL}/user/oauth/token",
-            "revocation_endpoint": f"{MCP_ISSUER_URL}/user/oauth/revoke",
+            "authorization_endpoint": f"{MCP_ISSUER_URL}/user/oauth/mcp/authorize",
+            "token_endpoint": f"{MCP_ISSUER_URL}/user/oauth/mcp/token",
+            "revocation_endpoint": f"{MCP_ISSUER_URL}/user/oauth/mcp/revoke",
             "response_types_supported": ["code"],
             "code_challenge_methods_supported": ["S256"],
         })

@@ -1,0 +1,94 @@
+---
+title: "Accent & Dialect Testing"
+sidebarTitle: "Accent & Dialect Testing"
+icon: "microphone"
+iconType: "regular"
+description: "Test your voice AI agent against regional accents and dialects of the same language."
+---
+
+## Overview
+
+Accent testing is distinct from [multilingual testing](/documentation/guides/testing-agents/multilingual-testing). Multilingual testing checks whether your agent handles *different languages* — Spanish, French, Hindi. Accent testing checks whether your agent handles *the same language spoken with different regional accents* — UK English spoken with a Scottish, Yorkshire, Geordie, or Welsh accent.
+
+The failure modes are different too. With multilingual testing, agents often fall back to English mid-conversation. With accent testing, the dominant failure mode is **ASR mis-transcription**: the agent's speech-to-text model isn't configured for regional acoustic variation, so it garbles key words and the agent responds incorrectly or not at all — even though the caller is speaking the agent's primary language.
+
+Common scenarios that benefit from dedicated accent testing:
+
+- Healthcare voice agents serving regional UK populations
+- Customer service agents deployed across US markets (Southern, AAVE, New York, etc.)
+- Any agent with a broad geographic footprint where callers speak the same language with distinct regional phonology
+
+## How It Works
+
+Accent testing uses the same **Personalities** and **Override Personality** primitives as other testing workflows. You create or assign a custom personality per target accent and run your existing evaluators against it — no new evaluators required.
+
+See [Creating Custom Personalities](/documentation/advanced/creating-custom-personalities) for how to add an accent that isn't in the default set.
+
+## Running an Accent Test
+
+<Steps>
+  <Step title="Identify the accents you need to cover">
+    List the regional accents your agent will encounter in production. For a UK health deployment this might include: Scottish (Edinburgh/Glasgow), Yorkshire, Geordie (Newcastle), West Midlands, Welsh English, and Northern Irish. Prioritise accents with the highest call volume or the most phonologically distinct vowel sounds.
+  </Step>
+  <Step title="Create a custom personality per accent">
+    In the **Personalities** section of the dashboard, create one personality for each target accent. Configure:
+
+    - **Voice ID** — select a voice that matches the target accent
+    - **Personality prompt** — describe the regional speaking style, pace, and any common pronunciation patterns (e.g. dropped H's, specific vowel shifts)
+    - **Behavioral traits** — pace, interruption patterns, and pause lengths can vary by region
+
+    If a predefined personality for your target accent already exists, you can use it directly without creating a custom one.
+  </Step>
+  <Step title="Run evaluators across accent personalities">
+    You have two options:
+
+    - **Override personality at runtime** — on the evaluators page, select the evaluators you want to test and use the **Override Personality** option to pick one or more accent personalities. Cekura runs each evaluator against every selected personality. This is the recommended approach when you want to sweep an existing evaluator set across many accents without duplicating them.
+    - **Duplicate evaluators per accent** — useful when you want accent variants saved as distinct evaluators for independent re-runs.
+
+    Keep scenario instructions and expected outcomes identical across accent variants so that differences in pass rate are attributable to the accent, not a different workflow.
+  </Step>
+  <Step title="Enable the Transcription Accuracy metric">
+    Add the **Transcription Accuracy** pre-defined metric to your evaluators. This metric compares the Testing Agent's transcription against a ground-truth reference, scoring errors in names, nouns, and numbers most heavily. It is the primary signal for detecting ASR failure on accented speech.
+
+    See [Pre-defined Metrics](/documentation/key-concepts/metrics/pre-defined-metrics) for cost and scoring details.
+  </Step>
+  <Step title="Compare pass rates per accent">
+    After running, use the [A/B Testing](/documentation/guides/testing-agents/ab-testing) compare view to diff two accent runs of the same evaluator side-by-side. This surfaces which accents have the highest failure rates and which metrics are most affected.
+  </Step>
+</Steps>
+
+## What to Watch For
+
+| Symptom | Likely Cause |
+|---|---|
+| Expected outcome fails, transcript looks garbled | STT model not configured for regional phonology — switch to an STT model with broader accent support or a region-specific model |
+| Transcription Accuracy score drops significantly vs standard English run | ASR mis-transcription on accented speech; check STT provider docs for accent/locale configuration |
+| Agent responds correctly to the content but mishears names or place names | Named-entity recognition gap in STT — regional nouns and place names are common failure points |
+| Failure rate varies significantly across accents | Likely an STT model coverage issue; some models handle standard accents well but degrade on more phonologically distinct regional variants |
+| Works in standard English but fails on heavily accented input | STT is likely locked to a standard locale (e.g. `en-US`) — update to a locale-aware or neutral English model |
+
+## Best Practices
+
+### Start With Transcription Accuracy
+
+Before writing custom LLM metrics to evaluate conversation quality, first confirm that ASR is working acceptably. A low Transcription Accuracy score explains downstream metric failures — there is no point tuning the agent's logic if it isn't hearing the caller correctly.
+
+### Hold the Workflow Constant, Vary the Accent
+
+When isolating accent-related issues, keep scenario instructions and success criteria identical across accent variants. Changing the workflow and the accent simultaneously makes it impossible to attribute a regression to its cause.
+
+### Test High-Stakes Vocabulary Explicitly
+
+Accented speakers often diverge most from a standard model on domain-specific vocabulary. For healthcare agents, this includes medication names, anatomical terms, and NHS service names — build evaluators that specifically exercise these terms.
+
+### Use A/B Testing to Rank Accents by Risk
+
+After a full sweep, sort accents by pass rate to identify which represent the highest regression risk. This helps prioritise which accent personalities to include in your CI/CD regression suite.
+
+## Related Resources
+
+- [Multilingual Testing](/documentation/guides/testing-agents/multilingual-testing) — Testing across *different languages* (Spanish, French, Hindi, etc.)
+- [Creating Custom Personalities](/documentation/advanced/creating-custom-personalities) — Add an accent personality that isn't in the default set
+- [Pre-defined Metrics](/documentation/key-concepts/metrics/pre-defined-metrics) — Transcription Accuracy metric details
+- [A/B Testing](/documentation/guides/testing-agents/ab-testing) — Compare pass rates across accent variants side-by-side
+- [Personality](/documentation/key-concepts/evaluators/personality) — Full personality configuration reference

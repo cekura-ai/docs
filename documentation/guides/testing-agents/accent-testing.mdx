@@ -1,0 +1,76 @@
+---
+title: "Accent Testing"
+sidebarTitle: "Accent Testing"
+icon: "microphone"
+iconType: "regular"
+description: "Test your voice AI agent against regional and non-native accent variations to surface speech recognition and comprehension failures."
+---
+
+## Overview
+
+When an agent serves users who speak the same language with different regional or non-native accents, accent variation becomes a distinct testing surface. Common failure modes that only surface under accent testing:
+
+- ASR (speech-to-text) producing incorrect transcriptions for accented speech, causing downstream logic errors
+- The agent failing to recognize words, names, or domain-specific terms when spoken with an unfamiliar accent
+- Comprehension failures that appear to be logic bugs but are actually transcription errors
+
+## How It Works
+
+Accent testing uses **Custom Personalities** to simulate callers with specific accent profiles. You configure a personality's voice ID, pace, and behavior prompt to match the accent variant you want to test, then run your existing evaluators against it. The agent sees the same workflow and expected outcomes — only the voice input changes.
+
+## Setting Up an Accent Test
+
+<Steps>
+  <Step title="Create a personality per accent variant">
+    In the *Personalities* section, create a custom personality for each accent you want to test. Configure:
+
+    - A voice ID with the target accent
+    - Behavioral traits such as pace and interruption patterns
+    - A personality prompt reflecting any dialect-specific phrasing if relevant
+
+    See [Creating Custom Personalities](/documentation/advanced/creating-custom-personalities) for step-by-step instructions.
+  </Step>
+  <Step title="Run your evaluators against each accent">
+    Use the **Override Personality** option when running evaluators to sweep the same workflow across all accent variants without duplicating evaluators. Select the evaluators you want to run and pick one or more accent personalities — Cekura executes each evaluator against every selected personality.
+
+    Keep the scenario instructions and expected outcomes identical across accent runs so you're measuring the same workflow, not different prompts.
+  </Step>
+  <Step title="Enable the Transcription Accuracy metric">
+    Add the *Transcription Accuracy* predefined metric to your evaluator. For simulation runs, this scores how many transcription errors the Testing Agent's speech-to-text makes — errors on names, nouns, and numbers carry the highest weight. A low Transcription Accuracy score under a specific accent personality is a direct signal that your agent's STT pipeline struggles with that accent.
+
+    See [Pre-defined Metrics](/documentation/key-concepts/metrics/pre-defined-metrics) for the full scoring breakdown.
+  </Step>
+  <Step title="Compare results across accents">
+    Use the [A/B Testing](/documentation/guides/testing-agents/ab-testing) compare view to diff pass rates for the same evaluator across different accent personalities. This surfaces which accent variants have the highest failure rates and makes prioritization straightforward.
+  </Step>
+</Steps>
+
+## What to Watch For
+
+| Symptom | Likely Cause |
+|---|---|
+| Expected outcome fails even though the workflow is simple | ASR transcription errors garbling key words or phrases |
+| Transcription Accuracy score is low for one personality but high for others | STT model not tuned for that accent variant |
+| Inconsistent pass rates across accent runs with identical logic | ASR handling is accent-dependent; review STT configuration |
+| Agent responds correctly in text but fails on voice input | Speech recognition issue, not a logic or prompt issue |
+
+## Best Practices
+
+### Hold the Workflow Constant
+
+Change only the personality between runs. If the scenario instructions differ across accent variants, you cannot tell whether a failure is caused by accent handling or a prompt difference.
+
+### Target the Hard Words
+
+Names, numbers, and domain-specific terms are where accent-driven ASR errors concentrate. Design evaluators that exercise these specifically so failures are easy to attribute to transcription.
+
+### Review Your STT Configuration
+
+ASR errors under accent testing often indicate the STT model is locked to a single locale. Review your agent's speech-to-text configuration to confirm it handles accent variation, and compare STT providers if failures are consistent across multiple accent personalities.
+
+## Related Resources
+
+- [Creating Custom Personalities](/documentation/advanced/creating-custom-personalities) — Set up voice profiles for specific accent variants
+- [Pre-defined Metrics](/documentation/key-concepts/metrics/pre-defined-metrics) — Transcription Accuracy scoring details
+- [A/B Testing](/documentation/guides/testing-agents/ab-testing) — Compare pass rates across accent variants
+- [Multilingual Testing](/documentation/guides/testing-agents/multilingual-testing) — Testing across different languages

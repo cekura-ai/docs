@@ -1,0 +1,250 @@
+---
+title: 'CHIRP WebSocket'
+sidebarTitle: "CHIRP WebSocket"
+icon: "wave-pulse"
+iconType: "regular"
+description: 'Test voice agents over direct WebSocket connections using the CHIRP protocol for real-time audio streaming.'
+---
+
+## Overview
+
+Test your voice agents directly over WebSocket connections using CHIRP (Conversational Handoff for Inter-agent Realtime Protocol). Cekura connects to your WebSocket endpoint and exchanges raw PCM audio in real-time, enabling low-latency voice testing without phone infrastructure.
+
+## When to Use CHIRP WebSocket
+
+Use CHIRP WebSocket testing when:
+
+- Your agent does not have a phone number
+- You already have a real-time audio pipeline over WebSocket
+- You need bidirectional streaming with lower latency than telephony
+- Your system handles raw PCM audio natively
+
+For agents with phone numbers, consider [SIP testing](/documentation/integrations/sip-integration) or standard voice testing instead.
+
+## How It Works
+
+1. **Connection**: Cekura opens a WebSocket connection to your configured `wss://` endpoint
+2. **Authentication**: Optional HTTP Basic Auth credentials are sent during the WebSocket handshake
+3. **Audio Exchange**: Raw PCM audio is exchanged as binary WebSocket frames in both directions
+4. **Evaluation**: Cekura captures audio, generates transcripts, and evaluates metrics
+
+### Audio Format
+
+| Property | Value |
+|----------|-------|
+| Encoding | PCM signed 16-bit little-endian |
+| Sample rate | 16,000 Hz |
+| Channels | Mono (1 channel) |
+| Transport | Binary WebSocket frames |
+
+<Tabs>
+<Tab title="No-code">
+
+Configure and run CHIRP WebSocket tests directly from the dashboard.
+
+<Steps>
+<Step title="Configure CHIRP WebSocket endpoint">
+Go to your agent settings and configure the CHIRP WebSocket connection:
+
+**Required field:**
+- **CHIRP WebSocket URL**: The `wss://` endpoint where your agent receives audio connections
+
+**Optional fields (for authenticated endpoints):**
+- **Basic Auth Username**: HTTP Basic Auth username sent during WebSocket upgrade
+- **Basic Auth Password**: HTTP Basic Auth password sent during WebSocket upgrade
+
+<Note>
+Your WebSocket endpoint must be publicly accessible or secured with HTTP Basic Auth. Cekura sends authentication credentials in the `Authorization` header during the WebSocket handshake.
+</Note>
+
+</Step>
+
+<Step title="Run tests from the dashboard">
+Select scenarios and run tests using the UI:
+
+Click **"Run with Voice (CHIRP)"** to execute your tests. Cekura:
+- Opens a WebSocket connection to your configured endpoint
+- Authenticates using Basic Auth (if configured)
+- Streams audio bidirectionally as binary WebSocket frames
+- Captures audio and transcript data
+- Evaluates metrics in real-time
+</Step>
+
+<Step title="View results">
+Results appear in your dashboard. Track test status, metrics, conversation details, and audio playback.
+</Step>
+</Steps>
+
+</Tab>
+
+<Tab title="Code">
+
+Use the API to integrate CHIRP WebSocket testing into your CI/CD workflow.
+
+## Prerequisites
+
+Configure the CHIRP WebSocket endpoint via the Agent API or dashboard:
+
+**Required field:**
+- **chirp_websocket_url**: The `wss://` endpoint where your agent receives audio connections
+
+**Optional fields:**
+- **chirp_basic_auth_username**: HTTP Basic Auth username
+- **chirp_basic_auth_password**: HTTP Basic Auth password
+
+### Agent Configuration Example
+
+```bash
+curl -X PATCH \
+  'https://api.cekura.ai/test_framework/v1/aiagents/{agent_id}/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "chirp_data": {
+      "chirp_websocket_url": "wss://your-host.com/voice",
+      "chirp_basic_auth_username": "user",
+      "chirp_basic_auth_password": "secret"
+    }
+  }'
+```
+
+## API Endpoint
+
+```
+POST https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_chirp/
+```
+
+## Authentication
+
+Include your API key in the request header:
+```
+X-CEKURA-API-KEY: <YOUR_API_KEY>
+```
+
+## Request Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `scenarios` | array | Yes* | List of scenario IDs to run |
+| `tags` | array | Yes* | Filter scenarios by tags |
+| `folder_path` | string | Yes* | Filter scenarios by folder |
+| `agent_id` | integer | No | Target agent ID; inferred from scenarios if omitted |
+| `frequency` | integer | No | Number of times to run each scenario (default: 1) |
+| `personality_ids` | array | No | Personality IDs to apply |
+| `test_profile_ids` | array | No | Test profile IDs to apply |
+| `concurrency_limit` | integer | No | Maximum concurrent runs |
+| `name` | string | No | Custom name for this result set |
+
+*One of `scenarios`, `tags`, or `folder_path` is required.
+
+## Examples
+
+### Single Run (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_chirp/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [30]
+  }'
+```
+
+### Multiple Runs (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_chirp/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [30, 31, 32],
+    "frequency": 2,
+    "name": "CHIRP WebSocket Test Run"
+  }'
+```
+
+### Run by Tags (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_chirp/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "tags": ["regression", "critical"],
+    "agent_id": 5
+  }'
+```
+
+## Response
+
+```json
+{
+  "id": 16870,
+  "name": "CHIRP WebSocket Test Run",
+  "agent": 5,
+  "status": "in_progress",
+  "success_rate": 0.0,
+  "run_as_text": false,
+  "is_cronjob": false,
+  "runs": [
+    {
+      "id": 34625,
+      "status": "running",
+      "scenario": 11547,
+      "scenario_name": "Customer Support Scenario",
+      "test_profile_data": {"key": "value"}
+    }
+  ],
+  "created_at": "2025-10-16T09:32:59.484534Z",
+  "updated_at": "2025-10-16T09:32:59.484942Z"
+}
+```
+
+## Error Responses
+
+### Missing CHIRP Configuration
+
+```json
+{
+  "agent": ["Agent must have CHIRP credentials configured (chirp_data with chirp_websocket_url)."]
+}
+```
+
+### Missing WebSocket URL
+
+```json
+{
+  "agent": ["Agent chirp_data must include chirp_websocket_url."]
+}
+```
+
+## Monitor Results
+
+Poll for results using the [List Runs with IDs API](/api-reference/test_framework/list-runs-with-ids).
+
+</Tab>
+</Tabs>
+
+## CHIRP Protocol Reference
+
+CHIRP is a transport-only protocol for exchanging raw audio over WebSocket. For the full protocol specification, including message formats and event handling, see the [CHIRP protocol documentation](https://docs.getbluejay.ai/simulation-integrations/websockets).
+
+### Key Protocol Details
+
+- **Binary frames**: Raw PCM audio (16kHz, 16-bit, mono)
+- **Text frames (optional)**: JSON events for speech detection (`speech.started`, `speech.completed`)
+- **Authentication**: HTTP Basic Auth during WebSocket upgrade
+- **Graceful close**: WebSocket close code `1000`
+
+<Tip>
+A minimal CHIRP server only needs to accept the WebSocket connection, validate authentication, and exchange binary audio frames. Text events are optional.
+</Tip>
+
+## Next Steps
+
+- Learn about [custom metrics](/documentation/key-concepts/metrics/llm-judge-metric)
+- Explore [predefined metrics](/documentation/key-concepts/metrics/pre-defined-metrics)
+- Set up [test profiles](/documentation/key-concepts/evaluators/test-profile) for parameterized testing

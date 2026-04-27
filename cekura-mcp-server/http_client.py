@@ -56,7 +56,14 @@ class CekuraAPIClient:
                 resolved_path = resolved_path.replace(f"{{{key}}}", str(value))
             else:
                 if value is not None:
-                    query_params[key] = value
+                    if isinstance(value, list):
+                        # Comma-separate lists for query params (e.g. run_ids, call_ids)
+                        query_params[key] = ",".join(str(v) for v in value)
+                    elif isinstance(value, dict):
+                        # JSON-serialize dicts for query params (e.g. filters_v2, filters)
+                        query_params[key] = json.dumps(value)
+                    else:
+                        query_params[key] = value
 
         return resolved_path, query_params
 

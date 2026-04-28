@@ -11,538 +11,317 @@ description: "Connect your AI assistant to Cekura for instant access to document
 
 Before setting up MCP, ensure you have:
 
-1. Access to [Cekura Dashboard](https://dashboard.cekura.ai)
-2. A valid Cekura API key
-3. **Node.js 20.18.1 or higher** installed (for Claude Desktop, Cursor, and VS Code)
+1. Access to the [Cekura Dashboard](https://dashboard.cekura.ai)
+2. **Node.js 20.18.1 or higher** installed (for Claude Desktop, Cursor, and VS Code)
    - Check your version: `node --version`
    - Download from: [nodejs.org](https://nodejs.org/)
 
-## Setup
+## 1. Choose Your Auth Method
 
-### 1. Get Your Cekura API Key
+<CardGroup cols={2}>
+  <Card title="OAuth (default)" icon="user-shield" color="#A6A7EA">
+    One-click browser sign-in. No keys to mint or paste. Session ties to your dashboard user. Recommended for most users.
+  </Card>
+  <Card title="API Key (advanced)" icon="key" color="#A6A7EA">
+    Use when you want a project- or org-scoped credential, want to share access via a single key (e.g. CI), or your client doesn't support OAuth. Generate one in **Settings → API Keys** in the [dashboard](https://dashboard.cekura.ai).
+  </Card>
+</CardGroup>
 
-<Steps>
-  <Step title="Navigate to API Settings">
-    Log in to your Cekura dashboard and go to **Settings** → **API Keys**
-  </Step>
-
-  <Step title="Create API Key">
-    Click **Create New Key** and copy the generated API key
-  </Step>
-
-  <Step title="Store Securely">
-    Save your API key in a secure location. You'll need it for MCP configuration.
-  </Step>
-</Steps>
-
-### 2. Configure MCP Server
-
-Add the Cekura MCP server to your AI assistant:
+## 2. Configure MCP Server
 
 <Tabs>
-  <Tab title="Claude Code">
-    Run the following command to add Cekura MCP server:
+  <Tab title="OAuth (default)">
+    No header required. On first use, your client opens a browser window to authorize Cekura against your dashboard account.
 
-    ```bash
-    claude mcp add --transport http cekura --scope user https://api.cekura.ai/mcp --header "X-CEKURA-API-KEY:YOUR_API_KEY_HERE"
-    ```
+    <Tabs>
+      <Tab title="Claude Code">
+        ```bash
+        claude mcp add --transport http cekura --scope user https://api.cekura.ai/mcp
+        ```
 
-    Verify the server is configured:
+        Verify:
+        ```bash
+        claude mcp list
+        ```
+      </Tab>
 
-    ```bash
-    claude mcp list
-    ```
+      <Tab title="Claude Desktop / Cursor / VS Code">
+        Add to your MCP config (`claude_desktop_config.json`, Cursor MCP config, or `.vscode/mcp.json`):
 
-    <Note>
-    Replace `YOUR_API_KEY_HERE` with your actual Cekura API key from the dashboard.
-    </Note>
-  </Tab>
-
-  <Tab title="Claude Desktop">
-    1. Open Claude Desktop
-    2. Go to **Settings** → **Developer** → **Edit Config**
-    3. Add the following configuration:
-
-    ```json
-    {
-      "mcpServers": {
-        "cekura": {
-          "command": "npx",
-          "args": [
-            "mcp-remote",
-            "https://api.cekura.ai/mcp",
-            "--header",
-            "X-CEKURA-API-KEY:${CEKURA_API_KEY}"
-          ],
-          "env": {
-            "CEKURA_API_KEY": "YOUR_API_KEY_HERE"
+        ```json
+        {
+          "mcpServers": {
+            "cekura": {
+              "command": "npx",
+              "args": ["mcp-remote", "https://api.cekura.ai/mcp"]
+            }
           }
         }
-      }
-    }
-    ```
+        ```
+      </Tab>
 
-    <Note>
-    Replace `YOUR_API_KEY_HERE` with your actual Cekura API key from the dashboard.
-    </Note>
+      <Tab title="Codex">
+        Add to `~/.codex/config.toml`:
+
+        ```toml
+        [mcp_servers.cekura]
+        url = "https://api.cekura.ai/mcp"
+        ```
+      </Tab>
+    </Tabs>
   </Tab>
 
-  <Tab title="Cursor">
-    1. Open Cursor
-    2. Press `Cmd/Ctrl + Shift + P` and search for **"MCP: Edit Config"**
-    3. Add the following configuration:
+  <Tab title="API Key">
+    Use this if you want a project-scoped credential, want to share access via a key, or your client doesn't support OAuth. Replace `YOUR_API_KEY_HERE` with the key from **Settings → API Keys**.
 
-    ```json
-    {
-      "mcpServers": {
-        "cekura": {
-          "command": "npx",
-          "args": [
-            "mcp-remote",
-            "https://api.cekura.ai/mcp",
-            "--header",
-            "X-CEKURA-API-KEY:${CEKURA_API_KEY}"
-          ],
-          "env": {
-            "CEKURA_API_KEY": "YOUR_API_KEY_HERE"
+    <Tabs>
+      <Tab title="Claude Code">
+        ```bash
+        claude mcp add --transport http cekura --scope user https://api.cekura.ai/mcp --header "X-CEKURA-API-KEY:YOUR_API_KEY_HERE"
+        ```
+
+        Verify:
+        ```bash
+        claude mcp list
+        ```
+      </Tab>
+
+      <Tab title="Claude Desktop">
+        ```json
+        {
+          "mcpServers": {
+            "cekura": {
+              "command": "npx",
+              "args": [
+                "mcp-remote",
+                "https://api.cekura.ai/mcp",
+                "--header",
+                "X-CEKURA-API-KEY:${CEKURA_API_KEY}"
+              ],
+              "env": {
+                "CEKURA_API_KEY": "YOUR_API_KEY_HERE"
+              }
+            }
           }
         }
-      }
-    }
-    ```
+        ```
+      </Tab>
 
-    <Note>
-    Replace `YOUR_API_KEY_HERE` with your actual Cekura API key from the dashboard.
-    </Note>
-  </Tab>
-
-  <Tab title="VS Code">
-    1. Create or edit `.vscode/mcp.json` in your project
-    2. Add the following configuration:
-
-    ```json
-    {
-      "mcpServers": {
-        "cekura": {
-          "command": "npx",
-          "args": [
-            "mcp-remote",
-            "https://api.cekura.ai/mcp",
-            "--header",
-            "X-CEKURA-API-KEY:${CEKURA_API_KEY}"
-          ],
-          "env": {
-            "CEKURA_API_KEY": "YOUR_API_KEY_HERE"
+      <Tab title="Cursor">
+        ```json
+        {
+          "mcpServers": {
+            "cekura": {
+              "command": "npx",
+              "args": [
+                "mcp-remote",
+                "https://api.cekura.ai/mcp",
+                "--header",
+                "X-CEKURA-API-KEY:${CEKURA_API_KEY}"
+              ],
+              "env": {
+                "CEKURA_API_KEY": "YOUR_API_KEY_HERE"
+              }
+            }
           }
         }
-      }
-    }
-    ```
+        ```
+      </Tab>
 
-    <Note>
-    Replace `YOUR_API_KEY_HERE` with your actual Cekura API key from the dashboard.
-    </Note>
-  </Tab>
+      <Tab title="VS Code">
+        Create or edit `.vscode/mcp.json`:
 
-  <Tab title="Codex">
-    **Option 1: Using CLI (Recommended)**
+        ```json
+        {
+          "mcpServers": {
+            "cekura": {
+              "command": "npx",
+              "args": [
+                "mcp-remote",
+                "https://api.cekura.ai/mcp",
+                "--header",
+                "X-CEKURA-API-KEY:${CEKURA_API_KEY}"
+              ],
+              "env": {
+                "CEKURA_API_KEY": "YOUR_API_KEY_HERE"
+              }
+            }
+          }
+        }
+        ```
+      </Tab>
 
-    Run the following command to add Cekura MCP server:
+      <Tab title="Codex">
+        **CLI:**
+        ```bash
+        codex mcp add cekura --env CEKURA_API_KEY=YOUR_API_KEY_HERE -- sh -c 'npx -y mcp-remote https://api.cekura.ai/mcp --header "X-CEKURA-API-KEY:$CEKURA_API_KEY"'
+        ```
 
-    ```bash
-    codex mcp add cekura --env CEKURA_API_KEY=YOUR_API_KEY_HERE -- sh -c 'npx -y mcp-remote https://api.cekura.ai/mcp --header "X-CEKURA-API-KEY:$CEKURA_API_KEY"'
-    ```
-
-    Verify the server is configured:
-
-    ```bash
-    codex mcp list
-    ```
-
-    <Note>
-    Replace `YOUR_API_KEY_HERE` with your actual Cekura API key. The `sh -c` wrapper is required to expand the environment variable before passing it to `mcp-remote`.
-    </Note>
-
-    **Option 2: Manual HTTP Configuration**
-
-    1. Open or create `~/.codex/config.toml`
-    2. Add the following configuration:
-
-    ```toml
-    [mcp_servers.cekura]
-    url = "https://api.cekura.ai/mcp"
-    http_headers = { "X-CEKURA-API-KEY" = "YOUR_API_KEY_HERE" }
-    ```
-
-    <Note>
-    Replace `YOUR_API_KEY_HERE` with your actual Cekura API key. This method configures Cekura as a native HTTP server without needing the `mcp-remote` wrapper.
-    </Note>
+        **Or, native HTTP via `~/.codex/config.toml`:**
+        ```toml
+        [mcp_servers.cekura]
+        url = "https://api.cekura.ai/mcp"
+        http_headers = { "X-CEKURA-API-KEY" = "YOUR_API_KEY_HERE" }
+        ```
+      </Tab>
+    </Tabs>
   </Tab>
 </Tabs>
 
-### 3. Verify Connection
+## 3. Verify Connection
 
-Restart your AI assistant and verify the connection:
+Restart your AI assistant and ask:
 
 ```plaintext
-Ask your AI: "List my Cekura agents"
+"List my Cekura agents"
 ```
 
-If configured correctly, your assistant will be able to interact with Cekura's API.
+If configured correctly, your assistant returns your agents from the Cekura API.
 
 ## How MCP Works
 
-When you connect to Cekura's MCP server, you get instant access to both documentation and APIs:
-
 <Steps>
   <Step title="Unified Access">
-    One connection provides 84+ tools: documentation search plus all documented API operations for testing, observability, and automation.
+    One connection exposes 84+ tools spanning documentation search and API operations.
   </Step>
-
-  <Step title="Documentation Search (No API Key Required)">
-    Search across Cekura's knowledge base for integration guides, API schemas, and feature documentation. Your AI assistant can answer questions without manual searches.
+  <Step title="Documentation Search (no auth)">
+    Search Cekura's knowledge base for guides, schemas, and examples without an API key.
   </Step>
-
-  <Step title="API Operations (API Key Required)">
-    Create agents, run tests, analyze results, and manage your Cekura workspace directly through natural language commands.
+  <Step title="API Operations (auth required)">
+    Create agents, run tests, analyze results, and manage your workspace via natural language.
   </Step>
-
   <Step title="Smart Tool Selection">
-    Your AI assistant automatically chooses the right tools based on your requests—whether you're asking questions or taking actions.
+    Your assistant picks the right tool based on intent—answers questions or takes action.
   </Step>
-
   <Step title="Secure Authentication">
-    Your API key is automatically included in API requests via the `X-CEKURA-API-KEY` header. Documentation search requires no authentication.
+    OAuth uses a session-bound Bearer token your client manages automatically. API-key clients send `X-CEKURA-API-KEY`.
   </Step>
 </Steps>
 
-## Maximize Your Benefits
-
-Get the most out of Cekura's MCP integration:
+## Working with MCP
 
 <AccordionGroup>
-  <Accordion title="1. Start with Learning, Then Execute">
-    **Learning Phase:**
-    - "How do I integrate with Retell?"
-    - "What's the schema for creating an agent?"
-    - "Show me examples of custom metrics"
+  <Accordion title="Learn, then execute">
+    Ask your assistant a question first, then take action with the same context:
 
-    **Execution Phase:**
-    - "Create an agent named 'Support Bot' for Retell"
-    - "Run all evaluators for agent ID 123"
-    - "Show me test results from the last 24 hours"
-  </Accordion>
-
-  <Accordion title="2. Scaffold Complete Integrations">
-    Use comprehensive prompts to generate implementation plans:
-
+    ```plaintext
+    "How do I integrate with Retell?" → searches docs
+    "Create a Retell agent named 'Support Bot' with assistant ID abc123" → creates it
     ```
-    "Create a comprehensive plan to integrate Cekura observability
-    with our Retell voice agent. Include API setup, metric definitions,
-    and webhook configuration."
-    ```
-
-    Your AI will search documentation, understand patterns, and generate step-by-step implementation guides.
   </Accordion>
 
-  <Accordion title="3. Iterate Quickly with Context">
-    Your AI maintains context across questions and actions:
-
-    - "What metrics are available?" → *searches docs*
-    - "Create those metrics for my agent" → *uses API*
-    - "Now generate 10 test scenarios" → *uses API*
-    - "Run them" → *uses API*
+  <Accordion title="Combine documentation with your data">
+    "Show me how custom metrics work, then list the metrics on my Support Bot agent" — your assistant reads docs and your live workspace in one turn.
   </Accordion>
 
-  <Accordion title="4. Explore Without Leaving Your Editor">
-    No need to switch between docs, dashboard, and code:
-
-    - Ask about features while coding
-    - Create test resources on the fly
-    - Debug issues by checking API responses
-    - Understand error messages in context
-  </Accordion>
-
-  <Accordion title="5. Combine Documentation with API Data">
-    "Show me how to use custom metrics, then list my existing metrics"
-
-    Your AI will:
-    1. Search docs to explain custom metrics
-    2. Call the API to show your actual metrics
-    3. Provide contextualized guidance based on your setup
+  <Accordion title="Iterate quickly with context">
+    Your assistant maintains context across turns: list metrics → create a new one → generate test scenarios → run them.
   </Accordion>
 </AccordionGroup>
 
-<Note>
-The MCP server URL should be treated as a credential. Keep it secure and do not share it publicly.
-</Note>
-
-<Warning>
-Be mindful of context window limits. Large responses from Cekura APIs (like detailed transcripts) may consume significant context space.
-</Warning>
+For deeper end-to-end walkthroughs, see the [Claude Code Guide](/mcp/claude-code-guide).
 
 ## Request Headers
 
-Cekura's MCP server uses the following headers for authentication and identification:
-
-| Header | Value | Description |
-|--------|-------|-------------|
-| `X-CEKURA-API-KEY` | Your API key | Required for authentication |
-| `User-Agent` | `MCP-Client` | Identifies requests from MCP |
-| `Content-Type` | `application/json` | Request payload format |
-
-<Note>
-All API requests through MCP require a valid API key in the `X-CEKURA-API-KEY` header.
-</Note>
+| Header | Used by | Description |
+|--------|---------|-------------|
+| `Authorization: Bearer <token>` | OAuth | Set automatically by your MCP client after sign-in |
+| `X-CEKURA-API-KEY` | API key path | Required header when using an API key |
+| `Content-Type: application/json` | Both | Request payload format |
 
 ## Tool Configuration
 
-Each Cekura API endpoint is exposed as an MCP tool with the following structure:
-
-### Required Fields
-
-- **name**: The tool identifier (e.g., `list-agents`, `create-metric`)
-- **description**: What the tool does
-- **inputSchema**: JSON schema defining required parameters
-
-### Optional Fields
-
-- **examples**: Example usage patterns
-- **deprecated**: Whether the endpoint is deprecated
-
-### Example Configuration
-
-Cekura automatically configures all endpoints. Here's what a typical tool looks like:
-
-```json
-{
-  "name": "list-agents",
-  "description": "List all AI voice agents in your organization",
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "page": {
-        "type": "integer",
-        "description": "Page number for pagination"
-      },
-      "limit": {
-        "type": "integer",
-        "description": "Number of results per page"
-      }
-    }
-  }
-}
-```
-
-## Example Usage
-
-Common workflows combining documentation search and API operations:
-
-### Learning Then Executing
-
-```plaintext
-User: "How do I integrate with Retell?"
-
-AI: [Uses SearchCekura]
-"Here's how to integrate with Retell:
-1. Add your Retell API key in Settings
-2. Create an agent and select 'Retell' as provider
-3. Enter your Retell Assistant ID
-[Provides detailed guide with links]"
-
-User: "Create a Retell agent named 'Support Bot' with assistant ID abc123"
-
-AI: [Uses create-agent API]
-"I've created your Retell agent 'Support Bot' with ID 456.
-Ready to configure test scenarios?"
-```
-
-### Scaffolding Integrations
-
-```plaintext
-User: "Create a comprehensive plan to integrate Cekura observability"
-
-AI: [Uses SearchCekura multiple times]
-"Here's your integration plan:
-
-1. Setup (5 min)
-   - Get API key from Settings
-   - Add webhook URL to your provider
-
-2. Agent Configuration (10 min)
-   - Create agent via POST /test_framework/v1/aiagents/
-   - Required fields: name, contact_number, agent_type
-
-3. Define Metrics (15 min)
-   - Use SearchCekura for metric examples
-   - POST /test_framework/v1/metrics/ to create
-
-[Complete step-by-step plan with code examples]"
-```
-
-### Combined Search and Action
-
-```plaintext
-User: "Show me my agents and explain how to create metrics for them"
-
-AI: [Uses list-agents API + SearchCekura]
-"Your agents:
-1. Support Bot (ID: 123)
-2. Sales Agent (ID: 456)
-
-To create metrics for these agents:
-- Custom metrics evaluate specific behaviors
-- Use LLM-based or rule-based evaluation
-[Provides examples and documentation links]
-
-Would you like me to create specific metrics now?"
-```
+Tools are auto-generated from Cekura's OpenAPI spec — every documented endpoint becomes an MCP tool with a typed `inputSchema`. You don't author them; the server handles registration and stays in sync with the API. See the [API Reference](/api-reference) for endpoint details.
 
 ## Best Practices
 
 <AccordionGroup>
-  <Accordion title="1. System Prompts with MCP References">
-    Add a system prompt mentioning available tools:
-
-    ```
-    You have access to Cekura tools that allow you to manage voice agents,
-    create test scenarios, and analyze call quality.
-    ```
+  <Accordion title="Auth hygiene">
+    - **OAuth:** Re-authorize when your session expires; revoke MCP access from the dashboard if a device is lost.
+    - **API key:** Never commit keys to version control. Use environment variables. Rotate regularly. Use separate keys per environment.
   </Accordion>
 
-  <Accordion title="2. Secure Your API Keys">
-    - Never commit API keys to version control
-    - Use environment variables for API keys
-    - Rotate keys regularly
-    - Create separate keys for different environments
+  <Accordion title="Handle rate limits">
+    Cekura enforces per-plan rate limits. If you hit `429`, slow down or upgrade your plan. Check usage in **Settings → API Usage**.
   </Accordion>
 
-  <Accordion title="3. Handle Rate Limits">
-    Cekura enforces rate limits based on your plan:
-    - Free: 1,000 requests/day
-    - Pro: 10,000 requests/day
-    - Enterprise: Custom limits
-  </Accordion>
-
-  <Accordion title="4. Monitor Usage">
-    Check your MCP usage in the Cekura dashboard:
-    - Navigate to **Settings** → **API Usage**
-    - Monitor request counts and error rates
-    - Set up alerts for unusual activity
-  </Accordion>
-
-  <Accordion title="5. Start with Read Operations">
-    Begin by using read-only operations (GET endpoints) before using
-    write operations (POST/PATCH/DELETE).
-  </Accordion>
-
-  <Accordion title="6. Test in Development First">
-    Always test MCP configuration with a development API key before
-    using production credentials.
+  <Accordion title="Test before production">
+    Start with read-only operations (list agents, fetch results), then move to writes. Test in dev with a separate account or API key before pointing at production data.
   </Accordion>
 </AccordionGroup>
 
+<Warning>
+Large responses (detailed transcripts, full call logs) consume context. Ask for filtered or summarized results when possible.
+</Warning>
+
 ## Available Tools
 
-Cekura's MCP server provides 84+ tools across four main categories:
+Cekura's MCP server provides 84+ tools across four categories:
 
 <CardGroup cols={2}>
   <Card title="Documentation Search" icon="magnifying-glass" color="#A6A7EA">
-    **No API key required**
+    **No auth required**
     - Search integration guides
     - Find API schemas and examples
     - Understand features and workflows
-    - Get implementation patterns
   </Card>
 
   <Card title="Testing" icon="flask" color="#A6A7EA">
-    **Requires API key**
+    **Auth required**
     - Create and manage agents
     - Run test scenarios and evaluators
     - Define custom metrics
-    - View and analyze test results
+    - View and analyze results
   </Card>
 
   <Card title="Observability" icon="eye" color="#A6A7EA">
-    **Requires API key**
+    **Auth required**
     - List and search call logs
     - Send calls for evaluation
     - Analyze call performance
-    - Export call data
   </Card>
 
   <Card title="Automation" icon="clock" color="#A6A7EA">
-    **Requires API key**
+    **Auth required**
     - Create scheduled jobs
     - Manage cronjobs
     - Automate recurring tests
-    - Configure alerts
   </Card>
 </CardGroup>
 
-For detailed information on each endpoint, see the [API Reference](/api-reference).
+For per-endpoint details, see the [API Reference](/api-reference).
 
-## Example MCP Providers
+## Other MCP Clients
 
-### Make.com
-
-Make.com provides MCP servers for workflow automation.
-
-**Server URL Format:**
-```
-https://hook.make.com/YOUR_WEBHOOK_ID
-```
-
-### Zapier
-
-Zapier offers MCP integration through webhooks.
-
-**Server URL Format:**
-```
-https://hooks.zapier.com/hooks/catch/YOUR_HOOK_ID/
-```
-
-### Custom Servers
-
-You can also run your own MCP server. See [Building Custom MCP Servers](#) for details.
+The Cekura MCP server speaks standard HTTP MCP, so any MCP-compatible client (Make.com, Zapier, custom servers, etc.) can connect to `https://api.cekura.ai/mcp` using the same OAuth or API-key flow.
 
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="API Key Authentication Failed">
+  <Accordion title="Auth failed">
     **Error**: `401 Unauthorized`
 
-    **Solutions**:
-    - Verify your API key is correct
-    - Check the header name is `X-CEKURA-API-KEY` (case-sensitive)
-    - Ensure the API key hasn't expired
-    - Generate a new API key from the dashboard
+    - **OAuth:** Re-run the sign-in flow (your client usually re-prompts automatically). Confirm you're signed into the right Cekura account in your browser.
+    - **API key:** Verify the header name is `X-CEKURA-API-KEY` (case-sensitive) and the key is active in the dashboard. Generate a fresh key if needed.
   </Accordion>
 
   <Accordion title="Tools Not Showing Up">
     **Issue**: AI assistant doesn't see Cekura tools
 
-    **Solutions**:
     - Restart your AI assistant after configuration
-    - Verify the MCP server URL is correct: `https://api.cekura.ai/mcp`
-    - Check your configuration file syntax is valid JSON
-    - Look for error messages in the assistant's logs
+    - Verify the URL is `https://api.cekura.ai/mcp`
+    - Check your config file syntax is valid JSON / TOML
+    - Look for connection errors in the assistant's logs
   </Accordion>
 
   <Accordion title="Node.js Version Error (Windows)">
     **Error**: `Unsupported engine` or `ReferenceError: File is not defined`
 
-    **Cause**: Multiple Node.js versions installed, wrong version being used
+    **Cause**: Multiple Node.js versions installed, wrong version being used.
 
     **Solution**:
-    1. Check all Node.js installations:
-       ```bash
-       where node
-       ```
-    2. Find your Node v20+ installation:
-       ```bash
-       node -e "console.log(process.execPath)"
-       ```
+    1. List Node installs: `where node`
+    2. Find your Node v20+ path: `node -e "console.log(process.execPath)"`
     3. Use the absolute path in your config:
        ```json
        {
@@ -553,28 +332,21 @@ You can also run your own MCP server. See [Building Custom MCP Servers](#) for d
                "C:\\Full\\Path\\To\\npx-cli.js",
                "-y",
                "mcp-remote",
-               "https://api.cekura.ai/mcp",
-               "--header",
-               "X-CEKURA-API-KEY:${CEKURA_API_KEY}"
-             ],
-             "env": {
-               "CEKURA_API_KEY": "YOUR_API_KEY"
-             }
+               "https://api.cekura.ai/mcp"
+             ]
            }
          }
        }
        ```
-    4. Or uninstall older Node.js versions
+    4. Or uninstall older Node.js versions.
   </Accordion>
 
   <Accordion title="Rate Limit Exceeded">
     **Error**: `429 Too Many Requests`
 
-    **Solutions**:
-    - Check your current usage in the dashboard
-    - Upgrade your plan for higher limits
-    - Implement request throttling in your workflows
-    - Contact support for temporary limit increases
+    - Check current usage in **Settings → API Usage**
+    - Throttle requests in your workflow
+    - Upgrade your plan or contact support for higher limits
   </Accordion>
 </AccordionGroup>
 
@@ -585,12 +357,12 @@ You can also run your own MCP server. See [Building Custom MCP Servers](#) for d
     Complete API documentation
   </Card>
 
-  <Card title="Authentication" icon="key" href="/api-reference#authentication">
-    API key setup and management
+  <Card title="Cekura Skills" icon="sparkles" href="/mcp/skills">
+    Install Cekura skills into your AI coding agent
   </Card>
 
   <Card title="Dashboard" icon="gauge" href="https://dashboard.cekura.ai">
-    Manage your API keys
+    Manage auth, projects, and API keys
   </Card>
 
   <Card title="Support" icon="life-ring" href="mailto:support@cekura.ai">

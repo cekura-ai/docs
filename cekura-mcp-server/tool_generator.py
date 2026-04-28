@@ -1,10 +1,43 @@
 from typing import Dict, Any, Optional, Set, Tuple
 from openapi_parser import Operation
+from mcp.types import ToolAnnotations
 import re
 import json
 import sys
 import hashlib
 from pathlib import Path
+
+
+# POST endpoints whose final path segment marks them as destructive even though
+# they aren't DELETE. These remove or terminate things server-side.
+_DESTRUCTIVE_POST_PREFIXES = ('delete_', 'unmark_', 'discard-', 'discard_', 'cancel-', 'cancel_')
+_DESTRUCTIVE_POST_EXACT = {'end_call', 'end_calls'}
+
+
+def compute_annotations(operation: Operation) -> ToolAnnotations:
+    """Return MCP tool annotations classifying a tool as read-only / non-destructive / destructive.
+
+    Rules:
+        GET           → readOnlyHint=True
+        DELETE        → readOnlyHint=False, destructiveHint=True
+        POST (delete/end/unmark/discard/cancel) → readOnlyHint=False, destructiveHint=True
+        POST (other)  → readOnlyHint=False, destructiveHint=False
+        PUT, PATCH    → readOnlyHint=False, destructiveHint=False
+    """
+    method = operation.method.upper()
+    if method == 'GET':
+        return ToolAnnotations(readOnlyHint=True)
+    if method == 'DELETE':
+        return ToolAnnotations(readOnlyHint=False, destructiveHint=True)
+    if method == 'POST':
+        last_segment = operation.path.rstrip('/').split('/')[-1].lower()
+        is_destructive = (
+            last_segment in _DESTRUCTIVE_POST_EXACT
+            or any(last_segment.startswith(p) for p in _DESTRUCTIVE_POST_PREFIXES)
+        )
+        return ToolAnnotations(readOnlyHint=False, destructiveHint=is_destructive)
+    # PUT, PATCH — non-destructive update
+    return ToolAnnotations(readOnlyHint=False, destructiveHint=False)
 
 
 def load_documented_apis_whitelist() -> Optional[Set[Tuple[str, str]]]:

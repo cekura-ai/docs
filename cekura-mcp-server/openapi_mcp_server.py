@@ -8,6 +8,7 @@ from typing import Any, Dict, List
 from contextvars import ContextVar
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+from mcp.types import ToolAnnotations
 
 # Load secrets from AWS Secrets Manager before any env var is read
 if os.getenv("AWS_SECRET_NAME"):
@@ -28,6 +29,7 @@ from tool_generator import (
     load_documented_apis_whitelist,
     apply_overlay_to_description,
     apply_overlay_to_schema,
+    compute_annotations,
 )
 
 logging.basicConfig(
@@ -184,7 +186,8 @@ async def initialize_server():
                 tool_description = apply_overlay_to_description(tool_name, tool_description)
                 input_schema = apply_overlay_to_schema(tool_name, input_schema)
 
-                register_tool(tool_name, tool_description, input_schema, operation)
+                annotations = compute_annotations(operation)
+                register_tool(tool_name, tool_description, input_schema, operation, annotations=annotations)
                 tools_registered += 1
             except Exception as e:
                 logger.error(f"Error registering tool for {operation.path}: {e}", exc_info=True)
@@ -246,7 +249,8 @@ def register_mintlify_search_tool():
             "$schema": "http://json-schema.org/draft-07/schema#"
         },
         'description': "Search across the Cekura knowledge base to find relevant information, code examples, API references, and guides. Use this tool when you need to answer questions about Cekura, find specific documentation, understand how features work, or locate implementation details. The search returns contextual content with titles and direct links to the documentation pages.",
-        'is_proxy': True
+        'is_proxy': True,
+        'annotations': ToolAnnotations(readOnlyHint=True),
     }
 
 
@@ -319,21 +323,36 @@ async def call_mintlify_search(query: str) -> List[Dict[str, str]]:
     return [{"type": "text", "text": "Search failed after multiple attempts. Please try again later."}]
 
 
-def register_tool(name: str, description: str, input_schema: Dict[str, Any], operation):
+def register_tool(
+    name: str,
+    description: str,
+    input_schema: Dict[str, Any],
+    operation,
+    annotations: ToolAnnotations = None,
+):
     operations_registry[name] = {
         'operation': operation,
         'schema': input_schema,
-        'description': description
+        'description': description,
+        'annotations': annotations,
     }
 
 
-@mcp.tool(name="list_available_tools", description="List all available Cekura API tools")
+@mcp.tool(
+    name="list_available_tools",
+    description="List all available Cekura API tools",
+    annotations=ToolAnnotations(readOnlyHint=True),
+)
 async def list_available_tools() -> str:
     tools = sorted(operations_registry.keys())
     return f"Available tools ({len(tools)}):\n" + "\n".join(f"- {tool}" for tool in tools)
 
 
-@mcp.tool(name="test_simple_tool", description="A simple test tool to verify MCP registration")
+@mcp.tool(
+    name="test_simple_tool",
+    description="A simple test tool to verify MCP registration",
+    annotations=ToolAnnotations(readOnlyHint=True),
+)
 async def test_simple_tool(message: str) -> str:
     return f"Hello from Cekura MCP Server! You said: {message}"
 
@@ -363,7 +382,8 @@ def setup_dynamic_tool_handlers():
             MCPTool(
                 name=name,
                 description=data['description'],
-                inputSchema=data['schema']
+                inputSchema=data['schema'],
+                annotations=data.get('annotations'),
             )
             for name, data in operations_registry.items()
         ]

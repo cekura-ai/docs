@@ -98,7 +98,7 @@ def read_page_meta(page_path: str) -> dict:
 
 
 def page_url(page_path: str) -> str:
-    return f"{BASE_URL}/{page_path}"
+    return f"{BASE_URL}/{page_path}.md"
 
 
 def format_entry(page_path: str, meta: dict) -> str:

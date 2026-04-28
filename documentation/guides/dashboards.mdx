@@ -216,6 +216,8 @@ Used with `bar` charts to aggregate values within each time bucket.
 | `avg` | Average of values | Numeric, Boolean |
 | `min` | Minimum value | Numeric, Datetime |
 | `max` | Maximum value | Numeric, Datetime |
+| `p95` | 95th percentile | Numeric |
+| `p99` | 99th percentile | Numeric |
 
 ### Time Periods
 
@@ -232,25 +234,71 @@ Used with `bar` charts to define the time bucket size.
 
 Use `group_by` to split chart data by a secondary dimension. When set, bar and line charts display multiple series—one for each distinct value of the grouped field.
 
-The `group_by` parameter accepts a JSON object:
+The `group_by` parameter accepts a JSON object with two modes: field-based grouping and bucket-based grouping.
+
+#### Field-Based Grouping
+
+Group data by the distinct values of a field:
 
 ```json
 {
   "type": "field",
-  "field": "metric_evaluations.value"
+  "field": "call_ended_reason"
 }
 ```
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `type` | string | Grouping type. Currently supports `field`. |
-| `field` | string | Field path to group by (e.g., `metric_evaluations.value`) |
+| `type` | string | Set to `field` for field-based grouping. |
+| `field` | string | Field path to group by. |
+
+**Supported group-by fields:**
+
+| Field | Description |
+|-------|-------------|
+| `call_ended_reason` | Group by call end reason |
+| `topic` | Group by call topic |
+| `dropoff_point` | Group by drop-off point |
+| `agent_id` | Group by agent |
+| `is_reviewed` | Group by review status |
+| `metadata.{key}` | Group by a custom metadata key (e.g., `metadata.region`) |
+| `metric:{id}` | Group by categorical metric values (e.g., `metric:123`) |
 
 <Note>
-Grouping is only supported for the `metric_evaluations.value` field on `bar` and `line` charts. When `group_by` is set, the chart aggregates counts per time bucket for each distinct metric value.
+Metric-based grouping (`metric:{id}`) only works with categorical metrics. Numeric, datetime, and rating metrics are not supported for field-based grouping.
 </Note>
 
-**Example use case:** To visualize how metric scores are distributed over time, set `field` to `metric_evaluations.value`, `chart_type` to `bar`, and `group_by` to `{"type": "field", "field": "metric_evaluations.value"}`. The chart shows a stacked or grouped bar for each distinct score value (e.g., 1, 2, 3, 4, 5) per time period.
+#### Bucket-Based Grouping
+
+Group data into custom buckets using filter conditions. This is useful for creating threshold-based categories from numeric fields:
+
+```json
+{
+  "type": "bucket",
+  "buckets": [
+    { "label": "Short", "condition": { "field": "duration", "op": "lt", "value": 60 } },
+    { "label": "Medium", "condition": { "field": "duration", "op": "gte", "value": 60 } },
+    { "label": "Long", "condition": { "field": "duration", "op": "gte", "value": 180 } }
+  ],
+  "other_label": "Other"
+}
+```
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | string | Set to `bucket` for bucket-based grouping. |
+| `buckets` | array | Array of bucket definitions with `label` and `condition`. |
+| `other_label` | string | Optional label for values that don't match any bucket. |
+
+Each bucket's `condition` uses the same filter syntax as [widget filters](#filter-structure).
+
+<Note>
+Bucket-based grouping is available for widgets with numeric fields like `duration` or numeric metric evaluations.
+</Note>
+
+#### Aggregation Restrictions
+
+When grouping is enabled, only these aggregation functions are available: `count`, `sum`, `avg`, `min`, `max`. Percentile functions (`p95`, `p99`) are not supported with grouped data.
 
 ### Valid Combinations
 
@@ -258,7 +306,7 @@ Not all field + chart type + aggregation combinations are valid. The rules depen
 
 | Data Type | Allowed Chart Types | Allowed Aggregations |
 |-----------|-------------------|---------------------|
-| Numeric | `line`, `bar` | `count`, `sum`, `avg`, `min`, `max` |
+| Numeric | `line`, `bar` | `count`, `sum`, `avg`, `min`, `max`, `p95`, `p99` |
 | Boolean | `pie`, `bar` | `count`, `avg` |
 | String | `pie`, `bar` | `count` |
 | Datetime | `line`, `bar` | `count`, `min`, `max` |

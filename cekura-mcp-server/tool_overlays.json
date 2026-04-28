@@ -1,44 +1,60 @@
 {
-  "_comment": "Per-tool MCP enrichments. Applied on top of the OpenAPI-derived schema at registration time. Supported keys: required (string[]), description_prefix, description_suffix, destructive (bool), example_request, examples ([]), example_names ([string]), max_examples (int).",
-  "_intent": "Only content that should NOT appear in public REST API docs belongs here: (1) MCP-parser-specific limitations, (2) MCP tool-name cross-references that are meaningless to SDK/curl users, (3) temporary bridges while upstream backend PRs are in flight. Everything else lives in the backend @extend_schema or help_text. See UPSTREAMING.md for migration tracking.",
+  "_comment": "Per-tool MCP enrichments. Applied on top of the OpenAPI-derived schema at registration time. Covers MCP transport limitations, active bugs pending backend fix, and undocumented/easy-to-miss behavior agents need to interact correctly.",
+  "_intent": "Only content that should NOT appear in public REST API docs belongs here: (1) MCP-transport-specific limitations, (2) MCP tool-name cross-references meaningless to SDK/curl users, (3) temporary bridges while upstream backend PRs are in flight. Everything else lives in the backend @extend_schema or help_text.",
 
   "aiagents_upload_knowledge_base_create": {
-    "description_suffix": "KNOWN LIMITATION: this MCP tool cannot accept file bodies (MCP uses JSON-only transport). For file uploads use the Cekura dashboard or the Python SDK (`cekura.agents.upload_knowledge_base(id=..., files=[...])`). This tool currently returns existing KB page metadata only."
+    "description_suffix": "File uploads are not supported via MCP. Use the Cekura dashboard or Python SDK (`cekura.agents.upload_knowledge_base(id=..., files=[...])`) to upload files. Calling this tool without file parameters returns existing knowledge base metadata only."
   },
 
   "scenarios_run_scenarios_create": {
-    "description_suffix": "The run mode (voice / text / WebRTC) is determined by WHICH run endpoint you call — not by the agent config. The same agent can be run as voice via this endpoint or as text via scenarios_run_scenarios_text_create.\n\nUSE WHEN: real phone/SIP call. DO NOT USE for CI or rapid iteration — incurs telephony cost."
+    "description_suffix": "The run mode (voice / text / WebRTC) is determined by WHICH run endpoint you call — not by the agent config."
   },
 
   "scenarios_run_scenarios_text_create": {
-    "description_suffix": "The run mode is determined by WHICH run endpoint you call — not by the agent config. Calling this endpoint makes the run text-mode regardless of how the agent was created.\n\nUSE WHEN: cheap text/chat simulation. DO NOT USE for voice-specific metrics (latency, pitch) — they will be zero. Note: passing `websocket_url` reclassifies the result's `run_type` to `WebSocket`."
+    "description_suffix": "The run mode is determined by WHICH run endpoint you call — not by the agent config. DO NOT USE for voice-specific metrics (latency, pitch) — they will be zero."
   },
 
   "scenarios_run_scenarios_pipecat_create": {
-    "description_suffix": "The run mode is Pipecat/Daily WebRTC — determined by WHICH run endpoint you call, not the agent config.\n\nUSE WHEN: agent is deployed on Pipecat/Daily.co. Needs a Pipecat API key on the project."
+    "description_suffix": "The run mode is determined by WHICH run endpoint you call, not the agent config. Requires a Pipecat API key configured on the project."
   },
 
   "scenarios_run_scenarios_with_websockets_create": {
-    "description_suffix": "The run mode is custom WebSocket — determined by WHICH run endpoint you call, not the agent config.\n\nUSE WHEN: agent exposes its own WebSocket protocol. Each evaluator must carry a `websocket_url`. DO NOT USE for generic text testing — use scenarios_run_scenarios_text_create instead."
-  },
-
-  "metrics_create": {
-    "description_suffix": "**`add_to_new_agents` default**: when omitted or `true`, this metric is automatically assigned to every new agent created in the project going forward. Set `add_to_new_agents: false` if you want the metric scoped to specific agents only.\n\n**Attaching to evaluators**: after creation, use `scenarios_partial_update` with `metrics: [id1, id2, ...]` to attach metrics to evaluators. The metric IDs must belong to the same agent or project — use `metrics_list` with `agent_id=<id>` to list available metrics for an agent."
-  },
-
-  "metrics_list": {
-    "description_suffix": "**Filter tip**: always pass `agent_id` or `project_id` to scope results — without a filter you get every metric across your account. Example: `metrics_list(agent_id=1234)` returns only metrics accessible to that agent (both agent-level and project-level)."
-  },
-
-  "metrics_bulk_create_create": {
-    "description_suffix": "**Input shape**: pass the array of metric objects directly as the `items` parameter. Each item has the same fields as `metrics_create` (name, description, type, eval_type, prompt, project, etc.). Example: `items: [{\"name\": \"Empathy\", \"type\": \"llm_judge\", \"eval_type\": \"binary_qualitative\", \"prompt\": \"...\", \"project\": 1234}, ...]`"
+    "description_suffix": "The run mode is determined by WHICH run endpoint you call, not the agent config."
   },
 
   "observe_create": {
-    "description_suffix": "**MCP limitation — file upload:** The `voice_recording` (file upload) field cannot be used via MCP — MCP uses JSON-only transport. Use `voice_recording_url` to point to a hosted audio file instead. For direct file uploads use the REST API or the Python SDK."
+    "description_suffix": "File uploads not supported — use `voice_recording_url` instead of `voice_recording`. Do not pass `metric_ids` — causes a 500 error on current staging; use `call_logs_evaluate_metrics_create` after ingestion instead. Wrong roles silently produce an empty transcript with no error returned."
+  },
+
+  "runs_bulk_retrieve": {
+    "description_suffix": "`run_ids` must be a bare comma-separated string (e.g. `\"86368,86369\"`). Passing a JSON array `[86368, 86369]` or a JSON-quoted string both return `400: run_ids must be comma-separated integers`."
+  },
+
+  "call_logs_evaluate_metrics_create": {
+    "description_suffix": "Known issue: the `metrics` filter is not enforced — all metrics assigned to the call log are evaluated regardless of which IDs are passed."
+  },
+
+  "metrics_create": {
+    "description_suffix": "The `prompt` field is only active when explicitly setting `llm_provider` to a non-default value — for standard `llm_judge` metrics, the criterion goes in `description`. `assistant_id` is optional despite appearing required in some schema views — omit it entirely; passing an empty string returns a 400 error. `add_to_new_agents`: when omitted or `true`, this metric is automatically assigned to every new agent created in the project — set to `false` to scope to specific agents only. To attach a metric to evaluators after creation, use `scenarios_partial_update` with `metrics: [id1, id2, ...]`; use `metrics_list(agent_id=<id>)` to find available IDs."
+  },
+
+  "metrics_list": {
+    "description_suffix": "Always pass `agent_id` or `project_id` — omitting both returns all metrics in your account (potentially hundreds, exceeding response limits). `metrics_list(agent_id=1234)` returns metrics accessible to that agent including both agent-level and project-level metrics."
+  },
+
+  "metrics_bulk_create_create": {
+    "description_suffix": "Pass the array of metric objects as the `items` parameter. Each item accepts the same fields as `metrics_create`. Example: `items: [{\"name\": \"Empathy\", \"type\": \"llm_judge\", \"eval_type\": \"binary_qualitative\", \"description\": \"Did the agent show empathy?\", \"project\": 1234}]`. For `llm_judge` metrics, put the evaluation criterion in `description`, not `prompt`."
+  },
+
+  "test_profiles_partial_update": {
+    "description_suffix": "The `information` dict is replaced in full on every update — re-send the complete dict. Any key omitted will be deleted from the stored profile."
+  },
+
+  "scenarios_move_folder_create": {
+    "description_suffix": "To assign a scenario to a folder, use `scenarios_partial_update` with the `folder_path` field instead."
   },
 
   "call_logs_create_scenarios_progress_retrieve": {
-    "description_suffix": "**Done check:** `completed_scenarios + failed_scenarios >= total_scenarios` means processing is complete. The `scenarios_list` field (full Scenario objects) is only populated once complete; it is empty while still in progress."
+    "description_suffix": "Done when `completed_scenarios + failed_scenarios >= total_scenarios`. The `scenarios_list` field is populated only after completion."
   }
 }

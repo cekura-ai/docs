@@ -1,11 +1,12 @@
+import asyncio
+import json
+import logging
 import os
 import sys
-import asyncio
-import logging
-import httpx
-import json
-from typing import Any, Dict, List
 from contextvars import ContextVar
+from typing import Any, Dict, List
+
+import httpx
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
@@ -19,18 +20,18 @@ if os.getenv("AWS_SECRET_NAME"):
     os.environ.update({key: str(value) for key, value in _config.items()})
 
 from config import load_config
-from openapi_parser import load_openapi_spec
 from http_client import create_client
+from openapi_parser import load_openapi_spec
 from tool_generator import (
-    generate_tool_name,
-    generate_tool_description,
-    build_input_schema,
-    should_include_operation,
-    load_documented_apis_whitelist,
     apply_overlay_to_description,
     apply_overlay_to_schema,
+    build_input_schema,
     compute_annotations,
+    generate_tool_description,
+    generate_tool_name,
+    load_documented_apis_whitelist,
     maybe_append_org_project_hint,
+    should_include_operation,
 )
 
 logging.basicConfig(
@@ -58,6 +59,7 @@ MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "https://api.cekura.ai/mcp")
 
 # Derive allowed hosts from MCP_ISSUER_URL and MCP_SERVER_URL (covers prod, ngrok, local).
 from urllib.parse import urlparse as _urlparse
+
 _issuer_host = _urlparse(MCP_ISSUER_URL).netloc
 _server_host = _urlparse(MCP_SERVER_URL).netloc
 _allowed_hosts = [
@@ -95,7 +97,7 @@ MINTLIFY_TOOL_NAME = "search_cekura"  # Fallback, will be dynamically fetched
 
 
 async def fetch_mintlify_tool_name():
-    """Fetch the search tool name from Mintlify's MCP server dynamically."""
+    """Fetch the search tool name from Mintlify's MCP server dynamically. """
     global MINTLIFY_TOOL_NAME
 
     try:
@@ -432,6 +434,7 @@ def setup_dynamic_tool_handlers():
 
 def main():
     import argparse
+
     import uvicorn
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.responses import JSONResponse

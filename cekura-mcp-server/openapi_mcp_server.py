@@ -30,6 +30,7 @@ from tool_generator import (
     apply_overlay_to_description,
     apply_overlay_to_schema,
     compute_annotations,
+    maybe_append_org_project_hint,
 )
 
 logging.basicConfig(
@@ -183,6 +184,7 @@ async def initialize_server():
                 tool_description = generate_tool_description(operation)
                 input_schema = build_input_schema(operation, openapi_parser)
 
+                tool_description = maybe_append_org_project_hint(tool_name, input_schema, tool_description)
                 tool_description = apply_overlay_to_description(tool_name, tool_description)
                 input_schema = apply_overlay_to_schema(tool_name, input_schema)
 

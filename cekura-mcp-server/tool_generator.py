@@ -186,7 +186,14 @@ def _global_max_examples_per_tool() -> int:
     return _CACHED_MAX_EXAMPLES
 
 
+# Strip a trailing numeric collision suffix (`_2`, `_3`, ...) from the tool
+# name. `_v2` and other version suffixes are preserved — only pure-digit
+# trailers match.
+_COLLISION_SUFFIX = re.compile(r"_\d+$")
+
+
 def generate_tool_name(operation: Operation) -> str:
+    """Convert an OpenAPI operationId into an MCP tool name."""
     MAX_TOOL_NAME_LENGTH = 64
 
     if operation.operation_id:
@@ -197,6 +204,8 @@ def generate_tool_name(operation: Operation) -> str:
         path_slug = re.sub(r'[^a-zA-Z0-9_]', '', path_slug)
         method_name = operation.method.lower()
         name = f"{method_name}_{path_slug}"
+
+    name = _COLLISION_SUFFIX.sub("", name)
 
     if len(name) > MAX_TOOL_NAME_LENGTH:
         hash_suffix = hashlib.md5(name.encode()).hexdigest()[:8]
@@ -237,6 +246,39 @@ def generate_tool_description(operation: Operation) -> str:
     return f"{method} {path}"
 
 
+# Shared hint appended to any tool whose input schema accepts an organization
+# or project reference. Edit here once; every applicable tool picks it up.
+# Tools can opt out via the overlay flag `suppress_org_project_hint: true`.
+ORG_PROJECT_HINT = (
+    "If neither organization_id nor project_id is known, call user_organizations_list "
+    "(returns your accessible organisations) or projects_list (returns your "
+    "accessible projects) first, then retry with the chosen ID."
+)
+
+
+_ORG_PROJECT_FIELD_NAMES = (
+    "organization_id", "project_id",
+    "organization", "project",
+)
+
+
+def maybe_append_org_project_hint(
+    tool_name: str,
+    input_schema: Dict[str, Any],
+    description: str,
+) -> str:
+    """Append the shared org/project hint when the schema accepts either field."""
+    properties = input_schema.get("properties") or {}
+    if not any(name in properties for name in _ORG_PROJECT_FIELD_NAMES):
+        return description
+
+    overlay = load_tool_overlays().get(tool_name) or {}
+    if overlay.get("suppress_org_project_hint"):
+        return description
+
+    return f"{description}\n\n{ORG_PROJECT_HINT}"
+
+
 def build_input_schema(operation: Operation, parser: Any) -> Dict[str, Any]:
     return parser.build_parameter_schema(operation)
 
@@ -248,6 +290,12 @@ def should_include_operation(
     whitelist: Optional[Set[Tuple[str, str]]] = None
 ) -> bool:
     if operation.deprecated:
+        return False
+
+    # Never expose paths or operationIds containing `external` — these are
+    # back-compat duplicates of canonical paths and would surface as duplicate
+    # MCP tools.
+    if "external" in operation.path.lower() or (operation.operation_id and "external" in operation.operation_id.lower()):
         return False
 
     if whitelist is not None:
@@ -263,9 +311,6 @@ def should_include_operation(
         return False
 
     if exclude_ops and operation.operation_id in exclude_ops:
-        return False
-
-    if "external" in operation.path.lower() or (operation.operation_id and "external" in operation.operation_id.lower()):
         return False
 
     if filter_tags:

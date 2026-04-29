@@ -8,6 +8,8 @@ from tool_generator import (
     generate_tool_name,
     generate_tool_description,
     should_include_operation,
+    maybe_append_org_project_hint,
+    ORG_PROJECT_HINT,
 )
 from openapi_parser import Operation
 
@@ -290,3 +292,43 @@ class TestShouldIncludeOperation:
         whitelist = {("GET", "/api/v1/test")}
         result = should_include_operation(operation, whitelist=whitelist)
         assert result is True
+
+
+class TestMaybeAppendOrgProjectHint:
+    """Tests for the auto-injected org/project hint."""
+
+    def test_appended_when_organization_id_in_schema(self):
+        schema = {"properties": {"organization_id": {"type": "integer"}}}
+        result = maybe_append_org_project_hint("aiagents_list", schema, "Base description.")
+        assert result.startswith("Base description.")
+        assert ORG_PROJECT_HINT in result
+
+    def test_appended_when_project_id_in_schema(self):
+        schema = {"properties": {"project_id": {"type": "integer"}}}
+        result = maybe_append_org_project_hint("metrics_list", schema, "Base description.")
+        assert ORG_PROJECT_HINT in result
+
+    def test_appended_for_django_fk_names_in_body(self):
+        # POST /aiagents/ uses serializer FK fields named `project`/`organization`
+        schema = {"properties": {"project": {"type": "integer"}, "agent_name": {"type": "string"}}}
+        result = maybe_append_org_project_hint("aiagents_create", schema, "Base description.")
+        assert ORG_PROJECT_HINT in result
+
+    def test_not_appended_when_neither_present(self):
+        schema = {"properties": {"agent_id": {"type": "integer"}}}
+        result = maybe_append_org_project_hint("aiagents_retrieve", schema, "Base description.")
+        assert result == "Base description."
+
+    def test_suppressed_by_overlay_flag(self, monkeypatch):
+        monkeypatch.setattr(
+            "tool_generator.load_tool_overlays",
+            lambda: {"some_tool": {"suppress_org_project_hint": True}},
+        )
+        schema = {"properties": {"organization_id": {"type": "integer"}}}
+        result = maybe_append_org_project_hint("some_tool", schema, "Base description.")
+        assert result == "Base description."
+
+    def test_handles_missing_properties_key(self):
+        schema = {}
+        result = maybe_append_org_project_hint("anything", schema, "Base description.")
+        assert result == "Base description."

@@ -81,7 +81,7 @@ Each condition object has the following fields:
   The trigger condition that determines when this action should be taken.
 
   **Special cases**:
-  - When `id` is 0, the condition can be empty (represents the first message)
+  - When `id` is 0, the condition must be `"FIRST_MESSAGE"` (represents the first message)
   - When `type` is `action_followup`, the condition should be an integer referencing the previous condition ID
   - For standard conditions, the condition is a string describing the trigger
 </ParamField>
@@ -101,24 +101,39 @@ Each condition object has the following fields:
 <ParamField path="fixed_message" type="boolean" default="false">
   When set to `true`, the `action` field contains the exact message to send instead of instructions. Use this when you need precise, word-for-word control over what the testing agent says.
 
-  **Note**: For `id: 0` (first message), `fixed_message` is always `true`.
+  **Note**: For the first message (`id: 0`, `condition: "FIRST_MESSAGE"`), `fixed_message` must be `true`.
 </ParamField>
 
 ## First Message (id: 0)
 
-The condition with `id: 0` is special—it represents the **first message** the testing agent sends to start the conversation. Unlike other conditions, the first message **always has `fixed_message: true`**, meaning the `action` field contains the exact message to send.
+The condition with `id: 0` is special—it represents the **first message** the testing agent sends to start the conversation. This condition has specific requirements:
+
+- **`condition`** must be set to `"FIRST_MESSAGE"`
+- **`id`** must be `0`
+- **`fixed_message`** must be `true`
 
 ```json
 {
   "id": 0,
-  "condition": "",  // Empty for first message
+  "condition": "FIRST_MESSAGE",
   "action": "Hi, I need to cancel my appointment",
   "fixed_message": true
 }
 ```
 
+If your agent speaks first and you want the testing agent to wait before responding, you can leave the `action` field empty:
+
+```json
+{
+  "id": 0,
+  "condition": "FIRST_MESSAGE",
+  "action": "",
+  "fixed_message": true
+}
+```
+
 <Tip>
-For `id: 0`, the condition field is typically empty. The `action` will always contain the exact message to send (fixed_message is always true for the first message).
+The first condition must always have `condition: "FIRST_MESSAGE"`, `id: 0`, and `fixed_message: true`. The `action` field contains the exact message to send, or can be empty if the main agent speaks first.
 </Tip>
 
 ## Condition Types
@@ -538,7 +553,7 @@ Conditional Actions supports a variety of special tags in the `action` field to 
   "conditions": [
     {
       "id": 0,
-      "condition": "",
+      "condition": "FIRST_MESSAGE",
       "action": "Hello, I need to cancel my appointment",
       "fixed_message": true
     },
@@ -567,7 +582,7 @@ Conditional Actions supports a variety of special tags in the `action` field to 
   "conditions": [
     {
       "id": 0,
-      "condition": "",
+      "condition": "FIRST_MESSAGE",
       "action": "Hi, I need to cancel my appointment on Tuesday",
       "fixed_message": true
     },
@@ -601,7 +616,7 @@ Conditional Actions supports a variety of special tags in the `action` field to 
   "conditions": [
     {
       "id": 0,
-      "condition": "",
+      "condition": "FIRST_MESSAGE",
       "action": "",
       "fixed_message": true
     },
@@ -634,7 +649,7 @@ Conditional Actions supports a variety of special tags in the `action` field to 
   "conditions": [
     {
       "id": 0,
-      "condition": "",
+      "condition": "FIRST_MESSAGE",
       "action": "Hi, I need help with my order",
       "fixed_message": true
     },
@@ -667,7 +682,7 @@ Conditional Actions supports a variety of special tags in the `action` field to 
   "conditions": [
     {
       "id": 0,
-      "condition": "",
+      "condition": "FIRST_MESSAGE",
       "action": "<background_noise sound=\"office\" volume=\"0.05\">Hi, I'm calling about my order</background_noise>",
       "fixed_message": true
     },
@@ -722,6 +737,7 @@ Handle different paths based on agent response:
   "conditions": [
     {
       "id": 0,
+      "condition": "FIRST_MESSAGE",
       "action": "I would like to request a refund for my order",
       "fixed_message": true
     },
@@ -748,6 +764,7 @@ Progressively provide information as requested:
   "conditions": [
     {
       "id": 0,
+      "condition": "FIRST_MESSAGE",
       "action": "Hi, I'm calling about my account",
       "fixed_message": true
     },
@@ -821,6 +838,33 @@ Use `action_followup` for complex multi-part responses:
   - All other tags work with all TTS providers
 </Warning>
 
+## Validation Rules
+
+Conditional actions are validated when you create or update an evaluator. The following rules are enforced:
+
+<AccordionGroup>
+  <Accordion title="First Message Requirements" icon="play">
+    The first condition in your conditions array must:
+    - Have `condition` set to `"FIRST_MESSAGE"`
+    - Have `id` set to `0`
+    - Have `fixed_message` set to `true`
+
+    The `action` field can contain the message to send, or be empty if your agent speaks first.
+  </Accordion>
+
+  <Accordion title="Unique Condition IDs" icon="fingerprint">
+    Each condition must have a unique `id`. Duplicate IDs will cause a validation error.
+  </Accordion>
+
+  <Accordion title="Action Content Requirements" icon="message">
+    Actions cannot be empty, whitespace-only, or contain only special characters—except for the first message (`FIRST_MESSAGE`), which may have an empty action when your agent speaks first.
+  </Accordion>
+
+  <Accordion title="Supported Tags Only" icon="tags">
+    Only supported XML tags are allowed in action content. Using unsupported tags will cause a validation error. See the [Supported Tags](#supported-tags) section for the complete list.
+  </Accordion>
+</AccordionGroup>
+
 ## Troubleshooting
 
 <AccordionGroup>
@@ -846,9 +890,19 @@ Use `action_followup` for complex multi-part responses:
     **Issue**: The conversation doesn't start.
 
     **Solutions**:
-    - Ensure you have a condition with `id: 0`
-    - Verify the action field is not empty
+    - Ensure the first condition has `condition: "FIRST_MESSAGE"`, `id: 0`, and `fixed_message: true`
+    - Verify the action field contains the message to send (or is empty if your agent speaks first)
     - Check that the role is defined
+  </Accordion>
+
+  <Accordion title="Validation Errors" icon="circle-exclamation">
+    **Issue**: You receive a validation error when creating or updating an evaluator.
+
+    **Common causes and solutions**:
+    - **First message format**: The first condition must have `condition: "FIRST_MESSAGE"`, `id: 0`, and `fixed_message: true`
+    - **Duplicate IDs**: Each condition must have a unique `id` value
+    - **Empty action**: Non-first-message conditions must have meaningful content in the `action` field
+    - **Unsupported tags**: Only use tags listed in the [Supported Tags](#supported-tags) section
   </Accordion>
 </AccordionGroup>
 

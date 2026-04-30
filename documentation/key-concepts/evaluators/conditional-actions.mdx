@@ -59,17 +59,20 @@ The `conditions` array defines the rules and actions for the evaluator. Each con
       "id": 0,
       "condition": "FIRST_MESSAGE",
       "action": "Hi, I need to cancel my appointment",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 1,
       "condition": "The agent asks for your name",
-      "action": "Provide your name as John Smith"
+      "action": "Provide your name as John Smith",
+      "type": "standard"
     },
     {
       "id": 2,
       "condition": "The agent asks for a reason",
-      "action": "Say you have a scheduling conflict"
+      "action": "Say you have a scheduling conflict",
+      "type": "standard"
     }
   ]
 }
@@ -83,7 +86,7 @@ Each condition object has the following fields:
   Unique identifier for the condition. The first condition must use `id: 0`. Each ID must be unique — duplicate IDs are rejected.
 </ParamField>
 
-<ParamField path="condition" type="string | integer">
+<ParamField path="condition" type="string | integer" required>
   The trigger condition that determines when this action should be taken.
 
   **Special cases**:
@@ -100,9 +103,9 @@ Each condition object has the following fields:
   **Exception**: The `FIRST_MESSAGE` condition (id: 0) may have an empty action when the main agent speaks first.
 </ParamField>
 
-<ParamField path="type" type="string" default="standard">
-  The condition type. Options:
-  - `standard`: Normal condition (default)
+<ParamField path="type" type="string" required>
+  The condition type. Must be explicitly provided — there is no default. Options:
+  - `standard`: Normal condition triggered by the conversation context
   - `action_followup`: Action to take immediately after a previous action
 </ParamField>
 
@@ -125,13 +128,13 @@ The backend enforces the following constraints on all Conditional Actions evalua
 
     ```json
     // ✅ Valid
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello", "fixed_message": true }
+    { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello", "type": "standard", "fixed_message": true }
 
     // ❌ Invalid — condition is empty
-    { "id": 0, "condition": "", "action": "Hello", "fixed_message": true }
+    { "id": 0, "condition": "", "action": "Hello", "type": "standard", "fixed_message": true }
 
     // ❌ Invalid — fixed_message is missing
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello" }
+    { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello", "type": "standard" }
     ```
   </Accordion>
 
@@ -140,22 +143,25 @@ The backend enforces the following constraints on all Conditional Actions evalua
 
     ```json
     // ✅ Valid — FIRST_MESSAGE may have empty action
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "", "fixed_message": true }
+    { "id": 0, "condition": "FIRST_MESSAGE", "action": "", "type": "standard", "fixed_message": true }
 
     // ❌ Invalid — non-FIRST_MESSAGE condition has empty action
-    { "id": 1, "condition": "The agent greets you", "action": "" }
+    { "id": 1, "condition": "The agent greets you", "action": "", "type": "standard" }
 
     // ❌ Invalid — whitespace-only action
-    { "id": 1, "condition": "The agent greets you", "action": "   " }
+    { "id": 1, "condition": "The agent greets you", "action": "   ", "type": "standard" }
     ```
   </Accordion>
 
-  <Accordion title="3. Supported XML tags only" icon="circle-3">
-    XML tags used in `action` fields must be from the [supported tag set](#supported-tags). Using an unrecognized tag returns a validation error listing the supported tags.
+  <Accordion title="3. type is required" icon="circle-3">
+    Every condition must include a `type` field. There is no default — omitting `type` returns a validation error.
 
     ```json
-    // ❌ Invalid — <whisper> is not a supported tag
-    { "id": 1, "condition": "Agent greets", "action": "<whisper>Hello</whisper>", "fixed_message": true }
+    // ✅ Valid
+    { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard" }
+
+    // ❌ Invalid — type is missing
+    { "id": 1, "condition": "Agent asks for name", "action": "Provide name" }
     ```
   </Accordion>
 
@@ -165,15 +171,17 @@ The backend enforces the following constraints on all Conditional Actions evalua
     ```json
     // ❌ Invalid — id 1 appears twice
     [
-      { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello", "fixed_message": true },
-      { "id": 1, "condition": "Agent asks for name", "action": "Provide name" },
-      { "id": 1, "condition": "Agent asks for email", "action": "Provide email" }
+      { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello", "type": "standard", "fixed_message": true },
+      { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard" },
+      { "id": 1, "condition": "Agent asks for email", "action": "Provide email", "type": "standard" }
     ]
     ```
   </Accordion>
 
   <Accordion title="5. Language required" icon="circle-5">
     Conditional Actions evaluators require a `scenario_language`. Set it by assigning a personality with a language configured. If you provide a personality, the language is inferred automatically; if no personality is set, `scenario_language` must be explicitly provided.
+
+    This also applies when changing an existing evaluator's type to Conditional Actions.
   </Accordion>
 </AccordionGroup>
 
@@ -190,6 +198,7 @@ The condition with `id: 0` is special—it represents the **first message** the 
   "id": 0,
   "condition": "FIRST_MESSAGE",
   "action": "Hi, I need to cancel my appointment",
+  "type": "standard",
   "fixed_message": true
 }
 ```
@@ -201,6 +210,7 @@ The condition with `id: 0` is special—it represents the **first message** the 
   "id": 0,
   "condition": "FIRST_MESSAGE",
   "action": "",
+  "type": "standard",
   "fixed_message": true
 }
 ```
@@ -232,7 +242,7 @@ Action followup conditions execute after a previous action has been taken, regar
 {
   "id": 2,
   "type": "action_followup",
-  "condition": 1,  // References the previous condition ID
+  "condition": 1,
   "action": "Also mention that you need a confirmation email"
 }
 ```
@@ -252,9 +262,10 @@ When `fixed_message` is `false` (or omitted), the `action` field provides instru
 ```json
 {
   "id": 1,
+  "type": "standard",
   "condition": "The agent asks for your name",
   "action": "Provide your name as John Smith",
-  "fixed_message": false  // Optional, false is the default
+  "fixed_message": false
 }
 ```
 
@@ -267,6 +278,7 @@ When `fixed_message` is `true`, the `action` field contains the exact text that 
 ```json
 {
   "id": 1,
+  "type": "standard",
   "condition": "The agent asks for your name",
   "action": "My name is John Smith",
   "fixed_message": true
@@ -304,8 +316,6 @@ Conditional Actions supports a variety of special tags in the `action` field to 
 
 <Warning>
 **Important**: Tags are only supported when `fixed_message` is set to `true`. They will not work with `fixed_message: false` (instruction-based actions).
-
-Only tags from the supported set are allowed. Using an unrecognized XML tag returns a validation error.
 </Warning>
 
 ### Communication Tags
@@ -317,6 +327,7 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
     ```json
     {
       "id": 1,
+      "type": "standard",
       "condition": "The call is answered",
       "action": "<ivr text=\"Press 1 for sales, press 2 for support\" />",
       "fixed_message": true
@@ -372,6 +383,7 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
     ```json
     {
       "id": 3,
+      "type": "standard",
       "condition": "The agent offers time slots",
       "action": "Let me think <silence time=\"2s\" /> I'll take the 3pm slot",
       "fixed_message": true
@@ -460,6 +472,7 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
     ```json
     {
       "id": 2,
+      "type": "standard",
       "condition": "The agent asks for account number",
       "action": "<dtmf digits=\"123\" /> I've entered my account number",
       "fixed_message": true
@@ -591,22 +604,26 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
       "id": 0,
       "condition": "FIRST_MESSAGE",
       "action": "Hello, I need to cancel my appointment",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 1,
       "condition": "The agent asks for your name",
-      "action": "Provide your name"
+      "action": "Provide your name",
+      "type": "standard"
     },
     {
       "id": 2,
       "condition": "The agent asks for your date of birth",
-      "action": "Provide your date of birth"
+      "action": "Provide your date of birth",
+      "type": "standard"
     },
     {
       "id": 3,
       "condition": "The agent confirms the cancellation",
-      "action": "Thank them and end the call"
+      "action": "Thank them and end the call",
+      "type": "standard"
     }
   ]
 }
@@ -620,22 +637,26 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
       "id": 0,
       "condition": "FIRST_MESSAGE",
       "action": "Hi, I need to cancel my appointment on Tuesday",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 1,
       "condition": "The agent offers to reschedule",
-      "action": "Accept and say you prefer next week"
+      "action": "Accept and say you prefer next week",
+      "type": "standard"
     },
     {
       "id": 2,
       "condition": "The agent provides available time slots",
-      "action": "Select the first available option"
+      "action": "Select the first available option",
+      "type": "standard"
     },
     {
       "id": 3,
       "condition": "The agent asks if anything else is needed",
       "action": "No, that's all. Thank you for your help. <endcall />",
+      "type": "standard",
       "fixed_message": true
     }
   ]
@@ -654,23 +675,27 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
       "id": 0,
       "condition": "FIRST_MESSAGE",
       "action": "",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 1,
       "condition": "The IVR plays the menu options",
       "action": "<dtmf digits=\"2\" />",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 2,
       "condition": "The agent asks how they can help",
-      "action": "Explain your billing issue"
+      "action": "Explain your billing issue",
+      "type": "standard"
     },
     {
       "id": 3,
       "condition": "The agent asks for account number",
       "action": "<dtmf digits=\"123456#\" />",
+      "type": "standard",
       "fixed_message": true
     }
   ]
@@ -687,6 +712,7 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
       "id": 0,
       "condition": "FIRST_MESSAGE",
       "action": "Hi, I need help with my order",
+      "type": "standard",
       "fixed_message": true
     },
     {
@@ -704,7 +730,8 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
     {
       "id": 3,
       "condition": "The agent responds to your requests",
-      "action": "Thank them and confirm the details"
+      "action": "Thank them and confirm the details",
+      "type": "standard"
     }
   ]
 }
@@ -720,18 +747,21 @@ Only tags from the supported set are allowed. Using an unrecognized XML tag retu
       "id": 0,
       "condition": "FIRST_MESSAGE",
       "action": "<background_noise sound=\"office\" volume=\"0.05\">Hi, I'm calling about my order</background_noise>",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 1,
       "condition": "The agent asks you to repeat",
       "action": "<volume ratio=\"1.3\" />I said I'm calling about my order, <spell>ABC</spell> 123",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 2,
       "condition": "The agent asks for more information",
       "action": "Let me check <silence time=\"2s\" /> here's the reference number",
+      "type": "standard",
       "fixed_message": true
     }
   ]
@@ -775,17 +805,20 @@ Handle different paths based on agent response:
       "id": 0,
       "condition": "FIRST_MESSAGE",
       "action": "I would like to request a refund for my order",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 1,
       "condition": "The agent approves the refund",
-      "action": "Thank them and confirm the details"
+      "action": "Thank them and confirm the details",
+      "type": "standard"
     },
     {
       "id": 2,
       "condition": "The agent denies the refund",
-      "action": "Ask to speak with a manager"
+      "action": "Ask to speak with a manager",
+      "type": "standard"
     }
   ]
 }
@@ -802,22 +835,26 @@ Progressively provide information as requested:
       "id": 0,
       "condition": "FIRST_MESSAGE",
       "action": "Hi, I'm calling about my account",
+      "type": "standard",
       "fixed_message": true
     },
     {
       "id": 1,
       "condition": "The agent asks for your name",
-      "action": "Provide your name"
+      "action": "Provide your name",
+      "type": "standard"
     },
     {
       "id": 2,
       "condition": "The agent asks for your account number",
-      "action": "Provide your account number"
+      "action": "Provide your account number",
+      "type": "standard"
     },
     {
       "id": 3,
       "condition": "The agent asks for verification",
-      "action": "Provide your date of birth"
+      "action": "Provide your date of birth",
+      "type": "standard"
     }
   ]
 }
@@ -833,7 +870,8 @@ Use `action_followup` for complex multi-part responses:
     {
       "id": 5,
       "condition": "The agent asks about your preferences",
-      "action": "State your first preference"
+      "action": "State your first preference",
+      "type": "standard"
     },
     {
       "id": 6,
@@ -873,18 +911,18 @@ Use `action_followup` for complex multi-part responses:
 
     **Solution**: Ensure the first element in your `conditions` array has all three:
     ```json
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "...", "fixed_message": true }
+    { "id": 0, "condition": "FIRST_MESSAGE", "action": "...", "type": "standard", "fixed_message": true }
     ```
     Previously `condition` was left empty (`""`); it must now be the exact string `"FIRST_MESSAGE"`.
   </Accordion>
 
-  <Accordion title="Validation error: unsupported XML tag" icon="tag">
-    **Issue**: A condition action contains a tag that isn't recognized.
+  <Accordion title="Validation error: type is required" icon="triangle-exclamation">
+    **Issue**: The API returns a validation error about a missing `type` field.
 
-    **Solutions**:
-    - Check the tag name spelling against the [supported tags list](#supported-tags)
-    - Remove or replace any custom or unsupported tags
-    - The error message lists all supported tags for reference
+    **Solution**: Add `type` explicitly to every condition. There is no default:
+    ```json
+    { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard" }
+    ```
   </Accordion>
 
   <Accordion title="Validation error: duplicate condition ID" icon="copy">

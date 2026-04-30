@@ -1,0 +1,220 @@
+---
+title: 'Conditional Actions'
+description: 'Build dynamic, rule-based evaluators that adapt responses based on what your agent says'
+---
+
+## What are Conditional Actions?
+
+Conditional Actions let you build evaluators that respond dynamically to your agent instead of following a fixed linear script. Each condition is a rule: *"when the agent says X, respond with Y"*. This makes it easy to test branching conversations, decision trees, and multi-turn flows.
+
+## Structure
+
+A Conditional Actions evaluator has two top-level fields:
+
+```json
+{
+  "role": "You are a patient calling to schedule an appointment",
+  "conditions": [ ... ]
+}
+```
+
+| Field | Description |
+|---|---|
+| `role` | Describes who the testing agent is playing |
+| `conditions` | Array of condition-action rules |
+
+## Conditions
+
+Each condition in the array describes a trigger and a response:
+
+```json
+{
+  "id": 1,
+  "condition": "The agent asks for your name",
+  "action": "My name is John Smith",
+  "type": "standard",
+  "fixed_message": true
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `id` | Yes | Unique integer. Must start at `0` for the FIRST_MESSAGE entry |
+| `condition` | Yes | Natural-language description of what the agent said to trigger this response. Must be `"FIRST_MESSAGE"` for `id: 0` |
+| `action` | Yes | What the testing agent says or does. May be empty only for the FIRST_MESSAGE when the main agent speaks first |
+| `type` | No | `"standard"` (default) or `"action_followup"` |
+| `fixed_message` | No | `true` = send `action` verbatim; `false` (default) = use `action` as an instruction for the LLM |
+
+## Validation Rules
+
+All Conditional Actions evaluators must follow these rules:
+
+1. **FIRST_MESSAGE required** — The first condition must always have `id: 0`, `condition: "FIRST_MESSAGE"`, and `fixed_message: true`.
+2. **Unique IDs** — No two conditions may share the same `id`.
+3. **Non-empty actions** — The `action` field must not be empty, whitespace-only, or contain only special characters — except for the FIRST_MESSAGE condition (which may be empty when the main agent speaks first).
+4. **Supported tags only** — XML tags in `action` fields must come from the [supported tag list](#supported-tags).
+5. **No duplicate IDs** — Each condition must have a unique integer `id`.
+6. **Language required** — A `scenario_language` must be set when creating a Conditional Actions evaluator.
+
+## The FIRST_MESSAGE Condition
+
+Every Conditional Actions evaluator starts with a special condition at `id: 0`:
+
+```json
+{
+  "id": 0,
+  "condition": "FIRST_MESSAGE",
+  "action": "Hello, I need to schedule an appointment",
+  "type": "standard",
+  "fixed_message": true
+}
+```
+
+- If the **testing agent speaks first**, set `action` to the opening message.
+- If the **main agent speaks first** (e.g., an IVR greeting), set `action` to `""` — the main agent will initiate the conversation.
+
+## Condition Types
+
+### Standard (`type: "standard"`)
+
+The testing agent responds when the agent's latest message matches the `condition` description.
+
+```json
+{
+  "id": 1,
+  "condition": "The agent greets the caller and asks how to help",
+  "action": "I need to cancel my appointment for next Tuesday",
+  "type": "standard",
+  "fixed_message": true
+}
+```
+
+### Action Followup (`type: "action_followup"`)
+
+The testing agent responds after a specific **prior condition** was triggered. The `condition` field must be an integer referencing another condition's `id`.
+
+Use this when the agent's response depends on what the testing agent just said, not on the main agent's message.
+
+```json
+{
+  "id": 0,
+  "condition": "FIRST_MESSAGE",
+  "action": "I need to reschedule my appointment",
+  "type": "standard",
+  "fixed_message": true
+},
+{
+  "id": 1,
+  "condition": "The agent asks for the preferred date",
+  "action": "Next Friday works best for me",
+  "type": "standard",
+  "fixed_message": true
+},
+{
+  "id": 2,
+  "condition": 1,
+  "action": "Yes, morning if possible",
+  "type": "action_followup",
+  "fixed_message": true
+}
+```
+
+In this example, condition `2` fires after condition `1` is triggered, regardless of what the agent says.
+
+## Fixed Message vs. LLM Instruction
+
+| `fixed_message` | Behavior |
+|---|---|
+| `true` | The `action` is sent **verbatim** as the testing agent's response |
+| `false` | The `action` is used as an **instruction** for the LLM to generate a natural response |
+
+Use `fixed_message: true` when you need exact, repeatable responses — for example, when testing specific phrases, numbers, or when using XML tags.
+
+## Supported Tags
+
+When `fixed_message: true`, you can include XML tags in the `action` field to control behavior:
+
+### Pause / Timing
+
+| Tag | Format | Description |
+|---|---|---|
+| `<silence>` | `<silence time="2s" />` | Pause for the specified duration |
+| `<break>` | `<break time="2s" />` | Same as silence — pause for the specified duration |
+| `<hold>` | `<hold time="5s" />` | Hold the call |
+
+### Call Control
+
+| Tag | Format | Description |
+|---|---|---|
+| `<endcall>` | `<endcall />` | Hang up the call |
+| `<ivr>` | `<ivr text="Press 1 for billing" />` | Send IVR tones |
+| `<dtmf>` | `<dtmf digits="1" />` | Send DTMF keypad input |
+
+### Speech & Audio
+
+| Tag | Format | Description |
+|---|---|---|
+| `<speed>` | `<speed ratio="1.5" /> Speak faster` | Adjust speech speed. Must appear at the start |
+| `<volume>` | `<volume ratio="1.2" />` | Adjust volume (0.5–2.0) |
+| `<spell>` | `<spell>API</spell>` | Spell out characters letter by letter |
+
+### Messaging
+
+| Tag | Format | Description |
+|---|---|---|
+| `<send_sms>` | `<send_sms text="Your code is 1234" />` | Send an SMS |
+| `<voicemail>` | `<voicemail text="Please leave a message" />` | Trigger voicemail |
+
+### Environment
+
+| Tag | Format | Description |
+|---|---|---|
+| `<background_noise>` | `<background_noise sound="office" />` | Add background audio |
+| `<noise>` | `<noise sound="traffic" />` | Add noise |
+| `<network_simulation>` | `<network_simulation latency="200" />` | Simulate network conditions |
+| `<interruption>` | `<interruption time="2s" />` | Interrupt mid-response (requires `type: "action_followup"`) |
+
+## Full Example
+
+```json
+{
+  "role": "A patient calling to schedule a follow-up appointment",
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "FIRST_MESSAGE",
+      "action": "Hello, I need to schedule a follow-up appointment with Dr. Smith",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent asks for your date of birth",
+      "action": "December 17th, 1985",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 2,
+      "condition": "The agent asks for your preferred date and time",
+      "action": "Next Thursday afternoon if possible",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 3,
+      "condition": "The agent confirms the appointment and provides a reference number",
+      "action": "",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 4,
+      "condition": 3,
+      "action": "<endcall />",
+      "type": "action_followup",
+      "fixed_message": true
+    }
+  ]
+}
+```

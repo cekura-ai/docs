@@ -1,0 +1,308 @@
+---
+title: 'Websocket Simulations'
+sidebarTitle: "Websocket Testing"
+icon: "waveform-lines"
+iconType: "regular"
+description: 'Test agents with raw-PCM WebSocket voice using the CHIRP protocol'
+---
+
+## Overview
+
+Cekura can simulate calls against any voice agent that exposes a raw-PCM WebSocket endpoint. Instead of going through a vendor SDK, Cekura dials your `wss://` URL directly and exchanges 16 kHz mono PCM audio as binary WebSocket frames using the **CHIRP** protocol.
+
+This is the right integration when:
+- Your agent has no phone number and you don't want to use a vendor SDK.
+- You already run a real-time audio pipeline and want lower-latency bidirectional streaming.
+- You need to test a custom voice stack or research prototype that speaks raw PCM.
+
+For the full wire format, see [CHIRP Protocol Specification](/documentation/integrations/chirp/protocol).
+
+<Tabs>
+<Tab title="WebSocket">
+
+Run tests directly from the dashboard against your CHIRP WebSocket endpoint.
+
+<Steps>
+<Step title="Configure Chirp credentials">
+Open your agent settings, pick **Chirp** in the provider grid, and fill in the WebSocket URL (and optional Basic Auth):
+
+<img src="/images/chirp/websocket-config.png" alt="Chirp WebSocket Configuration" />
+
+**Required:**
+- **WebSocket URL** — The `wss://` (or `ws://`) endpoint your agent listens on. Cekura connects directly to this URL.
+
+**Optional:**
+- **Basic Auth Username**
+- **Basic Auth Password**
+
+When both username and password are provided, Cekura sends an `Authorization: Basic <base64(user:pass)>` header on the WebSocket upgrade. Leave them empty if your endpoint is unauthenticated.
+
+<Note>
+Your endpoint must speak raw `pcm_s16le` audio at **16 kHz mono**, framed as WebSocket binary messages. See the [protocol spec](/documentation/integrations/chirp/protocol) for the full handshake, message types, and barge-in semantics.
+</Note>
+
+</Step>
+
+<Step title="Enable the Websocket voice connection">
+Under **Connections → Voice**, make sure **Websocket** is enabled. Chirp auto-enables this when you pick the provider:
+
+<img src="/images/chirp/connections-config.png" alt="Chirp Voice Connection" />
+
+</Step>
+
+<Step title="Run tests from the dashboard">
+Select scenarios for your agent and click **Run**. With Chirp configured, the run dialog shows a **Run with Chirp** button:
+
+<img src="/images/chirp/run-chirp-tests.png" alt="Run Chirp Tests" />
+
+Cekura will:
+- Open a WebSocket to your configured URL with the Basic Auth header (if set)
+- Stream 16 kHz mono PCM audio to your agent and play your agent's audio back
+- Capture the conversation, transcribe it, and run your evaluators against the result
+</Step>
+
+<Step title="View results">
+Results appear in your dashboard like any other run — status, metrics, transcripts, and audio playback are all available. Failed connections are surfaced via run status:
+
+| Run status | When you see it |
+|------------|-----------------|
+| `REJECTED` | Server returned `401`/`403` on the WebSocket upgrade (bad Basic Auth or rejected origin). |
+| `INCOMPLETED` | Host unreachable, TLS failure, or server closed the connection before the test could complete. |
+| `COMPLETED` | Audio exchange finished cleanly. Evaluator scores are available. |
+
+</Step>
+</Steps>
+
+</Tab>
+
+<Tab title="Code">
+
+Use the API to trigger Chirp runs from your own code or CI.
+
+## Prerequisites
+
+Configure Chirp credentials on your agent first (same as the **WebSocket** tab):
+
+<img src="/images/chirp/websocket-config.png" alt="Chirp WebSocket Configuration" />
+
+**Required:**
+- **WebSocket URL** — `wss://` endpoint that speaks the [CHIRP protocol](/documentation/integrations/chirp/protocol).
+
+**Optional:**
+- **Basic Auth Username** / **Password** for the WebSocket upgrade.
+
+## API Endpoint
+
+```
+POST https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_chirp/
+```
+
+## Authentication
+
+Include your Cekura API key in the request header:
+```
+X-CEKURA-API-KEY: <YOUR_API_KEY>
+```
+
+## Request Parameters
+
+**scenarios** (array | integer | string, required): Test scenarios to run
+- **Array format**: List of scenario IDs `[123, 456, 789]`
+- **Integer format**: Run the first N scenarios for the agent `5`
+- **String format**: Run all scenarios for the agent `"all"`
+
+**agent_id** (integer, optional): Your Agent ID in Cekura. Required when using integer or `"all"` format for scenarios.
+
+**frequency** (integer, optional): Number of times to run each scenario (default: `1`).
+
+**name** (string, optional): Custom name for this test run.
+
+**concurrency_limit** (integer, optional): Cap on parallel runs.
+
+## Examples
+
+### Single Run (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_chirp/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [30]
+  }'
+```
+
+### Multiple Runs (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_chirp/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": [30, 31, 32],
+    "frequency": 2,
+    "name": "Chirp Test Run"
+  }'
+```
+
+### Run First N Scenarios (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_chirp/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": 5,
+    "agent_id": 123,
+    "frequency": 1,
+    "name": "First 5 Scenarios"
+  }'
+```
+
+### Run All Scenarios (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_chirp/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "scenarios": "all",
+    "agent_id": 123,
+    "frequency": 1,
+    "name": "All Scenarios Test"
+  }'
+```
+
+### Python Example
+
+```python
+import requests
+
+API_KEY = "<YOUR_API_KEY>"
+BASE_URL = "https://api.cekura.ai/test_framework"
+
+headers = {
+    "X-CEKURA-API-KEY": API_KEY,
+    "Content-Type": "application/json",
+}
+
+payload = {
+    "scenarios": [30, 31, 32],
+    "frequency": 2,
+    "name": "Chirp Test Run",
+}
+
+resp = requests.post(
+    f"{BASE_URL}/v1/scenarios-external/run_scenarios_chirp/",
+    headers=headers,
+    json=payload,
+)
+result = resp.json()
+print(result)
+```
+
+### Python — Run All Scenarios
+
+```python
+import requests
+
+API_KEY = "<YOUR_API_KEY>"
+BASE_URL = "https://api.cekura.ai/test_framework"
+
+headers = {
+    "X-CEKURA-API-KEY": API_KEY,
+    "Content-Type": "application/json",
+}
+
+payload = {
+    "scenarios": "all",
+    "agent_id": 123,
+    "frequency": 1,
+    "name": "All Scenarios Test",
+}
+
+resp = requests.post(
+    f"{BASE_URL}/v1/scenarios-external/run_scenarios_chirp/",
+    headers=headers,
+    json=payload,
+)
+result = resp.json()
+print(result)
+```
+
+## Response
+
+```json
+{
+  "id": 16870,
+  "name": "Chirp Test Run",
+  "agent": 5,
+  "status": "in_progress",
+  "success_rate": 0.0,
+  "run_as_text": false,
+  "is_cronjob": false,
+  "runs": [
+    {
+      "id": 34625,
+      "status": "running",
+      "scenario": 11547,
+      "scenario_name": "Customer Support Scenario",
+      "test_profile_data": {"key": "value"}
+    }
+  ],
+  "created_at": "2026-04-30T09:32:59.484534Z",
+  "updated_at": "2026-04-30T09:32:59.484942Z"
+}
+```
+
+## Error Responses
+
+### Missing Chirp Credentials
+
+```json
+{
+  "detail": "Agent must have CHIRP credentials configured (chirp_data with chirp_websocket_url)."
+}
+```
+
+### Missing WebSocket URL
+
+```json
+{
+  "chirp_data": ["chirp_websocket_url is required"]
+}
+```
+
+### Invalid Scenarios
+
+```json
+{
+  "scenarios": ["Invalid scenario IDs or scenarios not found"]
+}
+```
+
+### Insufficient Balance
+
+```json
+{
+  "detail": "Insufficient balance for this operation"
+}
+```
+
+## Monitor Results
+
+Poll for results using the [List Runs with IDs API](/api-reference/test_framework/list-runs-with-ids).
+
+</Tab>
+</Tabs>
+
+## Next Steps
+
+- [CHIRP Protocol Specification](/documentation/integrations/chirp/protocol)
+- [Custom metrics](/documentation/key-concepts/metrics/custom-metrics)
+- [Instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)
+- [Load testing](/documentation/guides/testing-agents/load-testing)

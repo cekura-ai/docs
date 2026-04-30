@@ -817,6 +817,48 @@ _result = response.get("result")
 _explanation = response.get("explanation")
 ```
 
+### Audio-Based Analysis
+
+Custom Python metrics have access to the full voice recording and pre-computed audio segment timing, enabling you to evaluate speech delivery properties that go beyond what transcript text alone can capture. This is the right approach when no pre-defined metric covers the specific speech quality requirement you need to validate.
+
+**Available audio data:**
+- `data["voice_recording"]` — URL to the voice recording file
+- `data["recording_data"]` — Pre-computed speaking segments: `main_speaking` and `testing_speaking` arrays of `[start, end]` timestamps in seconds
+- `data["transcript_json"]` — Per-utterance data including `start_time` and `end_time` in seconds, useful for locating the audio window around specific spoken content
+
+**Pattern: Locate relevant utterances, then evaluate the audio**
+
+Use `transcript_json` to find when specific content was spoken, then reference those timestamps to identify the corresponding audio segment for evaluation:
+
+```python
+# Find Main Agent utterances containing content to evaluate
+target_utterances = [
+    entry for entry in data["transcript_json"]
+    if entry["role"] == "Main Agent" and "<target content>" in entry["content"].lower()
+]
+
+recording_url = data["voice_recording"]
+
+if not target_utterances:
+    _result = False
+    _explanation = "No relevant utterances found in the recording"
+else:
+    # Use start_time / end_time to extract the right audio window.
+    # Then pass the audio segment to evaluate_llm_judge_metric or analyze it programmatically.
+    segment_start = target_utterances[0]["start_time"]
+    segment_end = target_utterances[0]["end_time"]
+    # ... audio extraction and evaluation logic ...
+    _result = True
+    _explanation = "Speech delivery met the expected pattern"
+```
+
+For the evaluation step, call `evaluate_llm_judge_metric` with a description tailored to the audio content, or apply your own signal processing logic. See [Calling LLM Judge Metrics from Python](#calling-llm-judge-metrics-from-python) for the function reference.
+
+**Use cases:**
+- Verifying that multi-part spoken content is delivered with appropriate pauses between segments
+- Detecting whether specific terms or sequences are spoken with the required cadence
+- Evaluating audio-level speech patterns not captured in the transcript (e.g., pacing, grouping, emphasis)
+
 ### Advanced Example
 
 Here's a more complex example that analyzes sentiment and response time:

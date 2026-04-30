@@ -361,6 +361,96 @@ async def test_simple_tool(message: str) -> str:
     return f"Hello from Cekura MCP Server! You said: {message}"
 
 
+def _claude_jsonl_to_cekura_transcript(jsonl_text: str) -> List[Dict[str, object]]:
+    """Convert a Claude Code session transcript (JSONL) to the cekura transcript
+    shape: a list of {role, content, start_time, end_time} entries. Roles are
+    "Testing Agent" (the human user) and "Main Agent" (Claude). Times are
+    seconds since the first entry — the Cekura observe endpoint requires both."""
+    raw: List[Dict[str, object]] = []  # {ts: datetime|None, role, content}
+    for line in jsonl_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        msg_type = entry.get("type") or entry.get("role")
+        if msg_type in ("user", "human"):
+            role = "Testing Agent"
+        elif msg_type == "assistant":
+            role = "Main Agent"
+        else:
+            continue
+
+        # Claude Code's transcript wraps the message under entry["message"]; older
+        # / simpler producers may put content at the top level.
+        content = entry.get("content")
+        if content is None:
+            message = entry.get("message")
+            if isinstance(message, dict):
+                content = message.get("content")
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, list):
+            parts: List[str] = []
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                btype = block.get("type")
+                if btype == "text":
+                    parts.append(block.get("text", ""))
+                elif btype == "tool_use":
+                    parts.append(f"[tool_use:{block.get('name', '?')}]")
+                elif btype == "tool_result":
+                    parts.append("[tool_result]")
+            text = "\n".join(p for p in parts if p)
+        else:
+            continue
+
+        text = text.strip()
+        if not text:
+            continue
+
+        ts_raw = entry.get("timestamp")
+        ts: object = None
+        if isinstance(ts_raw, str) and ts_raw:
+            try:
+                ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+            except ValueError:
+                ts = None
+        raw.append({"ts": ts, "role": role, "content": text})
+
+    if not raw:
+        return []
+
+    # Anchor t0 at the first parseable timestamp; entries with no timestamp are
+    # placed sequentially after the most recent timed entry.
+    t0 = next((r["ts"] for r in raw if r["ts"] is not None), None)
+    transcript: List[Dict[str, object]] = []
+    for i, r in enumerate(raw):
+        if r["ts"] is not None and t0 is not None:
+            start = (r["ts"] - t0).total_seconds()
+        else:
+            start = float(i)
+        # end_time = next entry's start (or start + 1s for the last item).
+        # Avoid zero-duration ranges, which the upstream may reject.
+        if i + 1 < len(raw) and raw[i + 1]["ts"] is not None and t0 is not None:
+            end = (raw[i + 1]["ts"] - t0).total_seconds()
+        else:
+            end = start + 1.0
+        if end <= start:
+            end = start + 0.1
+        transcript.append({
+            "role": r["role"],
+            "content": r["content"],
+            "start_time": start,
+            "end_time": end,
+        })
+    return transcript
+
+
 def get_request_credential() -> tuple[str, str]:
     """Return (credential, type) from request context. Type is 'bearer' or 'api_key'."""
     bearer = request_bearer_token.get()
@@ -483,6 +573,87 @@ def main():
             "tools_registered": len(operations_registry)
         })
 
+    async def monitoring_session_create(request):
+        # Forwards the Claude Code session transcript to the Cekura observability
+        # ingestion endpoint (POST /observability/v1/observe/) as a CallLog.
+        # Agent ID + API key are read from env for now — eventually these should
+        # come from the request (per-user credentials, per-skill agent mapping).
+        try:
+            payload = await request.json()
+        except Exception as e:
+            return JSONResponse({"error": f"invalid JSON body: {e}"}, status_code=400)
+
+        session_id = payload.get("session_id")
+        skill = payload.get("skill")
+        transcript_jsonl = payload.get("transcript_jsonl")
+
+        if not isinstance(session_id, str) or not session_id:
+            return JSONResponse({"error": "missing or invalid 'session_id'"}, status_code=400)
+        if not isinstance(skill, str) or not skill:
+            return JSONResponse({"error": "missing or invalid 'skill'"}, status_code=400)
+        if not isinstance(transcript_jsonl, str):
+            return JSONResponse({"error": "missing or invalid 'transcript_jsonl' (expected string)"}, status_code=400)
+
+        agent_id_raw = os.environ.get("CEKURA_OBSERVE_AGENT_ID", "").strip()
+        if not agent_id_raw:
+            return JSONResponse({"error": "CEKURA_OBSERVE_AGENT_ID is not configured on the server"}, status_code=500)
+        try:
+            agent_id = int(agent_id_raw)
+        except ValueError:
+            return JSONResponse({"error": f"CEKURA_OBSERVE_AGENT_ID must be an integer, got {agent_id_raw!r}"}, status_code=500)
+
+        api_key = os.environ.get("CEKURA_OBSERVE_API_KEY") or os.environ.get("CEKURA_API_KEY")
+        if not api_key:
+            return JSONResponse({"error": "CEKURA_OBSERVE_API_KEY (or CEKURA_API_KEY) is not configured on the server"}, status_code=500)
+
+        transcript = _claude_jsonl_to_cekura_transcript(transcript_jsonl)
+        if not transcript:
+            logger.info(f"observe: session {session_id} produced empty transcript after conversion — skipping")
+            return JSONResponse({"status": "skipped", "reason": "empty transcript after conversion"})
+
+        now = datetime.now(timezone.utc)
+        # Suffix the call_id with a per-event timestamp so repeated Stop-hook
+        # snapshots for the same Claude session don't collide on the backend.
+        call_id = f"claude-{session_id}-{int(now.timestamp())}"[:100]
+
+        body = {
+            "agent": agent_id,
+            "call_id": call_id,
+            "transcript_type": "cekura",
+            "transcript_json": transcript,
+            "timestamp": now.isoformat(),
+            "metadata": {
+                "source": "claude-code",
+                "skill": skill,
+                "claude_session_id": session_id,
+            },
+        }
+
+        observe_url = f"{server_config.base_url}/observability/v1/observe/"
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0)) as client:
+                resp = await client.post(
+                    observe_url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-CEKURA-API-KEY": api_key,
+                    },
+                    json=body,
+                )
+        except httpx.RequestError as e:
+            logger.error(f"observe: network error for session {session_id}: {e}")
+            return JSONResponse({"error": f"observe request failed: {e}"}, status_code=502)
+
+        if resp.status_code >= 400:
+            logger.error(f"observe: upstream returned {resp.status_code} for session {session_id}: {resp.text[:500]}")
+            return JSONResponse(
+                {"error": "observe upstream rejected request", "status": resp.status_code, "body": resp.text[:500]},
+                status_code=502,
+            )
+
+        logger.info(f"observe: forwarded session {session_id} as call_id={call_id} (skill={skill}, turns={len(transcript)})")
+        return JSONResponse({"status": "ok", "call_id": call_id, "upstream_status": resp.status_code})
+
     async def oauth_protected_resource(request):
         # RFC 9728 — resource server advertises its authorization server
         return JSONResponse({
@@ -507,6 +678,7 @@ def main():
     app.router.routes.insert(1, Route("/.well-known/oauth-authorization-server", oauth_as_metadata))
     app.router.routes.insert(2, Route("/mcp/health", health_check))
     app.router.routes.insert(3, Route("/mcp/healthz", health_check))
+    app.router.routes.insert(4, Route("/mcp/monitoring/sessions", monitoring_session_create, methods=["POST"]))
 
     app.add_middleware(CredentialMiddleware)
     logger.info("Credential middleware added (API key + Bearer token support)")

@@ -409,11 +409,20 @@ def setup_dynamic_tool_handlers():
                 base_url = request_base_url.get() or server_config.base_url
                 user_api_client = create_client(base_url, credential, credential_type=credential_type)
 
+                # Forward the resolved per-property types so the HTTP client can respect
+                # `type: string` fields (e.g. scenarios.instructions, which carries a
+                # stringified JSON body) instead of auto-parsing JSON-looking strings.
+                schema_properties = tool_data['schema'].get('properties', {}) or {}
+                property_types = {
+                    k: v.get('type') for k, v in schema_properties.items() if isinstance(v, dict)
+                }
+
                 result = await user_api_client.execute_request(
                     method=op.method,
                     path=op.path,
                     params=arguments,
-                    body=op.request_body
+                    body=op.request_body,
+                    property_types=property_types,
                 )
 
                 await user_api_client.close()

@@ -50,7 +50,7 @@ pip install cekura==1.1.0
 <Tab title="JavaScript">
 
 ```bash
-npm install @cekura/sdk
+npm install @cekura/livekit
 ```
 
 </Tab>
@@ -93,7 +93,7 @@ async def entrypoint(ctx: agents.JobContext):
 ```typescript
 import { defineAgent, voice } from '@livekit/agents';
 import type { JobContext } from '@livekit/agents';
-import { LiveKitTracer } from '@cekura/sdk';
+import { LiveKitTracer } from '@cekura/livekit';
 
 // Initialize Cekura tracer
 const cekura = new LiveKitTracer({
@@ -190,7 +190,7 @@ pip install cekura==1.1.0
 <Tab title="JavaScript">
 
 ```bash
-npm install @cekura/sdk
+npm install @cekura/livekit
 ```
 
 </Tab>
@@ -233,7 +233,7 @@ async def entrypoint(ctx: agents.JobContext):
 ```typescript
 import { defineAgent, voice } from '@livekit/agents';
 import type { JobContext } from '@livekit/agents';
-import { LiveKitTracer } from '@cekura/sdk';
+import { LiveKitTracer } from '@cekura/livekit';
 
 // Initialize Cekura tracer
 const cekura = new LiveKitTracer({
@@ -313,7 +313,7 @@ The run now displays:
   - **TTS (Text-to-Speech)**: Generation time and audio synthesis metrics
   - **LLM**: Token usage, response time, and inference latency
   - **EOU (End-of-Utterance)**: Detection timing and accuracy
-- **Custom Metadata**: Additional metadata passed to the SDK via `**metadata` parameters
+- **Custom Metadata**: Additional metadata passed to the SDK via the `metadata` parameter
 
 ## Automatic Chat Mode Support
 
@@ -325,7 +325,7 @@ When you run a text-based test, the SDK automatically patches your session to di
 - **Cost savings** by eliminating STT/TTS provider costs and reducing Cekura credit usage
 - **Faster simulations** compared to voice-based tests
 
-Your `track_session()` integration works seamlessly for both voice and text modes.
+Your `track_session()` / `trackSession()` integration works seamlessly for both voice and text modes.
 
 ## Using Mock Tools with LiveKit Tracing
 
@@ -341,17 +341,37 @@ The SDK supports mock tools, allowing you to test your agent with predictable to
 
 ## Best Practices
 
-1. **Use the right method for your environment**: Use `track_session()` in your test/UAT environments for simulation testing with mock tools. Use `observe_session()` in your production environment for monitoring live calls with audio recording.
+1. **Use the right method for your environment**: Use `track_session()` / `trackSession()` in your test/UAT environments for simulation testing with mock tools. Use `observe_session()` / `observeSession()` in your production environment for monitoring live calls with audio recording.
 
 2. **Use environment variables for credentials**: Don't hardcode API keys in your code
 
-3. **Keep the SDK updated**: Run `pip install --upgrade cekura` periodically for the latest features
+3. **Keep the SDK updated**: Periodically upgrade to the latest version for new features.
+
+   <Tabs>
+   <Tab title="Python">
+
+   ```bash
+   pip install --upgrade cekura
+   ```
+
+   </Tab>
+   <Tab title="JavaScript">
+
+   ```bash
+   npm install @cekura/livekit@latest
+   ```
+
+   </Tab>
+   </Tabs>
 
 4. **Review tool calls regularly**: Add the predefined metric **Tool Call Success** to your evaluators
 
 ## SDK Reference
 
 ### LiveKitTracer Initialization
+
+<Tabs>
+<Tab title="Python">
 
 ```python
 from cekura.livekit import LiveKitTracer
@@ -364,9 +384,29 @@ cekura = LiveKitTracer(
 )
 ```
 
+</Tab>
+<Tab title="JavaScript">
+
+```typescript
+import { LiveKitTracer } from '@cekura/livekit';
+
+const cekura = new LiveKitTracer({
+  apiKey: 'your_api_key',         // Required: Your Cekura API key
+  agentId: 123,                   // Required: Agent ID from dashboard
+  host: 'https://api.cekura.ai',  // Optional: Custom API host
+  enabled: true,                  // Optional: Enable/disable tracer
+});
+```
+
+</Tab>
+</Tabs>
+
 ### track_session()
 
 Tracks simulation/test calls with automatic mock tool injection and chat mode support. Collects transcripts, tool calls, session logs, and metrics.
+
+<Tabs>
+<Tab title="Python">
 
 ```python
 await cekura.track_session(
@@ -378,6 +418,22 @@ await cekura.track_session(
 )
 ```
 
+</Tab>
+<Tab title="JavaScript">
+
+```typescript
+await cekura.trackSession(
+  ctx,         // Required: LiveKit JobContext
+  session,     // Required: LiveKit AgentSession
+  agent,       // Optional: Agent instance for mock tool injection
+  metadata,    // Optional: Custom metadata object
+  captureLogs, // Optional: Capture session logs (default: true)
+);
+```
+
+</Tab>
+</Tabs>
+
 **Environment variables:**
 - `CEKURA_TRACING_ENABLED="false"`: Disable tracking entirely
 - `CEKURA_MOCK_TOOLS_ENABLED="false"`: Disable only mock tool injection
@@ -385,6 +441,9 @@ await cekura.track_session(
 ### observe_session()
 
 Monitors production calls with dual-channel audio recording. Collects transcripts, tool calls, session logs, and metrics. Requires LiveKit credentials configured in Cekura.
+
+<Tabs>
+<Tab title="Python">
 
 ```python
 await cekura.observe_session(
@@ -395,12 +454,30 @@ await cekura.observe_session(
 )
 ```
 
+</Tab>
+<Tab title="JavaScript">
+
+```typescript
+await cekura.observeSession(
+  ctx,         // Required: LiveKit JobContext
+  session,     // Required: LiveKit AgentSession
+  metadata,    // Optional: Custom metadata object
+  captureLogs, // Optional: Capture session logs (default: true)
+);
+```
+
+</Tab>
+</Tabs>
+
 **Environment variables:**
 - `CEKURA_OBSERVABILITY_ENABLED="false"`: Disable observability entirely
 
 ### get_simulation_data()
 
-Extracts simulation data populated by Cekura when running simulation calls from the platform. Returns empty dict for phone-based calls.
+Extracts simulation data populated by Cekura when running simulation calls from the platform. Returns an empty object for phone-based calls.
+
+<Tabs>
+<Tab title="Python">
 
 ```python
 await ctx.connect()  # Must be called first
@@ -410,7 +487,24 @@ simulation_data = cekura.get_simulation_data(
 )
 ```
 
-**Returns:** Dictionary with simulation metadata:
+</Tab>
+<Tab title="JavaScript">
+
+```typescript
+await ctx.connect(); // Must be called first
+
+const simulationData = cekura.getSimulationData(
+  ctx, // Required: LiveKit JobContext
+);
+```
+
+</Tab>
+</Tabs>
+
+**Returns:** Object with simulation metadata:
+
+<Tabs>
+<Tab title="Python">
 
 ```python
 {
@@ -426,8 +520,28 @@ simulation_data = cekura.get_simulation_data(
 }
 ```
 
+</Tab>
+<Tab title="JavaScript">
+
+```typescript
+{
+  scenario_id: 123,                  // Scenario being tested
+  run_id: 456,                       // Current run ID
+  test_profile_data: {               // Test profile data
+    customer_name: 'John Doe',
+    account_number: 'ACC-12345',
+  },
+  additional_config: {               // LiveKit config from agent settings
+    sample_key: 'sample_value',
+  },
+}
+```
+
+</Tab>
+</Tabs>
+
 <Note>
-This data is ONLY available when using Option 2 (Automated LiveKit Testing) - running tests via "Run with LiveKit". Phone-based calls (Option 1) will return an empty dictionary.
+This data is ONLY available when using Option 2 (Automated LiveKit Testing) - running tests via "Run with LiveKit". Phone-based calls (Option 1) will return an empty object.
 </Note>
 
 ## Next Steps

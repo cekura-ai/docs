@@ -108,7 +108,7 @@ Each condition object has the following fields:
 <ParamField path="type" type="string" required>
   The condition type. Must be explicitly provided — there is no default. Options:
   - `standard`: Normal condition triggered by the conversation context
-  - `action_followup`: Action to take immediately after a previous action
+  - `action_followup`: Fires on the **next turn** after the referenced condition — the testing agent sends the referenced condition's message, waits for the main agent to reply, then sends this message
 </ParamField>
 
 <ParamField path="fixed_message" type="boolean" required>
@@ -250,7 +250,18 @@ Standard conditions are evaluated based on the conversation context. They trigge
 
 ### Action Followup Conditions
 
-Action followup conditions execute after a previous action has been taken, regardless of what the main agent responds. This is useful for multi-part responses or clarifications. The `condition` field should reference the previous condition ID as an integer.
+An `action_followup` fires on the **next turn** after the condition it references. It does not fire immediately. The sequence is:
+
+1. Testing agent sends the message from condition X
+2. Main agent receives it and replies
+3. `action_followup` (with `condition: X`) fires — testing agent sends this message
+
+The main agent's reply is received but does not affect whether the followup fires. Because of this, `action_followup` has two key uses:
+
+- **Multi-part responses**: send several messages across consecutive turns after a single trigger
+- **Scripted sequences**: chain followups to deliver an exact sequence of messages from the testing agent, turn by turn, without needing any conditions to match — the sequence fires automatically regardless of what the main agent says
+
+The `condition` field must be an integer referencing the `id` of the previous condition.
 
 ```json
 {
@@ -263,7 +274,7 @@ Action followup conditions execute after a previous action has been taken, regar
 ```
 
 <Note>
-Action followup conditions execute after the referenced action is taken, irrespective of the agent's response. The `condition` field should contain the ID (as an integer) of the previous condition.
+`action_followup` does **not** fire immediately after condition X — it fires on the **next turn**, after the main agent has replied to condition X. The `condition` field holds the `id` (integer) of the condition whose turn triggers this followup.
 </Note>
 
 ## Action vs Fixed Message
@@ -793,6 +804,14 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 }
 ```
 
+**Turn-by-turn flow for Example 3:**
+1. Testing agent sends condition 0: "Hi, I need help with my order"
+2. Main agent replies
+3. Action followup (condition: 0) fires — testing agent: "Also mention you haven't received a confirmation email"
+4. Main agent replies
+5. Action followup (condition: 1) fires — testing agent: "And ask if you can get expedited shipping"
+6. Main agent replies — condition 3 (standard) matches and fires
+
 ### Example 4: Using Advanced Tags
 
 ```json
@@ -921,33 +940,40 @@ Progressively provide information as requested:
 }
 ```
 
-### Pattern 3: Multi-Step Action
+### Pattern 3: Scripted Sequence with action_followup
 
-Use `action_followup` for complex multi-part responses:
+Chain `action_followup` conditions to deliver an exact sequence of messages across turns, with no conditions to match — each followup fires automatically on the next turn after the main agent replies, regardless of what the main agent says:
 
 ```json
 {
   "conditions": [
     {
-      "id": 5,
-      "condition": "The agent asks about your preferences",
-      "action": "State your first preference",
+      "id": 0,
+      "condition": "FIRST_MESSAGE",
+      "action": "Hi, I need to update my address",
       "type": "standard",
-      "fixed_message": false
+      "fixed_message": true
     },
     {
-      "id": 6,
+      "id": 1,
       "type": "action_followup",
-      "condition": 5,
-      "action": "Add your second preference",
-      "fixed_message": false
+      "condition": 0,
+      "action": "My new street is 123 Main Street",
+      "fixed_message": true
     },
     {
-      "id": 7,
+      "id": 2,
       "type": "action_followup",
-      "condition": 6,
-      "action": "Mention any special requirements",
-      "fixed_message": false
+      "condition": 1,
+      "action": "City is Springfield",
+      "fixed_message": true
+    },
+    {
+      "id": 3,
+      "type": "action_followup",
+      "condition": 2,
+      "action": "Zip code is 62701",
+      "fixed_message": true
     }
   ]
 }
@@ -1017,6 +1043,16 @@ Use `action_followup` for complex multi-part responses:
     - Make the condition more specific
     - Check if a previous condition is matching instead
     - Verify the condition describes what the agent says, not what the evaluator should do
+  </Accordion>
+
+  <Accordion title="action_followup firing unexpectedly or not at all" icon="triangle-exclamation">
+    **Issue**: An `action_followup` fires at the wrong time or doesn't fire.
+
+    **Explanation**: `action_followup` fires on the **next turn** after the referenced condition — after the testing agent sends condition X and the main agent replies. It does not fire in the same turn as condition X.
+
+    **Solutions**:
+    - Ensure `condition` points to the correct ID of the preceding condition
+    - If chaining multiple followups, each one references the ID of the previous followup (not the original condition)
   </Accordion>
 
   <Accordion title="Tags Not Working" icon="tag">

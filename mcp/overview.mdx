@@ -12,25 +12,29 @@ description: "Connect your AI assistant to Cekura for instant access to document
 Before setting up MCP, ensure you have:
 
 1. Access to the [Cekura Dashboard](https://dashboard.cekura.ai)
-2. **Node.js 20.18.1 or higher** installed (for Claude Desktop, Cursor, and VS Code)
+2. **Node.js 20.18.1 or higher** installed (only if you're configuring Cursor, VS Code, or another client that uses the `mcp-remote` shim — Claude Code and Claude Desktop don't need it)
    - Check your version: `node --version`
    - Download from: [nodejs.org](https://nodejs.org/)
 
 ## 1. Choose Your Auth Method
 
+Most users should pick **OAuth**. Only switch to **API Key** if one of the conditions below applies.
+
 <CardGroup cols={2}>
-  <Card title="OAuth (default)" icon="user-shield" color="#A6A7EA">
-    One-click browser sign-in. No keys to mint or paste. Session ties to your dashboard user. Recommended for most users.
+  <Card title="OAuth (recommended)" icon="user-shield" color="#A6A7EA">
+    One-click browser sign-in, no keys to manage. Session ties to your dashboard user. This is the default for individual use.
   </Card>
-  <Card title="API Key (advanced)" icon="key" color="#A6A7EA">
-    Use when you want a project- or org-scoped credential, want to share access via a single key (e.g. CI), or your client doesn't support OAuth. Generate one in **Settings → API Keys** in the [dashboard](https://dashboard.cekura.ai).
+  <Card title="API Key (only if you need it)" icon="key" color="#A6A7EA">
+    Use **only** when you need a project- or org-scoped credential, want to share one key across CI / teammates, or have a client that doesn't support OAuth. Generate one in **Settings → API Keys** in the [dashboard](https://dashboard.cekura.ai).
   </Card>
 </CardGroup>
 
 ## 2. Configure MCP Server
 
 <Tabs>
-  <Tab title="OAuth (default)">
+  <Tab title="OAuth (recommended)">
+    **This is the recommended path.** Skip to the API Key tab only if you need project/org scoping or a shared credential.
+
     No header required. On first use, your client opens a browser window to authorize Cekura against your dashboard account.
 
     <Tabs>
@@ -45,8 +49,20 @@ Before setting up MCP, ensure you have:
         ```
       </Tab>
 
-      <Tab title="Claude Desktop / Cursor / VS Code">
-        Add to your MCP config (`claude_desktop_config.json`, Cursor MCP config, or `.vscode/mcp.json`):
+      <Tab title="Claude Desktop">
+        Use the in-app Connectors UI — no config file editing required.
+
+        1. Open Claude Desktop → **Settings** → **Connectors**.
+        2. Click **Add custom connector**.
+        3. Set **Name** to `Cekura` and **URL** to `https://api.cekura.ai/mcp`.
+        4. Save. Claude Desktop opens a browser window to authorize against your Cekura dashboard account.
+        5. Once authorized, Cekura tools appear in the connector list and are available in any new chat.
+
+        No Node.js required for this path — Claude Desktop's native connector handles the remote MCP transport directly.
+      </Tab>
+
+      <Tab title="Cursor / VS Code">
+        Add to your Cursor MCP config or `.vscode/mcp.json`:
 
         ```json
         {
@@ -87,6 +103,10 @@ Before setting up MCP, ensure you have:
       </Tab>
 
       <Tab title="Claude Desktop">
+        <Tip>
+        If you don't specifically need an API key, use the OAuth tab above — Claude Desktop has a much simpler Connectors-UI flow that doesn't require editing config files.
+        </Tip>
+
         ```json
         {
           "mcpServers": {
@@ -237,8 +257,8 @@ Tools are auto-generated from Cekura's OpenAPI spec — every documented endpoin
 
 <AccordionGroup>
   <Accordion title="Auth hygiene">
-    - **OAuth:** Re-authorize when your session expires; revoke MCP access from the dashboard if a device is lost.
-    - **API key:** Never commit keys to version control. Use environment variables. Rotate regularly. Use separate keys per environment.
+    - **OAuth (preferred):** Re-authorize when your session expires; revoke MCP access from the dashboard if a device is lost.
+    - **API key:** Never commit keys to version control. Use environment variables. Rotate regularly. Use separate keys per environment. If you're using an API key only because OAuth wasn't obvious, switch — OAuth is simpler to revoke and avoids leaks via config files.
   </Accordion>
 
   <Accordion title="Handle rate limits">

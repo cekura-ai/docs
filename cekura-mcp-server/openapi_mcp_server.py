@@ -569,21 +569,45 @@ def main():
 
     logger.info(f"Server initialized successfully. Running on http://{args.host}:{args.port}/mcp")
 
+    # Paths that intentionally bypass auth — health probes and OAuth
+    # discovery documents. Discovery URLs must be reachable unauthenticated
+    # so clients can find the authorization server before they have a token.
+    NO_AUTH_PATHS = {
+        "/mcp/health",
+        "/mcp/healthz",
+        "/mcp/.well-known/oauth-protected-resource",
+        "/mcp/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-protected-resource",
+        "/.well-known/oauth-authorization-server",
+    }
+
+    # WWW-Authenticate value used on 401 responses. Points clients at the
+    # canonical (ALB-reachable) protected-resource metadata URL per RFC 9728.
+    WWW_AUTH_HEADER = (
+        f'Bearer resource_metadata="{MCP_SERVER_URL}/.well-known/oauth-protected-resource", '
+        f'error="invalid_token"'
+    )
+
     class CredentialMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request, call_next):
-            if request.url.path in ["/mcp/health", "/mcp/healthz"]:
+            path = request.url.path
+            if path in NO_AUTH_PATHS:
                 return await call_next(request)
 
             # Bearer token — OAuth web users or agent/CLI JWT passthrough
+            has_bearer = False
             auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
             if auth_header and auth_header.lower().startswith('bearer '):
                 request_bearer_token.set(auth_header[7:])
+                has_bearer = True
                 logger.debug("Bearer token credential set for request")
 
             # API key header — legacy mcp-remote / Claude Desktop
+            has_api_key = False
             api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
             if api_key:
                 request_api_key.set(api_key)
+                has_api_key = True
                 logger.debug("API key credential set for request")
 
             # Base URL override — only honoured when ALLOW_BASE_URL_OVERRIDE=true (dev/staging)
@@ -591,6 +615,20 @@ def main():
                 base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
                 if base_url_override:
                     request_base_url.set(base_url_override.rstrip("/"))
+
+            # Enforce auth at the transport layer for MCP traffic. Without this,
+            # FastMCP's `initialize` and `tools/list` succeed unauthenticated,
+            # which makes Claude Desktop's connector flow conclude "no auth
+            # required" and skip the OAuth handshake entirely.
+            if path.startswith("/mcp") and not has_bearer and not has_api_key:
+                return JSONResponse(
+                    {
+                        "error": "unauthorized",
+                        "error_description": "Authenticate via OAuth (Bearer) or X-CEKURA-API-KEY",
+                    },
+                    status_code=401,
+                    headers={"WWW-Authenticate": WWW_AUTH_HEADER},
+                )
 
             return await call_next(request)
 
@@ -702,11 +740,17 @@ def main():
 
     app = mcp.streamable_http_app()
 
-    app.router.routes.insert(0, Route("/.well-known/oauth-protected-resource", oauth_protected_resource))
-    app.router.routes.insert(1, Route("/.well-known/oauth-authorization-server", oauth_as_metadata))
-    app.router.routes.insert(2, Route("/mcp/health", health_check))
-    app.router.routes.insert(3, Route("/mcp/healthz", health_check))
-    app.router.routes.insert(4, Route("/mcp/monitoring/sessions", monitoring_session_create, methods=["POST"]))
+    # Register OAuth discovery routes under both /mcp/.well-known/... (canonical,
+    # reachable through the prod ALB which only forwards /mcp/*) and the root
+    # /.well-known/... form (works for direct-port access in dev and is robust
+    # against any future ALB rule broadening).
+    app.router.routes.insert(0, Route("/mcp/.well-known/oauth-protected-resource", oauth_protected_resource))
+    app.router.routes.insert(1, Route("/mcp/.well-known/oauth-authorization-server", oauth_as_metadata))
+    app.router.routes.insert(2, Route("/.well-known/oauth-protected-resource", oauth_protected_resource))
+    app.router.routes.insert(3, Route("/.well-known/oauth-authorization-server", oauth_as_metadata))
+    app.router.routes.insert(4, Route("/mcp/health", health_check))
+    app.router.routes.insert(5, Route("/mcp/healthz", health_check))
+    app.router.routes.insert(6, Route("/mcp/monitoring/sessions", monitoring_session_create, methods=["POST"]))
 
     app.add_middleware(CredentialMiddleware)
     logger.info("Credential middleware added (API key + Bearer token support)")

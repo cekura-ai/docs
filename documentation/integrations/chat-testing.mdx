@@ -269,11 +269,16 @@ Use voice testing for ASR/TTS validation and final production checks.
 
     Either side can end the conversation. Cekura sends `{"type": "end_call"}` to your server and waits 1 second before closing the connection — your server does not need to close the connection itself. To end the conversation from your side, simply close the WebSocket connection; Cekura treats an unexpected close as the main agent ending the call.
 
-    Cekura closes the connection after 5 minutes without a content message. It also sends a WebSocket ping periodically and considers the connection dropped if no pong is received. Ping/pong are handled automatically at the WebSocket protocol layer by most libraries, so no explicit handling is required in your application code.
+    Cekura enforces two inactivity timeouts:
+
+    - **30 seconds** without any message (including metadata frames) — connection is closed
+    - **5 minutes** without a real content message — connection is closed regardless of metadata activity
+
+    It also sends a WebSocket ping periodically and considers the connection dropped if no pong is received. Ping/pong are handled automatically at the WebSocket protocol layer by most libraries, so no explicit handling is required in your application code.
 
     **Keeping the connection alive during long LLM calls**
 
-    If your server takes a long time to respond — for example during a slow LLM inference or a rate-limit retry — the connection can appear idle and get dropped by the inactivity timeout. To prevent this, send a metadata-only frame every few seconds while processing:
+    If your server takes a long time to respond — for example during a slow LLM inference or a rate-limit retry — the 30-second inactivity timeout will drop the connection. To prevent this, send a metadata-only frame every few seconds while processing:
 
     ```json
     {"metadata": {"keepalive": true}}

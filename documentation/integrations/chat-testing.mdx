@@ -269,7 +269,52 @@ Use voice testing for ASR/TTS validation and final production checks.
 
     Either side can end the conversation. Cekura sends `{"type": "end_call"}` to your server and waits 1 second before closing the connection — your server does not need to close the connection itself. To end the conversation from your side, simply close the WebSocket connection; Cekura treats an unexpected close as the main agent ending the call.
 
-    Cekura closes the connection after 5 minutes without a content message. It also sends a WebSocket ping every 30 seconds and considers the connection dropped if no pong is received within 10 seconds. Ping/pong are handled automatically at the WebSocket protocol layer by most libraries, so no explicit handling is required in your application code.
+    Cekura closes the connection after 5 minutes without a content message. It also sends a WebSocket ping periodically and considers the connection dropped if no pong is received. Ping/pong are handled automatically at the WebSocket protocol layer by most libraries, so no explicit handling is required in your application code.
+
+    **Keeping the connection alive during long LLM calls**
+
+    If your server takes a long time to respond — for example during a slow LLM inference or a rate-limit retry — the connection can appear idle and get dropped by the inactivity timeout. To prevent this, send a metadata-only frame every few seconds while processing:
+
+    ```json
+    {"metadata": {"keepalive": true}}
+    ```
+
+    Cekura treats any incoming frame (including metadata-only frames) as activity, so this resets the inactivity timer without triggering a response from the testing agent.
+
+    ```python
+    async def chat_response(message, session_id, websocket=None):
+        async def keepalive():
+            while True:
+                await asyncio.sleep(8)  # send every 8 seconds
+                try:
+                    if websocket:
+                        await websocket.send(json.dumps({"metadata": {"keepalive": True}}))
+                except Exception:
+                    break  # connection already closed
+
+        ka_task = asyncio.create_task(keepalive()) if websocket else None
+        try:
+            # ... your LLM call here ...
+            return json.dumps({"content": assistant_response})
+        finally:
+            if ka_task:
+                ka_task.cancel()
+    ```
+
+    <Warning>
+    Only one task should ever call `websocket.send()` at a time. Do **not** start a second keepalive loop inside a retry helper — two concurrent senders can corrupt WebSocket frames and silently drop the connection.
+    </Warning>
+
+    Also set `ping_interval=None` on `websockets.serve` to disable server-initiated pings, which add unnecessary control-frame traffic through tunnels like ngrok:
+
+    ```python
+    server = await websockets.serve(
+        handle_websocket,
+        "0.0.0.0",
+        8765,
+        ping_interval=None,
+    )
+    ```
   </Step>
 
   <Step title="Expose Server">

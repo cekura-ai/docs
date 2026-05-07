@@ -1,0 +1,226 @@
+---
+title: "Metrics"
+description: "Define how runs and calls are scored"
+---
+
+<Note>
+Setup steps and authentication are in the [Overview](/cli-sdk/overview). This page covers metric authoring and management.
+</Note>
+
+A **metric** scores a run or production call. Cekura supports three flavors:
+
+- **Predefined** — platform-managed metrics like sentiment, interruption count, latency.
+- **LLM judge** — you write a prompt; an LLM scores the transcript.
+- **Custom code** — Python that runs against the call payload.
+
+## Browse predefined metrics
+
+These are read-only and shared across the platform.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura predefined-metrics list
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    catalog = client.predefined_metrics.list()
+    for m in catalog:
+        print(m["slug"], m["name"], m["eval_type"])
+    ```
+  </Tab>
+</Tabs>
+
+## Create a metric
+
+<Tabs>
+  <Tab title="CLI">
+    Prepare `metric.json`:
+
+    ```json
+    {
+      "agents": [123],
+      "name": "Booking confirmed",
+      "type": "llm_judge",
+      "eval_type": "boolean",
+      "prompt": "Did the agent confirm a booking and read back the date and time?"
+    }
+    ```
+
+    Apply:
+
+    ```bash
+    cekura metrics create --from-file metric.json
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    from cekura import Cekura
+
+    client = Cekura()
+
+    # LLM-judge metric
+    metric = client.metrics.create(
+        agents=[123],
+        name="Booking confirmed",
+        type="llm_judge",
+        eval_type="boolean",
+        prompt="Did the agent confirm a booking and read back the date and time?",
+    )
+
+    # Python (custom code) metric
+    client.metrics.create(
+        agents=[123],
+        name="Hold duration > 30s",
+        type="python",
+        eval_type="boolean",
+        code="""
+def evaluate(call):
+    return any(seg['duration'] > 30 for seg in call.get('hold_segments', []))
+""",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## List, update, delete
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura metrics list --agent-id 123
+    cekura metrics get 55
+    cekura metrics update 55 --from-file patch.json
+    cekura metrics delete 55
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.metrics.list(agent_id=123)
+    client.metrics.get(metric_id=55)
+    client.metrics.update(metric_id=55, prompt="Refined judge prompt")
+    client.metrics.delete(metric_id=55)
+    ```
+  </Tab>
+</Tabs>
+
+## Bulk operations
+
+Manage many metrics in one call.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    # Create several at once
+    cekura metrics bulk-create --from-file metrics.json
+
+    # Bulk-attach metrics across agents
+    cekura metrics bulk-manage-agents \
+      --metric-ids 55,56 \
+      --agents-to-add 123,124
+
+    # Toggle active state on many metrics
+    cekura metrics bulk-toggle-settings --metric-ids 55,56 --is-active true
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    # Create several at once
+    client.metrics.bulk_create(metrics=[
+        {"name": "Greeting present", "type": "llm_judge", "prompt": "...", "agents": [123]},
+        {"name": "Closing present",  "type": "llm_judge", "prompt": "...", "agents": [123]},
+    ])
+
+    # Attach / detach metrics across agents
+    client.metrics.bulk_manage_agents(
+        metric_ids=[55, 56],
+        agents_to_add=[123, 124],
+        agents_to_remove=[],
+    )
+
+    # Toggle settings on many metrics at once
+    client.metrics.bulk_toggle_settings(
+        metric_ids=[55, 56],
+        is_active=True,
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Generate metrics with AI
+
+Stuck on what to measure? Cekura can propose metrics from your agent's scenarios.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura metrics generate --agent-id 123 --count 10
+    cekura metrics generate-progress --progress-id <id>
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    job = client.metrics.generate(agent_id=123, count=10)
+    client.metrics.generate_progress(progress_id=job["progress_id"])
+    ```
+  </Tab>
+</Tabs>
+
+## Critical metric scenarios & reviews
+
+Two advanced workflows:
+
+- **Critical metric scenarios** — scenarios flagged because their metric output drifted. Useful for triage.
+- **Metric reviews (Labs pipeline)** — kick off feedback processing on metric judgments and watch progress.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    # Critical metric scenarios
+    cekura critical-metric-scenarios list --metric-id 55
+    cekura critical-metric-scenarios update 42 --json '{"is_resolved": true}'
+
+    # Metric reviews
+    cekura metric-reviews process-feedbacks --metric-id 55
+    cekura metric-reviews progress --job-id <id>
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    # Critical metric scenarios
+    client.critical_metric_scenarios.list(metric_id=55)
+    client.critical_metric_scenarios.update(id=42, is_resolved=True)
+
+    # Metric reviews
+    job = client.metric_reviews.process_feedbacks(metric_id=55)
+    client.metric_reviews.process_feedbacks_progress(job_id=job["job_id"])
+    ```
+  </Tab>
+</Tabs>
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Runs & Results" icon="play" href="/cli-sdk/runs">
+    Where metric scores show up after a run.
+  </Card>
+
+  <Card title="Calls" icon="phone" href="/cli-sdk/calls">
+    Run metrics against production calls, not just simulations.
+  </Card>
+
+  <Card title="Metric concepts" icon="database" href="/documentation/key-concepts/metrics/overview">
+    LLM judge, Python, rubric, sampling — when to use what.
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Full field reference for metric payloads.
+  </Card>
+</CardGroup>

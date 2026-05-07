@@ -1,0 +1,194 @@
+---
+title: "Calls"
+description: "Observe production calls and run metrics on real traffic"
+---
+
+<Note>
+Setup steps and authentication are in the [Overview](/cli-sdk/overview). This page covers production-call observability.
+</Note>
+
+A **call** is a production conversation — captured from your live voice agent. Once a call is in Cekura, you can run metrics on it, build test sets from it, and analyze trends across thousands of calls. Webhooks from Vapi / Retell / ElevenLabs / LiveKit / Pipecat ingest automatically; you can also send calls programmatically.
+
+## List calls
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura calls list --project-id 742
+    cekura calls list --agent-id 123 --format json | jq '.[] | .id, .duration'
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    calls = client.calls.list(project_id=742, page_size=50)
+    for c in calls.get("results", calls):
+        print(c["id"], c.get("duration"), c.get("call_ended_reason"))
+    ```
+  </Tab>
+</Tabs>
+
+Common filters: `project_id`, `agent_id`, `from_date`, `to_date`, `success`, `topic`. See the API Reference for the full list.
+
+## Inspect a call
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura calls get 7788
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    call = client.calls.get(call_id=7788)
+    print(call["transcript"])
+    print(call["metric_evaluations"])
+    ```
+  </Tab>
+</Tabs>
+
+## Send a call for evaluation
+
+If your provider isn't on the auto-ingestion list — or you want to ship a call from your own backend — send it explicitly.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura calls send --from-file call.json
+    ```
+
+    Where `call.json` contains the agent ID, transcript, duration, and metadata.
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.calls.send(
+        agent=123,
+        transcript=[
+            {"role": "agent", "text": "How can I help?"},
+            {"role": "user",  "text": "I'd like to reschedule my appointment."},
+        ],
+        duration=124,
+        metadata={"source": "internal-bot"},
+    )
+    ```
+
+    Provider-specific webhook helpers are also available:
+
+    ```python
+    client.calls.observe_vapi(payload=...)
+    client.calls.observe_retell(payload=...)
+    client.calls.observe_elevenlabs(payload=...)
+    client.calls.observe_livekit(payload=...)
+    client.calls.observe_pipecat(payload=...)
+    ```
+
+    In production these are usually wired as webhooks pointing at your backend or directly at `api.cekura.ai/observe` — the SDK helpers are useful for replays and testing.
+  </Tab>
+</Tabs>
+
+## Run metrics on a call
+
+Score an already-ingested call against one or more metrics.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura calls evaluate 7788 --metric-ids 55,56
+
+    # Re-run a previous evaluation (e.g. after editing a metric prompt)
+    cekura calls rerun-evaluation 7788 --metric-ids 55
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.calls.evaluate_metrics(call_log_id=7788, metric_ids=[55, 56])
+
+    # Re-run a previous evaluation
+    client.calls.rerun_evaluation(call_log_id=7788, metric_ids=[55])
+    ```
+  </Tab>
+</Tabs>
+
+## Generate scenarios from real calls
+
+Found an interesting production call? Turn it into regression scenarios.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura calls create-scenarios 7788 --count 3
+    cekura calls create-scenarios-progress --progress-id <id>
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    job = client.calls.create_scenarios(call_log_id=7788, count=3)
+    client.calls.create_scenarios_progress(progress_id=job["progress_id"])
+    ```
+  </Tab>
+</Tabs>
+
+## Promote a call into a test set
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura test-sets create-from-call-log \
+      --call-log-id 7788 \
+      --name "support-edge-cases"
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.test_sets.create_from_call_log(
+        call_log_id=7788,
+        name="support-edge-cases",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Improve the agent's prompt from real failures
+
+Use the failure pattern across recent calls to suggest a prompt improvement.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura calls improve-prompt --agent-id 123 --lookback-days 7
+    cekura calls improve-prompt-progress --progress-id <id>
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    job = client.calls.improve_prompt(agent_id=123, lookback_days=7)
+    client.calls.improve_prompt_progress(progress_id=job["progress_id"])
+    ```
+  </Tab>
+</Tabs>
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Metrics" icon="database" href="/cli-sdk/metrics">
+    Define what you score production calls on.
+  </Card>
+
+  <Card title="Runs & Results" icon="play" href="/cli-sdk/runs">
+    Same scoring engine — for simulated, not production, traffic.
+  </Card>
+
+  <Card title="Dashboards" icon="chart-line" href="/api-reference">
+    Visualize call quality and metric trends over time.
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Full field reference for call logs and observation payloads.
+  </Card>
+</CardGroup>

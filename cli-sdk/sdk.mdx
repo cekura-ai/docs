@@ -1,0 +1,200 @@
+---
+title: "Python SDK"
+description: "Programmatic access to Cekura — sync and async clients for application code"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+<Note>
+The Python SDK ships in the same package as the CLI. If you haven't installed or authenticated yet, follow the [Overview](/cli-sdk/overview) first.
+</Note>
+
+## Quickstart
+
+```bash
+pip install cekura
+```
+
+```python
+from cekura import Cekura
+
+# Reads CEKURA_API_KEY env var, or falls back to the OAuth session
+# saved by `cekura auth login`. Pass api_key="..." to override.
+client = Cekura()
+
+# List agents
+agents = client.agents.list(project_id=742)
+
+# Fetch one
+agent = client.agents.get(agent_id=123)
+
+# Trigger a run
+result = client.scenarios.run_text(
+    agent_id=123,
+    scenario_ids=[1, 2, 3],
+)
+```
+
+## Sync client
+
+```python
+from cekura import Cekura
+
+client = Cekura()
+
+# List scenarios for an agent
+scenarios = client.scenarios.list(agent_id=123)
+
+# Update an agent
+client.agents.update(agent_id=123, description="Updated by SDK")
+
+# Pull production calls
+calls = client.calls.list(project_id=742, page_size=50)
+for c in calls.get("results", calls):
+    print(c["id"], c.get("duration"))
+```
+
+## Async client
+
+For application code that's already async (FastAPI, aiohttp, anyio, etc.), use `AsyncCekura`:
+
+```python
+import asyncio
+from cekura import AsyncCekura
+
+async def main():
+    async with AsyncCekura() as client:
+        agents = await client.agents.list(project_id=742)
+        for a in agents:
+            print(a["id"], a["agent_name"])
+
+asyncio.run(main())
+```
+
+The async client mirrors the sync API method-for-method — anything you can do with `Cekura` you can do with `await AsyncCekura(...)`.
+
+## Resource map
+
+The client exposes one attribute per top-level resource. Each provides typed methods (`list`, `get`, `create`, `update`, `delete`) plus resource-specific actions:
+
+```
+client.agents              client.cron_jobs
+client.scenarios           client.dashboards
+client.metrics             client.test_sets
+client.runs                client.metric_reviews
+client.calls               client.critical_metric_scenarios
+client.projects            client.predefined_metrics
+client.organizations       client.phone_numbers
+client.personalities       client.billing
+client.test_profiles       client.api_keys
+```
+
+Use `dir(client)` in a REPL or `help(client.agents)` to discover everything available.
+
+## Common patterns
+
+<AccordionGroup>
+  <Accordion title="Pull last 50 production calls">
+    ```python
+    from cekura import Cekura
+
+    client = Cekura()
+    calls = client.calls.list(project_id=742, page_size=50)
+    for c in calls.get("results", calls):
+        print(c["id"], c.get("duration"), c.get("call_ended_reason"))
+    ```
+  </Accordion>
+
+  <Accordion title="Trigger an evaluation and poll until complete">
+    ```python
+    import time
+    from cekura import Cekura
+
+    client = Cekura()
+    result = client.scenarios.run_text(
+        agent_id=123,
+        scenario_ids=[1, 2, 3],
+    )
+    run_id = result["run_id"]
+
+    while True:
+        run = client.runs.get(run_id)
+        if run["status"] in ("passed", "failed", "errored"):
+            break
+        time.sleep(5)
+
+    print("final status:", run["status"])
+    ```
+  </Accordion>
+
+  <Accordion title="Bulk-update scenarios">
+    ```python
+    from cekura import Cekura
+
+    client = Cekura()
+    client.scenarios.bulk_update(
+        scenarios=[
+            {"id": 101, "tags": ["regression"]},
+            {"id": 102, "tags": ["smoke"]},
+        ],
+    )
+    ```
+  </Accordion>
+
+  <Accordion title="Create a metric programmatically">
+    ```python
+    from cekura import Cekura
+
+    client = Cekura()
+    metric = client.metrics.create(
+        agent_id=123,
+        name="Booking confirmed",
+        type="llm_judge",
+        prompt="Did the agent confirm a booking and read back the date and time?",
+    )
+    print("created metric", metric["id"])
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Configuration
+
+The SDK resolves configuration in this order (first match wins):
+
+1. **Explicit argument** — `Cekura(api_key=..., api_url=...)`
+2. **Environment variable** — `CEKURA_API_KEY`, `CEKURA_API_URL`
+3. **Config file** — `~/.cekura/config.toml` (managed by the CLI)
+4. **Defaults** — `https://api.cekura.ai`
+
+This means a developer can `cekura auth login` once and any Python script on the same machine picks up the OAuth session automatically — no API key needed.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="`Authentication failed`">
+    - **OAuth path:** the saved session expired. Re-run `cekura auth login`.
+    - **API key path:** confirm `CEKURA_API_KEY` is set in the process environment, or pass `Cekura(api_key=...)` explicitly. Some endpoints (e.g. `billing.info`) require an org-scoped API key — OAuth bearer is not sufficient.
+  </Accordion>
+
+  <Accordion title="Rate limited (429)">
+    The platform enforces per-plan rate limits. Add backoff between calls, batch where possible, or upgrade your plan. Check usage in **Settings → API Usage**.
+  </Accordion>
+
+  <Accordion title="Pagination">
+    List endpoints return a paginated response shape: `{"count": N, "next": url, "previous": url, "results": [...]}`. Pass `page=` and `page_size=` to walk pages, or check `results` length to know when to stop.
+  </Accordion>
+</AccordionGroup>
+
+## References
+
+<CardGroup cols={2}>
+  <Card title="CLI guide" icon="terminal" href="/cli-sdk/cli">
+    Use the same operations from your terminal or CI pipeline.
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Full endpoint documentation for every resource the SDK exposes.
+  </Card>
+</CardGroup>

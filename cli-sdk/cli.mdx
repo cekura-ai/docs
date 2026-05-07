@@ -1,0 +1,204 @@
+---
+title: "CLI"
+description: "Manage agents, scenarios, runs, and call data from your terminal"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+<Note>
+The Cekura CLI ships in the same package as the Python SDK. If you haven't installed or authenticated yet, follow the [Overview](/cli-sdk/overview) first.
+</Note>
+
+## Quickstart
+
+```bash
+# Install
+pip install cekura
+
+# Sign in (opens a browser)
+cekura auth login
+
+# List your agents
+cekura agents list
+```
+
+Set defaults so you don't have to repeat `--project-id` / `--organization-id` on every command:
+
+```bash
+cekura config set default_organization_id 14
+cekura config set default_project_id 742
+```
+
+<Tip>
+On first sign-in (`cekura auth login`), the first organization and project the CLI sees on your account are saved as defaults automatically. You only need to override these when you want a different default — typically because you belong to multiple organizations or projects.
+</Tip>
+
+## Common commands
+
+```bash
+# List agents in a project
+cekura agents list --project-id 742
+
+# Get one agent
+cekura agents get 123
+
+# List scenarios for an agent
+cekura scenarios list --agent-id 123
+
+# Trigger an evaluation run (text mode)
+cekura run start --agent-id 123 --scenario-ids 1,2,3
+
+# Inspect runs
+cekura runs list --agent-id 123
+
+# View production calls
+cekura calls list --project-id 742
+```
+
+Every command supports `--help` for a full flag listing:
+
+```bash
+cekura agents --help
+cekura scenarios bulk-update --help
+```
+
+## JSON output for scripting
+
+Add `--format json` to any list/get command for clean stdout you can pipe into `jq`, `python -c`, or your own tools:
+
+```bash
+cekura agents list --project-id 742 --format json | jq '.[].agent_name'
+```
+
+This works on every list and detail command and is the recommended mode for shell scripts and CI pipelines.
+
+## Top-level command groups
+
+| Group | Purpose |
+|---|---|
+| `auth` | Sign in / out, check current identity |
+| `config` | View and set CLI defaults |
+| `agents` | Create, update, list voice agents and their tools |
+| `scenarios` | Manage test scenarios (evaluators) |
+| `metrics` | Define evaluation metrics |
+| `run` / `runs` | Trigger evaluations and inspect individual runs |
+| `calls` | Production call logs and ad-hoc evaluation |
+| `dashboards` | Analytics dashboards and widgets |
+| `predefined-metrics`, `critical-metric-scenarios`, `metric-reviews` | Platform-managed metrics workflow |
+| `test-profiles`, `personalities`, `phone-numbers` | Reusable test configuration |
+| `cron` | Schedule recurring evaluations |
+| `test-sets` | Curate evaluation datasets from runs or call logs |
+| `projects`, `organizations`, `billing`, `api-keys` | Workspace administration |
+
+## Common workflows
+
+<AccordionGroup>
+  <Accordion title="Run evaluations from CI">
+    1. Generate an org-scoped API key in the dashboard.
+    2. Add it as a CI secret named `CEKURA_API_KEY`.
+    3. In your pipeline:
+
+       ```bash
+       export CEKURA_API_KEY=$CEKURA_API_KEY
+       cekura run start --agent-id 123 --scenario-ids 1,2,3 --format json | tee run.json
+       RUN_ID=$(jq -r '.run_id' run.json)
+       cekura runs get "$RUN_ID" --format json
+       ```
+
+       Fail the pipeline on a non-passing run by parsing the JSON status field:
+
+       ```bash
+       STATUS=$(jq -r '.status' run.json)
+       [ "$STATUS" = "passed" ] || exit 1
+       ```
+  </Accordion>
+
+  <Accordion title="Bulk-update scenarios from a JSON file">
+    Prepare `scenarios.json`:
+
+    ```json
+    {
+      "scenarios": [
+        { "id": 101, "tags": ["regression"] },
+        { "id": 102, "tags": ["smoke"] }
+      ]
+    }
+    ```
+
+    Apply:
+
+    ```bash
+    cekura scenarios bulk-update --from-file scenarios.json
+    ```
+
+    The payload must be a JSON object with a top-level `scenarios` key, plus any of `metric_ids_to_add`, `metric_ids_to_remove`, `tool_ids_to_add`, etc.
+  </Accordion>
+
+  <Accordion title="Promote a passing run into a test set">
+    ```bash
+    cekura test-sets create-from-run \
+      --run-id 9876 \
+      --name "regression-2024-04"
+    ```
+
+    Or build one from a production call log:
+
+    ```bash
+    cekura test-sets create-from-call-log \
+      --call-log-id 12345 \
+      --name "support-edge-cases"
+    ```
+  </Accordion>
+
+  <Accordion title="Schedule recurring evaluations">
+    ```bash
+    cekura cron create \
+      --name "Nightly regression" \
+      --agent-id 123 \
+      --schedule "0 2 * * *" \
+      --tags "regression"
+    ```
+
+    List and manage existing jobs:
+
+    ```bash
+    cekura cron list --project-id 742
+    cekura cron delete 42
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="`Authentication failed. Check your CEKURA_API_KEY.`">
+    - **OAuth users:** your token may have expired. Run `cekura auth login` again.
+    - **API key users:** verify `cekura config get` shows the right `api_url` and that `CEKURA_API_KEY` is set in the current shell. Generate a fresh key in **Settings → API Keys** if needed.
+  </Accordion>
+
+  <Accordion title="`Please provide one of the required query parameter`">
+    Several list endpoints require a scope filter (`--project-id`, `--agent-id`, or `--organization-id`). Pass one explicitly, or set defaults via `cekura config set default_project_id <id>`.
+  </Accordion>
+
+  <Accordion title="Rate limited (429)">
+    The platform enforces per-plan rate limits. Throttle your loop, batch where possible, or upgrade your plan. Check usage in **Settings → API Usage**.
+  </Accordion>
+
+  <Accordion title="Want machine-readable output">
+    Add `--format json` to any list/get command. Use `jq` or `python -c` to parse.
+  </Accordion>
+</AccordionGroup>
+
+## References
+
+<CardGroup cols={2}>
+  <Card title="SDK guide" icon="python" href="/cli-sdk/sdk">
+    Use the same operations from Python with sync or async clients.
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Full endpoint documentation for every resource the CLI exposes.
+  </Card>
+</CardGroup>

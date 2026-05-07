@@ -666,6 +666,9 @@ def evaluate_llm_judge_metric(
     description: str,
     eval_type: str|None = None,
     enum_values: List[str]|None = None,
+    audio: bool = False,
+    audio_start_time: float|None = None,
+    audio_end_time: float|None = None,
 ) -> Dict:
 ```
 
@@ -699,6 +702,18 @@ def evaluate_llm_judge_metric(
   List of possible values when using `eval_type="enum"`. Only applicable for ENUM type evaluations.
 
   Example: `["Excellent", "Good", "Fair", "Poor"]`
+</ParamField>
+
+<ParamField path="audio" type="bool" default="False">
+  When `True`, the LLM judge analyzes the actual voice recording instead of (or in addition to) the transcript. Use this to evaluate speech delivery, tone, pacing, or other audio properties not captured in the transcript text. Requires `data["voice_recording"]` to be a valid URL.
+</ParamField>
+
+<ParamField path="audio_start_time" type="float|None" default="None">
+  Clip start in seconds from the call start when `audio=True`. If omitted, the full recording is analyzed. Use `transcript_json` entry `start_time` values to locate specific utterances.
+</ParamField>
+
+<ParamField path="audio_end_time" type="float|None" default="None">
+  Clip end in seconds from the call start when `audio=True`. Must be greater than `audio_start_time` if both are provided.
 </ParamField>
 
 **Return Value:**
@@ -858,7 +873,40 @@ else:
     _explanation = "Speech delivery met the expected pattern"
 ```
 
-For the evaluation step, call `evaluate_llm_judge_metric` with a description tailored to the audio content, or apply your own signal processing logic. See [Calling LLM Judge Metrics from Python](#calling-llm-judge-metrics-from-python) for the function reference.
+**Pattern: Pass audio directly to `evaluate_llm_judge_metric`**
+
+Use the `audio=True` parameter along with `audio_start_time` / `audio_end_time` to let the LLM judge listen to the actual recording segment rather than reading the transcript:
+
+```python
+key = "<your_cekura_api_key>"
+
+# Find Main Agent utterances containing the content to evaluate
+target_utterances = [
+    entry for entry in data["transcript_json"]
+    if entry["role"] == "Main Agent" and "<target content>" in entry["content"].lower()
+]
+
+if not target_utterances:
+    _result = False
+    _explanation = "No relevant utterances found in the recording"
+else:
+    segment_start = target_utterances[0]["start_time"]
+    segment_end = target_utterances[0]["end_time"]
+
+    response = evaluate_llm_judge_metric(
+        data,
+        key,
+        description="Did the agent deliver this segment clearly, at an appropriate pace, and without unnatural pauses?",
+        eval_type="binary_qualitative",
+        audio=True,
+        audio_start_time=segment_start,
+        audio_end_time=segment_end,
+    )
+    _result = response["result"]
+    _explanation = response["explanation"]
+```
+
+For custom signal processing instead of LLM judging, use `data["voice_recording"]` and `data["recording_data"]` directly. See [Calling LLM Judge Metrics from Python](#calling-llm-judge-metrics-from-python) for the full function reference including all audio parameters.
 
 **Use cases:**
 - Verifying that multi-part spoken content is delivered with appropriate pauses between segments

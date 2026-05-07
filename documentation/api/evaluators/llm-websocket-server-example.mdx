@@ -71,3 +71,64 @@ ngrok config add-authtoken <your-token>
 ```bash
 ngrok http 127.0.0.1:8765
 ```
+
+## Keeping the Connection Alive
+
+Cekura's test framework closes a WebSocket connection after **5 minutes of inactivity** (no messages exchanged). Under normal operation this never fires because the agent is actively responding. However, when your LLM is slow to respond — for example during a long inference call or a transient rate-limit retry — the connection can appear idle and get dropped.
+
+### Send keepalive metadata frames
+
+While your server is processing a request, periodically send a metadata-only frame to signal that the connection is still active:
+
+```json
+{"metadata": {"keepalive": true}}
+```
+
+Cekura ignores the content of `metadata`-only frames (no `role` or `content` key) but still counts them as activity, resetting the inactivity timer.
+
+### Implementation pattern
+
+Start a background task when you begin processing each message and cancel it when you send the reply:
+
+```python
+async def chat_response(message, session_id, websocket=None):
+    async def keepalive():
+        while True:
+            await asyncio.sleep(8)   # send every 8 seconds
+            try:
+                if websocket:
+                    await websocket.send(json.dumps({"metadata": {"keepalive": True}}))
+            except Exception:
+                break  # connection already closed
+
+    ka_task = asyncio.create_task(keepalive()) if websocket else None
+    try:
+        # ... your LLM call here ...
+        return json.dumps({"content": assistant_response})
+    finally:
+        if ka_task:
+            ka_task.cancel()
+```
+
+**Important:** only one task should ever call `websocket.send()` at a time. Do **not** start a second keepalive loop inside a retry helper — two concurrent senders can corrupt WebSocket frames.
+
+### Choosing an interval
+
+| Interval | Behaviour |
+|----------|-----------|
+| Too short (< 3s) | Floods the tunnel with frames; can congest ngrok and delay real messages |
+| 5–10s | Recommended — well under the 5-minute window, low overhead |
+| > 60s | Risky if your LLM calls are slow |
+
+### Disabling server-side pings
+
+Set `ping_interval=None` when starting `websockets.serve` to stop the server from sending its own WebSocket ping frames. These are separate from the metadata keepalives above and add unnecessary control-frame traffic through the tunnel:
+
+```python
+server = await websockets.serve(
+    handle_websocket,
+    "0.0.0.0",
+    8765,
+    ping_interval=None,  # Cekura manages keepalive via its own ping interval
+)
+```

@@ -56,3 +56,41 @@ class TestWhitelistIntegration:
         assert isinstance(path, str)
         assert method.isupper()
         assert path.startswith('/')
+
+    @pytest.mark.parametrize("method,path", [
+        # Scenario instruction generate / improve
+        ("POST", "/test_framework/v1/scenarios/improve_instructions"),
+        ("GET", "/test_framework/v1/scenarios/instructions-progress"),
+        ("POST", "/test_framework/v1/scenarios/generate-instructions"),
+        ("POST", "/test_framework/v1/scenarios/{id}/update_scenario_with_transcript"),
+        # Metric generate / simplify
+        ("POST", "/test_framework/v1/metrics/generate_clean_description"),
+        ("POST", "/test_framework/v1/metrics/generate_evaluation_trigger"),
+        ("POST", "/test_framework/v1/metrics/simplify_prompt"),
+        ("GET", "/test_framework/v1/metrics/simplify_prompt_progress"),
+        # Run improve_prompt full workflow
+        ("POST", "/test_framework/v1/runs/improve_prompt_bg"),
+        ("GET", "/test_framework/v1/runs/improve_prompt_progress"),
+        ("POST", "/test_framework/v1/runs/improve_prompt_issues"),
+        # Call-logs improve_prompt full workflow
+        ("POST", "/observability/v1/call-logs/improve_prompt"),
+        ("POST", "/observability/v1/call-logs/improve_prompt_bg"),
+        ("GET", "/observability/v1/call-logs/improve_prompt_progress"),
+        ("POST", "/observability/v1/call-logs/improve_prompt_issues"),
+        # Result triage
+        ("POST", "/test_framework/v1/results/{id}/ask_about_failures"),
+        # Scenario-improvement-sessions CRUD
+        ("GET", "/test_framework/v1/scenario-improvement-sessions"),
+        ("POST", "/test_framework/v1/scenario-improvement-sessions"),
+        ("GET", "/test_framework/v1/scenario-improvement-sessions/{id}"),
+        ("PATCH", "/test_framework/v1/scenario-improvement-sessions/{id}"),
+    ])
+    def test_improve_generate_endpoints_in_whitelist(self, method, path):
+        """Assert every improve/generate endpoint we intend to expose via MCP is on
+        the documented-API allow-list (i.e. an MDX page exists + mint.json references it)."""
+        whitelist = load_documented_apis_whitelist()
+        assert (method, path) in whitelist, (
+            f"{method} {path} missing from documented_apis.json — "
+            f"its MDX page or mint.json entry is likely absent. "
+            f"Re-run extract_documented_apis.py."
+        )

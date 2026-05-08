@@ -128,6 +128,28 @@
                 }
             }
         },
+        "/app/v1/product-chat/commands/": {
+            "get": {
+                "operationId": "app-v1-product-chat-commands-retrieve",
+                "description": "List slash commands available in the product-chat sandbox typeahead.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{\"commands\": [{\"name\", \"description\", \"plugin\", \"command\"}, ...], \"cached_at\": \"<iso8601>\"}"
+                    },
+                    "401": {
+                        "description": "Authentication required (Supabase JWT only)."
+                    }
+                }
+            }
+        },
         "/app/v1/product-chat/progress/": {
             "get": {
                 "operationId": "app-v1-product-chat-progress-retrieve",
@@ -1698,7 +1720,7 @@
         "/observability/v1/call-logs/": {
             "get": {
                 "operationId": "call-logs-list",
-                "description": "call_logs_list: List production call logs for an agent or project. Always pass `agent_id` or `project_id` to scope results — without one, the response may be very large.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated call log IDs, e.g. `\"123,456\"`\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.\n\n**Not here — use results endpoints instead:** test/simulation runs triggered via `run_scenarios_*` do **not** create call logs. Use `results_list` + `runs_bulk_retrieve` for simulation data. Call logs only appear for real production traffic.",
+                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
                 "summary": "List call logs",
                 "parameters": [
                     {
@@ -1760,7 +1782,7 @@
                         "schema": {
                             "type": "integer"
                         },
-                        "description": "\nFilter by project ID. Either agent_id or project_id should be provided.\nExample: `1376`\n"
+                        "description": "\nFilter by project ID. Either agent_id or project_id should be provided.\n**Required when using an organization-level API key** to scope results to a specific project.\nExample: `1376`\n"
                     },
                     {
                         "in": "query",
@@ -1805,7 +1827,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "call-logs-list",
-                        "description": "call_logs_list: List production call logs for an agent or project. Always pass `agent_id` or `project_id` to scope results — without one, the response may be very large.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated call log IDs, e.g. `\"123,456\"`\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.\n\n**Not here — use results endpoints instead:** test/simulation runs triggered via `run_scenarios_*` do **not** create call logs. Use `results_list` + `runs_bulk_retrieve` for simulation data. Call logs only appear for real production traffic."
+                        "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`."
                     }
                 }
             },
@@ -1864,7 +1886,7 @@
         "/observability/v1/call-logs-external/": {
             "get": {
                 "operationId": "call-logs-external-list",
-                "description": "call_logs_list: List production call logs for an agent or project. Always pass `agent_id` or `project_id` to scope results — without one, the response may be very large.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated call log IDs, e.g. `\"123,456\"`\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.\n\n**Not here — use results endpoints instead:** test/simulation runs triggered via `run_scenarios_*` do **not** create call logs. Use `results_list` + `runs_bulk_retrieve` for simulation data. Call logs only appear for real production traffic.",
+                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
                 "summary": "List call logs",
                 "parameters": [
                     {
@@ -1926,7 +1948,7 @@
                         "schema": {
                             "type": "integer"
                         },
-                        "description": "\nFilter by project ID. Either agent_id or project_id should be provided.\nExample: `1376`\n"
+                        "description": "\nFilter by project ID. Either agent_id or project_id should be provided.\n**Required when using an organization-level API key** to scope results to a specific project.\nExample: `1376`\n"
                     },
                     {
                         "in": "query",
@@ -2016,7 +2038,7 @@
         "/observability/v1/call-logs-external/{id}/": {
             "get": {
                 "operationId": "call-logs-external-retrieve",
-                "description": "Retrieve a call log by ID",
+                "description": "Retrieve a production CallLog by its integer **CallLog ID** (path parameter). This is distinct from simulation `run_id` (use `runs_retrieve` for those) and from the call log's own `call_id` string field (the provider's call identifier).",
                 "parameters": [
                     {
                         "in": "path",
@@ -2998,7 +3020,7 @@
         "/observability/v1/call-logs-external/filters_call_id/": {
             "get": {
                 "operationId": "call-logs-external-filters-call-id-retrieve",
-                "description": "Call logs filters call id",
+                "description": "Autocomplete-search the production CallLog `call_id` field (the provider's call identifier string, e.g. `\"patronus_xyz\"`). This is distinct from simulation `run_id` (integer; see `runs_list`) and from CallLog ID (integer DB ID).",
                 "tags": [
                     "observability"
                 ],
@@ -3358,7 +3380,7 @@
         "/observability/v1/call-logs/{id}/": {
             "get": {
                 "operationId": "call-logs-retrieve",
-                "description": "Retrieve a call log by ID",
+                "description": "Retrieve a production CallLog by its integer **CallLog ID** (path parameter). This is distinct from simulation `run_id` (use `runs_retrieve` for those) and from the call log's own `call_id` string field (the provider's call identifier).",
                 "parameters": [
                     {
                         "in": "path",
@@ -3409,7 +3431,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "call-logs-retrieve",
-                        "description": "Retrieve a call log by ID"
+                        "description": "Retrieve a production CallLog by its integer **CallLog ID** (path parameter). This is distinct from simulation `run_id` (use `runs_retrieve` for those) and from the call log's own `call_id` string field (the provider's call identifier)."
                     }
                 }
             },
@@ -4452,7 +4474,7 @@
         "/observability/v1/call-logs/filters_call_id/": {
             "get": {
                 "operationId": "call-logs-filters-call-id-retrieve",
-                "description": "Call logs filters call id",
+                "description": "Autocomplete-search the production CallLog `call_id` field (the provider's call identifier string, e.g. `\"patronus_xyz\"`). This is distinct from simulation `run_id` (integer; see `runs_list`) and from CallLog ID (integer DB ID).",
                 "tags": [
                     "observability"
                 ],
@@ -4477,7 +4499,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "call-logs-filters-call-id-retrieve",
-                        "description": "Call logs filters call id"
+                        "description": "Autocomplete-search the production CallLog `call_id` field (the provider's call identifier string, e.g. `\"patronus_xyz\"`). This is distinct from simulation `run_id` (integer; see `runs_list`) and from CallLog ID (integer DB ID)."
                     }
                 }
             }
@@ -8736,6 +8758,59 @@
                 }
             }
         },
+        "/test_framework/metric-reviews/process_feedbacks_cancel/": {
+            "post": {
+                "operationId": "test-framework-metric-reviews-process-feedbacks-cancel-create",
+                "description": "Cancel a running optimization. Used after the user edits a flagged\nannotation so the run can be restarted with the corrected dataset\ninstead of finishing with the old labels.\n\nPOST { progress_id }",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricReviewInline"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricReviewInline"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricReviewInline"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricReviewInline"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "test-framework-metric-reviews-process-feedbacks-cancel-create",
+                        "description": "Cancel a running optimization. Used after the user edits a flagged\nannotation so the run can be restarted with the corrected dataset\ninstead of finishing with the old labels.\n\nPOST { progress_id }"
+                    }
+                }
+            }
+        },
         "/test_framework/metric-reviews/process_feedbacks_progress/": {
             "get": {
                 "operationId": "metric-reviews-process-feedbacks-progress",
@@ -10235,7 +10310,7 @@
         "/test_framework/v1/aiagents/": {
             "get": {
                 "operationId": "aiagents-list",
-                "description": "aiagents_list: List AI voice agents in your account. Filter by `project_id` to scope to one project, or omit to list every agent the caller can access. Returns a paginated list of agent summaries (id, name, provider, contact number, created/updated timestamps).",
+                "description": "aiagents_list: List AI voice agents in your account. Filter by `project_id` to scope to one project, or omit to list every agent the caller can access. Returns a paginated list of agent summaries (id, name, provider, contact number, created/updated timestamps).\n\nPerformance tip: passing `project_id` from your workspace context narrows the result. Try `page_size=20` first — you can paginate or raise the page size if you actually need more.",
                 "summary": "List AI voice agents",
                 "parameters": [
                     {
@@ -10304,7 +10379,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "aiagents-list",
-                        "description": "aiagents_list: List AI voice agents in your account. Filter by `project_id` to scope to one project, or omit to list every agent the caller can access. Returns a paginated list of agent summaries (id, name, provider, contact number, created/updated timestamps)."
+                        "description": "aiagents_list: List AI voice agents in your account. Filter by `project_id` to scope to one project, or omit to list every agent the caller can access. Returns a paginated list of agent summaries (id, name, provider, contact number, created/updated timestamps).\n\nPerformance tip: passing `project_id` from your workspace context narrows the result. Try `page_size=20` first — you can paginate or raise the page size if you actually need more."
                     }
                 }
             },
@@ -10482,7 +10557,7 @@
         "/test_framework/v1/aiagents-external/": {
             "get": {
                 "operationId": "aiagents-external-list",
-                "description": "aiagents_list: List AI voice agents in your account. Filter by `project_id` to scope to one project, or omit to list every agent the caller can access. Returns a paginated list of agent summaries (id, name, provider, contact number, created/updated timestamps).",
+                "description": "aiagents_list: List AI voice agents in your account. Filter by `project_id` to scope to one project, or omit to list every agent the caller can access. Returns a paginated list of agent summaries (id, name, provider, contact number, created/updated timestamps).\n\nPerformance tip: passing `project_id` from your workspace context narrows the result. Try `page_size=20` first — you can paginate or raise the page size if you actually need more.",
                 "summary": "List AI voice agents",
                 "parameters": [
                     {
@@ -12380,21 +12455,20 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/Tool"
+                                "$ref": "#/components/schemas/DisableMockToolsRequest"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/Tool"
+                                "$ref": "#/components/schemas/DisableMockToolsRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/Tool"
+                                "$ref": "#/components/schemas/DisableMockToolsRequest"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -12402,11 +12476,21 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/DisableMockToolsResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DisableMockErrorResponse"
                                 }
                             }
                         },
@@ -12488,21 +12572,20 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/Tool"
+                                "$ref": "#/components/schemas/EnableMockToolsRequest"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/Tool"
+                                "$ref": "#/components/schemas/EnableMockToolsRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/Tool"
+                                "$ref": "#/components/schemas/EnableMockToolsRequest"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -12510,11 +12593,21 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/EnableMockToolsResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EnableMockErrorResponse"
                                 }
                             }
                         },
@@ -14975,7 +15068,7 @@
         "/test_framework/v1/metrics/": {
             "get": {
                 "operationId": "metrics-list",
-                "description": "\nmetrics_list: List quality metrics (LLM-judge prompts, custom code, or predefined metrics) used to evaluate AI voice agents. Filter by `agent_id` or `project_id` to scope results.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n        ",
+                "description": "\nmetrics_list: List quality metrics (LLM-judge prompts, custom code, or predefined metrics) used to evaluate AI voice agents. Filter by `agent_id` or `project_id` to scope results.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n\nPerformance tip: `agent_id` (when a specific agent is in context) or `project_id` will narrow the result. Orgs can accumulate hundreds of metrics so a filter usually helps.\n        ",
                 "summary": "List metrics",
                 "parameters": [
                     {
@@ -15152,7 +15245,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metrics-list",
-                        "description": "\nmetrics_list: List quality metrics (LLM-judge prompts, custom code, or predefined metrics) used to evaluate AI voice agents. Filter by `agent_id` or `project_id` to scope results.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n        "
+                        "description": "\nmetrics_list: List quality metrics (LLM-judge prompts, custom code, or predefined metrics) used to evaluate AI voice agents. Filter by `agent_id` or `project_id` to scope results.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n\nPerformance tip: `agent_id` (when a specific agent is in context) or `project_id` will narrow the result. Orgs can accumulate hundreds of metrics so a filter usually helps.\n        "
                     }
                 }
             },
@@ -15271,7 +15364,7 @@
         "/test_framework/v1/metrics-external/": {
             "get": {
                 "operationId": "metrics-external-list",
-                "description": "\nmetrics_list: List quality metrics (LLM-judge prompts, custom code, or predefined metrics) used to evaluate AI voice agents. Filter by `agent_id` or `project_id` to scope results.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n        ",
+                "description": "\nmetrics_list: List quality metrics (LLM-judge prompts, custom code, or predefined metrics) used to evaluate AI voice agents. Filter by `agent_id` or `project_id` to scope results.\n\nFiltering behavior:\n- If only agent_id is provided: Returns metrics associated with that agent only\n- If only project_id is provided: Returns metrics associated with that project only\n- If both agent_id and project_id are provided: Returns metrics from both the agent and the project\n- If agents is provided: Returns metrics where any of the specified agents are in the M2M agents field\n- If slug is provided: Returns the metric with that specific slug\n\nPerformance tip: `agent_id` (when a specific agent is in context) or `project_id` will narrow the result. Orgs can accumulate hundreds of metrics so a filter usually helps.\n        ",
                 "summary": "List metrics",
                 "parameters": [
                     {
@@ -15986,17 +16079,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricDetailV2"
+                                "$ref": "#/components/schemas/EvaluateLlmJudgeMetricRequest"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricDetailV2"
+                                "$ref": "#/components/schemas/EvaluateLlmJudgeMetricRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricDetailV2"
+                                "$ref": "#/components/schemas/EvaluateLlmJudgeMetricRequest"
                             }
                         }
                     },
@@ -16012,7 +16105,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/MetricDetailV2"
+                                    "$ref": "#/components/schemas/EvaluateLlmJudgeMetricResponse"
                                 }
                             }
                         },
@@ -16066,63 +16159,6 @@
                 "responses": {
                     "200": {
                         "description": "Returns progress_id for tracking progress"
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/metrics-external/{id}/validate_annotations/": {
-            "post": {
-                "operationId": "metrics-external-validate-annotations-create",
-                "description": "Validate failed annotations to identify potential mis-annotations.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this metric.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ValidateAnnotationsResponse"
-                                }
-                            }
-                        },
-                        "description": ""
                     }
                 }
             }
@@ -17390,17 +17426,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricDetailV2"
+                                "$ref": "#/components/schemas/EvaluateLlmJudgeMetricRequest"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricDetailV2"
+                                "$ref": "#/components/schemas/EvaluateLlmJudgeMetricRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/MetricDetailV2"
+                                "$ref": "#/components/schemas/EvaluateLlmJudgeMetricRequest"
                             }
                         }
                     },
@@ -17416,7 +17452,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/MetricDetailV2"
+                                    "$ref": "#/components/schemas/EvaluateLlmJudgeMetricResponse"
                                 }
                             }
                         },
@@ -17484,70 +17520,6 @@
                         "enabled": true,
                         "name": "metrics-run-reviews-create",
                         "description": "Re-evaluate all test sets for this metric with optional overrides. Returns a progress_id to poll for completion."
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/metrics/{id}/validate_annotations/": {
-            "post": {
-                "operationId": "metrics-validate-annotations-create",
-                "description": "Validate failed annotations to identify potential mis-annotations.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this metric.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ValidateAnnotationsRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ValidateAnnotationsResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "metrics-validate-annotations-create",
-                        "description": "Validate failed annotations to identify potential mis-annotations."
                     }
                 }
             }
@@ -18459,7 +18431,7 @@
         "/test_framework/v1/personalities/": {
             "get": {
                 "operationId": "personalities-list",
-                "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Note:** this endpoint can return a large number of results. Use `language` or `project_id` filters to narrow the response.\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.",
+                "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters.",
                 "parameters": [
                     {
                         "in": "query",
@@ -18505,7 +18477,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "personalities-list",
-                        "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Note:** this endpoint can return a large number of results. Use `language` or `project_id` filters to narrow the response.\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization."
+                        "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters."
                     }
                 }
             },
@@ -18564,7 +18536,7 @@
         "/test_framework/v1/personalities-external/": {
             "get": {
                 "operationId": "personalities-external-list",
-                "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Note:** this endpoint can return a large number of results. Use `language` or `project_id` filters to narrow the response.\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.",
+                "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters.",
                 "parameters": [
                     {
                         "in": "query",
@@ -21503,7 +21475,7 @@
         "/test_framework/v1/results-external/{id}/": {
             "get": {
                 "operationId": "results-external-retrieve",
-                "description": "The `success` and `success_rate` fields indicate the run reached a terminal state, not that it passed its expected outcome. A run with an `error_message` (e.g. failed connection) still reports `success=true`. For actual pass/fail outcomes check: `runs[].evaluation.metrics[].result`, `runs[].expected_outcome`, and `runs[].error_message`.\n\nThe `runs` field is a dict keyed by run ID string (e.g. `{\"86368\": {...}, \"86367\": {...}}`), not an array — unlike the list endpoint.",
+                "description": "The `success` and `success_rate` fields indicate the run reached a terminal state, not that it passed its expected outcome. A run with an `error_message` (e.g. failed connection) still reports `success=true`. For actual pass/fail outcomes check: `runs[].evaluation.metrics[].result`, `runs[].expected_outcome`, and `runs[].error_message`.\n\nThe `runs` field is a dict keyed by run ID string (e.g. `{\"86368\": {...}, \"86367\": {...}}`), not an array — unlike the list endpoint. Each run also has a `call_id` STRING field (the provider's call identifier) — that is a data field, NOT an endpoint ID; do not pass it where `run_id` is expected.",
                 "summary": "Retrieve a test result",
                 "parameters": [
                     {
@@ -21660,6 +21632,24 @@
                                             "runs_by_tags": "object",
                                             "latency_data": "object",
                                             "failed_reasons": "array",
+                                            "run_settings": {
+                                                "override_value": 10,
+                                                "frequency": 2,
+                                                "concurrency_limit": 5,
+                                                "personality_ids": [
+                                                    3,
+                                                    7
+                                                ],
+                                                "test_profile_ids": [
+                                                    20
+                                                ],
+                                                "mode": "same_number",
+                                                "livekit_data": {
+                                                    "agent_name": "kit",
+                                                    "config": {},
+                                                    "url": "wss://example"
+                                                }
+                                            },
                                             "created_at": "datetime",
                                             "updated_at": "datetime"
                                         }
@@ -22425,7 +22415,7 @@
         "/test_framework/v1/results/{id}/": {
             "get": {
                 "operationId": "results-retrieve",
-                "description": "The `success` and `success_rate` fields indicate the run reached a terminal state, not that it passed its expected outcome. A run with an `error_message` (e.g. failed connection) still reports `success=true`. For actual pass/fail outcomes check: `runs[].evaluation.metrics[].result`, `runs[].expected_outcome`, and `runs[].error_message`.\n\nThe `runs` field is a dict keyed by run ID string (e.g. `{\"86368\": {...}, \"86367\": {...}}`), not an array — unlike the list endpoint.",
+                "description": "The `success` and `success_rate` fields indicate the run reached a terminal state, not that it passed its expected outcome. A run with an `error_message` (e.g. failed connection) still reports `success=true`. For actual pass/fail outcomes check: `runs[].evaluation.metrics[].result`, `runs[].expected_outcome`, and `runs[].error_message`.\n\nThe `runs` field is a dict keyed by run ID string (e.g. `{\"86368\": {...}, \"86367\": {...}}`), not an array — unlike the list endpoint. Each run also has a `call_id` STRING field (the provider's call identifier) — that is a data field, NOT an endpoint ID; do not pass it where `run_id` is expected.",
                 "summary": "Retrieve a test result",
                 "parameters": [
                     {
@@ -22582,6 +22572,24 @@
                                             "runs_by_tags": "object",
                                             "latency_data": "object",
                                             "failed_reasons": "array",
+                                            "run_settings": {
+                                                "override_value": 10,
+                                                "frequency": 2,
+                                                "concurrency_limit": 5,
+                                                "personality_ids": [
+                                                    3,
+                                                    7
+                                                ],
+                                                "test_profile_ids": [
+                                                    20
+                                                ],
+                                                "mode": "same_number",
+                                                "livekit_data": {
+                                                    "agent_name": "kit",
+                                                    "config": {},
+                                                    "url": "wss://example"
+                                                }
+                                            },
                                             "created_at": "datetime",
                                             "updated_at": "datetime"
                                         }
@@ -22611,7 +22619,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "results-retrieve",
-                        "description": "The `success` and `success_rate` fields indicate the run reached a terminal state, not that it passed its expected outcome. A run with an `error_message` (e.g. failed connection) still reports `success=true`. For actual pass/fail outcomes check: `runs[].evaluation.metrics[].result`, `runs[].expected_outcome`, and `runs[].error_message`.\n\nThe `runs` field is a dict keyed by run ID string (e.g. `{\"86368\": {...}, \"86367\": {...}}`), not an array — unlike the list endpoint."
+                        "description": "The `success` and `success_rate` fields indicate the run reached a terminal state, not that it passed its expected outcome. A run with an `error_message` (e.g. failed connection) still reports `success=true`. For actual pass/fail outcomes check: `runs[].evaluation.metrics[].result`, `runs[].expected_outcome`, and `runs[].error_message`.\n\nThe `runs` field is a dict keyed by run ID string (e.g. `{\"86368\": {...}, \"86367\": {...}}`), not an array — unlike the list endpoint. Each run also has a `call_id` STRING field (the provider's call identifier) — that is a data field, NOT an endpoint ID; do not pass it where `run_id` is expected."
                     }
                 }
             },
@@ -23431,7 +23439,7 @@
         "/test_framework/v1/runs/": {
             "get": {
                 "operationId": "runs-list",
-                "description": "List test runs",
+                "description": "List test runs. Each item's `id` is the integer `run_id` used at `/runs/{run_id}/`; the `call_id` field is a provider string identifier, NOT an endpoint ID.",
                 "parameters": [
                     {
                         "in": "query",
@@ -23788,7 +23796,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-list",
-                        "description": "List test runs"
+                        "description": "List test runs. Each item's `id` is the integer `run_id` used at `/runs/{run_id}/`; the `call_id` field is a provider string identifier, NOT an endpoint ID."
                     }
                 }
             }
@@ -23796,7 +23804,7 @@
         "/test_framework/v1/runs-external/": {
             "get": {
                 "operationId": "runs-external-list",
-                "description": "List test runs",
+                "description": "List test runs. Each item's `id` is the integer `run_id` used at `/runs/{run_id}/`; the `call_id` field is a provider string identifier, NOT an endpoint ID.",
                 "parameters": [
                     {
                         "in": "query",
@@ -24154,7 +24162,7 @@
         "/test_framework/v1/runs-external/{id}/": {
             "get": {
                 "operationId": "runs-external-retrieve",
-                "description": "Retrieve a test run by ID",
+                "description": "Retrieve a test run by `run_id` (the integer path parameter). The `call_id` field on the response is the provider's call identifier (string) — do NOT pass it where `run_id` is expected.",
                 "parameters": [
                     {
                         "in": "path",
@@ -24992,7 +25000,7 @@
         "/test_framework/v1/runs/{id}/": {
             "get": {
                 "operationId": "runs-retrieve",
-                "description": "Retrieve a test run by ID",
+                "description": "Retrieve a test run by `run_id` (the integer path parameter). The `call_id` field on the response is the provider's call identifier (string) — do NOT pass it where `run_id` is expected.",
                 "parameters": [
                     {
                         "in": "path",
@@ -25028,7 +25036,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "runs-retrieve",
-                        "description": "Retrieve a test run by ID"
+                        "description": "Retrieve a test run by `run_id` (the integer path parameter). The `call_id` field on the response is the provider's call identifier (string) — do NOT pass it where `run_id` is expected."
                     }
                 }
             },
@@ -26236,7 +26244,7 @@
         "/test_framework/v1/scenarios/": {
             "get": {
                 "operationId": "scenarios-list",
-                "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.",
+                "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first.",
                 "summary": "List evaluators (scenarios)",
                 "parameters": [
                     {
@@ -26340,13 +26348,13 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-list",
-                        "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics."
+                        "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first."
                     }
                 }
             },
             "post": {
                 "operationId": "scenarios-create",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object (preferred) — the backend converts it to JSON and stores it in `instructions` automatically. (Advanced callers who already have a stringified JSON may post it via `instructions` with `scenario_type=\"conditional_actions\"` instead.)\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator (scenario)",
                 "tags": [
                     "Scenarios"
@@ -26469,7 +26477,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-create",
-                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object (preferred) — the backend converts it to JSON and stores it in `instructions` automatically. (Advanced callers who already have a stringified JSON may post it via `instructions` with `scenario_type=\"conditional_actions\"` instead.)\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
+                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
                     }
                 }
             }
@@ -26477,7 +26485,7 @@
         "/test_framework/v1/scenarios-external/": {
             "get": {
                 "operationId": "scenarios-external-list",
-                "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.",
+                "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first.",
                 "summary": "List evaluators (scenarios)",
                 "parameters": [
                     {
@@ -26580,7 +26588,7 @@
             },
             "post": {
                 "operationId": "scenarios-external-create",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object (preferred) — the backend converts it to JSON and stores it in `instructions` automatically. (Advanced callers who already have a stringified JSON may post it via `instructions` with `scenario_type=\"conditional_actions\"` instead.)\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator (scenario)",
                 "tags": [
                     "Scenarios"
@@ -37117,7 +37125,7 @@
         "/test_framework/v2/scenarios/": {
             "get": {
                 "operationId": "test-framework-v2-scenarios-list",
-                "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.",
+                "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first.",
                 "summary": "List evaluators (scenarios)",
                 "parameters": [
                     {
@@ -37221,13 +37229,13 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-v2-scenarios-list",
-                        "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics."
+                        "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first."
                     }
                 }
             },
             "post": {
                 "operationId": "test-framework-v2-scenarios-create",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object (preferred) — the backend converts it to JSON and stores it in `instructions` automatically. (Advanced callers who already have a stringified JSON may post it via `instructions` with `scenario_type=\"conditional_actions\"` instead.)\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator (scenario)",
                 "tags": [
                     "Scenarios"
@@ -37350,7 +37358,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-v2-scenarios-create",
-                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object (preferred) — the backend converts it to JSON and stores it in `instructions` automatically. (Advanced callers who already have a stringified JSON may post it via `instructions` with `scenario_type=\"conditional_actions\"` instead.)\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
+                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
                     }
                 }
             }
@@ -44897,6 +44905,52 @@
                 "description": "Projects add member"
             }
         },
+        "/user/v1/projects-external/{id}/daily-report/{date}/pdf/": {
+            "get": {
+                "operationId": "projects-external-daily-report-pdf-retrieve",
+                "description": "Resolve a daily report PDF (sent at `date`) to a fresh presigned S3 URL.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this project.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "date",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Project"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/user/v1/projects-external/{id}/disable_personalities/": {
             "post": {
                 "operationId": "projects-external-disable-personalities-create",
@@ -45274,6 +45328,100 @@
                     }
                 },
                 "description": "Projects personalities"
+            }
+        },
+        "/user/v1/projects-external/{id}/preview_daily_report/": {
+            "post": {
+                "operationId": "projects-external-preview-daily-report-create",
+                "description": "Trigger an on-demand render of the daily observability report PDF.\n\nReturns a `task_id` the client can poll via `preview_daily_report_progress`.\nThree short-circuit paths:\n  - `?force=true` skips both warm cache and dedupe lock and always re-runs.\n  - A warm cache hit (within 15 min) returns the cached file_url synchronously.\n  - An in-flight generation for the same project returns the existing task_id.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this project.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Project"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Project"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Project"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Project"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/user/v1/projects-external/{id}/preview_daily_report_progress/": {
+            "get": {
+                "operationId": "projects-external-preview-daily-report-progress-retrieve",
+                "description": "Poll the state of an in-flight `preview_daily_report` task.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this project.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Project"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
             }
         },
         "/user/v1/projects-external/{id}/remove_member/": {
@@ -45654,6 +45802,52 @@
                 "description": "Projects add member"
             }
         },
+        "/user/v1/projects/{id}/daily-report/{date}/pdf/": {
+            "get": {
+                "operationId": "projects-daily-report-pdf-retrieve",
+                "description": "Resolve a daily report PDF (sent at `date`) to a fresh presigned S3 URL.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this project.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "date",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Project"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/user/v1/projects/{id}/disable_personalities/": {
             "post": {
                 "operationId": "projects-disable-personalities-create",
@@ -46031,6 +46225,100 @@
                     }
                 },
                 "description": "Projects personalities"
+            }
+        },
+        "/user/v1/projects/{id}/preview_daily_report/": {
+            "post": {
+                "operationId": "projects-preview-daily-report-create",
+                "description": "Trigger an on-demand render of the daily observability report PDF.\n\nReturns a `task_id` the client can poll via `preview_daily_report_progress`.\nThree short-circuit paths:\n  - `?force=true` skips both warm cache and dedupe lock and always re-runs.\n  - A warm cache hit (within 15 min) returns the cached file_url synchronously.\n  - An in-flight generation for the same project returns the existing task_id.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this project.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Project"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Project"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Project"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Project"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/user/v1/projects/{id}/preview_daily_report_progress/": {
+            "get": {
+                "operationId": "projects-preview-daily-report-progress-retrieve",
+                "description": "Poll the state of an in-flight `preview_daily_report` task.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this project.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Project"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
             }
         },
         "/user/v1/projects/{id}/remove_member/": {
@@ -47628,15 +47916,16 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "x-spec-enum-id": "b822ad429c7b7fec",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -47736,12 +48025,13 @@
                             "trillet",
                             "cisco",
                             "genesys",
+                            "chirp",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "f6ef8a6c5a59cc33",
+                        "x-spec-enum-id": "43adf9cc06494c10",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -48087,14 +48377,15 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
-                        "description": "Primary language for this agent.\nExample: `\"en\"` or `\"es\"`\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "description": "Primary language for this agent.\nExample: `\"en\"` or `\"es\"`\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "created_at": {
                         "type": "string",
@@ -49775,7 +50066,7 @@
             },
             "ConditionalActions": {
                 "type": "object",
-                "description": "Structured conditional-actions payload.\n\nWhen supplied, the backend converts this to a JSON string and stores it in the\nscenario's `instructions` field. Prefer this structured shape over posting a\nstringified JSON via `instructions` directly — it is typed and validated.",
+                "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`.\n\nUse either `conditional_actions` (structured) or `instructions` (plain text)\non a scenario — not both.",
                 "properties": {
                     "role": {
                         "type": "string",
@@ -49951,6 +50242,13 @@
                         "type": "string",
                         "writeOnly": true,
                         "description": "Comma-separated metric IDs to evaluate for this call. Example: \"118,119\". To run metrics after the call is created, use the evaluate_metrics endpoint instead."
+                    },
+                    "main_agent_channel_index": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Channel index (0 or 1) of the main agent in stereo recordings. When provided, skips automatic channel detection. Example: `0` means channel 0 is the main agent, channel 1 is the customer/testing agent."
                     }
                 },
                 "required": [
@@ -50040,14 +50338,15 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
-                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -50321,6 +50620,27 @@
                     },
                     "is_active": {
                         "type": "boolean"
+                    },
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "created_via": {
+                        "enum": [
+                            "user",
+                            "api",
+                            "mcp",
+                            "cli",
+                            "sdk",
+                            null
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "x-spec-enum-id": "360ac7f2b69a95cc",
+                        "readOnly": true,
+                        "description": "How the cron job was created: user (UI), api (API key), or mcp (MCP client)\n\n* `user` - User\n* `api` - API\n* `mcp` - MCP\n* `cli` - CLI\n* `sdk` - SDK"
                     },
                     "created_at": {
                         "type": "string",
@@ -50716,6 +51036,37 @@
                     "project_id"
                 ]
             },
+            "DisableMockErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "DisableMockToolsRequest": {
+                "type": "object",
+                "properties": {
+                    "api_key": {
+                        "type": "string",
+                        "description": "Optional API key for the provider. If not provided, will use stored credentials."
+                    }
+                }
+            },
+            "DisableMockToolsResponse": {
+                "type": "object",
+                "properties": {
+                    "progress_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "progress_id"
+                ]
+            },
             "DisablePersonalitiesRequest": {
                 "type": "object",
                 "properties": {
@@ -50807,6 +51158,37 @@
                     "target_node"
                 ]
             },
+            "EnableMockErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "EnableMockToolsRequest": {
+                "type": "object",
+                "properties": {
+                    "api_key": {
+                        "type": "string",
+                        "description": "Optional API key. If not provided, uses stored credentials."
+                    }
+                }
+            },
+            "EnableMockToolsResponse": {
+                "type": "object",
+                "properties": {
+                    "progress_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "progress_id"
+                ]
+            },
             "EnablePersonalitiesRequest": {
                 "type": "object",
                 "properties": {
@@ -50820,6 +51202,71 @@
                 },
                 "required": [
                     "personalities"
+                ]
+            },
+            "EvaluateLlmJudgeMetricRequest": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "Evaluation prompt for the LLM judge."
+                    },
+                    "data": {
+                        "description": "Per-call payload (transcript, metadata, voice_recording, etc.) the metric runs against."
+                    },
+                    "eval_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "One of binary_workflow_adherence, binary_qualitative, numeric, continuous_qualitative, enum."
+                    },
+                    "enum_values": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Required when eval_type='enum'."
+                    },
+                    "audio": {
+                        "type": "boolean",
+                        "description": "When true, the LLM judge analyzes the voice recording instead of (or in addition to) the transcript."
+                    },
+                    "audio_start_time": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "description": "Optional clip start (seconds from call start) when audio=true."
+                    },
+                    "audio_end_time": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "description": "Optional clip end (seconds from call start) when audio=true."
+                    }
+                },
+                "required": [
+                    "data",
+                    "description"
+                ]
+            },
+            "EvaluateLlmJudgeMetricResponse": {
+                "type": "object",
+                "properties": {
+                    "progress_id": {
+                        "type": "string",
+                        "description": "Poll evaluate_metric_progress with this ID."
+                    }
+                },
+                "required": [
+                    "progress_id"
                 ]
             },
             "EvaluateMetrics": {
@@ -52040,6 +52487,11 @@
                         ],
                         "description": "Override channel ID for this metric's alerts",
                         "maxLength": 255
+                    },
+                    "affects_call_success": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "\nWhether this metric is configured in the project's rubric and therefore contributes\nto overall call success evaluation.\nExample: `true`\n"
                     }
                 },
                 "required": [
@@ -53199,6 +53651,10 @@
                         "x-spec-enum-id": "31820255025544ce",
                         "description": "Billing type for the pack\n\n* `subscription` - Subscription\n* `self_serve` - Self Serve"
                     },
+                    "allow_view_only_role": {
+                        "type": "boolean",
+                        "description": "Allow VIEW_ONLY role for memberships/invites on this pack. When False, view-only seats are blocked."
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -53368,6 +53824,10 @@
                     "allow_cancellation": {
                         "type": "boolean",
                         "description": "Allow users to cancel subscription"
+                    },
+                    "allow_view_only_role": {
+                        "type": "boolean",
+                        "description": "Allow VIEW_ONLY role for memberships/invites on this pack. When False, view-only seats are blocked."
                     },
                     "extra_member_price": {
                         "type": "string",
@@ -54243,14 +54703,15 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
-                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -55604,6 +56065,10 @@
                         "type": "boolean",
                         "description": "\nNotify daily report even if there are no calls\nExample: `true` or `false`\n"
                     },
+                    "daily_report_ai_summary_enabled": {
+                        "type": "boolean",
+                        "description": "\nReplace the default daily report data dump with an AI-narrated Top Issues\nsection in Slack and email. Off by default. When on, Slack also exposes a\n\"Show more\" button that opens a modal with the legacy detail sections.\nExample: `true` or `false`\n"
+                    },
                     "notify_cron_failure": {
                         "type": "boolean",
                         "description": "\nNotify cron failure\nExample: `true` or `false`\n"
@@ -56032,6 +56497,15 @@
                         ],
                         "readOnly": true,
                         "description": "Run Execution Type"
+                    },
+                    "run_settings": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Snapshot of the override-relevant request payload (personality_ids, frequency, concurrency_limit, connection-specific overrides, etc.)."
                     },
                     "created_at": {
                         "type": "string",
@@ -56694,7 +57168,7 @@
                     },
                     "instructions": {
                         "type": "string",
-                        "description": "\nScenario Instructions - the format depends on the scenario_type:\n\n**For scenario_type=\"instruction\":**\nProvide plain text instructions that describe the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nProvide a JSON-formatted string (stringified) with the following structure:\n\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi there, I need to check on my appointment <break time=\\\"1.5s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"contains \\\"appointment\\\" OR contains \\\"schedule\\\" OR contains \\\"help\\\"\",\n      \"action\": \"Yes, I have an appointment scheduled for tomorrow [laughter] [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"contains \\\"confirm\\\" OR contains \\\"thank\\\" OR contains \\\"anything else\\\"\",\n      \"action\": \"No that's all, thank you so much <break time=\\\"1.0s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": 2,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Important:** The JSON must be stringified (use JSON.dumps in Python or JSON.stringify in JavaScript) before sending.\n\n**Structure Details:**\n\n- **`role`** (string): Personality/role description for the scenario actor\n\n- **`conditions`** (array): Ordered list of conditional actions that define the conversation flow\n\n  **Each condition object has:**\n  - **`id`** (integer): Unique sequential identifier (0, 1, 2, 3...)\n\n  - **`condition`** (string | integer): The trigger that activates this action\n    - `\"FIRST_MESSAGE\"` - Triggers at conversation start (use for id: 0)\n    - `\"contains \\\"keyword\\\"\"` - Triggers when agent's response contains keyword(s)\n    - Use `OR` for multiple keywords: `\"contains \\\"word1\\\" OR contains \\\"word2\\\"`\n    - Use `AND` for all keywords: `\"contains \\\"word1\\\" AND contains \\\"word2\\\"`\n    - Integer (e.g., `2`) - References another condition's id for sequential followup actions\n\n  - **`action`** (string): What the scenario actor says or does\n    - **SSML pause tags:** `<break time=\"1.5s\" />` or `<break time=\"1.0s\" />`\n    - **Emotion markers:** `[laughter]`, `[sigh]`, etc. (can repeat like `[laughter] [laughter]`)\n    - **Special actions:** `<endcall />` to end the call\n\n  - **`type`** (string): Either `\"standard\"` (normal response) or `\"action_followup\"` (triggers after another condition)\n\n  - **`fixed_message`** (boolean): Set to `true` for fixed responses, `false` for dynamic\n\n**Usage Tips:**\n- Always start with `id: 0` and `condition: \"FIRST_MESSAGE\"`\n- Use the last condition to trigger `<endcall />` for clean call termination\n- Combine SSML tags and emotion markers naturally: `\"Great <break time=\\\"1.5s\\\" /> [laughter] [laughter]\"`\n- The contains operators are case-insensitive\n"
+                        "description": "\nScenario Instructions - the format depends on the scenario_type:\n\n**For scenario_type=\"instruction\":**\nProvide plain text instructions that describe the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you send via `instructions`, pass a JSON-formatted string with the following structure:\n\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi there, I need to check on my appointment <break time=\\\"1.5s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"contains \\\"appointment\\\" OR contains \\\"schedule\\\" OR contains \\\"help\\\"\",\n      \"action\": \"Yes, I have an appointment scheduled for tomorrow [laughter] [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"contains \\\"confirm\\\" OR contains \\\"thank\\\" OR contains \\\"anything else\\\"\",\n      \"action\": \"No that's all, thank you so much <break time=\\\"1.0s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": 2,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Note:** When sent via `instructions`, the value must be a JSON-formatted string (e.g. `JSON.stringify(...)` / `json.dumps(...)`). For new integrations, use the structured `conditional_actions` field below.\n\n**Structure Details:**\n\n- **`role`** (string): Personality/role description for the scenario actor\n\n- **`conditions`** (array): Ordered list of conditional actions that define the conversation flow\n\n  **Each condition object has:**\n  - **`id`** (integer): Unique sequential identifier (0, 1, 2, 3...)\n\n  - **`condition`** (string | integer): The trigger that activates this action\n    - `\"FIRST_MESSAGE\"` - Triggers at conversation start (use for id: 0)\n    - `\"contains \\\"keyword\\\"\"` - Triggers when agent's response contains keyword(s)\n    - Use `OR` for multiple keywords: `\"contains \\\"word1\\\" OR contains \\\"word2\\\"`\n    - Use `AND` for all keywords: `\"contains \\\"word1\\\" AND contains \\\"word2\\\"`\n    - Integer (e.g., `2`) - References another condition's id for sequential followup actions\n\n  - **`action`** (string): What the scenario actor says or does\n    - **SSML pause tags:** `<break time=\"1.5s\" />` or `<break time=\"1.0s\" />`\n    - **Emotion markers:** `[laughter]`, `[sigh]`, etc. (can repeat like `[laughter] [laughter]`)\n    - **Special actions:** `<endcall />` to end the call\n\n  - **`type`** (string): Either `\"standard\"` (normal response) or `\"action_followup\"` (triggers after another condition)\n\n  - **`fixed_message`** (boolean): Set to `true` for fixed responses, `false` for dynamic\n\n**Usage Tips:**\n- Always start with `id: 0` and `condition: \"FIRST_MESSAGE\"`\n- Use the last condition to trigger `<endcall />` for clean call termination\n- Combine SSML tags and emotion markers naturally: `\"Great <break time=\\\"1.5s\\\" /> [laughter] [laughter]\"`\n- The contains operators are case-insensitive\n"
                     },
                     "conditional_actions": {
                         "allOf": [
@@ -56702,7 +57176,7 @@
                                 "$ref": "#/components/schemas/ConditionalActions"
                             }
                         ],
-                        "description": "Structured conditional-actions payload — preferred over posting a stringified JSON via `instructions` for `scenario_type=\"conditional_actions\"`. When supplied, the backend converts this object to a JSON string and stores it in the scenario's `instructions` field automatically.\n\nUse either `conditional_actions` (structured) OR `instructions` (stringified JSON) — not both."
+                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both."
                     },
                     "expected_outcome_prompt": {
                         "type": "string",
@@ -56822,15 +57296,16 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "x-spec-enum-id": "b822ad429c7b7fec",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -56930,12 +57405,13 @@
                             "trillet",
                             "cisco",
                             "genesys",
+                            "chirp",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "f6ef8a6c5a59cc33",
+                        "x-spec-enum-id": "43adf9cc06494c10",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -57775,6 +58251,7 @@
                             "avg",
                             "min",
                             "max",
+                            "p50",
                             "p95",
                             "p99",
                             "",
@@ -57784,8 +58261,8 @@
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "ed5e96d16e4da01a",
-                        "description": "Aggregation function to apply (for bar charts)\n\n* `count` - Count\n* `sum` - Sum\n* `avg` - Average\n* `min` - Minimum\n* `max` - Maximum\n* `p95` - 95th Percentile\n* `p99` - 99th Percentile"
+                        "x-spec-enum-id": "be3fac57dbd138ef",
+                        "description": "Aggregation function to apply (for bar charts)\n\n* `count` - Count\n* `sum` - Sum\n* `avg` - Average\n* `min` - Minimum\n* `max` - Maximum\n* `p50` - 50th Percentile (Median)\n* `p95` - 95th Percentile\n* `p99` - 99th Percentile"
                     },
                     "group_by": {
                         "oneOf": [
@@ -58261,7 +58738,18 @@
                     },
                     "improved_evaluation_trigger": {
                         "type": "string",
-                        "description": "Improved evaluation trigger"
+                        "description": "Improved evaluation trigger. Interpretation depends on improved_trigger_kind: 'always' (literal) → run on every example; Python source → trigger.py from the sandbox (when improved_trigger_kind='custom_code'); LLM-judge prompt otherwise."
+                    },
+                    "improved_trigger_kind": {
+                        "enum": [
+                            "always",
+                            "llm_judge",
+                            "custom_code"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "2210e45c3e829037",
+                        "default": "always",
+                        "description": "Tells the frontend how to interpret improved_evaluation_trigger. Set to 'custom_code' when meta-harness produced an optimized Python trigger; 'always' when no trigger gating is needed.\n\n* `always` - Always\n* `llm_judge` - LLM Judge\n* `custom_code` - Custom Code"
                     },
                     "trigger_type": {
                         "enum": [
@@ -58294,6 +58782,22 @@
                             "$ref": "#/components/schemas/ReviewResult"
                         },
                         "description": "Evaluation results for each test set"
+                    },
+                    "custom_code": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Optimized Python code (meta-harness output). When present, metric should switch to custom_code type."
+                    },
+                    "type": {
+                        "enum": [
+                            "basic",
+                            "custom_prompt",
+                            "custom_code",
+                            "llm_judge"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "b44700c0a6443b40",
+                        "description": "Suggested metric type after optimization (custom_code if meta-harness produced code)\n\n* `basic` - Basic (Deprecated in favor of LLM Judge)\n* `custom_prompt` - Custom Prompt ( Deprecated in favor of LLM Judge)\n* `custom_code` - Custom Code\n* `llm_judge` - LLM Judge"
                     }
                 },
                 "required": [
@@ -58474,6 +58978,10 @@
                     "notify_daily_report_no_calls": {
                         "type": "boolean",
                         "description": "\nNotify daily report even if there are no calls\nExample: `true` or `false`\n"
+                    },
+                    "daily_report_ai_summary_enabled": {
+                        "type": "boolean",
+                        "description": "\nReplace the default daily report data dump with an AI-narrated Top Issues\nsection in Slack and email. Off by default. When on, Slack also exposes a\n\"Show more\" button that opens a modal with the legacy detail sections.\nExample: `true` or `false`\n"
                     },
                     "notify_cron_failure": {
                         "type": "boolean",
@@ -59152,6 +59660,15 @@
                         ],
                         "readOnly": true,
                         "description": "Run Execution Type"
+                    },
+                    "run_settings": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Snapshot of the override-relevant request payload (personality_ids, frequency, concurrency_limit, connection-specific overrides, etc.)."
                     },
                     "created_at": {
                         "type": "string",
@@ -59948,7 +60465,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional actions object. Use this alongside `instructions` for structured validation of your conditional actions data.\n\nIMPORTANT: `instructions` must still be provided — pass the JSON-stringified version of this object as the `instructions` value. This field validates the structure; `instructions` stores it.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -60001,14 +60518,15 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -60512,7 +61030,7 @@
                     },
                     "instructions": {
                         "type": "string",
-                        "description": "\nScenario Instructions - format depends on scenario_type:\n\n**For scenario_type=\"instruction\":**\nPlain text instructions describing the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nJSON-formatted string (stringified) with role and conditions:\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi there, I need to check on my appointment <break time=\\\"1.5s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"contains \\\"appointment\\\" OR contains \\\"schedule\\\" OR contains \\\"help\\\"\",\n      \"action\": \"Yes, I have an appointment scheduled for tomorrow [laughter] [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"contains \\\"confirm\\\" OR contains \\\"thank\\\" OR contains \\\"anything else\\\"\",\n      \"action\": \"No that's all, thank you so much <break time=\\\"1.0s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": 2,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Structure:**\n- `role`: Personality/role description\n- `conditions`: Array with id (0,1,2...), condition (FIRST_MESSAGE | contains operators with OR/AND | condition id reference), action (text with SSML `<break time=\"1.5s\" />` and markers `[laughter]` or `<endcall />`), type (standard | action_followup), fixed_message (boolean)\n"
+                        "description": "\nScenario Instructions - format depends on scenario_type:\n\n**For scenario_type=\"instruction\":**\nPlain text describing the caller's behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you must send via this field, pass a JSON-formatted string with role and conditions:\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi there, I need to check on my appointment <break time=\\\"1.5s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"contains \\\"appointment\\\" OR contains \\\"schedule\\\" OR contains \\\"help\\\"\",\n      \"action\": \"Yes, I have an appointment scheduled for tomorrow [laughter] [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"contains \\\"confirm\\\" OR contains \\\"thank\\\" OR contains \\\"anything else\\\"\",\n      \"action\": \"No that's all, thank you so much <break time=\\\"1.0s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": 2,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Structure:**\n- `role`: Personality/role description\n- `conditions`: Array with id (0,1,2...), condition (FIRST_MESSAGE | contains operators with OR/AND | condition id reference), action (text with SSML `<break time=\"1.5s\" />` and markers `[laughter]` or `<endcall />`), type (standard | action_followup), fixed_message (boolean)\n"
                     },
                     "scenario_language": {
                         "enum": [
@@ -60554,6 +61072,7 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
@@ -60564,8 +61083,8 @@
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "71f88caf8da6d93e",
-                        "description": "Language code for the scenario (ISO language code)\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "description": "Language code for the scenario (ISO language code)\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -60784,7 +61303,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional actions object. Use this alongside `instructions` for structured validation of your conditional actions data.\n\nIMPORTANT: `instructions` must still be provided — pass the JSON-stringified version of this object as the `instructions` value. This field validates the structure; `instructions` stores it.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -60837,14 +61356,15 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -60966,7 +61486,7 @@
                     },
                     "agent": {
                         "type": "integer",
-                        "description": "Scope the permission check to a specific agent. Either this or `project` is required."
+                        "description": "Scopes the permission check to a specific agent (either this or `project` is required). When provided, also overrides each evaluator's `agent` to this ID."
                     },
                     "project": {
                         "type": "integer",
@@ -62126,7 +62646,7 @@
                     },
                     "instructions": {
                         "type": "string",
-                        "description": "\nScenario Instructions - the format depends on the scenario_type:\n\n**For scenario_type=\"instruction\":**\nProvide plain text instructions that describe the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nProvide a JSON-formatted string (stringified) with the following structure:\n\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi there, I need to check on my appointment <break time=\\\"1.5s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"contains \\\"appointment\\\" OR contains \\\"schedule\\\" OR contains \\\"help\\\"\",\n      \"action\": \"Yes, I have an appointment scheduled for tomorrow [laughter] [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"contains \\\"confirm\\\" OR contains \\\"thank\\\" OR contains \\\"anything else\\\"\",\n      \"action\": \"No that's all, thank you so much <break time=\\\"1.0s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": 2,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Important:** The JSON must be stringified (use JSON.dumps in Python or JSON.stringify in JavaScript) before sending.\n\n**Structure Details:**\n\n- **`role`** (string): Personality/role description for the scenario actor\n\n- **`conditions`** (array): Ordered list of conditional actions that define the conversation flow\n\n  **Each condition object has:**\n  - **`id`** (integer): Unique sequential identifier (0, 1, 2, 3...)\n\n  - **`condition`** (string | integer): The trigger that activates this action\n    - `\"FIRST_MESSAGE\"` - Triggers at conversation start (use for id: 0)\n    - `\"contains \\\"keyword\\\"\"` - Triggers when agent's response contains keyword(s)\n    - Use `OR` for multiple keywords: `\"contains \\\"word1\\\" OR contains \\\"word2\\\"`\n    - Use `AND` for all keywords: `\"contains \\\"word1\\\" AND contains \\\"word2\\\"`\n    - Integer (e.g., `2`) - References another condition's id for sequential followup actions\n\n  - **`action`** (string): What the scenario actor says or does\n    - **SSML pause tags:** `<break time=\"1.5s\" />` or `<break time=\"1.0s\" />`\n    - **Emotion markers:** `[laughter]`, `[sigh]`, etc. (can repeat like `[laughter] [laughter]`)\n    - **Special actions:** `<endcall />` to end the call\n\n  - **`type`** (string): Either `\"standard\"` (normal response) or `\"action_followup\"` (triggers after another condition)\n\n  - **`fixed_message`** (boolean): Set to `true` for fixed responses, `false` for dynamic\n\n**Usage Tips:**\n- Always start with `id: 0` and `condition: \"FIRST_MESSAGE\"`\n- Use the last condition to trigger `<endcall />` for clean call termination\n- Combine SSML tags and emotion markers naturally: `\"Great <break time=\\\"1.5s\\\" /> [laughter] [laughter]\"`\n- The contains operators are case-insensitive\n"
+                        "description": "\nScenario Instructions - the format depends on the scenario_type:\n\n**For scenario_type=\"instruction\":**\nProvide plain text instructions that describe the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you send via `instructions`, pass a JSON-formatted string with the following structure:\n\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi there, I need to check on my appointment <break time=\\\"1.5s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"contains \\\"appointment\\\" OR contains \\\"schedule\\\" OR contains \\\"help\\\"\",\n      \"action\": \"Yes, I have an appointment scheduled for tomorrow [laughter] [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"contains \\\"confirm\\\" OR contains \\\"thank\\\" OR contains \\\"anything else\\\"\",\n      \"action\": \"No that's all, thank you so much <break time=\\\"1.0s\\\" /> [laughter]\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": 2,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Note:** When sent via `instructions`, the value must be a JSON-formatted string (e.g. `JSON.stringify(...)` / `json.dumps(...)`). For new integrations, use the structured `conditional_actions` field below.\n\n**Structure Details:**\n\n- **`role`** (string): Personality/role description for the scenario actor\n\n- **`conditions`** (array): Ordered list of conditional actions that define the conversation flow\n\n  **Each condition object has:**\n  - **`id`** (integer): Unique sequential identifier (0, 1, 2, 3...)\n\n  - **`condition`** (string | integer): The trigger that activates this action\n    - `\"FIRST_MESSAGE\"` - Triggers at conversation start (use for id: 0)\n    - `\"contains \\\"keyword\\\"\"` - Triggers when agent's response contains keyword(s)\n    - Use `OR` for multiple keywords: `\"contains \\\"word1\\\" OR contains \\\"word2\\\"`\n    - Use `AND` for all keywords: `\"contains \\\"word1\\\" AND contains \\\"word2\\\"`\n    - Integer (e.g., `2`) - References another condition's id for sequential followup actions\n\n  - **`action`** (string): What the scenario actor says or does\n    - **SSML pause tags:** `<break time=\"1.5s\" />` or `<break time=\"1.0s\" />`\n    - **Emotion markers:** `[laughter]`, `[sigh]`, etc. (can repeat like `[laughter] [laughter]`)\n    - **Special actions:** `<endcall />` to end the call\n\n  - **`type`** (string): Either `\"standard\"` (normal response) or `\"action_followup\"` (triggers after another condition)\n\n  - **`fixed_message`** (boolean): Set to `true` for fixed responses, `false` for dynamic\n\n**Usage Tips:**\n- Always start with `id: 0` and `condition: \"FIRST_MESSAGE\"`\n- Use the last condition to trigger `<endcall />` for clean call termination\n- Combine SSML tags and emotion markers naturally: `\"Great <break time=\\\"1.5s\\\" /> [laughter] [laughter]\"`\n- The contains operators are case-insensitive\n"
                     },
                     "conditional_actions": {
                         "allOf": [
@@ -62134,7 +62654,7 @@
                                 "$ref": "#/components/schemas/ConditionalActions"
                             }
                         ],
-                        "description": "Structured conditional-actions payload — preferred over posting a stringified JSON via `instructions` for `scenario_type=\"conditional_actions\"`. When supplied, the backend converts this object to a JSON string and stores it in the scenario's `instructions` field automatically.\n\nUse either `conditional_actions` (structured) OR `instructions` (stringified JSON) — not both."
+                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both."
                     },
                     "expected_outcome_prompt": {
                         "type": "string",
@@ -62352,7 +62872,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional actions object. Use this alongside `instructions` for structured validation of your conditional actions data.\n\nIMPORTANT: `instructions` must still be provided — pass the JSON-stringified version of this object as the `instructions` value. This field validates the structure; `instructions` stores it.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -62407,14 +62927,15 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "type": "string",
@@ -62541,15 +63062,16 @@
                             "sv",
                             "th",
                             "tr",
+                            "tl",
                             "ta",
                             "te",
                             "uk",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "71f88caf8da6d93e",
+                        "x-spec-enum-id": "b822ad429c7b7fec",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -62649,12 +63171,13 @@
                             "trillet",
                             "cisco",
                             "genesys",
+                            "chirp",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "f6ef8a6c5a59cc33",
+                        "x-spec-enum-id": "43adf9cc06494c10",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -63645,57 +64168,6 @@
                     "project"
                 ]
             },
-            "ValidateAnnotationsRequest": {
-                "type": "object",
-                "properties": {
-                    "failed_reviews": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": {}
-                        },
-                        "description": "List of failed reviews with review_id, expected_value, actual_value, explanation"
-                    },
-                    "simplified_prompt": {
-                        "type": "string",
-                        "description": "The simplified prompt used during evaluation. If provided, will be used for validation instead of metric's original description."
-                    }
-                },
-                "required": [
-                    "failed_reviews"
-                ]
-            },
-            "ValidateAnnotationsResponse": {
-                "type": "object",
-                "properties": {
-                    "flagged_cases": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": {}
-                        }
-                    },
-                    "all_results": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": {}
-                        }
-                    },
-                    "total_validated": {
-                        "type": "integer"
-                    },
-                    "total_flagged": {
-                        "type": "integer"
-                    }
-                },
-                "required": [
-                    "all_results",
-                    "flagged_cases",
-                    "total_flagged",
-                    "total_validated"
-                ]
-            },
             "View": {
                 "type": "object",
                 "properties": {
@@ -63981,6 +64453,7 @@
                             "avg",
                             "min",
                             "max",
+                            "p50",
                             "p95",
                             "p99",
                             "",
@@ -63990,8 +64463,8 @@
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "ed5e96d16e4da01a",
-                        "description": "Aggregation function to apply (for bar charts)\n\n* `count` - Count\n* `sum` - Sum\n* `avg` - Average\n* `min` - Minimum\n* `max` - Maximum\n* `p95` - 95th Percentile\n* `p99` - 99th Percentile"
+                        "x-spec-enum-id": "be3fac57dbd138ef",
+                        "description": "Aggregation function to apply (for bar charts)\n\n* `count` - Count\n* `sum` - Sum\n* `avg` - Average\n* `min` - Minimum\n* `max` - Maximum\n* `p50` - 50th Percentile (Median)\n* `p95` - 95th Percentile\n* `p99` - 99th Percentile"
                     },
                     "group_by": {
                         "oneOf": [

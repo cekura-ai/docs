@@ -1,0 +1,211 @@
+---
+title: "Agents"
+description: "Create, configure, and manage voice AI agents"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+<Note>
+Setup steps and authentication are in the [Overview](/cli-sdk/overview). This page focuses on the agent resource itself.
+</Note>
+
+An **agent** is the AI voice assistant under test. It links to a provider (Vapi, Retell, ElevenLabs, LiveKit, Pipecat, or a custom integration), a system prompt, mock tools, a knowledge base, and a set of personalities. Most evaluation workflows start by creating or selecting an agent.
+
+## Create
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura agents create \
+      --project-id 742 \
+      --name "Support Bot" \
+      --description "Inbound customer support agent" \
+      --provider vapi \
+      --vapi-assistant-id asst_abc123
+    ```
+
+    For complex configs, write a JSON file and pass it:
+
+    ```bash
+    cekura agents create --from-file agent.json
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    from cekura import Cekura
+
+    client = Cekura()
+
+    agent = client.agents.create(
+        project=742,
+        agent_name="Support Bot",
+        description="Inbound customer support agent",
+        provider="vapi",
+        vapi_assistant_id="asst_abc123",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## List, get, update
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    # List agents in a project
+    cekura agents list --project-id 742
+
+    # Inspect one
+    cekura agents get 123
+
+    # Patch fields inline
+    cekura agents update 123 --json '{"description": "v2 prompt rolled out"}'
+
+    # Or from a file
+    cekura agents update 123 --from-file patch.json
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    # List
+    agents = client.agents.list(project_id=742)
+
+    # Fetch one
+    detail = client.agents.get(agent_id=123)
+
+    # Partial update
+    client.agents.update(
+        agent_id=123,
+        description="v2 prompt rolled out",
+    )
+    ```
+
+    `replace()` performs a full PUT instead of a PATCH — use it when you want to overwrite the entire agent definition.
+  </Tab>
+</Tabs>
+
+## Mock tools
+
+Mock tools let evaluations run without hitting your real backend.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    # List existing tools
+    cekura agents tools-list 123
+
+    # Add a tool
+    cekura agents tool-create 123 --from-file booking_tool.json
+
+    # Update / remove
+    cekura agents tool-update 123 book_appointment --from-file new.json
+    cekura agents tool-destroy 123 book_appointment
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    # List
+    tools = client.agents.tools_list(123)
+
+    # Create
+    client.agents.tools_create(
+        agent_id=123,
+        name="book_appointment",
+        description="Books an appointment for the caller",
+        parameters={"date": "string", "time": "string"},
+        mock_response={"confirmation_id": "ABC123"},
+    )
+
+    # Update by tool name
+    client.agents.tool_update(
+        123, tool_name="book_appointment", mock_response={...},
+    )
+
+    # Remove
+    client.agents.tool_destroy(123, tool_name="book_appointment")
+    ```
+  </Tab>
+</Tabs>
+
+## Knowledge base
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura agents upload-knowledge-base 123 --file ./policies.pdf
+    cekura agents get-knowledge-base 123
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    with open("policies.pdf", "rb") as f:
+        client.agents.upload_knowledge_base(123, file=f)
+
+    kb = client.agents.get_knowledge_base(123)
+    ```
+  </Tab>
+</Tabs>
+
+## Personalities
+
+Personalities apply across an agent's evaluation runs (e.g. "interruptive", "soft-spoken").
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura personalities enable-for-project 742 --personalities 3,29
+    cekura personalities disable-for-project 742 --personalities 3
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.agents.enable_personalities(123, personalities=[3, 29])
+    client.agents.disable_personalities(123, personalities=[3])
+    ```
+  </Tab>
+</Tabs>
+
+## Duplicate
+
+Quickly fork an agent for A/B testing or a new prompt variant:
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura agents duplicate 123
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.agents.duplicate(agent_id=123)
+    ```
+  </Tab>
+</Tabs>
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Evaluators" icon="vial" href="/cli-sdk/evaluators">
+    Scenarios, test profiles, personalities — the test inputs that run against an agent.
+  </Card>
+
+  <Card title="Runs & Results" icon="play" href="/cli-sdk/runs">
+    Trigger an evaluation against the agent and inspect the outcome.
+  </Card>
+
+  <Card title="Agents API" icon="book" href="/api-reference">
+    Full field reference for agent payloads.
+  </Card>
+
+  <Card title="Agent setup guide" icon="robot" href="/documentation/key-concepts/agents/Agent_Setup_Guide">
+    Concepts, provider integrations, and best practices.
+  </Card>
+</CardGroup>

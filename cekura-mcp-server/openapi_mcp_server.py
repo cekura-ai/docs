@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from contextvars import ContextVar
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import httpx
@@ -361,6 +362,114 @@ async def test_simple_tool(message: str) -> str:
     return f"Hello from Cekura MCP Server! You said: {message}"
 
 
+def _claude_jsonl_to_cekura_transcript(jsonl_text: str) -> List[Dict[str, object]]:
+    """Convert a Claude Code session transcript (JSONL) to the cekura transcript
+    shape: a list of {role, content, start_time, end_time} entries. Roles are
+    "Testing Agent" (the human user) and "Main Agent" (Claude). Times are
+    seconds since the first entry — the Cekura observe endpoint requires both."""
+    raw: List[Dict[str, object]] = []  # {ts: datetime|None, role, content}
+    for line in jsonl_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        msg_type = entry.get("type") or entry.get("role")
+        if msg_type in ("user", "human"):
+            role = "Testing Agent"
+        elif msg_type == "assistant":
+            role = "Main Agent"
+        else:
+            continue
+
+        # Claude Code's transcript wraps the message under entry["message"]; older
+        # / simpler producers may put content at the top level.
+        content = entry.get("content")
+        if content is None:
+            message = entry.get("message")
+            if isinstance(message, dict):
+                content = message.get("content")
+        if isinstance(content, str):
+            text = content
+        elif isinstance(content, list):
+            parts: List[str] = []
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                btype = block.get("type")
+                if btype == "text":
+                    parts.append(block.get("text", ""))
+                elif btype == "tool_use":
+                    parts.append(f"[tool_use:{block.get('name', '?')}]")
+                elif btype == "tool_result":
+                    parts.append("[tool_result]")
+            text = "\n".join(p for p in parts if p)
+        else:
+            continue
+
+        text = text.strip()
+        if not text:
+            continue
+
+        ts_raw = entry.get("timestamp")
+        ts: object = None
+        if isinstance(ts_raw, str) and ts_raw:
+            try:
+                ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+            except ValueError:
+                ts = None
+        raw.append({"ts": ts, "role": role, "content": text})
+
+    if not raw:
+        return []
+
+    # Anchor t0 at the first parseable timestamp; entries with no timestamp are
+    # placed sequentially after the most recent timed entry.
+    t0 = next((r["ts"] for r in raw if r["ts"] is not None), None)
+    transcript: List[Dict[str, object]] = []
+    for i, r in enumerate(raw):
+        if r["ts"] is not None and t0 is not None:
+            start = (r["ts"] - t0).total_seconds()
+        else:
+            start = float(i)
+        # end_time = next entry's start (or start + 1s for the last item).
+        # Avoid zero-duration ranges, which the upstream may reject.
+        if i + 1 < len(raw) and raw[i + 1]["ts"] is not None and t0 is not None:
+            end = (raw[i + 1]["ts"] - t0).total_seconds()
+        else:
+            end = start + 1.0
+        if end <= start:
+            end = start + 0.1
+        transcript.append({
+            "role": r["role"],
+            "content": r["content"],
+            "start_time": start,
+            "end_time": end,
+        })
+
+    # Enforce per-role monotonicity: the upstream observe serializer rejects any
+    # entry whose start_time or end_time is earlier than the previous entry of
+    # the same role. Claude Code JSONL timestamps can have small inversions
+    # (async recording, ms rounding), so clamp to the running max per role.
+    role_last: Dict[str, Dict[str, float]] = {}
+    for entry in transcript:
+        role = entry["role"]
+        last = role_last.get(role)
+        if last is not None:
+            if entry["start_time"] < last["start"]:
+                entry["start_time"] = last["start"]
+            if entry["end_time"] < last["end"]:
+                entry["end_time"] = last["end"]
+        if entry["end_time"] <= entry["start_time"]:
+            entry["end_time"] = entry["start_time"] + 0.1
+        role_last[role] = {"start": entry["start_time"], "end": entry["end_time"]}
+
+    return transcript
+
+
 def get_request_credential() -> tuple[str, str]:
     """Return (credential, type) from request context. Type is 'bearer' or 'api_key'."""
     bearer = request_bearer_token.get()
@@ -409,11 +518,20 @@ def setup_dynamic_tool_handlers():
                 base_url = request_base_url.get() or server_config.base_url
                 user_api_client = create_client(base_url, credential, credential_type=credential_type)
 
+                # Forward the resolved per-property types so the HTTP client can respect
+                # `type: string` fields (e.g. scenarios.instructions, which carries a
+                # stringified JSON body) instead of auto-parsing JSON-looking strings.
+                schema_properties = tool_data['schema'].get('properties', {}) or {}
+                property_types = {
+                    k: v.get('type') for k, v in schema_properties.items() if isinstance(v, dict)
+                }
+
                 result = await user_api_client.execute_request(
                     method=op.method,
                     path=op.path,
                     params=arguments,
-                    body=op.request_body
+                    body=op.request_body,
+                    property_types=property_types,
                 )
 
                 await user_api_client.close()
@@ -451,21 +569,45 @@ def main():
 
     logger.info(f"Server initialized successfully. Running on http://{args.host}:{args.port}/mcp")
 
+    # Paths that intentionally bypass auth — health probes and OAuth
+    # discovery documents. Discovery URLs must be reachable unauthenticated
+    # so clients can find the authorization server before they have a token.
+    NO_AUTH_PATHS = {
+        "/mcp/health",
+        "/mcp/healthz",
+        "/mcp/.well-known/oauth-protected-resource",
+        "/mcp/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-protected-resource",
+        "/.well-known/oauth-authorization-server",
+    }
+
+    # WWW-Authenticate value used on 401 responses. Points clients at the
+    # canonical (ALB-reachable) protected-resource metadata URL per RFC 9728.
+    WWW_AUTH_HEADER = (
+        f'Bearer resource_metadata="{MCP_SERVER_URL}/.well-known/oauth-protected-resource", '
+        f'error="invalid_token"'
+    )
+
     class CredentialMiddleware(BaseHTTPMiddleware):
         async def dispatch(self, request, call_next):
-            if request.url.path in ["/mcp/health", "/mcp/healthz"]:
+            path = request.url.path
+            if path in NO_AUTH_PATHS:
                 return await call_next(request)
 
             # Bearer token — OAuth web users or agent/CLI JWT passthrough
+            has_bearer = False
             auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
             if auth_header and auth_header.lower().startswith('bearer '):
                 request_bearer_token.set(auth_header[7:])
+                has_bearer = True
                 logger.debug("Bearer token credential set for request")
 
             # API key header — legacy mcp-remote / Claude Desktop
+            has_api_key = False
             api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
             if api_key:
                 request_api_key.set(api_key)
+                has_api_key = True
                 logger.debug("API key credential set for request")
 
             # Base URL override — only honoured when ALLOW_BASE_URL_OVERRIDE=true (dev/staging)
@@ -473,6 +615,20 @@ def main():
                 base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
                 if base_url_override:
                     request_base_url.set(base_url_override.rstrip("/"))
+
+            # Enforce auth at the transport layer for MCP traffic. Without this,
+            # FastMCP's `initialize` and `tools/list` succeed unauthenticated,
+            # which makes Claude Desktop's connector flow conclude "no auth
+            # required" and skip the OAuth handshake entirely.
+            if path.startswith("/mcp") and not has_bearer and not has_api_key:
+                return JSONResponse(
+                    {
+                        "error": "unauthorized",
+                        "error_description": "Authenticate via OAuth (Bearer) or X-CEKURA-API-KEY",
+                    },
+                    status_code=401,
+                    headers={"WWW-Authenticate": WWW_AUTH_HEADER},
+                )
 
             return await call_next(request)
 
@@ -482,6 +638,87 @@ def main():
             "service": "cekura-mcp-server",
             "tools_registered": len(operations_registry)
         })
+
+    async def monitoring_session_create(request):
+        # Forwards the Claude Code session transcript to the Cekura observability
+        # ingestion endpoint (POST /observability/v1/observe/) as a CallLog.
+        # Agent ID + API key are read from env for now — eventually these should
+        # come from the request (per-user credentials, per-skill agent mapping).
+        try:
+            payload = await request.json()
+        except Exception as e:
+            return JSONResponse({"error": f"invalid JSON body: {e}"}, status_code=400)
+
+        session_id = payload.get("session_id")
+        skill = payload.get("skill")
+        transcript_jsonl = payload.get("transcript_jsonl")
+
+        if not isinstance(session_id, str) or not session_id:
+            return JSONResponse({"error": "missing or invalid 'session_id'"}, status_code=400)
+        if not isinstance(skill, str) or not skill:
+            return JSONResponse({"error": "missing or invalid 'skill'"}, status_code=400)
+        if not isinstance(transcript_jsonl, str):
+            return JSONResponse({"error": "missing or invalid 'transcript_jsonl' (expected string)"}, status_code=400)
+
+        agent_id_raw = os.environ.get("CEKURA_OBSERVE_AGENT_ID", "").strip()
+        if not agent_id_raw:
+            return JSONResponse({"error": "CEKURA_OBSERVE_AGENT_ID is not configured on the server"}, status_code=500)
+        try:
+            agent_id = int(agent_id_raw)
+        except ValueError:
+            return JSONResponse({"error": f"CEKURA_OBSERVE_AGENT_ID must be an integer, got {agent_id_raw!r}"}, status_code=500)
+
+        api_key = os.environ.get("CEKURA_OBSERVE_API_KEY") or os.environ.get("CEKURA_API_KEY")
+        if not api_key:
+            return JSONResponse({"error": "CEKURA_OBSERVE_API_KEY (or CEKURA_API_KEY) is not configured on the server"}, status_code=500)
+
+        transcript = _claude_jsonl_to_cekura_transcript(transcript_jsonl)
+        if not transcript:
+            logger.info(f"observe: session {session_id} produced empty transcript after conversion — skipping")
+            return JSONResponse({"status": "skipped", "reason": "empty transcript after conversion"})
+
+        now = datetime.now(timezone.utc)
+        # Suffix the call_id with a per-event timestamp so repeated Stop-hook
+        # snapshots for the same Claude session don't collide on the backend.
+        call_id = f"claude-{session_id}-{int(now.timestamp())}"[:100]
+
+        body = {
+            "agent": agent_id,
+            "call_id": call_id,
+            "transcript_type": "cekura",
+            "transcript_json": transcript,
+            "timestamp": now.isoformat(),
+            "metadata": {
+                "source": "claude-code",
+                "skill": skill,
+                "claude_session_id": session_id,
+            },
+        }
+
+        observe_url = f"{server_config.base_url}/observability/v1/observe/"
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(15.0, connect=5.0)) as client:
+                resp = await client.post(
+                    observe_url,
+                    headers={
+                        "Content-Type": "application/json",
+                        "X-CEKURA-API-KEY": api_key,
+                    },
+                    json=body,
+                )
+        except httpx.RequestError as e:
+            logger.error(f"observe: network error for session {session_id}: {e}")
+            return JSONResponse({"error": f"observe request failed: {e}"}, status_code=502)
+
+        if resp.status_code >= 400:
+            logger.error(f"observe: upstream returned {resp.status_code} for session {session_id}: {resp.text[:500]}")
+            return JSONResponse(
+                {"error": "observe upstream rejected request", "status": resp.status_code, "body": resp.text[:500]},
+                status_code=502,
+            )
+
+        logger.info(f"observe: forwarded session {session_id} as call_id={call_id} (skill={skill}, turns={len(transcript)})")
+        return JSONResponse({"status": "ok", "call_id": call_id, "upstream_status": resp.status_code})
 
     async def oauth_protected_resource(request):
         # RFC 9728 — resource server advertises its authorization server
@@ -503,10 +740,17 @@ def main():
 
     app = mcp.streamable_http_app()
 
-    app.router.routes.insert(0, Route("/.well-known/oauth-protected-resource", oauth_protected_resource))
-    app.router.routes.insert(1, Route("/.well-known/oauth-authorization-server", oauth_as_metadata))
-    app.router.routes.insert(2, Route("/mcp/health", health_check))
-    app.router.routes.insert(3, Route("/mcp/healthz", health_check))
+    # Register OAuth discovery routes under both /mcp/.well-known/... (canonical,
+    # reachable through the prod ALB which only forwards /mcp/*) and the root
+    # /.well-known/... form (works for direct-port access in dev and is robust
+    # against any future ALB rule broadening).
+    app.router.routes.insert(0, Route("/mcp/.well-known/oauth-protected-resource", oauth_protected_resource))
+    app.router.routes.insert(1, Route("/mcp/.well-known/oauth-authorization-server", oauth_as_metadata))
+    app.router.routes.insert(2, Route("/.well-known/oauth-protected-resource", oauth_protected_resource))
+    app.router.routes.insert(3, Route("/.well-known/oauth-authorization-server", oauth_as_metadata))
+    app.router.routes.insert(4, Route("/mcp/health", health_check))
+    app.router.routes.insert(5, Route("/mcp/healthz", health_check))
+    app.router.routes.insert(6, Route("/mcp/monitoring/sessions", monitoring_session_create, methods=["POST"]))
 
     app.add_middleware(CredentialMiddleware)
     logger.info("Credential middleware added (API key + Bearer token support)")

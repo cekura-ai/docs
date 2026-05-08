@@ -184,7 +184,7 @@ Per-user install in most cases — share the install command in your team's onbo
 
 ### How do I cleanly reinstall the Cekura plugin?
 
-If `/upgrade-skills` puts you in a stuck state — usually after a structural change to the marketplace — run all four commands in order:
+If `/upgrade-skills` reports stale plugin entries, or `/plugin install` fails with "Source path does not exist", run these 4 commands in order in any Claude Code session:
 
 ```
 /plugin marketplace remove cekura-skills
@@ -193,28 +193,15 @@ If `/upgrade-skills` puts you in a stuck state — usually after a structural ch
 /plugin install cekura@cekura-skills
 ```
 
-Step 3 is the critical one. It forces Claude Code to re-read the marketplace.json from disk; without it, step 4 may try to install against stale parsed metadata and fail with a "Source path does not exist" error.
+Step 3 is the critical one — it forces Claude Code to re-read the marketplace manifest. After step 4, `claude plugin list` should show one `cekura@cekura-skills` entry and all 14 slash commands resolve under `cekura:*`.
 
-After step 4, `claude plugin list` should show one `cekura@cekura-skills` entry, and all 14 slash commands resolve under `cekura:*`.
+### `/plugin install` errors with "Source path does not exist" — what's wrong?
 
-### `/plugin install` errors with "Source path does not exist: …/plugins/cekura" — what's wrong?
-
-Claude Code is using cached marketplace metadata that points at an older repo layout. Re-run `/plugin marketplace update cekura-skills`, then retry the install. If the error persists, fully restart Claude Code (close and reopen the session), then redo `/plugin marketplace add … → update → install`.
+Claude Code is using cached marketplace metadata. Re-run `/plugin marketplace update cekura-skills`, then retry the install. If the error persists, fully restart Claude Code (close and reopen the session), then redo `/plugin marketplace add … → update → install`.
 
 ### Why didn't `/plugin marketplace add` install the plugin automatically?
 
 Marketplaces and plugins are separate concerns in Claude Code. `marketplace add` registers where to find plugins; `plugin install <name>@<marketplace>` installs a specific plugin from a registered marketplace. Adding a marketplace doesn't auto-install everything in it.
-
-### I have stale cache dirs from older plugin versions — should I clean them up?
-
-Yes, safe to remove. After upgrading from v0.4.x (which shipped 3 separate plugins) to v0.5.0+ (which merged them into a single `cekura` plugin), you may see leftover `cekura-evals/` and `cekura-metrics/` dirs under `~/.claude/plugins/cache/cekura-skills/`. They're harmless but take up a few MB:
-
-```bash
-rm -rf ~/.claude/plugins/cache/cekura-skills/cekura-evals
-rm -rf ~/.claude/plugins/cache/cekura-skills/cekura-metrics
-```
-
-You can also delete older versioned dirs of the active plugin (e.g. `cekura/0.2.0/`, `cekura/0.3.0/`) — Claude Code only uses the version recorded in `~/.claude/plugins/installed_plugins.json`.
 
 ### Where does the Cekura plugin live on disk?
 
@@ -222,7 +209,7 @@ Two places:
 - **Marketplace source** (the git clone): `~/.claude/plugins/marketplaces/cekura-skills/`
 - **Active plugin cache** (what Claude Code serves at runtime): `~/.claude/plugins/cache/cekura-skills/cekura/<version>/cekura/` — contains `skills/`, `commands/`, `agents/`, `hooks/`.
 
-`git pull` on the source dir alone doesn't refresh the cache — you have to run `/plugin marketplace update cekura-skills` (or reinstall) to rebuild it.
+`git pull` on the source dir alone doesn't refresh the cache — run `/plugin marketplace update cekura-skills` (or reinstall) to rebuild it.
 
 ## Links
 

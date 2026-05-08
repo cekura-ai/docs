@@ -14,16 +14,19 @@ Cekura skills give your AI coding agent the playbook for designing evaluators, c
 
 ## What you get
 
-Six skills, scoped to specific Cekura workflows:
+Nine skills, scoped to specific Cekura workflows:
 
 | Skill | Activates on |
 |---|---|
 | `cekura-coordinator` | "What can Cekura do?" — routes to the right skill |
 | `cekura-onboarding` | "Get started with Cekura" — full platform walkthrough |
 | `cekura-create-agent` | "Connect my voice agent to Cekura" |
+| `cekura-self-improving-agent` | "Improve my agent / auto-tune from eval results" |
 | `cekura-metric-design` | "Create a metric / measure call quality" |
 | `cekura-metric-improvement` | "Improve a metric / fix metric accuracy" |
+| `cekura-predefined-metrics` | "What predefined metrics are available / which built-in metrics should I use" |
 | `cekura-eval-design` | "Design test scenarios for my voice agent" |
+| `cekura-fixing-prod-issues` | "Fix a production call bug / reproduce and test a fix before raising a PR" |
 
 <Note>
 **Best with MCP, but optional.** Skills work standalone as a knowledge layer (workflows, design patterns, anti-patterns) and pair best with the Cekura MCP server, which lets the agent perform platform actions for you. Without MCP, the agent walks you through direct API calls or dashboard steps. See [MCP overview](/mcp/overview) for setup.
@@ -55,20 +58,20 @@ Six skills, scoped to specific Cekura workflows:
     1. Run `/plugins` inside a Claude Code session
     2. **Marketplaces** tab → **Add Marketplace**
     3. Paste `https://github.com/cekura-ai/cekura-skills.git` and confirm
-    4. **Discover** tab → search `cekura` → install all three plugins
+    4. **Discover** tab → search `cekura` → install the `cekura` plugin
     5. Restart your Claude Code session
     6. Run `/setup-mcp` to configure the MCP server
 
     **VS Code:**
     1. Open the Claude Code chat panel
     2. **Manage Plugins** → **Marketplaces** → paste the same URL → **Add**
-    3. **Plugins** tab → install all three `cekura` plugins
+    3. **Plugins** tab → install the `cekura` plugin
     4. Restart VS Code, then run `/setup-mcp`
   </Tab>
 </Tabs>
 
 <Note>
-**Claude Code users:** `npx skills add` installs the **skills only** — even on Claude Code. You won't get slash commands (`/setup-mcp`, `/upgrade-skills`, `/report-bug`, `/create-metric`, `/list-metrics`, `/evaluate-calls`, `/improve-metric`, `/autogen-eval`, `/manual-create-update-eval`, `/list-evals`, `/run-evals`, `/eval-results`), auto-configured MCP wiring, or the MCP-failure detection hook. Use the marketplace install if you want those.
+**Claude Code users:** `npx skills add` installs the **skills only** — even on Claude Code. You won't get the 14 slash commands (`/cekura-onboarding`, `/setup-mcp`, `/upgrade-skills`, `/report-bug`, `/create-metric`, `/list-metrics`, `/evaluate-calls`, `/improve-metric`, `/autogen-eval`, `/manual-create-update-eval`, `/list-evals`, `/run-evals`, `/eval-results`, `/cekura-report`), auto-configured MCP wiring, or the MCP-failure detection hook. Use the marketplace install if you want those.
 </Note>
 
 ## Update / refresh
@@ -178,6 +181,48 @@ npx skills add <your-org>/cekura-skills
 ### Are skills shared across my team?
 
 Per-user install in most cases — share the install command in your team's onboarding doc. The Claude API custom-skills upload path supports workspace-wide sharing once a skill is uploaded.
+
+### How do I cleanly reinstall the Cekura plugin?
+
+If `/upgrade-skills` puts you in a stuck state — usually after a structural change to the marketplace — run all four commands in order:
+
+```
+/plugin marketplace remove cekura-skills
+/plugin marketplace add cekura-ai/cekura-skills
+/plugin marketplace update cekura-skills
+/plugin install cekura@cekura-skills
+```
+
+Step 3 is the critical one. It forces Claude Code to re-read the marketplace.json from disk; without it, step 4 may try to install against stale parsed metadata and fail with a "Source path does not exist" error.
+
+After step 4, `claude plugin list` should show one `cekura@cekura-skills` entry, and all 14 slash commands resolve under `cekura:*`.
+
+### `/plugin install` errors with "Source path does not exist: …/plugins/cekura" — what's wrong?
+
+Claude Code is using cached marketplace metadata that points at an older repo layout. Re-run `/plugin marketplace update cekura-skills`, then retry the install. If the error persists, fully restart Claude Code (close and reopen the session), then redo `/plugin marketplace add … → update → install`.
+
+### Why didn't `/plugin marketplace add` install the plugin automatically?
+
+Marketplaces and plugins are separate concerns in Claude Code. `marketplace add` registers where to find plugins; `plugin install <name>@<marketplace>` installs a specific plugin from a registered marketplace. Adding a marketplace doesn't auto-install everything in it.
+
+### I have stale cache dirs from older plugin versions — should I clean them up?
+
+Yes, safe to remove. After upgrading from v0.4.x (which shipped 3 separate plugins) to v0.5.0+ (which merged them into a single `cekura` plugin), you may see leftover `cekura-evals/` and `cekura-metrics/` dirs under `~/.claude/plugins/cache/cekura-skills/`. They're harmless but take up a few MB:
+
+```bash
+rm -rf ~/.claude/plugins/cache/cekura-skills/cekura-evals
+rm -rf ~/.claude/plugins/cache/cekura-skills/cekura-metrics
+```
+
+You can also delete older versioned dirs of the active plugin (e.g. `cekura/0.2.0/`, `cekura/0.3.0/`) — Claude Code only uses the version recorded in `~/.claude/plugins/installed_plugins.json`.
+
+### Where does the Cekura plugin live on disk?
+
+Two places:
+- **Marketplace source** (the git clone): `~/.claude/plugins/marketplaces/cekura-skills/`
+- **Active plugin cache** (what Claude Code serves at runtime): `~/.claude/plugins/cache/cekura-skills/cekura/<version>/cekura/` — contains `skills/`, `commands/`, `agents/`, `hooks/`.
+
+`git pull` on the source dir alone doesn't refresh the cache — you have to run `/plugin marketplace update cekura-skills` (or reinstall) to rebuild it.
 
 ## Links
 

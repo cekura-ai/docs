@@ -26,11 +26,12 @@ class CekuraAPIClient:
         path: str,
         params: Optional[Dict[str, Any]] = None,
         body: Optional[Dict[str, Any]] = None,
+        property_types: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
         params = params or {}
         resolved_path, query_params = self._prepare_request(path, params)
         url = f"{self.base_url}{resolved_path}"
-        request_body = self._build_request_body(body, params) if body else None
+        request_body = self._build_request_body(body, params, property_types) if body else None
 
         try:
             response = await self.client.request(
@@ -67,12 +68,18 @@ class CekuraAPIClient:
 
         return resolved_path, query_params
 
-    def _build_request_body(self, body_schema: Optional[Dict[str, Any]], params: Dict[str, Any]) -> Any:
+    def _build_request_body(
+        self,
+        body_schema: Optional[Dict[str, Any]],
+        params: Dict[str, Any],
+        property_types: Optional[Dict[str, str]] = None,
+    ) -> Any:
+        types = property_types or {}
         if not body_schema:
             body = {}
             for k, v in params.items():
                 if v is not None:
-                    body[k] = self._parse_json_field(k, v)
+                    body[k] = self._parse_json_field(k, v, types.get(k))
             return body
 
         # Detect top-level array schemas (e.g. bulk_create endpoints).
@@ -82,29 +89,50 @@ class CekuraAPIClient:
         json_schema = content.get("application/json", {}).get("schema", {})
         if json_schema.get("type") == "array" and "items" in params:
             raw = params["items"]
-            return self._parse_json_field("items", raw) if isinstance(raw, str) else raw
+            return self._parse_json_field("items", raw, "array") if isinstance(raw, str) else raw
 
         body = {}
         for k, v in params.items():
             if v is not None:
-                body[k] = self._parse_json_field(k, v)
+                body[k] = self._parse_json_field(k, v, types.get(k))
         return body
 
-    def _parse_json_field(self, key: str, value: Any) -> Any:
+    # Schemas with a declared primitive type must never have their value coerced —
+    # the caller may legitimately send a JSON-looking literal string (e.g.
+    # scenarios.instructions, which is `type: string` and stores stringified JSON
+    # verbatim).
+    _PRIMITIVE_TYPES = ("string", "integer", "number", "boolean")
+
+    # Body fields whose schemas are too loose to recognise by type alone
+    # (oneOf with mixed types, allOf, untyped JSONField). Recovery uses name
+    # heuristics here.
+    _LEGACY_JSON_FIELD_PATTERNS = (
+        '_json', 'metadata', 'dynamic_variables', 'context', '_data', 'information',
+    )
+
+    def _parse_json_field(self, key: str, value: Any, target_type: Optional[str] = None) -> Any:
         if not isinstance(value, str):
             return value
 
-        # Auto-parse any string that looks like a JSON array or object.
-        # Claude sometimes serializes array/object arguments as strings even when the
-        # schema says type:array/object. Safely try to recover here.
+        if target_type in self._PRIMITIVE_TYPES:
+            return value
+
+        # Auto-recover when the value looks like a JSON array/object. Claude sometimes
+        # serializes container args as strings even when the schema says
+        # type:array/object. Only accept the parse when it actually produces the
+        # shape the schema asked for — otherwise the original string is safer.
         if value.startswith(('[', '{')):
             try:
-                return json.loads(value)
+                parsed = json.loads(value)
             except (json.JSONDecodeError, TypeError):
                 return value
+            if target_type == "array" and not isinstance(parsed, list):
+                return value
+            if target_type == "object" and not isinstance(parsed, dict):
+                return value
+            return parsed
 
-        json_field_patterns = ['_json', 'metadata', 'dynamic_variables', 'context', '_data', 'information']
-        if any(pattern in key.lower() for pattern in json_field_patterns):
+        if any(pattern in key.lower() for pattern in self._LEGACY_JSON_FIELD_PATTERNS):
             try:
                 return json.loads(value)
             except (json.JSONDecodeError, TypeError):

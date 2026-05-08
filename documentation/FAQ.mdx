@@ -46,6 +46,17 @@ To manage your credit burn effectively, consider the following strategies:
 If you need to request a credit top-up, enable overages, or discuss a custom plan, please reach out to us at support@cekura.ai or via your dedicated Slack support channel.
 
 
+## Can I see logs of the webhooks Cekura sends to my endpoint?
+
+Cekura does not currently store or display webhook delivery logs in the dashboard UI. You cannot view a history of outgoing webhook events, their delivery status, or your endpoint's responses directly from the dashboard.
+
+**What is available:**
+- **Enterprise contracts**: Customers on enterprise plans have access to audit logs that can cover webhook activity. Contact your account team for details on what is included.
+- **Per-call investigation**: For a specific call or event, the Cekura support team can search internal traces to check webhook delivery. Reach out via your support channel with the specific call details.
+
+For information on the structure and payload format of the webhooks Cekura sends, see the [Webhook Format](https://docs.cekura.ai/documentation/advanced/webhook-format) reference page.
+
+
 ## Where can I upload knowledge base files on the Cekura dashboard and what is the recommended format for an FAQ-based document?
 
 To provide your AI agent with the necessary context and reduce hallucinations, you can upload knowledge base files directly through the Cekura dashboard. 
@@ -248,7 +259,7 @@ Timeouts in the Cekura dashboard during outbound testing usually occur when the 
 
 1. **Unmatched Evaluator Runs**: Each individual call must correspond to a specific triggered evaluator run. For example, if you make three parallel calls but only trigger the "Run Evaluator" action once in the dashboard, Cekura will only record one run. The other calls will not be matched to a session, leading to timeouts for the expected test cases.
 2. **The Outbound Timeout Window**: By default, once you trigger an evaluator (via UI or API), you must initiate the call within **5 minutes**. If the call is received after this window, the session expires and results in a timeout.
-   * **Pro Tip**: This window is configurable. You can adjust the duration by navigating to **Settings -> Project -> General -> Outbound Timeout**.
+   * **Pro Tip**: This window is configurable up to a maximum of **5 minutes** via **Settings -> Project -> General -> Outbound Timeout**.
 3. **Caller ID Mismatch**: Cekura identifies calls based on the phone number specified in your Agent Settings. If the incoming caller ID does not match the expected number for that specific test, the system cannot link the call to the evaluator.
 4. **Mode Configuration**: When running outbound tests, ensure you have selected the correct mode (`same_number` vs `different_numbers`) for handling multiple concurrent calls.
 
@@ -474,9 +485,20 @@ To trackthese metrics for your Pipecat + Twilio agent:
 3. **Monitor:** View the resulting TTFA plots in your Cekura dashboard to identify trends or spikes in infrastructure performance.
 
 
-## How do I configure the Cekura bot to send results to a Slack channel if no results are appearing after adding it?
+## How do I set up the Cekura Slack integration to receive evaluation results and call alerts in a channel?
 
-To configure the Cekura Slack integration and ensure results are appearing in your channel, follow these steps: 1. Go to **Settings** in the Cekura platform. 2. Ensure you are in the **relevant project**. 3. Navigate to **Integrations** and click **Slack**. 4. Follow the steps listed under 'How to setup Slack notifications' to connect your workspace. 5. **Add the Cekura Bot:** After the integration is set up, you must manually add the bot to your desired Slack channel. You can do this by typing `/invite @Cekura` in the channel or using the 'Add apps' option in Slack. 6. **Enable Notifications:** Make sure 'test result notifications' are enabled in your project settings. This configuration allows the bot to post evaluation results, which you can then use to reference specific runs and start discussion threads within Slack.
+The Cekura Slack integration uses a single setup path that covers both simulation test result notifications and live production call evaluation alerts. Once configured, the Cekura bot posts to your chosen channel whenever a metric evaluation completes — whether from a simulation run or a live production call.
+
+To set up the integration:
+
+1. Go to **Settings** in the Cekura platform.
+2. Ensure you are in the **relevant project**.
+3. Navigate to **Integrations** and click **Configure** next to **Slack**.
+4. Follow the steps listed under 'How to setup Slack notifications' to connect your workspace.
+5. **Add the Cekura Bot:** After the integration is set up, you must manually add the bot to your desired Slack channel. You can do this by typing `/invite @Cekura` in the channel or using the 'Add apps' option in Slack.
+6. **Enable Notifications:** Make sure notifications are enabled in your project settings.
+
+Once connected, your team can view evaluation results, click through to specific runs or call logs, and submit metric feedback directly from Slack.
 
 
 ## Is screen recording or video/microphone use disabled in the Cekura dashboard?
@@ -960,12 +982,12 @@ The Testing Agent's behavior is governed by its "Personality" configuration. You
 - Locate the **Start Speaking Plan** section.
 - Reduce the **Wait Seconds** value. Setting this to a lower value (e.g., 0 or 1 second) instructs the agent to initiate its response as soon as it detects the end of the user's turn.
 
-### 2. Use Conditional Actions for Deterministic Responses
+### 2. Use Structured Tests for Deterministic Responses
 By default, the Testing Agent often uses an LLM to generate responses based on the conversation context, which adds processing time. To achieve faster, more deterministic responses:
-- Implement **Conditional Actions** within your evaluators. 
+- Implement **Structured Tests** within your evaluators. 
 - Use **Fixed Messages** for specific scenarios. This allows the agent to respond with a pre-defined string immediately upon detecting a trigger, bypassing the additional LLM query and significantly reducing latency.
 - This approach is ideal for standard greetings, specific verification steps, or any part of the test case where the response is predictable.
-- You can find detailed instructions here: [Conditional Actions Documentation](https://docs.cekura.ai/documentation/key-concepts/evaluators/conditional-actions)
+- You can find detailed instructions here: [Structured Tests Documentation](https://docs.cekura.ai/documentation/key-concepts/evaluators/conditional-actions)
 
 ### 3. Understanding Latency Spikes
 Latency can occasionally be affected by intermittent performance issues with transcribers or LLM providers. While Cekura works to accommodate these spikes within your configured wait times, using deterministic evaluators (Fixed Messages) is the most effective way to ensure the agent stays within the timing requirements of your silence detection system.
@@ -1009,5 +1031,14 @@ To update the expected outcomes for a specific group of scenarios, follow these 
 
 ### Mass Updating Tags
 Currently, the **Improve Scenarios** tool is optimized for updating scenario content and expected outcomes. While you can filter by tags to select your scenarios, the ability to mass update or remove tags directly via the chat agent is a feature that is currently being added and will be available in the coming days.
+
+
+## Can I duplicate evaluators, agents, or metrics across projects?
+
+**Evaluators can be duplicated across projects.** Select one or more evaluators in the dashboard, click **Actions** > **Duplicate**, then choose the target project and folder. This copies the evaluators to the new project without modifying the originals, giving you a consistent baseline that you can then customize per project. See [Organizing Projects](/documentation/guides/organizing-projects#duplicating-and-moving-evaluators) for a full walkthrough.
+
+**Agents and metrics do not have a built-in UI duplication tool.** To replicate agent or metric configuration across projects, use the [REST API](https://docs.cekura.ai/api-reference/test_framework/create-agent) or the [MCP server](https://docs.cekura.ai/mcp/overview) to create them programmatically with the same settings.
+
+For environment separation (e.g., staging vs. production), another option is to keep all agents in a single shared project and use separate API keys or agent IDs to route webhook payloads to different backend environments. This avoids the need to keep multiple copies of metrics and evaluators in sync. See [Organizing Projects](/documentation/guides/organizing-projects) for recommended patterns.
 
 For more details on setting up and managing your testing environment, please visit the [Cekura Documentation](https://docs.cekura.ai/).

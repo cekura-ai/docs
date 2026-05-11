@@ -1,4 +1,4 @@
-"""Validate tool_overlays.json against the live openapi.json + whitelist.
+"""Validate mcp_tools.json against the live openapi.json.
 
 Run from the MCP server directory:
 
@@ -14,12 +14,11 @@ import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set
 
 from openapi_parser import Operation, load_openapi_spec
 from tool_generator import (
     generate_tool_name,
-    load_documented_apis_whitelist,
     load_tool_overlays,
     should_include_operation,
 )
@@ -53,14 +52,13 @@ def _build_context(
     overlays: Optional[Dict] = None,
 ) -> _Context:
     parser = load_openapi_spec(str(spec_path))
-    whitelist = load_documented_apis_whitelist()
     overlays = overlays if overlays is not None else load_tool_overlays()
 
     operations_by_tool: Dict[str, Operation] = {}
     schema_by_tool: Dict[str, Dict] = {}
 
     for op in parser.extract_operations():
-        if not should_include_operation(op, whitelist=whitelist):
+        if not should_include_operation(op):
             continue
         name = generate_tool_name(op)
         operations_by_tool[name] = op
@@ -134,12 +132,8 @@ def _check_example_fields(ctx: _Context) -> None:
 
 
 def _check_schema_example_fields(ctx: _Context) -> None:
-    """Flag backend-sourced `@extend_schema(examples=[...])` entries whose keys
-    reference fields not in the tool's input schema (renamed / removed upstream).
-
-    Warning-level: backend examples are surfaced by default, but a stale field
-    in an example won't break callers — the backend will just reject the call
-    with a clear 400. Still worth flagging so backend authors notice."""
+    """Flag spec-sourced example entries whose keys reference fields not in the
+    tool's input schema."""
     for tool_name, schema in ctx.schema_by_tool.items():
         openapi_examples = schema.get("_openapi_examples") or []
         if not openapi_examples:
@@ -156,23 +150,14 @@ def _check_schema_example_fields(ctx: _Context) -> None:
                     "warning",
                     "stale_schema_example_field",
                     tool_name,
-                    f"Backend example '{name}' references field(s) {sorted(unknown)} "
-                    "that are not in the tool's input schema. Likely a field was renamed "
-                    "or removed upstream without updating @extend_schema(examples=...).",
+                    f"Example '{name}' references field(s) {sorted(unknown)} "
+                    "that are not in the tool's input schema.",
                 )
 
 
 def _check_destructive_coverage(ctx: _Context) -> None:
-    """Verify that every DELETE / *_destroy tool has a ⚠ / 'Irreversible' marker.
-
-    The marker can live in two places (preferred order):
-    1. Upstream — the OpenAPI operation description starts with '⚠' or contains 'Irreversible'
-       (set via @extend_schema on the view, then propagated by manage.py spectacular).
-    2. Overlay fallback — the overlay entry has `destructive: true`, which causes the MCP
-       server to prepend the DESTRUCTIVE marker at registration time.
-
-    If neither is present the tool silently looks like a safe read operation to LLM agents.
-    """
+    """Verify that every DELETE / *_destroy tool has a ⚠ / 'Irreversible' marker
+    in its description, or `destructive: true` in the overlay."""
     for tool_name, op in ctx.operations_by_tool.items():
         looks_destructive = (
             op.method.upper() == "DELETE"
@@ -184,12 +169,10 @@ def _check_destructive_coverage(ctx: _Context) -> None:
         if tool_name in DESTRUCTIVE_OPTOUT:
             continue
 
-        # Check overlay flag (legacy / fallback path)
         overlay = ctx.overlays.get(tool_name, {})
         if overlay.get("destructive") is True:
             continue
 
-        # Check upstream OpenAPI description for ⚠ or 'Irreversible'
         upstream_desc = (op.description or op.summary or "").strip()
         if "⚠" in upstream_desc or "irreversible" in upstream_desc.lower():
             continue
@@ -199,8 +182,8 @@ def _check_destructive_coverage(ctx: _Context) -> None:
             "destructive_missing",
             tool_name,
             f"Operation {op.method} {op.path} registers as tool '{tool_name}' but has no "
-            "destructive marker. Add '⚠ Irreversible...' to the @extend_schema description "
-            "upstream, or set 'destructive: true' in the overlay as a fallback.",
+            "destructive marker. Add '⚠ Irreversible...' to the operation description, "
+            "or set 'destructive: true' in the overlay.",
         )
 
 

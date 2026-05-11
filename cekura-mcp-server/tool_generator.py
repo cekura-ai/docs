@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, Set, Tuple
+from typing import Dict, Any, Optional
 from openapi_parser import Operation
 from mcp.types import ToolAnnotations
 import re
@@ -25,6 +25,12 @@ def compute_annotations(operation: Operation) -> ToolAnnotations:
         PUT, PATCH    → readOnlyHint=False, destructiveHint=False
     """
     method = operation.method.upper()
+    read_only = (method == 'GET')
+
+    explicit = (operation.extensions or {}).get('x-mcp-destructive')
+    if explicit is not None:
+        return ToolAnnotations(readOnlyHint=read_only, destructiveHint=bool(explicit))
+
     if method == 'GET':
         return ToolAnnotations(readOnlyHint=True)
     if method == 'DELETE':
@@ -36,31 +42,7 @@ def compute_annotations(operation: Operation) -> ToolAnnotations:
             or any(last_segment.startswith(p) for p in _DESTRUCTIVE_POST_PREFIXES)
         )
         return ToolAnnotations(readOnlyHint=False, destructiveHint=is_destructive)
-    # PUT, PATCH — non-destructive update
     return ToolAnnotations(readOnlyHint=False, destructiveHint=False)
-
-
-def load_documented_apis_whitelist() -> Optional[Set[Tuple[str, str]]]:
-    whitelist_file = Path(__file__).parent / 'documented_apis.json'
-
-    if not whitelist_file.exists():
-        print(f"Warning: Whitelist file not found at {whitelist_file}", file=sys.stderr)
-        return None
-
-    try:
-        with open(whitelist_file, 'r') as f:
-            data = json.load(f)
-
-        whitelist = set()
-        for endpoint in data.get('endpoints', []):
-            method = endpoint['method'].upper()
-            path = endpoint['path']
-            whitelist.add((method, path))
-
-        return whitelist
-    except Exception as e:
-        print(f"Error loading documented_apis.json: {e}", file=sys.stderr)
-        return None
 
 
 _OVERLAY_CACHE: Optional[Dict[str, Any]] = None
@@ -72,7 +54,7 @@ def load_tool_overlays() -> Dict[str, Any]:
     if _OVERLAY_CACHE is not None:
         return _OVERLAY_CACHE
 
-    overlay_file = Path(__file__).parent / 'tool_overlays.json'
+    overlay_file = Path(__file__).parent / 'mcp_tools.json'
     if not overlay_file.exists():
         _OVERLAY_CACHE = {}
         return _OVERLAY_CACHE
@@ -80,11 +62,10 @@ def load_tool_overlays() -> Dict[str, Any]:
     try:
         with open(overlay_file, 'r') as f:
             data = json.load(f)
-        # Drop any underscore-prefixed keys (reserved for comments/meta).
         _OVERLAY_CACHE = {k: v for k, v in data.items() if not k.startswith('_')}
         return _OVERLAY_CACHE
     except Exception as e:
-        print(f"Error loading tool_overlays.json: {e}", file=sys.stderr)
+        print(f"Error loading mcp_tools.json: {e}", file=sys.stderr)
         _OVERLAY_CACHE = {}
         return _OVERLAY_CACHE
 
@@ -117,12 +98,10 @@ def apply_overlay_to_schema(tool_name: str, schema: Dict[str, Any]) -> Dict[str,
         schema['required'] = sorted(existing)
 
     # Examples precedence (JSON-Schema draft-07 `examples` array, one per request body):
-    #   1. Overlay `examples: [...]` → use verbatim; backend/openapi examples ignored.
-    #   2. Else, merge openapi-spec examples (from drf-spectacular @extend_schema(examples=...))
-    #      with overlay.example_request (legacy fallback). Overlay filters:
+    #   1. Overlay `examples: [...]` → use verbatim; openapi examples ignored.
+    #   2. Else, merge openapi-spec examples with overlay.example_request. Overlay filters:
     #        - `example_names: [...]` → keep only openapi examples whose name matches.
     #        - `max_examples: N` → cap the result at N. If absent, use global cap.
-    # Runs even when no overlay entry exists — backend examples still flow through under defaults.
     schema_examples = _resolve_examples_for_tool(schema, overlay)
     # Clean up the private key from the parser either way.
     schema.pop('_openapi_examples', None)
@@ -283,41 +262,7 @@ def build_input_schema(operation: Operation, parser: Any) -> Dict[str, Any]:
     return parser.build_parameter_schema(operation)
 
 
-def should_include_operation(
-    operation: Operation,
-    filter_tags: list = None,
-    exclude_ops: list = None,
-    whitelist: Optional[Set[Tuple[str, str]]] = None
-) -> bool:
+def should_include_operation(operation: Operation) -> bool:
     if operation.deprecated:
         return False
-
-    # Never expose paths or operationIds containing `external` — these are
-    # back-compat duplicates of canonical paths and would surface as duplicate
-    # MCP tools.
-    if "external" in operation.path.lower() or (operation.operation_id and "external" in operation.operation_id.lower()):
-        return False
-
-    if whitelist is not None:
-        method = operation.method.upper()
-        path = operation.path.rstrip('/')
-
-        if (method, path) in whitelist:
-            return True
-
-        if (method, path + '/') in whitelist:
-            return True
-
-        return False
-
-    if exclude_ops and operation.operation_id in exclude_ops:
-        return False
-
-    if filter_tags:
-        if not operation.tags:
-            return False
-        has_matching_tag = any(tag in filter_tags for tag in operation.tags)
-        if not has_matching_tag:
-            return False
-
-    return True
+    return bool((operation.extensions or {}).get('x-mcp-expose'))

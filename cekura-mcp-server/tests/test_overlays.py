@@ -1,6 +1,6 @@
 """Overlay drift tests — picked up by the existing CI pytest jobs.
 
-Fails fast if `tool_overlays.json` has drifted from the live `openapi.json`:
+Fails fast if `mcp_tools.json` has drifted from the live `openapi.json`:
 orphan entries, stale required-field lists, stale example keys, or DELETE tools
 missing the destructive marker.
 
@@ -82,7 +82,7 @@ def test_example_request_fields_exist(findings):
 import json as _json
 from pathlib import Path as _Path
 
-_OVERLAYS_FILE = _Path(__file__).parent.parent / "tool_overlays.json"
+_OVERLAYS_FILE = _Path(__file__).parent.parent / "mcp_tools.json"
 
 
 def _load_overlays():

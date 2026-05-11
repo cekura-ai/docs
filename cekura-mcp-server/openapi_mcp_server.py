@@ -30,7 +30,6 @@ from tool_generator import (
     compute_annotations,
     generate_tool_description,
     generate_tool_name,
-    load_documented_apis_whitelist,
     maybe_append_org_project_hint,
     should_include_operation,
 )
@@ -153,24 +152,12 @@ async def initialize_server():
         operations = openapi_parser.extract_operations()
         logger.info(f"Found {len(operations)} operations in OpenAPI spec")
 
-        # Load whitelist of documented APIs
-        whitelist = load_documented_apis_whitelist()
-        if whitelist:
-            logger.info(f"Using documented APIs whitelist with {len(whitelist)} endpoints")
-        else:
-            logger.warning("No whitelist found - using all operations (filtered by tags/excludes)")
-
         blocked_tools = server_config.resolve_blocked_tools()
 
         tools_registered = 0
         blocked_hits = []
         for operation in operations:
-            if not should_include_operation(
-                operation,
-                filter_tags=server_config.filter_tags,
-                exclude_ops=server_config.exclude_operations,
-                whitelist=whitelist
-            ):
+            if not should_include_operation(operation):
                 continue
 
             if server_config.max_tools and tools_registered >= server_config.max_tools:

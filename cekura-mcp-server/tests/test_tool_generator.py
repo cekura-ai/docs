@@ -1,10 +1,6 @@
 """Tests for tool generator module"""
 import pytest
-from pathlib import Path
-import json
-import tempfile
 from tool_generator import (
-    load_documented_apis_whitelist,
     generate_tool_name,
     generate_tool_description,
     should_include_operation,
@@ -12,42 +8,6 @@ from tool_generator import (
     ORG_PROJECT_HINT,
 )
 from openapi_parser import Operation
-
-
-class TestLoadDocumentedAPIsWhitelist:
-    """Test suite for whitelist loading"""
-
-    def test_load_whitelist_success(self, tmp_path, monkeypatch):
-        """Test successfully loading whitelist"""
-        # Create fake documented_apis.json
-        whitelist_data = {
-            "total": 2,
-            "endpoints": [
-                {"method": "GET", "path": "/api/v1/test"},
-                {"method": "POST", "path": "/api/v1/test"}
-            ]
-        }
-
-        # Mock the file location
-        data_dir = tmp_path / "data"
-        data_dir.mkdir()
-        whitelist_file = data_dir / "documented_apis.json"
-        whitelist_file.write_text(json.dumps(whitelist_data))
-
-        # Monkey patch the Path resolution
-        original_file = Path(__file__).parent.parent / "tool_generator.py"
-        monkeypatch.setattr("tool_generator.Path", lambda x: tmp_path if x == original_file else Path(x))
-
-        # This won't work directly, so let's just test the file content
-        result = load_documented_apis_whitelist()
-        # With real implementation, this would work
-        # assert result == {("GET", "/api/v1/test"), ("POST", "/api/v1/test")}
-
-    def test_load_whitelist_file_not_found(self):
-        """Test behavior when whitelist file doesn't exist"""
-        result = load_documented_apis_whitelist()
-        # Should return None if file not found
-        # Actual result depends on implementation
 
 
 class TestGenerateToolName:
@@ -182,116 +142,25 @@ class TestGenerateToolDescription:
 class TestShouldIncludeOperation:
     """Test suite for operation filtering"""
 
-    def test_include_operation_no_filters(self):
-        """Test including operation with no filters"""
-        operation = Operation(
-            path="/api/v1/test",
-            method="GET",
-            operation_id="test",
-            summary=None,
-            description=None,
-            parameters=[],
-            request_body=None,
-            responses={},
-            tags=["api"]
+    def _op(self, path="/api/v1/test", method="GET", extensions=None):
+        return Operation(
+            path=path, method=method, operation_id="test",
+            summary=None, description=None, parameters=[],
+            request_body=None, responses={}, tags=[],
+            extensions=extensions or {},
         )
 
-        result = should_include_operation(operation)
-        assert result is True
+    def test_excluded_when_no_marker(self):
+        assert should_include_operation(self._op()) is False
 
-    def test_exclude_operation_by_id(self):
-        """Test excluding operation by operation_id"""
-        operation = Operation(
-            path="/api/v1/test",
-            method="GET",
-            operation_id="excluded_op",
-            summary=None,
-            description=None,
-            parameters=[],
-            request_body=None,
-            responses={},
-            tags=[]
-        )
+    def test_included_when_marker_present(self):
+        assert should_include_operation(self._op(extensions={"x-mcp-expose": True})) is True
 
-        result = should_include_operation(operation, exclude_ops=["excluded_op"])
-        assert result is False
+    def test_excluded_when_deprecated(self):
+        op = self._op(extensions={"x-mcp-expose": True})
+        op.deprecated = True
+        assert should_include_operation(op) is False
 
-    def test_exclude_external_operations(self):
-        """Test excluding operations with 'external' in path"""
-        operation = Operation(
-            path="/api/external/test",
-            method="GET",
-            operation_id="test",
-            summary=None,
-            description=None,
-            parameters=[],
-            request_body=None,
-            responses={},
-            tags=[]
-        )
-
-        result = should_include_operation(operation)
-        assert result is False
-
-    def test_filter_by_tags(self):
-        """Test filtering operations by tags"""
-        operation = Operation(
-            path="/api/v1/test",
-            method="GET",
-            operation_id="test",
-            summary=None,
-            description=None,
-            parameters=[],
-            request_body=None,
-            responses={},
-            tags=["api", "v1"]
-        )
-
-        result = should_include_operation(operation, filter_tags=["api"])
-        assert result is True
-
-        result = should_include_operation(operation, filter_tags=["other"])
-        assert result is False
-
-    def test_whitelist_filtering(self):
-        """Test filtering with whitelist"""
-        operation = Operation(
-            path="/api/v1/test",
-            method="GET",
-            operation_id="test",
-            summary=None,
-            description=None,
-            parameters=[],
-            request_body=None,
-            responses={},
-            tags=[]
-        )
-
-        whitelist = {("GET", "/api/v1/test")}
-        result = should_include_operation(operation, whitelist=whitelist)
-        assert result is True
-
-        whitelist = {("POST", "/api/v1/test")}
-        result = should_include_operation(operation, whitelist=whitelist)
-        assert result is False
-
-    def test_whitelist_with_trailing_slash(self):
-        """Test whitelist matching with trailing slash handling"""
-        operation = Operation(
-            path="/api/v1/test/",
-            method="GET",
-            operation_id="test",
-            summary=None,
-            description=None,
-            parameters=[],
-            request_body=None,
-            responses={},
-            tags=[]
-        )
-
-        whitelist = {("GET", "/api/v1/test")}
-        result = should_include_operation(operation, whitelist=whitelist)
-        assert result is True
 
 
 class TestMaybeAppendOrgProjectHint:

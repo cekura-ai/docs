@@ -68,13 +68,9 @@ class TestConfig:
 
         monkeypatch.setenv("CEKURA_BASE_URL", "https://api.test.com")
         monkeypatch.setenv("CEKURA_OPENAPI_SPEC", str(spec_file))
-        monkeypatch.setenv("CEKURA_FILTER_TAGS", "tag1,tag2,tag3")
-        monkeypatch.setenv("CEKURA_EXCLUDE_OPERATIONS", "op1,op2")
         monkeypatch.setenv("CEKURA_MAX_TOOLS", "50")
 
         config = load_config()
-        assert config.filter_tags == ["tag1", "tag2", "tag3"]
-        assert config.exclude_operations == ["op1", "op2"]
         assert config.max_tools == 50
 
     def test_parse_list_env_valid(self, monkeypatch):

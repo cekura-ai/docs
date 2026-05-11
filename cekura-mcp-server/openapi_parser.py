@@ -15,6 +15,11 @@ class Operation:
     responses: Dict[str, Any]
     tags: List[str]
     deprecated: bool = False
+    extensions: Dict[str, Any] = None
+
+    def __post_init__(self):
+        if self.extensions is None:
+            self.extensions = {}
 
 
 class OpenAPIParser:
@@ -36,6 +41,7 @@ class OpenAPIParser:
             for method in ["get", "post", "put", "patch", "delete"]:
                 if method in path_item:
                     operation_data = path_item[method]
+                    extensions = {k: v for k, v in operation_data.items() if k.startswith("x-")}
                     operation = Operation(
                         path=path,
                         method=method.upper(),
@@ -47,6 +53,7 @@ class OpenAPIParser:
                         responses=operation_data.get("responses", {}),
                         tags=operation_data.get("tags", []),
                         deprecated=operation_data.get("deprecated", False),
+                        extensions=extensions,
                     )
                     operations.append(operation)
 
@@ -142,11 +149,10 @@ class OpenAPIParser:
                     elif "required" in resolved:
                         required.extend(resolved["required"])
 
-            # drf-spectacular puts @extend_schema(examples=[OpenApiExample(...)])
-            # under requestBody.content.application/json.examples as a dict keyed by
-            # a CamelCased version of the example name. Each entry has:
-            #   { value, summary, description }
-            # We flatten into a list so downstream precedence (filter / cap) is simple.
+            # OpenAPI 3.0 stores per-example payloads under
+            # requestBody.content.application/json.examples as a dict keyed by
+            # name, each with { value, summary, description }. Flatten into a
+            # list so downstream precedence (filter / cap) is simple.
             examples_dict = json_content.get("examples", {})
             if isinstance(examples_dict, dict):
                 for key, entry in examples_dict.items():

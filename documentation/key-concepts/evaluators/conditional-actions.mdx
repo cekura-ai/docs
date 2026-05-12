@@ -371,6 +371,10 @@ Conditional Actions supports a variety of special tags in the `action` field to 
     `<ivr>` must be the **entire action** — it cannot be combined with other text or tags in the same action string.
     </Warning>
 
+    <Note>
+    **DTMF digits appear in the transcript when using `<ivr>`.** When a scenario contains the `<ivr>` tag, any DTMF digits pressed by the main agent (the agent being tested) are captured and appear in the transcript. This lets you write conditions that detect the exact digit pressed — for example, `"The main agent pressed 1"` — rather than relying on speech detection alone. Both `<ivr>` and `<dtmf>` can appear in any condition, not just `id: 0`.
+    </Note>
+
     **Attributes:**
     - `text`: The IVR message to play (required)
   </Accordion>
@@ -733,9 +737,11 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
 </CodeGroup>
 
-### Example 2: IVR (Interactive Voice Response) Navigation
+### Example 2: IVR Navigation
 
-```json
+<CodeGroup>
+
+```json Inbound IVR (main agent is the IVR)
 {
   "role": "You are a customer calling support",
   "conditions": [
@@ -770,6 +776,50 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
   ]
 }
 ```
+
+```json Outbound IVR (testing agent simulates an external IVR)
+{
+  "role": "You are simulating a third-party IVR that the agent will call into",
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "FIRST_MESSAGE",
+      "action": "<ivr text=\"Thank you for calling Acme Corp. Press 1 for sales, press 2 for support.\" />",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The main agent pressed 1",
+      "action": "Connecting you to sales now. Please hold.",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 2,
+      "condition": "The main agent pressed 2",
+      "action": "Connecting you to support now. Please hold.",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 3,
+      "condition": "The agent states their reason for calling",
+      "action": "Thank you. Routing your call now. <endcall />",
+      "type": "standard",
+      "fixed_message": true
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+<Note>
+**Inbound vs outbound IVR patterns differ:**
+- **Inbound** (main agent IS the IVR): Use `<dtmf>` to navigate the IVR menu played by the main agent. `<dtmf>` can appear in any condition.
+- **Outbound** (testing agent simulates an external IVR): Use `<ivr text="..." />` to play the IVR menu. `<ivr>` can appear in any condition. When the scenario contains `<ivr>`, DTMF digits pressed by the main agent appear in the transcript — write your conditions using the specific digit (e.g., `"The main agent pressed 1"`).
+</Note>
 
 ### Example 3: Multi-Part Response with Followup
 

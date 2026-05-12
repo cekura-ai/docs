@@ -1042,3 +1042,37 @@ Currently, the **Improve Scenarios** tool is optimized for updating scenario con
 For environment separation (e.g., staging vs. production), another option is to keep all agents in a single shared project and use separate API keys or agent IDs to route webhook payloads to different backend environments. This avoids the need to keep multiple copies of metrics and evaluators in sync. See [Organizing Projects](/documentation/guides/organizing-projects) for recommended patterns.
 
 For more details on setting up and managing your testing environment, please visit the [Cekura Documentation](https://docs.cekura.ai/).
+
+
+## How can I correlate Cekura calls with my distributed tracing system using OpenTelemetry?
+
+Cekura supports OpenTelemetry trace ID correlation, allowing you to link call logs and runs with traces in your observability backend. This is useful for end-to-end debugging across your voice agent infrastructure.
+
+### Passing a Trace ID
+
+When creating a call log via the API, include a `trace_id` field in your request payload. The trace ID must be a 32-character lowercase hexadecimal string, matching the standard OpenTelemetry format.
+
+**Example:**
+```json
+{
+  "agent": 123,
+  "call_id": "call_abc123",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  ...
+}
+```
+
+### Retrieving Trace Data
+
+Once a call or run has an associated trace ID, you can retrieve the trace spans through the Cekura API:
+
+- **For call logs:** `GET /observability/v1/call-logs/{id}/trace/`
+- **For runs:** `GET /test_framework/v1/runs/{id}/trace/`
+
+These endpoints return the trace ID and associated spans, enabling you to correlate Cekura evaluation data with your distributed tracing backend.
+
+### Use Cases
+
+- **Debugging latency issues:** Correlate slow evaluations with specific spans in your agent's execution pipeline.
+- **Cross-system observability:** Link Cekura call data with traces from your LLM provider, telephony infrastructure, or backend services.
+- **Production monitoring:** Include trace IDs when forwarding production calls to Cekura for unified observability.

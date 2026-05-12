@@ -47736,44 +47736,48 @@
                     "organization": {
                         "type": "integer",
                         "readOnly": true,
-                        "description": "Organization ID associated with this billing information.\nExample: `37`"
+                        "description": "Organization ID this billing record belongs to.\nExample: `37`"
                     },
                     "credits_remaining": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "Current available credits balance.\nExample: `7436.08`"
+                        "description": "Credits currently available to spend on runs and calls.\nExample: `7436.08`"
                     },
                     "credits_used": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "Total credits consumed from all transactions.\nExample: `36462.14`"
+                        "description": "Total credits consumed across all non-refunded transactions on this billing record.\nExample: `36462.14`"
                     },
                     "initial_balance": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "Initial credits balance from the subscription pack.\nExample: `50000.00`"
+                        "description": "Credits granted by the current pack at the start of the billing period (before any usage).\nExample: `50000.00`"
                     },
                     "balance_expiry": {
                         "type": "string",
                         "format": "date-time",
-                        "description": "Date when the current balance expires (null if no expiry).\nExample: `2025-12-31T23:59:59Z`"
+                        "description": "Date the current credit balance expires (null if no expiry is set).\nExample: `2026-06-23T10:00:00Z`"
                     },
                     "subscription_status": {
-                        "type": "string",
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SubscriptionStatus"
+                            }
+                        ],
                         "readOnly": true,
-                        "description": "Current subscription status including active state, trial status, pack name, and expiry date.\nExample: `{\"is_active\": true, \"is_trial\": false, \"pack_name\": \"Enterprise\", \"expire_at\": \"2025-12-31T23:59:59Z\"}`"
+                        "description": "\nCurrent subscription state for the org plus the active pack's max-allowed plan caps. `status` is one of `active`, `trial`, `expired`, `inactive`. `days_until_expiry` is negative when `expire_at` is in the past. Nested `pack` caps are the plan's ceilings — the org's currently configured limits may be lower. All fields are null/false when there is no active subscription.\n\nExample:\n```json\n{\n  \"status\": \"active\",\n  \"is_active\": true,\n  \"is_trial\": false,\n  \"pack_name\": \"Enterprise\",\n  \"expire_at\": \"2026-06-15T10:00:00Z\",\n  \"last_payment_at\": \"2026-05-15T10:00:00Z\",\n  \"days_until_expiry\": 34,\n  \"created_at\": \"2025-08-01T09:00:00Z\",\n  \"pack\": {\n    \"name\": \"Enterprise\",\n    \"max_concurrent_runs_limit\": 50,\n    \"max_concurrent_chat_runs_limit\": 50,\n    \"max_agents_limit\": 20,\n    \"max_members_limit\": 10,\n    \"max_projects_limit\": 10,\n    \"billing_type\": \"subscription\",\n    \"subscription_overage\": \"0.08\"\n  }\n}\n```\n"
                     },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true,
-                        "description": "Timestamp when the billing record was created.\nExample: `2024-01-15T10:30:00Z`"
+                        "description": "When this billing record was first created.\nExample: `2024-01-15T10:30:00Z`"
                     },
                     "updated_at": {
                         "type": "string",
                         "format": "date-time",
                         "readOnly": true,
-                        "description": "Timestamp when the billing record was last updated.\nExample: `2025-11-22T14:25:30Z`"
+                        "description": "When this billing record was last modified.\nExample: `2026-05-12T14:25:30Z`"
                     }
                 },
                 "required": [
@@ -62409,6 +62413,138 @@
                     "expire_at",
                     "last_payment_at",
                     "stripe_subscription_id"
+                ]
+            },
+            "SubscriptionStatus": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "active",
+                            "trial",
+                            "expired",
+                            "inactive"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "00a3c2044965e0ec",
+                        "description": "One-shot lifecycle signal for the subscription.\n\n* `active` - active\n* `trial` - trial\n* `expired` - expired\n* `inactive` - inactive"
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "description": "Whether the subscription row is flagged active."
+                    },
+                    "is_trial": {
+                        "type": "boolean",
+                        "description": "True if the customer is on a trial pack."
+                    },
+                    "pack_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Display name of the current pack."
+                    },
+                    "expire_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "When the current billing period ends."
+                    },
+                    "last_payment_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "Timestamp of the last successful charge."
+                    },
+                    "days_until_expiry": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Days until `expire_at`; negative if already past."
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "When the subscription was first created."
+                    },
+                    "pack": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/SubscriptionStatusPack"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "days_until_expiry",
+                    "expire_at",
+                    "is_active",
+                    "is_trial",
+                    "last_payment_at",
+                    "pack",
+                    "pack_name",
+                    "status"
+                ]
+            },
+            "SubscriptionStatusPack": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Pack display name."
+                    },
+                    "max_concurrent_runs_limit": {
+                        "type": "integer",
+                        "description": "Maximum parallel call/voice runs allowed by the plan."
+                    },
+                    "max_concurrent_chat_runs_limit": {
+                        "type": "integer",
+                        "description": "Maximum parallel chat runs allowed by the plan."
+                    },
+                    "max_agents_limit": {
+                        "type": "integer",
+                        "description": "Maximum agents allowed by the plan (`-1` = unlimited)."
+                    },
+                    "max_members_limit": {
+                        "type": "integer",
+                        "description": "Maximum org members allowed by the plan (`-1` = unlimited)."
+                    },
+                    "max_projects_limit": {
+                        "type": "integer",
+                        "description": "Maximum projects allowed by the plan (`-1` = unlimited)."
+                    },
+                    "billing_type": {
+                        "type": "string",
+                        "description": "Pack billing type, e.g. `subscription` or `self_serve`."
+                    },
+                    "subscription_overage": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,3}(?:\\.\\d{0,2})?$",
+                        "description": "Price per credit for overage purchases. `-1` disables overage."
+                    }
+                },
+                "required": [
+                    "billing_type",
+                    "max_agents_limit",
+                    "max_concurrent_chat_runs_limit",
+                    "max_concurrent_runs_limit",
+                    "max_members_limit",
+                    "max_projects_limit",
+                    "name",
+                    "subscription_overage"
                 ]
             },
             "TestProfileData": {

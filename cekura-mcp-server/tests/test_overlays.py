@@ -1,6 +1,6 @@
 """Overlay drift tests — picked up by the existing CI pytest jobs.
 
-Fails fast if `tool_overlays.json` has drifted from the live `openapi.json`:
+Fails fast if `mcp_tools.json` has drifted from the live `openapi.json`:
 orphan entries, stale required-field lists, stale example keys, or DELETE tools
 missing the destructive marker.
 
@@ -73,3 +73,68 @@ def test_example_request_fields_exist(findings):
             "Overlay example_request keys reference fields removed upstream: "
             + "; ".join(f"{f.tool} -> {f.message}" for f in stale)
         )
+
+
+# ---------------------------------------------------------------------------
+# Generate/improve preference suffixes — keep agents off raw create/patch
+# ---------------------------------------------------------------------------
+
+import json as _json
+from pathlib import Path as _Path
+
+_OVERLAYS_FILE = _Path(__file__).parent.parent / "mcp_tools.json"
+
+
+def _load_overlays():
+    with open(_OVERLAYS_FILE, "r") as fh:
+        return _json.load(fh)
+
+
+# Tools where reaching for a raw create/patch is almost always wrong when an
+# AI-assisted generate/improve counterpart exists. Each must carry a
+# `description_suffix` calling that out (see plan A4).
+_RAW_TOOLS_THAT_NEED_PREFERENCE_SUFFIX = [
+    "scenarios_create",
+    "scenarios_partial_update",
+    "metrics_create",
+    "metrics_partial_update",
+    "aiagents_create",
+    "aiagents_partial_update",
+]
+
+# AI-assisted tools that need clarifying suffixes so agents pick them up
+# correctly (e.g. `scenarios_agent_create` is misleading without the note that
+# it's the unified clarify+improve endpoint).
+_AI_TOOLS_THAT_NEED_CLARIFYING_SUFFIX = [
+    "scenarios_agent_create",
+    "scenarios_generate_bg",
+    "scenarios_improve_instructions_create",
+]
+
+_PREFERENCE_KEYWORDS = ("Prefer", "preferred", "prefer")
+
+
+@pytest.mark.parametrize("tool", _RAW_TOOLS_THAT_NEED_PREFERENCE_SUFFIX)
+def test_raw_create_patch_tools_have_preference_suffix(tool):
+    overlays = _load_overlays()
+    assert tool in overlays, (
+        f"{tool} must have an overlay entry steering agents to its "
+        f"generate/improve counterpart."
+    )
+    suffix = overlays[tool].get("description_suffix", "")
+    assert suffix, f"{tool} overlay must define a non-empty description_suffix."
+    assert any(kw in suffix for kw in _PREFERENCE_KEYWORDS), (
+        f"{tool} description_suffix must contain a 'Prefer ...' steering line; "
+        f"got: {suffix[:120]!r}"
+    )
+
+
+@pytest.mark.parametrize("tool", _AI_TOOLS_THAT_NEED_CLARIFYING_SUFFIX)
+def test_generate_improve_tools_have_clarifying_suffix(tool):
+    overlays = _load_overlays()
+    assert tool in overlays, (
+        f"{tool} must have an overlay entry clarifying when to pick it over "
+        f"raw create/patch."
+    )
+    suffix = overlays[tool].get("description_suffix", "")
+    assert suffix, f"{tool} overlay must define a non-empty description_suffix."

@@ -152,6 +152,91 @@ The right command depends on the transport:
   </Tab>
 </Tabs>
 
+## Vote on a metric result
+
+Capture thumbs up/down feedback on a specific metric evaluation for a run, optionally attach the expected value and free-text feedback. The run is marked as reviewed; the metric evaluation is updated. Feeds the labs / metric-review workflow.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura runs mark-metric-vote 5544 \
+      --metric-id 55 \
+      --thumbs-down \
+      --expected-value 2 \
+      --feedback "Agent missed the reschedule step"
+    ```
+
+    `--expected-value` is parsed as JSON when possible (`5`, `true`, `"foo"`), so numeric / boolean metrics get the right type.
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.runs.mark_metric_vote(
+        run_id=5544,
+        metric_id=55,
+        thumbs_up=False,
+        expected_value=2,
+        feedback="Agent missed the reschedule step",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Expected outcome
+
+If a scenario has an `expected_outcome`, you can (re)evaluate whether the run met it, then thumbs-vote on the outcome verdict the same way you vote on metric results.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    # Re-score expected outcome for this run
+    client.runs.run_expected_outcome(run_id=5544)
+
+    # Thumbs vote on the outcome verdict
+    client.runs.mark_expected_outcome_vote(
+        run_id=5544,
+        thumbs_up=True,
+        feedback="Agent did escalate to a human",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Flag a critical-scenario verdict as wrong
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    client.runs.mark_critical_scenario_wrong(run_id=5544, scenario_id=42)
+    client.runs.unmark_critical_scenario_wrong(run_id=5544, scenario_id=42)
+    ```
+  </Tab>
+</Tabs>
+
+## Improve the agent's prompt from run failures
+
+Iterate on the agent's prompt using the failure pattern across recent runs.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    # Background job — returns a progress_id you can poll
+    job = client.runs.improve_prompt_bg(
+        run_ids=[5544, 5545, 5546],
+        agent=123,
+        prompt="<current agent system prompt>",
+    )
+    client.runs.improve_prompt_progress(progress_id=job["progress_id"])
+
+    # One-shot synchronous variant (smaller batches)
+    client.runs.improve_prompt(run_ids=[5544], agent=123, prompt="<current>")
+
+    # Just the categorized failure issues, without rewriting the prompt
+    client.runs.improve_prompt_issues(run_ids=[5544, 5545], agent=123)
+    ```
+  </Tab>
+</Tabs>
+
 ## Re-evaluate without re-running
 
 If you change a metric prompt and want to score existing runs against the new definition:

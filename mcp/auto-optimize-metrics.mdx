@@ -22,37 +22,32 @@ The [Metric Lab](/documentation/guides/metric-lab) **Auto Improve** button rewri
     Follow the [MCP overview](/mcp/overview#2-configure-mcp-server) for the one-line `claude mcp add` setup. OAuth is recommended.
   </Step>
   <Step title="Have at least one metric with labelled test sets">
-    The optimiser needs `MetricReview` rows that already have `expected_value` and `feedback` set — i.e., calls you've **Added to Lab** and **Annotated** through the [Metric Lab workflow](/documentation/guides/metric-lab#annotate).
+    The optimiser needs calls you've **Added to Lab** and **Annotated** through the [Metric Lab workflow](/documentation/guides/metric-lab#annotate) — annotations and feedback are what the optimiser learns from.
   </Step>
-  <Step title="Note the IDs you want the routine to operate on">
-    For each metric you want auto-optimised, grab:
-    - The **metric ID** — visible in the URL when you open the metric (`/metrics/<id>`).
-    - The **test set IDs** the optimiser should learn from — the test sets linked to that metric's Lab. Visible in the Lab table view or the URL.
+  <Step title="Note the metric IDs you want the routine to operate on">
+    Open each metric in the dashboard and copy the **metric ID** from the URL (`/metrics/<id>`). That's the only ID you need — the optimiser uses every test set already in the metric's Lab automatically.
   </Step>
 </Steps>
 
 ## The routine prompt
 
-Paste this into Claude Code, filling in the metric and test set IDs. It chains the four MCP tools the optimiser needs end-to-end.
+Paste this into Claude Code, filling in the metric IDs. It chains the MCP tools the optimiser needs end-to-end.
 
 ```
 You are auto-optimising Cekura metric prompts based on accumulated test-set
-feedback. Run this for each entry in the list below.
+feedback. Run this for each metric_id below.
 
-Metrics to optimise:
-- metric_id: 12345
-  test_set_ids: [67, 89, 102]
-- metric_id: 12346
-  test_set_ids: [70, 91]
+Metrics to optimise: [12345, 12346]
 
-For each entry:
+For each metric_id:
 
-1. Call `metric_reviews_process_feedbacks` with that metric_id and test_set_ids.
-   Capture the returned `progress_id`.
+1. Call `metric_reviews_process_feedbacks` with just that metric_id. The
+   optimiser will use every test set already in the metric's Lab. Capture
+   the returned `progress_id`.
 
 2. Poll `metric_reviews_process_feedbacks_progress` with that progress_id
    roughly every 30s until status is "success" or "error". If "error", stop
-   and report the error for that metric — continue to the next entry.
+   and report the error for that metric — continue to the next one.
 
 3. On success, read the returned `metric_description` and `evaluation_trigger`
    from the progress output. Call `metrics_retrieve` for the same metric_id to
@@ -62,8 +57,8 @@ For each entry:
 4. Do NOT call `metrics_partial_update` yet. Print the diff and stop for this
    metric.
 
-After processing every entry, summarise: which metrics had proposed changes,
-which were unchanged, which errored. Do not apply any changes.
+After processing every metric, summarise: which had proposed changes, which
+were unchanged, which errored. Do not apply any changes.
 ```
 
 <Tip>
@@ -122,4 +117,4 @@ This applies the new prompt and immediately verifies it didn't regress the label
 
 **Progress polling times out.** The optimiser can take several minutes for metrics with many test sets. Increase the polling interval or raise your routine's timeout — do not retry mid-flight, that will start a second concurrent optimisation.
 
-**The routine can't list test sets.** Test set listing is not yet MCP-exposed. You must hardcode `test_set_ids` in the routine prompt for now. To pick up new test sets added to a metric's Lab, update the prompt manually.
+**I want to optimise against a specific subset of test sets, not the whole Lab.** Pass `test_set_ids` explicitly in step 1 instead of omitting it. The optimiser will use exactly those IDs.

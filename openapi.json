@@ -64,52 +64,7 @@
         "/app/v1/product-chat/": {
             "post": {
                 "operationId": "app-v1-product-chat-create",
-                "description": "Queue a Cekura AI Assistant request. Returns a progress_id immediately; poll the progress endpoint for incremental response chunks.",
-                "tags": [
-                    "app"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "description": "{\"progress_id\": \"<uuid>\"}  — poll /product-chat/progress/?progress_id=<id> for results."
-                    },
-                    "401": {
-                        "description": "Authentication required (Supabase JWT only)."
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded."
-                    }
-                }
-            }
-        },
-        "/app/v1/product-chat/cancel/": {
-            "post": {
-                "operationId": "app-v1-product-chat-cancel-create",
-                "description": "Cancel an in-progress AI assistant task. The Celery worker stops on its next iteration.",
+                "description": "POST /app/v1/product-chat/\n\nLegacy entry point. Creates the user/assistant messages, mints a\nstream token, kicks off the run in the agent runtime, and returns\n`{progress_id}` where `progress_id` is the assistant message id.",
                 "tags": [
                     "app"
                 ],
@@ -120,10 +75,26 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "{\"cancelled\": true}"
-                    },
-                    "400": {
-                        "description": "progress_id is required."
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v1/product-chat/cancel/": {
+            "post": {
+                "operationId": "app-v1-product-chat-cancel-create",
+                "description": "POST /app/v1/product-chat/cancel/  body={progress_id}",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -153,30 +124,10 @@
         "/app/v1/product-chat/export-pdf/": {
             "post": {
                 "operationId": "app-v1-product-chat-export-pdf-create",
-                "description": "Export an assistant message from product-chat as a PDF.",
+                "description": "POST /app/v1/product-chat/export-pdf/  body={session_id, message_index}",
                 "tags": [
                     "app"
                 ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatExportPdfRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatExportPdfRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatExportPdfRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
                 "security": [
                     {
                         "api_key": []
@@ -184,19 +135,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "application/pdf bytes."
-                    },
-                    "400": {
-                        "description": "message_index out of range or not an assistant turn."
-                    },
-                    "404": {
-                        "description": "Session not found in caller's orgs."
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded."
-                    },
-                    "502": {
-                        "description": "PDF rendering service unavailable."
+                        "description": "No response body"
                     }
                 }
             }
@@ -204,47 +143,18 @@
         "/app/v1/product-chat/feedback/": {
             "post": {
                 "operationId": "app-v1-product-chat-feedback-create",
-                "description": "Report a product-chat assistant message. One-click — no body fields beyond session/message_index.",
+                "description": "POST /app/v1/product-chat/feedback/  body={session_id, message_index?, ...}\n\nTwo side-effects, matching the legacy contract:\n  1. Persist the rating/text on `Message.metadata.feedback` for later UI.\n  2. Best-effort Slack alert via `send_product_chat_feedback_alert` so\n     the team sees the report in real time. Slack failures don't fail\n     the user request — same as the original `ProductChatFeedbackView`.",
                 "tags": [
                     "app"
                 ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatFeedbackRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatFeedbackRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ProductChatFeedbackRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
                 "security": [
                     {
                         "api_key": []
                     }
                 ],
                 "responses": {
-                    "202": {
-                        "description": "{\"received\": true}"
-                    },
-                    "400": {
-                        "description": "Validation error."
-                    },
-                    "404": {
-                        "description": "Session not found in caller's orgs."
-                    },
-                    "429": {
-                        "description": "Rate limit exceeded."
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -252,18 +162,7 @@
         "/app/v1/product-chat/progress/": {
             "get": {
                 "operationId": "app-v1-product-chat-progress-retrieve",
-                "description": "Poll for incremental chunks from a queued AI assistant task.",
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "UUID returned by POST /app/v1/product-chat/",
-                        "required": true
-                    }
-                ],
+                "description": "GET /app/v1/product-chat/progress/?progress_id=<message_id>\n\nReturns the legacy {status, chunks, session_id, ...} shape. `chunks`\nis the delta of assistant content since the previous poll, computed\nvia a Redis cursor.",
                 "tags": [
                     "app"
                 ],
@@ -274,21 +173,15 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "{\"status\": \"in_progress|completed|failed\", \"chunks\": [...], \"session_id\": \"...\", \"error\": null}"
-                    },
-                    "400": {
-                        "description": "progress_id query param is missing."
-                    },
-                    "404": {
-                        "description": "Progress not found (expired or invalid ID)."
+                        "description": "No response body"
                     }
                 }
             }
         },
         "/app/v1/product-chat/sessions/": {
             "get": {
-                "operationId": "app-v1-product-chat-sessions-list",
-                "description": "Return all persisted chat sessions for the authenticated user, ordered by most recently updated.",
+                "operationId": "app-v1-product-chat-sessions-retrieve",
+                "description": "GET /app/v1/product-chat/sessions/ — legacy {session_id, name, messages, updated_at}.",
                 "tags": [
                     "app"
                 ],
@@ -299,17 +192,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/ProductChatSession"
-                                    }
-                                }
-                            }
-                        },
-                        "description": ""
+                        "description": "No response body"
                     }
                 }
             }
@@ -317,7 +200,7 @@
         "/app/v1/product-chat/sessions/{session_id}/": {
             "delete": {
                 "operationId": "app-v1-product-chat-sessions-destroy",
-                "description": "Terminate a product chatbot sandbox. The conversation history is kept in the database.",
+                "description": "DELETE /app/v1/product-chat/sessions/:session_id/",
                 "parameters": [
                     {
                         "in": "path",
@@ -338,13 +221,349 @@
                 ],
                 "responses": {
                     "204": {
-                        "description": "Session terminated and deleted."
-                    },
-                    "401": {
-                        "description": "Authentication required."
-                    },
-                    "500": {
-                        "description": "Failed to terminate the sandbox session."
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/conversations/": {
+            "get": {
+                "operationId": "app-v2-product-chat-conversations-retrieve",
+                "description": "GET (list) / POST (create) conversations.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "app-v2-product-chat-conversations-create",
+                "description": "GET (list) / POST (create) conversations.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/conversations/{conversation_id}/": {
+            "get": {
+                "operationId": "app-v2-product-chat-conversations-retrieve_2",
+                "description": "GET (with messages) / DELETE (soft) one conversation.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "conversation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "app-v2-product-chat-conversations-destroy",
+                "description": "GET (with messages) / DELETE (soft) one conversation.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "conversation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/conversations/{conversation_id}/messages/": {
+            "post": {
+                "operationId": "app-v2-product-chat-conversations-messages-create",
+                "description": "POST /v2/conversations/:id/messages/\n\nCreates the user message + a streaming assistant message in one\ntransaction, mints a stream token, and returns the URL the browser\nshould open SSE against.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "conversation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/internal/health/": {
+            "get": {
+                "operationId": "app-v2-product-chat-internal-health-retrieve",
+                "description": "Backend reachability probe for the agent-runtime readiness check.\nReturns 200 if the backend can serve internal API-key-auth'd requests.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/internal/messages/{message_id}/cancel-status/": {
+            "get": {
+                "operationId": "app-v2-product-chat-internal-messages-cancel-status-retrieve",
+                "description": "Base class for internal endpoints. Uses static API-key auth only.\n\nCross-service request correlation: agent-runtime sets `X-Request-ID`\non every outbound call (typically the `message_id` for run-scoped\noperations). We surface it in the response and bind it to logs for\nthat request via DRF's `initial()` hook.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "message_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/internal/messages/{message_id}/checkpoint/": {
+            "post": {
+                "operationId": "app-v2-product-chat-internal-messages-checkpoint-create",
+                "description": "POST /internal/messages/:id/checkpoint/\n\nPersist progress / final / failed / clarification / tool_call state.\nCalled by the agent runtime driver task.\n\nMetadata semantics: top-level keys in the incoming `metadata` payload\nare *merged* with the existing row's metadata, never replaced. This\nmatters because tool calls land on `metadata.tool_calls` while\nclarifications land on `metadata.questions` — a clarification after\ntool use must not wipe the tool-call audit trail.\n\n`tool_call` is a special shape: it carries a single `tool_call` entry\nin the payload that gets *appended* to `metadata.tool_calls`. The\nother checkpoint types use simple key-merge semantics.\n\nAny path that mutates metadata uses SELECT FOR UPDATE so concurrent\ncheckpoints can't lose updates to each other.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "message_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/internal/messages/{message_id}/run-context/": {
+            "get": {
+                "operationId": "app-v2-product-chat-internal-messages-run-context-retrieve",
+                "description": "GET /internal/messages/:id/run-context/\n\nReturns full context the agent runtime needs to spawn a run, including\nthe conversation history and a fresh MCP JWT scoped to the user.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "message_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/internal/messages/orphans/": {
+            "get": {
+                "operationId": "app-v2-product-chat-internal-messages-orphans-retrieve",
+                "description": "List streaming messages that look abandoned. Used by agent_runtime's\norphan reaper at startup / on a periodic tick.\n\nA message is \"orphan\" if:\n  * status == 'streaming', AND\n  * last_progress_at < now - threshold     (driver attached but went silent), OR\n  * last_progress_at IS NULL AND created_at < now - threshold  (driver never attached)",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/messages/{message_id}/cancel/": {
+            "post": {
+                "operationId": "app-v2-product-chat-messages-cancel-create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "message_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "description": "App v2 product chat messages cancel"
+            }
+        },
+        "/app/v2/product-chat/messages/{message_id}/export-pdf/": {
+            "post": {
+                "operationId": "app-v2-product-chat-messages-export-pdf-create",
+                "description": "Returns the rendered report PDF for a given message.\n\nLooks up the assistant `Message` by id, computes its index within the\nconversation (preserved for compatibility with legacy filename / template\nfields), and delegates to `render_message_as_pdf()`.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "message_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/app/v2/product-chat/messages/{message_id}/feedback/": {
+            "post": {
+                "operationId": "app-v2-product-chat-messages-feedback-create",
+                "description": "Records feedback (thumbs up/down + optional text) on an assistant message.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "message_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -7472,8 +7691,7 @@
                                 "$ref": "#/components/schemas/Subscription"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -7528,8 +7746,7 @@
                                 "$ref": "#/components/schemas/Subscription"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -7584,8 +7801,7 @@
                                 "$ref": "#/components/schemas/Subscription"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -7640,8 +7856,7 @@
                                 "$ref": "#/components/schemas/Subscription"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -7686,8 +7901,7 @@
                                 "$ref": "#/components/schemas/Subscription"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -49807,7 +50021,7 @@
                         "type": "string",
                         "x-spec-enum-id": "adcfc876f3a8758f",
                         "default": "standard",
-                        "description": "`standard` — normal response to the matched condition. `action_followup` — fires after the referenced condition id.\n\n* `standard` - standard\n* `action_followup` - action_followup"
+                        "description": "`standard` — normal response to the matched condition. `action_followup` — fires on the testing agent's next turn after the referenced condition was executed (one main-agent reply elapses in between). Firing is deterministic and does not depend on the reply's content; it never fires in the same turn as its parent.\n\n* `standard` - standard\n* `action_followup` - action_followup"
                     },
                     "fixed_message": {
                         "type": "boolean",
@@ -57395,7 +57609,7 @@
                     },
                     "instructions": {
                         "type": "string",
-                        "description": "\nScenario Instructions - the format depends on the scenario_type:\n\n**For scenario_type=\"instruction\":**\nProvide plain text instructions that describe the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you send via `instructions`, pass a JSON-formatted string with the following structure:\n\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi, I'd like to check on my upcoming appointment <silence time=\\\"1.5s\\\" />\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"The agent asks for your name\",\n      \"action\": \"My name is Sarah Johnson\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"The agent asks for your date of birth\",\n      \"action\": \"January first, nineteen ninety\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": \"The agent confirms your identity and provides appointment details\",\n      \"action\": \"Thank you, that's all I needed <silence time=\\\"1.0s\\\" />\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 4,\n      \"condition\": 3,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Note:** When sent via `instructions`, the value must be a JSON-formatted string (e.g. `JSON.stringify(...)` / `json.dumps(...)`). For new integrations, use the structured `conditional_actions` field below.\n\n**Structure Details:**\n\n- **`role`** (string): Personality/role description for the scenario actor\n\n- **`conditions`** (array): Ordered list of conditional actions that define the conversation flow\n\n  **Each condition object has:**\n  - **`id`** (integer): Unique sequential identifier (0, 1, 2, 3...)\n\n  - **`condition`** (string | integer): The trigger that activates this action\n    - `\"FIRST_MESSAGE\"` — Triggers at conversation start (use for `id: 0`)\n    - Natural-language description of the main agent's observable action, written from a third-person observer perspective (e.g. `\"The agent asks for your date of birth\"`, `\"The agent confirms the cancellation\"`). Matched semantically against the conversation context.\n    - Integer (e.g. `3`) — References another condition's `id` for sequential `action_followup` chaining\n\n  - **`action`** (string): What the scenario actor says or does\n    - **SSML pause tags:** `<silence time=\"1.5s\" />` (interruptible) or `<hold time=\"2s\" />` (not interruptible). `<silence>` lets the main agent jump in mid-pause; `<hold>` enforces dead air.\n    - **Emotion markers:** `[laughter]`, `[sigh]`, etc. (can repeat like `[laughter] [laughter]`)\n    - **Special actions:** `<endcall />` to end the call\n\n  - **`type`** (string): Either `\"standard\"` (normal response) or `\"action_followup\"` (triggers after another condition)\n\n  - **`fixed_message`** (boolean): Set to `true` for fixed responses, `false` for dynamic\n\n**Usage Tips:**\n- Always start with `id: 0` and `condition: \"FIRST_MESSAGE\"`\n- Write conditions as third-person descriptions of what the main agent does (e.g. `\"The agent confirms the cancellation\"`)\n- Use the last condition to trigger `<endcall />` for clean call termination\n- Combine SSML tags and emotion markers naturally: `\"Great <silence time=\\\"1.5s\\\" /> [laughter] [laughter]\"`\n"
+                        "description": "\nScenario Instructions - the format depends on the scenario_type:\n\n**For scenario_type=\"instruction\":**\nProvide plain text instructions that describe the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you send via `instructions`, pass a JSON-formatted string with the following structure:\n\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi, I'd like to check on my upcoming appointment <silence time=\\\"1.5s\\\" />\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"The agent asks for your name\",\n      \"action\": \"My name is Sarah Johnson\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"The agent asks for your date of birth\",\n      \"action\": \"January first, nineteen ninety\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": \"The agent confirms your identity and provides appointment details\",\n      \"action\": \"Thank you, that's all I needed <silence time=\\\"1.0s\\\" />\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 4,\n      \"condition\": 3,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Note:** When sent via `instructions`, the value must be a JSON-formatted string (e.g. `JSON.stringify(...)` / `json.dumps(...)`). For new integrations, use the structured `conditional_actions` field below.\n\n**Structure Details:**\n\n- **`role`** (string): Personality/role description for the scenario actor\n\n- **`conditions`** (array): Ordered list of conditional actions that define the conversation flow\n\n  **Each condition object has:**\n  - **`id`** (integer): Unique sequential identifier (0, 1, 2, 3...)\n\n  - **`condition`** (string | integer): The trigger that activates this action\n    - `\"FIRST_MESSAGE\"` — Triggers at conversation start (use for `id: 0`)\n    - Natural-language description of the main agent's observable action, written from a third-person observer perspective (e.g. `\"The agent asks for your date of birth\"`, `\"The agent confirms the cancellation\"`). Matched semantically against the conversation context.\n    - Integer (e.g. `3`) — References another condition's `id` for sequential `action_followup` chaining\n\n  - **`action`** (string): What the scenario actor says or does\n    - **SSML pause tags:** `<silence time=\"1.5s\" />` (interruptible) or `<hold time=\"2s\" />` (not interruptible). `<silence>` lets the main agent jump in mid-pause; `<hold>` enforces dead air.\n    - **Emotion markers:** `[laughter]`, `[sigh]`, etc. (can repeat like `[laughter] [laughter]`)\n    - **Special actions:** `<endcall />` to end the call\n\n  - **`type`** (string): Either `\"standard\"` (normal response) or `\"action_followup\"` (fires on the testing agent's next turn after the referenced condition — one main-agent reply elapses in between, regardless of its content; never fires in the same turn as its parent)\n\n  - **`fixed_message`** (boolean): Set to `true` for fixed responses, `false` for dynamic\n\n**Usage Tips:**\n- Always start with `id: 0` and `condition: \"FIRST_MESSAGE\"`\n- Write conditions as third-person descriptions of what the main agent does (e.g. `\"The agent confirms the cancellation\"`)\n- Use the last condition to trigger `<endcall />` for clean call termination\n- Combine SSML tags and emotion markers naturally: `\"Great <silence time=\\\"1.5s\\\" /> [laughter] [laughter]\"`\n"
                     },
                     "conditional_actions": {
                         "allOf": [
@@ -59089,130 +59303,6 @@
                 "required": [
                     "improved_evaluation_trigger",
                     "improved_metric_description"
-                ]
-            },
-            "ProductChatExportPdfRequest": {
-                "type": "object",
-                "description": "Request body for POST /app/v1/product-chat/export-pdf/ — exports a\nsingle assistant message (typically a /cekura-report output) as a PDF.",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "maxLength": 128
-                    },
-                    "message_index": {
-                        "type": "integer",
-                        "minimum": 0
-                    }
-                },
-                "required": [
-                    "message_index",
-                    "session_id"
-                ]
-            },
-            "ProductChatFeedbackRequest": {
-                "type": "object",
-                "description": "Request body for POST /app/v1/product-chat/feedback/ — the per-message\n\"report\" button in the chat UI. One-click submission: no reason picker,\nno free text. The flagged message + surrounding turns IS the signal.",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "maxLength": 128
-                    },
-                    "message_index": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "minimum": 0
-                    }
-                },
-                "required": [
-                    "session_id"
-                ]
-            },
-            "ProductChatMessage": {
-                "type": "object",
-                "description": "A single message entry in a product chat conversation.",
-                "properties": {
-                    "role": {
-                        "enum": [
-                            "user",
-                            "assistant"
-                        ],
-                        "type": "string",
-                        "description": "* `user` - user\n* `assistant` - assistant",
-                        "x-spec-enum-id": "0376a589d982d83c"
-                    },
-                    "message": {
-                        "type": "string",
-                        "maxLength": 50000
-                    }
-                },
-                "required": [
-                    "message",
-                    "role"
-                ]
-            },
-            "ProductChatRequest": {
-                "type": "object",
-                "description": "Request body for POST /app/v1/product-chat/.\n\nThe frontend is responsible for managing conversation history and sending\nit on every request. This ensures context is preserved even after a sandbox\nrestart without requiring the sandbox to persist state between sessions.",
-                "properties": {
-                    "message": {
-                        "type": "string",
-                        "maxLength": 10000
-                    },
-                    "session_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "project_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "messages": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/ProductChatMessage"
-                        },
-                        "maxItems": 500
-                    },
-                    "files": {
-                        "type": "array",
-                        "items": {
-                            "type": "string",
-                            "format": "uri"
-                        },
-                        "maxItems": 5
-                    }
-                },
-                "required": [
-                    "message"
-                ]
-            },
-            "ProductChatSession": {
-                "type": "object",
-                "description": "Read serializer for the product chat session list and detail endpoints.\nReturned to the frontend so it can restore sessions after a page refresh.",
-                "properties": {
-                    "session_id": {
-                        "type": "string",
-                        "maxLength": 100
-                    },
-                    "name": {
-                        "type": "string",
-                        "maxLength": 100
-                    },
-                    "messages": {},
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true
-                    }
-                },
-                "required": [
-                    "session_id"
                 ]
             },
             "Project": {
@@ -61037,10 +61127,18 @@
                         },
                         "description": "AI-suggested changes from previous response - use with apply_changes=true to apply them"
                     },
+                    "agent_selections": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "description": "Structured agent selections: maps scenario_id (as string key) to agent_id. Use this instead of agent_resolution_response."
+                    },
                     "agent_resolution_response": {
                         "type": "string",
                         "default": "",
-                        "description": "User's response when agent clarification was needed"
+                        "description": "Deprecated: use agent_selections instead"
                     },
                     "scenarios_needing_agent": {
                         "type": "array",
@@ -63215,7 +63313,7 @@
                     },
                     "instructions": {
                         "type": "string",
-                        "description": "\nScenario Instructions - the format depends on the scenario_type:\n\n**For scenario_type=\"instruction\":**\nProvide plain text instructions that describe the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you send via `instructions`, pass a JSON-formatted string with the following structure:\n\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi, I'd like to check on my upcoming appointment <silence time=\\\"1.5s\\\" />\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"The agent asks for your name\",\n      \"action\": \"My name is Sarah Johnson\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"The agent asks for your date of birth\",\n      \"action\": \"January first, nineteen ninety\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": \"The agent confirms your identity and provides appointment details\",\n      \"action\": \"Thank you, that's all I needed <silence time=\\\"1.0s\\\" />\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 4,\n      \"condition\": 3,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Note:** When sent via `instructions`, the value must be a JSON-formatted string (e.g. `JSON.stringify(...)` / `json.dumps(...)`). For new integrations, use the structured `conditional_actions` field below.\n\n**Structure Details:**\n\n- **`role`** (string): Personality/role description for the scenario actor\n\n- **`conditions`** (array): Ordered list of conditional actions that define the conversation flow\n\n  **Each condition object has:**\n  - **`id`** (integer): Unique sequential identifier (0, 1, 2, 3...)\n\n  - **`condition`** (string | integer): The trigger that activates this action\n    - `\"FIRST_MESSAGE\"` — Triggers at conversation start (use for `id: 0`)\n    - Natural-language description of the main agent's observable action, written from a third-person observer perspective (e.g. `\"The agent asks for your date of birth\"`, `\"The agent confirms the cancellation\"`). Matched semantically against the conversation context.\n    - Integer (e.g. `3`) — References another condition's `id` for sequential `action_followup` chaining\n\n  - **`action`** (string): What the scenario actor says or does\n    - **SSML pause tags:** `<silence time=\"1.5s\" />` (interruptible) or `<hold time=\"2s\" />` (not interruptible). `<silence>` lets the main agent jump in mid-pause; `<hold>` enforces dead air.\n    - **Emotion markers:** `[laughter]`, `[sigh]`, etc. (can repeat like `[laughter] [laughter]`)\n    - **Special actions:** `<endcall />` to end the call\n\n  - **`type`** (string): Either `\"standard\"` (normal response) or `\"action_followup\"` (triggers after another condition)\n\n  - **`fixed_message`** (boolean): Set to `true` for fixed responses, `false` for dynamic\n\n**Usage Tips:**\n- Always start with `id: 0` and `condition: \"FIRST_MESSAGE\"`\n- Write conditions as third-person descriptions of what the main agent does (e.g. `\"The agent confirms the cancellation\"`)\n- Use the last condition to trigger `<endcall />` for clean call termination\n- Combine SSML tags and emotion markers naturally: `\"Great <silence time=\\\"1.5s\\\" /> [laughter] [laughter]\"`\n"
+                        "description": "\nScenario Instructions - the format depends on the scenario_type:\n\n**For scenario_type=\"instruction\":**\nProvide plain text instructions that describe the scenario behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you send via `instructions`, pass a JSON-formatted string with the following structure:\n\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"conditions\": [\n    {\n      \"id\": 0,\n      \"condition\": \"FIRST_MESSAGE\",\n      \"action\": \"Hi, I'd like to check on my upcoming appointment <silence time=\\\"1.5s\\\" />\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 1,\n      \"condition\": \"The agent asks for your name\",\n      \"action\": \"My name is Sarah Johnson\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 2,\n      \"condition\": \"The agent asks for your date of birth\",\n      \"action\": \"January first, nineteen ninety\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 3,\n      \"condition\": \"The agent confirms your identity and provides appointment details\",\n      \"action\": \"Thank you, that's all I needed <silence time=\\\"1.0s\\\" />\",\n      \"type\": \"standard\",\n      \"fixed_message\": true\n    },\n    {\n      \"id\": 4,\n      \"condition\": 3,\n      \"action\": \"<endcall />\",\n      \"type\": \"action_followup\",\n      \"fixed_message\": true\n    }\n  ]\n}\n```\n\n**Note:** When sent via `instructions`, the value must be a JSON-formatted string (e.g. `JSON.stringify(...)` / `json.dumps(...)`). For new integrations, use the structured `conditional_actions` field below.\n\n**Structure Details:**\n\n- **`role`** (string): Personality/role description for the scenario actor\n\n- **`conditions`** (array): Ordered list of conditional actions that define the conversation flow\n\n  **Each condition object has:**\n  - **`id`** (integer): Unique sequential identifier (0, 1, 2, 3...)\n\n  - **`condition`** (string | integer): The trigger that activates this action\n    - `\"FIRST_MESSAGE\"` — Triggers at conversation start (use for `id: 0`)\n    - Natural-language description of the main agent's observable action, written from a third-person observer perspective (e.g. `\"The agent asks for your date of birth\"`, `\"The agent confirms the cancellation\"`). Matched semantically against the conversation context.\n    - Integer (e.g. `3`) — References another condition's `id` for sequential `action_followup` chaining\n\n  - **`action`** (string): What the scenario actor says or does\n    - **SSML pause tags:** `<silence time=\"1.5s\" />` (interruptible) or `<hold time=\"2s\" />` (not interruptible). `<silence>` lets the main agent jump in mid-pause; `<hold>` enforces dead air.\n    - **Emotion markers:** `[laughter]`, `[sigh]`, etc. (can repeat like `[laughter] [laughter]`)\n    - **Special actions:** `<endcall />` to end the call\n\n  - **`type`** (string): Either `\"standard\"` (normal response) or `\"action_followup\"` (fires on the testing agent's next turn after the referenced condition — one main-agent reply elapses in between, regardless of its content; never fires in the same turn as its parent)\n\n  - **`fixed_message`** (boolean): Set to `true` for fixed responses, `false` for dynamic\n\n**Usage Tips:**\n- Always start with `id: 0` and `condition: \"FIRST_MESSAGE\"`\n- Write conditions as third-person descriptions of what the main agent does (e.g. `\"The agent confirms the cancellation\"`)\n- Use the last condition to trigger `<endcall />` for clean call termination\n- Combine SSML tags and emotion markers naturally: `\"Great <silence time=\\\"1.5s\\\" /> [laughter] [laughter]\"`\n"
                     },
                     "conditional_actions": {
                         "allOf": [
@@ -64168,14 +64266,16 @@
                         "type": [
                             "integer",
                             "null"
-                        ]
+                        ],
+                        "readOnly": true
                     },
                     "stripe_subscription_id": {
                         "type": "string",
-                        "maxLength": 100
+                        "readOnly": true
                     },
                     "is_active": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "readOnly": true
                     },
                     "is_trial": {
                         "type": "string",
@@ -64195,11 +64295,22 @@
                     },
                     "last_payment_at": {
                         "type": "string",
-                        "format": "date-time"
+                        "format": "date-time",
+                        "readOnly": true
                     },
                     "expire_at": {
                         "type": "string",
-                        "format": "date-time"
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "cancelled_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Timestamp when the subscription was cancelled (is_active set to False)."
                     },
                     "created_at": {
                         "type": "string",
@@ -64211,12 +64322,7 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                },
-                "required": [
-                    "expire_at",
-                    "last_payment_at",
-                    "stripe_subscription_id"
-                ]
+                }
             },
             "SubscriptionStatus": {
                 "type": "object",

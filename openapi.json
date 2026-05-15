@@ -64,7 +64,7 @@
         "/app/v1/product-chat/": {
             "post": {
                 "operationId": "app-v1-product-chat-create",
-                "description": "POST /app/v1/product-chat/\n\nLegacy entry point. Creates the user/assistant messages, mints a\nstream token, kicks off the run in the agent runtime, and returns\n`{progress_id}` where `progress_id` is the assistant message id.",
+                "description": "Send a product-chat message and start the agent run (legacy v1).\n\nCreates the user/assistant messages, mints a stream token, kicks off\nthe run in the agent runtime, and returns `{progress_id}` where\n`progress_id` is the assistant message id.",
                 "tags": [
                     "app"
                 ],
@@ -83,7 +83,7 @@
         "/app/v1/product-chat/cancel/": {
             "post": {
                 "operationId": "app-v1-product-chat-cancel-create",
-                "description": "POST /app/v1/product-chat/cancel/  body={progress_id}",
+                "description": "Cancel an in-flight product-chat run (legacy v1).\n\nBody: `{progress_id}`. Flags the assistant message for cancel; the\nagent runtime picks up the flag on its next checkpoint.",
                 "tags": [
                     "app"
                 ],
@@ -124,7 +124,7 @@
         "/app/v1/product-chat/export-pdf/": {
             "post": {
                 "operationId": "app-v1-product-chat-export-pdf-create",
-                "description": "POST /app/v1/product-chat/export-pdf/  body={session_id, message_index}",
+                "description": "Export a product-chat assistant message as PDF (legacy v1).\n\nBody: `{session_id, message_index}`. Renders the assistant turn at\nthe given index via the shared PDF service and streams the result.",
                 "tags": [
                     "app"
                 ],
@@ -143,7 +143,7 @@
         "/app/v1/product-chat/feedback/": {
             "post": {
                 "operationId": "app-v1-product-chat-feedback-create",
-                "description": "POST /app/v1/product-chat/feedback/  body={session_id, message_index?, ...}\n\nTwo side-effects, matching the legacy contract:\n  1. Persist the rating/text on `Message.metadata.feedback` for later UI.\n  2. Best-effort Slack alert via `send_product_chat_feedback_alert` so\n     the team sees the report in real time. Slack failures don't fail\n     the user request — same as the original `ProductChatFeedbackView`.",
+                "description": "Record user feedback on a product-chat assistant message (legacy v1).\n\nBody: `{session_id, message_index?, rating, feedback?}`. Two\nside-effects, matching the legacy contract:\n  1. Persist the rating/text on `Message.metadata.feedback` for later UI.\n  2. Best-effort Slack alert via `send_product_chat_feedback_alert` so\n     the team sees the report in real time. Slack failures don't fail\n     the user request — same as the original `ProductChatFeedbackView`.",
                 "tags": [
                     "app"
                 ],
@@ -162,7 +162,7 @@
         "/app/v1/product-chat/progress/": {
             "get": {
                 "operationId": "app-v1-product-chat-progress-retrieve",
-                "description": "GET /app/v1/product-chat/progress/?progress_id=<message_id>\n\nReturns the legacy {status, chunks, session_id, ...} shape. `chunks`\nis the delta of assistant content since the previous poll, computed\nvia a Redis cursor.",
+                "description": "Poll progress for an in-flight product-chat run (legacy v1).\n\nReturns the legacy `{status, chunks, session_id, ...}` shape. `chunks`\nis the delta of assistant content since the previous poll, computed\nvia a Redis cursor.",
                 "tags": [
                     "app"
                 ],
@@ -181,7 +181,7 @@
         "/app/v1/product-chat/sessions/": {
             "get": {
                 "operationId": "app-v1-product-chat-sessions-retrieve",
-                "description": "GET /app/v1/product-chat/sessions/ — legacy {session_id, name, messages, updated_at}.",
+                "description": "List the user's product-chat sessions (legacy v1).\n\nReturns each non-deleted conversation as\n`{session_id, name, messages, updated_at}`, ordered by most-recent update.",
                 "tags": [
                     "app"
                 ],
@@ -200,7 +200,7 @@
         "/app/v1/product-chat/sessions/{session_id}/": {
             "delete": {
                 "operationId": "app-v1-product-chat-sessions-destroy",
-                "description": "DELETE /app/v1/product-chat/sessions/:session_id/",
+                "description": "Delete a product-chat session (legacy v1).\n\nSoft-delete: sets `is_deleted=True` on the conversation. Accepts both\ncanonical UUIDs and legacy session ids.",
                 "parameters": [
                     {
                         "in": "path",
@@ -229,7 +229,7 @@
         "/app/v2/product-chat/conversations/": {
             "get": {
                 "operationId": "app-v2-product-chat-conversations-retrieve",
-                "description": "GET (list) / POST (create) conversations.",
+                "description": "List the user's product-chat conversations or create a new one.\n\n`GET` returns non-deleted conversations ordered by most-recent update.\n`POST` creates an empty conversation (optionally seeded with a name).",
                 "tags": [
                     "app"
                 ],
@@ -246,7 +246,7 @@
             },
             "post": {
                 "operationId": "app-v2-product-chat-conversations-create",
-                "description": "GET (list) / POST (create) conversations.",
+                "description": "List the user's product-chat conversations or create a new one.\n\n`GET` returns non-deleted conversations ordered by most-recent update.\n`POST` creates an empty conversation (optionally seeded with a name).",
                 "tags": [
                     "app"
                 ],
@@ -265,7 +265,7 @@
         "/app/v2/product-chat/conversations/{conversation_id}/": {
             "get": {
                 "operationId": "app-v2-product-chat-conversations-retrieve_2",
-                "description": "GET (with messages) / DELETE (soft) one conversation.",
+                "description": "Retrieve a product-chat conversation (with its messages) or soft-delete it.\n\n`GET` returns the conversation plus its ordered messages.\n`DELETE` soft-deletes it (sets `is_deleted=True`).",
                 "parameters": [
                     {
                         "in": "path",
@@ -293,7 +293,7 @@
             },
             "delete": {
                 "operationId": "app-v2-product-chat-conversations-destroy",
-                "description": "GET (with messages) / DELETE (soft) one conversation.",
+                "description": "Retrieve a product-chat conversation (with its messages) or soft-delete it.\n\n`GET` returns the conversation plus its ordered messages.\n`DELETE` soft-deletes it (sets `is_deleted=True`).",
                 "parameters": [
                     {
                         "in": "path",
@@ -323,7 +323,7 @@
         "/app/v2/product-chat/conversations/{conversation_id}/messages/": {
             "post": {
                 "operationId": "app-v2-product-chat-conversations-messages-create",
-                "description": "POST /v2/conversations/:id/messages/\n\nCreates the user message + a streaming assistant message in one\ntransaction, mints a stream token, and returns the URL the browser\nshould open SSE against.",
+                "description": "Send a user message to a product-chat conversation and start the assistant run.\n\nCreates the user message + a streaming assistant message in one\ntransaction, mints a stream token, and returns the URL the browser\nshould open SSE against.",
                 "parameters": [
                     {
                         "in": "path",
@@ -350,137 +350,10 @@
                 }
             }
         },
-        "/app/v2/product-chat/internal/health/": {
-            "get": {
-                "operationId": "app-v2-product-chat-internal-health-retrieve",
-                "description": "Backend reachability probe for the agent-runtime readiness check.\nReturns 200 if the backend can serve internal API-key-auth'd requests.",
-                "tags": [
-                    "app"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "No response body"
-                    }
-                }
-            }
-        },
-        "/app/v2/product-chat/internal/messages/{message_id}/cancel-status/": {
-            "get": {
-                "operationId": "app-v2-product-chat-internal-messages-cancel-status-retrieve",
-                "description": "Base class for internal endpoints. Uses static API-key auth only.\n\nCross-service request correlation: agent-runtime sets `X-Request-ID`\non every outbound call (typically the `message_id` for run-scoped\noperations). We surface it in the response and bind it to logs for\nthat request via DRF's `initial()` hook.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "message_id",
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "app"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "No response body"
-                    }
-                }
-            }
-        },
-        "/app/v2/product-chat/internal/messages/{message_id}/checkpoint/": {
-            "post": {
-                "operationId": "app-v2-product-chat-internal-messages-checkpoint-create",
-                "description": "POST /internal/messages/:id/checkpoint/\n\nPersist progress / final / failed / clarification / tool_call state.\nCalled by the agent runtime driver task.\n\nMetadata semantics: top-level keys in the incoming `metadata` payload\nare *merged* with the existing row's metadata, never replaced. This\nmatters because tool calls land on `metadata.tool_calls` while\nclarifications land on `metadata.questions` — a clarification after\ntool use must not wipe the tool-call audit trail.\n\n`tool_call` is a special shape: it carries a single `tool_call` entry\nin the payload that gets *appended* to `metadata.tool_calls`. The\nother checkpoint types use simple key-merge semantics.\n\nAny path that mutates metadata uses SELECT FOR UPDATE so concurrent\ncheckpoints can't lose updates to each other.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "message_id",
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "app"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "No response body"
-                    }
-                }
-            }
-        },
-        "/app/v2/product-chat/internal/messages/{message_id}/run-context/": {
-            "get": {
-                "operationId": "app-v2-product-chat-internal-messages-run-context-retrieve",
-                "description": "GET /internal/messages/:id/run-context/\n\nReturns full context the agent runtime needs to spawn a run, including\nthe conversation history and a fresh MCP JWT scoped to the user.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "message_id",
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "app"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "No response body"
-                    }
-                }
-            }
-        },
-        "/app/v2/product-chat/internal/messages/orphans/": {
-            "get": {
-                "operationId": "app-v2-product-chat-internal-messages-orphans-retrieve",
-                "description": "List streaming messages that look abandoned. Used by agent_runtime's\norphan reaper at startup / on a periodic tick.\n\nA message is \"orphan\" if:\n  * status == 'streaming', AND\n  * last_progress_at < now - threshold     (driver attached but went silent), OR\n  * last_progress_at IS NULL AND created_at < now - threshold  (driver never attached)",
-                "tags": [
-                    "app"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "No response body"
-                    }
-                }
-            }
-        },
         "/app/v2/product-chat/messages/{message_id}/cancel/": {
             "post": {
                 "operationId": "app-v2-product-chat-messages-cancel-create",
+                "description": "Cancel an in-flight product-chat assistant message.\n\nFlags the message for cancel; if no driver has attached yet, flips\nstatus synchronously so the message doesn't sit in `streaming` forever.",
                 "parameters": [
                     {
                         "in": "path",
@@ -504,8 +377,7 @@
                     "200": {
                         "description": "No response body"
                     }
-                },
-                "description": "App v2 product chat messages cancel"
+                }
             }
         },
         "/app/v2/product-chat/messages/{message_id}/export-pdf/": {

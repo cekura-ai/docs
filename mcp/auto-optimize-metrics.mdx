@@ -1,0 +1,125 @@
+---
+title: "Auto-optimise Metrics on a Schedule"
+sidebarTitle: "Auto-optimise Metrics"
+description: "Run the Metric Lab optimiser on a recurring schedule with a Claude Code routine — no UI clicks required."
+icon: "wand-magic-sparkles"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+The [Metric Lab](/documentation/guides/metric-lab) **Auto Improve** button rewrites a metric's prompt based on the feedback annotations on its test sets. This guide shows how to run that same optimiser on a recurring schedule using a [Claude Code](https://www.claude.com/product/claude-code) routine and the Cekura MCP — so newly-annotated test sets feed back into your metric prompts automatically.
+
+<Note>
+**Optimiser input is human feedback, not raw test sets.** The optimiser reads the annotations and notes you've left on `MetricReview` rows. If no new feedback has been added since the last run, re-running will not change the prompt. Treat this as a follow-on to your existing labelling cadence.
+</Note>
+
+## Prerequisites
+
+<Steps>
+  <Step title="Connect Claude Code to the Cekura MCP">
+    Follow the [MCP overview](/mcp/overview#2-configure-mcp-server) for the one-line `claude mcp add` setup. OAuth is recommended.
+  </Step>
+  <Step title="Have at least one metric with labelled test sets">
+    The optimiser needs `MetricReview` rows that already have `expected_value` and `feedback` set — i.e., calls you've **Added to Lab** and **Annotated** through the [Metric Lab workflow](/documentation/guides/metric-lab#annotate).
+  </Step>
+  <Step title="Note the IDs you want the routine to operate on">
+    For each metric you want auto-optimised, grab:
+    - The **metric ID** — visible in the URL when you open the metric (`/metrics/<id>`).
+    - The **test set IDs** the optimiser should learn from — the test sets linked to that metric's Lab. Visible in the Lab table view or the URL.
+  </Step>
+</Steps>
+
+## The routine prompt
+
+Paste this into Claude Code, filling in the metric and test set IDs. It chains the four MCP tools the optimiser needs end-to-end.
+
+```
+You are auto-optimising Cekura metric prompts based on accumulated test-set
+feedback. Run this for each entry in the list below.
+
+Metrics to optimise:
+- metric_id: 12345
+  test_set_ids: [67, 89, 102]
+- metric_id: 12346
+  test_set_ids: [70, 91]
+
+For each entry:
+
+1. Call `metric_reviews_process_feedbacks` with that metric_id and test_set_ids.
+   Capture the returned `progress_id`.
+
+2. Poll `metric_reviews_process_feedbacks_progress` with that progress_id
+   roughly every 30s until status is "success" or "error". If "error", stop
+   and report the error for that metric — continue to the next entry.
+
+3. On success, read the returned `metric_description` and `evaluation_trigger`
+   from the progress output. Call `metrics_retrieve` for the same metric_id to
+   read the *current* description and trigger, and produce a unified diff
+   between current and proposed for both fields.
+
+4. Do NOT call `metrics_partial_update` yet. Print the diff and stop for this
+   metric.
+
+After processing every entry, summarise: which metrics had proposed changes,
+which were unchanged, which errored. Do not apply any changes.
+```
+
+<Tip>
+Step 4 deliberately stops short of saving. The optimiser sometimes proposes large rewrites — keep a human in the loop for the first few runs before letting the routine call `metrics_partial_update` directly.
+</Tip>
+
+## Schedule it
+
+Once the prompt produces clean diffs you're comfortable with, schedule it with Claude Code's `/schedule` slash command:
+
+```
+/schedule weekly on Monday at 09:00
+
+<paste the routine prompt above>
+```
+
+Claude Code will fire the routine on that cron and surface the diffs in your inbox / Claude Code session each time it runs. See [Claude Code Routines](https://docs.claude.com/en/docs/claude-code/automation) for the full slash-command reference.
+
+A typical cadence:
+
+- **Weekly** if your team labels reviews regularly (recommended).
+- **Daily** only if you have an active labelling workflow producing dozens of new annotations per day.
+- **Monthly** if labelling is bursty (e.g. quarterly audits).
+
+## Auto-apply (advanced)
+
+Once you trust the routine, swap step 4 for:
+
+```
+4. Call `metrics_partial_update` with the metric_id and the proposed
+   `metric_description` and `evaluation_trigger` from the progress output.
+   Then call `metrics_run_reviews_create` for the same metric to re-score
+   every linked test set against the new prompt. Report the before/after
+   score delta from the run.
+```
+
+This applies the new prompt and immediately verifies it didn't regress the labelled set. If the score delta is negative for any metric, revert manually from the Metric Lab UI.
+
+<Note>
+**`metrics_partial_update` is destructive in effect.** It overwrites the live prompt your production agent evaluates against. Always run the read-only version of the routine for a week or two before enabling auto-apply.
+</Note>
+
+## How it maps to the Metric Lab UI
+
+| Routine step                                     | Equivalent in the [Metric Lab UI](/documentation/guides/metric-lab) |
+| ------------------------------------------------ | ------------------------------------------------------------------- |
+| `metric_reviews_process_feedbacks`               | Clicking **Auto Improve**                                           |
+| `metric_reviews_process_feedbacks_progress`      | The progress panel polling that task                                |
+| Reviewing the diff before saving                 | **View Changes** → diff view                                        |
+| `metrics_partial_update`                         | **Save**                                                            |
+| `metrics_run_reviews_create`                     | **Run** (re-score the test set)                                     |
+
+## Troubleshooting
+
+**The routine reports "no changes proposed" every run.** No new feedback has been added since the last run. The optimiser is deterministic on a fixed set of annotations.
+
+**Progress polling times out.** The optimiser can take several minutes for metrics with many test sets. Increase the polling interval or raise your routine's timeout — do not retry mid-flight, that will start a second concurrent optimisation.
+
+**The routine can't list test sets.** Test set listing is not yet MCP-exposed. You must hardcode `test_set_ids` in the routine prompt for now. To pick up new test sets added to a metric's Lab, update the prompt manually.

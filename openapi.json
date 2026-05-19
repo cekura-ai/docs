@@ -37447,7 +37447,7 @@
             },
             "post": {
                 "operationId": "test-framework-v2-aiagents-create",
-                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.credentials rather than flat fields. transcript_provider defaults to provider.type when omitted.\n\nRenamed fields vs v1: agent_name→name, contact_number→phone_number, sip_endpoint→sip_uri, outbound_auto_call→auto_dial_outbound, auto_fetch_calls_enabled→auto_import_calls, auto_sync_prompt_enabled→auto_sync_prompt, agent_gives_first_message→agent_speaks_first.",
+                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type:**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id (voice agent) + chat_agent_id (text-mode agent, can differ)\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (Bland pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- agentforce: api_key (client_secret) + config.{client_id, domain, agent_id}\n- trillet: api_key + config.{workspace_id}\n- self_hosted: credentials.config.{url (wss://), headers}\n\nSee examples below for full per-provider payloads.",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "AI Agents"
@@ -37556,6 +37556,133 @@
                                     },
                                     "summary": "Self-hosted via websocket URL",
                                     "description": "Your agent exposes a websocket endpoint for text-mode testing."
+                                },
+                                "Self-hosted(observation-only,MostCommon)": {
+                                    "value": {
+                                        "name": "Support Bot",
+                                        "description": "Handles inbound support calls",
+                                        "project": 42,
+                                        "inbound": true,
+                                        "phone_number": "+14155551234",
+                                        "provider": {
+                                            "type": "self_hosted"
+                                        }
+                                    },
+                                    "summary": "Self-hosted (observation-only, most common)"
+                                },
+                                "Self-hostedViaWebSocket(text-modeTesting)": {
+                                    "value": {
+                                        "name": "WS Agent",
+                                        "description": "Agent with websocket endpoint for text-mode runs",
+                                        "project": 42,
+                                        "inbound": false,
+                                        "provider": {
+                                            "type": "self_hosted",
+                                            "credentials": {
+                                                "config": {
+                                                    "url": "wss://staging.example.com/agent",
+                                                    "headers": {
+                                                        "Authorization": "Bearer token"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "summary": "Self-hosted via WebSocket (text-mode testing)"
+                                },
+                                "VAPI": {
+                                    "value": {
+                                        "name": "VAPI Sales Agent",
+                                        "description": "Outbound sales qualification",
+                                        "project": 42,
+                                        "inbound": false,
+                                        "phone_number": "+14155551234",
+                                        "provider": {
+                                            "type": "vapi",
+                                            "agent_id": "asst_abc123xyz",
+                                            "credentials": {
+                                                "api_key": "vapi_sk_xxx",
+                                                "config": {
+                                                    "public_key": "vapi_pk_xxx"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "Retell": {
+                                    "value": {
+                                        "name": "Retell Booking Agent",
+                                        "description": "Schedules appointments",
+                                        "project": 42,
+                                        "inbound": true,
+                                        "phone_number": "+14155551234",
+                                        "provider": {
+                                            "type": "retell",
+                                            "agent_id": "retell_voice_agent_abc123",
+                                            "chat_agent_id": "retell_chat_agent_xyz456",
+                                            "credentials": {
+                                                "api_key": "key_xxx",
+                                                "config": {
+                                                    "trigger_url": "https://api.retellai.com/create-phone-call"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "description": "agent_id = Retell agent for voice/inbound calls. chat_agent_id = separate Retell agent for text-mode test runs (optional if same agent handles both)."
+                                },
+                                "Bland": {
+                                    "value": {
+                                        "name": "Bland Support Agent",
+                                        "description": "Handles billing questions",
+                                        "project": 42,
+                                        "inbound": true,
+                                        "phone_number": "+14155551234",
+                                        "provider": {
+                                            "type": "bland",
+                                            "agent_id": "bland_pathway_xyz",
+                                            "credentials": {
+                                                "api_key": "bland_xxx",
+                                                "config": {
+                                                    "encrypted_key": "twilio_encrypted_key_xxx"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "description": "agent_id is the Bland pathway_id. bland_data.encrypted_key is the Twilio credential bundle."
+                                },
+                                "LiveKit": {
+                                    "value": {
+                                        "name": "LiveKit Concierge",
+                                        "description": "Multi-modal front-desk agent",
+                                        "project": 42,
+                                        "inbound": true,
+                                        "provider": {
+                                            "type": "livekit",
+                                            "credentials": {
+                                                "api_key": "APIxxx",
+                                                "config": {
+                                                    "api_secret": "secret_xxx",
+                                                    "url": "wss://acme.livekit.cloud"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "description": "api_secret and url are required inside credentials.config."
+                                },
+                                "ElevenLabs": {
+                                    "value": {
+                                        "name": "ElevenLabs Voice Agent",
+                                        "description": "Voice agent on ElevenLabs",
+                                        "project": 42,
+                                        "inbound": true,
+                                        "provider": {
+                                            "type": "elevenlabs",
+                                            "agent_id": "elevenlabs_agent_abc123",
+                                            "credentials": {
+                                                "api_key": "elevenlabs_key_xxx"
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -37612,7 +37739,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-v2-aiagents-create",
-                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.credentials rather than flat fields. transcript_provider defaults to provider.type when omitted.\n\nRenamed fields vs v1: agent_name→name, contact_number→phone_number, sip_endpoint→sip_uri, outbound_auto_call→auto_dial_outbound, auto_fetch_calls_enabled→auto_import_calls, auto_sync_prompt_enabled→auto_sync_prompt, agent_gives_first_message→agent_speaks_first."
+                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type:**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id (voice agent) + chat_agent_id (text-mode agent, can differ)\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (Bland pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- agentforce: api_key (client_secret) + config.{client_id, domain, agent_id}\n- trillet: api_key + config.{workspace_id}\n- self_hosted: credentials.config.{url (wss://), headers}\n\nSee examples below for full per-provider payloads."
                     }
                 }
             }
@@ -50014,6 +50141,25 @@
                     "name"
                 ]
             },
+            "AgentCredentials": {
+                "type": "object",
+                "description": "Nested credentials block inside the provider object.",
+                "properties": {
+                    "api_key": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "API key or client secret for the provider (write-only — never returned). Required for: vapi, retell, elevenlabs, bland, livekit, agentforce, trillet, pipecat, synthflow, koreai, genesys, custom_provider."
+                    },
+                    "config": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {},
+                        "description": "Provider-specific configuration. Keys vary by provider.type:\nvapi: {public_key, trigger_url}\nretell: {trigger_url}\nelevenlabs: {trigger_url}\nbland: {encrypted_key} — Twilio credential bundle\nlivekit: {api_secret (required), url (required), tracing_enabled}\nagentforce: {client_id (required), domain (required), agent_id (required)}\ntrillet: {workspace_id (required)}\nkoreai: {client_id (required), bot_id (required), host}\ngenesys: {client_id (required), region (required)}\npipecat: {webhook_url}\nchirp: {chirp_websocket_url (required), chirp_basic_auth_username, chirp_basic_auth_password}\nself_hosted: {url (wss:// endpoint, required), headers (dict)}"
+                    }
+                }
+            },
             "AgentProvider": {
                 "type": "object",
                 "properties": {
@@ -50034,22 +50180,31 @@
                         ],
                         "type": "string",
                         "x-spec-enum-id": "32a4ff73f93c3fea",
-                        "description": "AI platform provider. Use 'self_hosted' for websocket/observation-only agents.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit"
+                        "description": "AI platform provider type. Use self_hosted for observation-only or websocket agents. Valid values: vapi, retell, elevenlabs, bland, livekit, agentforce, trillet, cisco, sms, whatsapp, self_hosted.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit"
                     },
                     "agent_id": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "description": "Agent ID on the provider's platform. Maps to assistant_id (vapi, elevenlabs) or chat_assistant_id (retell, bland)."
+                        "description": "Agent ID for voice/inbound runs on the provider's platform. Maps to assistant_id for vapi, elevenlabs, and retell (Retell phone-call agent). Maps to chat_assistant_id for bland (pathway_id), cisco, sms, and whatsapp."
                     },
-                    "credentials": {
+                    "chat_agent_id": {
                         "type": [
-                            "object",
+                            "string",
                             "null"
                         ],
-                        "additionalProperties": {},
-                        "description": "Provider credentials: api_key (write-only) and config (provider-specific data). For self_hosted: config.url (wss://) and config.headers."
+                        "description": "Agent ID used for chat/text-mode test runs. Retell only: provide a separate Retell agent ID here when your chat agent differs from your voice agent. Maps to chat_assistant_id. Other providers do not use this field."
+                    },
+                    "credentials": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentCredentials"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
                     }
                 }
             },

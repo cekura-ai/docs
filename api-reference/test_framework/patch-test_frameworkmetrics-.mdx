@@ -4,8 +4,94 @@ description: "Partially update a metric. Includes agent-level config fields that
 openapi: patch /test_framework/v1/metrics/{id}/
 ---
 
-Three fields write through to the metric's associated agent when provided:
+## `configuration` — per-metric options
 
-- **`pronunciation_words`** — list of `[word, phonemes]` pairs for the pronunciation analysis metric (e.g. `[["HIPAA", "hɪpə"]]`).
-- **`spelling_word_types`** — list of word-category strings for the spelling analysis metric (e.g. `["medical", "technical"]`).
-- **`hallucination_kb_files`** — list of KnowledgeBaseFile IDs used by the hallucination detection metric. Replaces the current set on the agent.
+The `configuration` field is a JSON object whose valid keys depend on the predefined metric's function. Only the following predefined metrics read from `configuration`; all other metrics ignore this field.
+
+<AccordionGroup>
+
+  <Accordion title="Detect Silence — configuration.silence_duration">
+    **Key**: `silence_duration` | **Type**: integer | **Default**: `10`
+
+    Minimum number of seconds of mutual silence (both speakers silent) before the metric marks the call as failing. Applies to the **Detect Silence in Conversation** predefined metric.
+
+    ```json
+    { "silence_duration": 5 }
+    ```
+
+    Set a lower value (e.g. `5`) to be more sensitive to silence gaps; raise it (e.g. `20`) to ignore brief pauses.
+  </Accordion>
+
+  <Accordion title="Infrastructure Issues — configuration.infra_issues_timeout">
+    **Key**: `infra_issues_timeout` | **Type**: integer | **Default**: `10`
+
+    Number of seconds the Main Agent may take to respond after the Testing Agent finishes speaking before the metric flags an infrastructure problem. Applies to the **Infrastructure Issues** predefined metric.
+
+    ```json
+    { "infra_issues_timeout": 15 }
+    ```
+
+    Increase this value for agents with known high latency to avoid false positives.
+  </Accordion>
+
+  <Accordion title="Dropoff Node — configuration.nodes">
+    **Key**: `nodes` | **Type**: array of `{name, description}` objects
+
+    Defines the conversation stages used to classify where a call dropped off. Applies to the **Dropoff Node** predefined metric. Writing `nodes` here also syncs `dropoff_nodes` on the associated agent.
+
+    ```json
+    {
+      "nodes": [
+        { "name": "Greeting", "description": "Agent introduces itself and greets the caller" },
+        { "name": "Intent Capture", "description": "Agent identifies why the caller is reaching out" },
+        { "name": "Resolution", "description": "Agent resolves the caller's issue or request" },
+        { "name": "Closing", "description": "Agent wraps up and ends the call" }
+      ]
+    }
+    ```
+
+    Each `name` becomes a selectable enum value on results. Keep names short and mutually exclusive. The metric uses an LLM to match the conversation endpoint to the closest node.
+  </Accordion>
+
+  <Accordion title="Topic of Call — configuration.nodes">
+    **Key**: `nodes` | **Type**: array of `{name, description}` objects
+
+    Defines the topic categories used to classify each call. Applies to the **Topic of Call** predefined metric. Writing `nodes` here also syncs `topic_nodes` on the associated agent.
+
+    ```json
+    {
+      "nodes": [
+        { "name": "Billing", "description": "Questions about invoices, payments, or account charges" },
+        { "name": "Technical Support", "description": "Help with product setup, bugs, or errors" },
+        { "name": "Sales", "description": "Inquiries about pricing, upgrades, or new products" },
+        { "name": "General Inquiry", "description": "Anything that doesn't fit the above categories" }
+      ]
+    }
+    ```
+
+    Each `name` becomes a selectable enum value on results. Add a catch-all category (e.g. "Other") to handle calls that don't fit your defined topics.
+  </Accordion>
+
+  <Accordion title="Letterwise Pronunciation (Spelling) — configuration.word_types">
+    **Key**: `word_types` | **Type**: array of strings | **Default**: `[]`
+
+    List of word categories that the Main Agent is expected to spell out letter-by-letter during the call. Applies to the **Letterwise Pronunciation** predefined metric. Can also be set via `spelling_word_types` on the agent (see agent-level fields below).
+
+    ```json
+    { "word_types": ["name", "email", "confirmation_code"] }
+    ```
+
+    Common values: `"name"`, `"email"`, `"phone_number"`, `"confirmation_code"`, `"address"`. The metric checks that every occurrence of each category type was spelled out correctly in the audio.
+  </Accordion>
+
+</AccordionGroup>
+
+---
+
+## Agent-level fields (write-through)
+
+Three fields are not stored on the metric itself — they write through to the metric's associated agent. Provide them on the same PATCH request as any other metric field.
+
+- **`pronunciation_words`** — list of `[word, phonemes]` pairs for the **Pronunciation Check** metric. Each pair tells the evaluator how a word should be pronounced. Example: `[["Cekura", "suh-KYUR-uh"], ["HIPAA", "HIP-uh"]]`.
+- **`spelling_word_types`** — list of word-category strings for the **Letterwise Pronunciation** metric. Sets which categories the agent must spell out. Example: `["name", "email"]`. Equivalent to `configuration.word_types` but stored on the agent.
+- **`hallucination_kb_files`** — list of KnowledgeBaseFile IDs for the **Hallucination** metric. Replaces the entire set of knowledge base files on the agent used for fact-checking.

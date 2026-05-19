@@ -37447,7 +37447,7 @@
             },
             "post": {
                 "operationId": "test-framework-v2-aiagents-create",
-                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type:**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id (voice agent) + chat_agent_id (text-mode agent, can differ)\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (Bland pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- agentforce: api_key (client_secret) + config.{client_id, domain, agent_id}\n- trillet: api_key + config.{workspace_id}\n- self_hosted: credentials.config.{url (wss://), headers}\n\nSee examples below for full per-provider payloads.",
+                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type:**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id (voice agent) + optional chat_agent_details.agent_id (text-mode agent)\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (Bland pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- agentforce: api_key (client_secret) + config.{client_id, domain, agent_id}\n- trillet: api_key + config.{workspace_id}\n- self_hosted: credentials.config.{url (wss://), headers}\n\nSee examples below for full per-provider payloads.",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "AI Agents"
@@ -37619,16 +37619,19 @@
                                         "provider": {
                                             "type": "retell",
                                             "agent_id": "retell_voice_agent_abc123",
-                                            "chat_agent_id": "retell_chat_agent_xyz456",
                                             "credentials": {
                                                 "api_key": "key_xxx",
                                                 "config": {
                                                     "trigger_url": "https://api.retellai.com/create-phone-call"
                                                 }
+                                            },
+                                            "chat_agent_details": {
+                                                "type": "retell",
+                                                "agent_id": "retell_chat_agent_xyz456"
                                             }
                                         }
                                     },
-                                    "description": "agent_id = Retell agent for voice/inbound calls. chat_agent_id = separate Retell agent for text-mode test runs (optional if same agent handles both)."
+                                    "description": "agent_id = Retell agent for voice/inbound calls. chat_agent_details = optional separate agent for text-mode test runs."
                                 },
                                 "Bland": {
                                     "value": {
@@ -37739,7 +37742,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-v2-aiagents-create",
-                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type:**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id (voice agent) + chat_agent_id (text-mode agent, can differ)\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (Bland pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- agentforce: api_key (client_secret) + config.{client_id, domain, agent_id}\n- trillet: api_key + config.{workspace_id}\n- self_hosted: credentials.config.{url (wss://), headers}\n\nSee examples below for full per-provider payloads."
+                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type:**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id (voice agent) + optional chat_agent_details.agent_id (text-mode agent)\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (Bland pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- agentforce: api_key (client_secret) + config.{client_id, domain, agent_id}\n- trillet: api_key + config.{workspace_id}\n- self_hosted: credentials.config.{url (wss://), headers}\n\nSee examples below for full per-provider payloads."
                     }
                 }
             }
@@ -50187,14 +50190,7 @@
                             "string",
                             "null"
                         ],
-                        "description": "Agent ID for voice/inbound runs on the provider's platform. Maps to assistant_id for vapi, elevenlabs, and retell (Retell phone-call agent). Maps to chat_assistant_id for bland (pathway_id), cisco, sms, and whatsapp."
-                    },
-                    "chat_agent_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "description": "Agent ID used for chat/text-mode test runs. Retell only: provide a separate Retell agent ID here when your chat agent differs from your voice agent. Maps to chat_assistant_id. Other providers do not use this field."
+                        "description": "Agent ID for voice/inbound runs on the provider's platform. Maps to assistant_id for vapi and elevenlabs. Maps to assistant_id for retell (Retell phone-call agent — separate from chat agent). Maps to chat_assistant_id for bland (pathway_id), cisco, sms, and whatsapp."
                     },
                     "credentials": {
                         "oneOf": [
@@ -50205,6 +50201,17 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "chat_agent_details": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/ChatAgentDetails"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Optional chat/text-mode configuration. Defines which provider handles text-mode test runs and the agent ID to use. The allowed chat type depends on the voice provider.type — see the supported combinations table."
                     }
                 }
             },
@@ -51611,6 +51618,49 @@
                     "content",
                     "role",
                     "timestamp"
+                ]
+            },
+            "ChatAgentDetails": {
+                "type": "object",
+                "description": "Chat-mode provider configuration nested inside the provider block.",
+                "properties": {
+                    "type": {
+                        "enum": [
+                            "retell",
+                            "bland",
+                            "vapi",
+                            "elevenlabs",
+                            "livekit",
+                            "sms",
+                            "whatsapp",
+                            "self_hosted",
+                            "agentforce"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "5aa3f69149f829f2",
+                        "description": "Chat provider type. Must be compatible with the voice provider.type. Valid values: retell, bland, vapi, elevenlabs, livekit, sms, whatsapp, self_hosted, agentforce.\n\n* `retell` - retell\n* `bland` - bland\n* `vapi` - vapi\n* `elevenlabs` - elevenlabs\n* `livekit` - livekit\n* `sms` - sms\n* `whatsapp` - whatsapp\n* `self_hosted` - self_hosted\n* `agentforce` - agentforce"
+                    },
+                    "agent_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Agent ID on the chat provider's platform. Maps to chat_assistant_id. Required for retell and bland chat modes."
+                    },
+                    "credentials": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentCredentials"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Credentials for the chat provider when it differs from the voice provider. Not needed for sms or whatsapp."
+                    }
+                },
+                "required": [
+                    "type"
                 ]
             },
             "ChatMessage": {

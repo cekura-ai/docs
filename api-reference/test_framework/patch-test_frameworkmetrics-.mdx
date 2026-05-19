@@ -1,12 +1,27 @@
 ---
 title: Update Metric (Partial)
-description: "Partially update a metric. Includes agent-level config fields that write through to the associated agent."
+description: "Partially update a metric. Includes per-metric configuration options and fields that configure the associated agent."
 openapi: patch /test_framework/v1/metrics/{id}/
 ---
 
-## `configuration` — per-metric options
+## Per-metric configuration
 
-The `configuration` field is a JSON object whose valid keys depend on the predefined metric's function. Only the following predefined metrics read from `configuration`; all other metrics ignore this field.
+Certain predefined metrics support additional settings. These are set either via the `configuration` JSON field (stored on the metric) or as top-level fields that write through to the metric's associated agent. The table below shows which field to use for each metric.
+
+| Predefined metric | Field | Where stored |
+|---|---|---|
+| Detect Silence | `configuration.silence_duration` | Metric |
+| Infrastructure Issues | `configuration.infra_issues_timeout` | Metric |
+| Dropoff Node | `configuration.nodes` | Metric → synced to agent |
+| Topic of Call | `configuration.nodes` | Metric → synced to agent |
+| Letterwise Pronunciation | `configuration.word_types` | Metric |
+| Letterwise Pronunciation | `spelling_word_types` (top-level) | Agent (write-through) |
+| Pronunciation Check | `pronunciation_words` (top-level) | Agent (write-through) |
+| Hallucination | `hallucination_kb_files` (top-level) | Agent (write-through) |
+
+---
+
+### `configuration` keys
 
 <AccordionGroup>
 
@@ -72,10 +87,10 @@ The `configuration` field is a JSON object whose valid keys depend on the predef
     Each `name` becomes a selectable enum value on results. Add a catch-all category (e.g. "Other") to handle calls that don't fit your defined topics.
   </Accordion>
 
-  <Accordion title="Letterwise Pronunciation (Spelling) — configuration.word_types">
+  <Accordion title="Letterwise Pronunciation — configuration.word_types">
     **Key**: `word_types` | **Type**: array of strings | **Default**: `[]`
 
-    List of word categories that the Main Agent is expected to spell out letter-by-letter during the call. Applies to the **Letterwise Pronunciation** predefined metric. Can also be set via `spelling_word_types` on the agent (see agent-level fields below).
+    List of word categories that the Main Agent is expected to spell out letter-by-letter. Applies to the **Letterwise Pronunciation** predefined metric. Can equivalently be set via the top-level `spelling_word_types` field (see below).
 
     ```json
     { "word_types": ["name", "email", "confirmation_code"] }
@@ -88,10 +103,56 @@ The `configuration` field is a JSON object whose valid keys depend on the predef
 
 ---
 
-## Agent-level fields (write-through)
+### Top-level write-through fields
 
-Three fields are not stored on the metric itself — they write through to the metric's associated agent. Provide them on the same PATCH request as any other metric field.
+These are top-level fields on the PATCH payload — not nested inside `configuration`. They are stored on the metric's associated agent rather than on the metric itself. Sending them on the same request as other metric fields is safe; they are applied independently.
 
-- **`pronunciation_words`** — list of `[word, phonemes]` pairs for the **Pronunciation Check** metric. Each pair tells the evaluator how a word should be pronounced. Example: `[["Cekura", "suh-KYUR-uh"], ["HIPAA", "HIP-uh"]]`.
-- **`spelling_word_types`** — list of word-category strings for the **Letterwise Pronunciation** metric. Sets which categories the agent must spell out. Example: `["name", "email"]`. Equivalent to `configuration.word_types` but stored on the agent.
-- **`hallucination_kb_files`** — list of KnowledgeBaseFile IDs for the **Hallucination** metric. Replaces the entire set of knowledge base files on the agent used for fact-checking.
+<AccordionGroup>
+
+  <Accordion title="Pronunciation Check — pronunciation_words">
+    **Field**: `pronunciation_words` | **Type**: array of `[word, phonemes]` pairs
+
+    Defines the words the **Pronunciation Check** metric should evaluate, along with their expected phonetic pronunciation. The metric scores how accurately the Main Agent pronounces each listed word.
+
+    ```json
+    {
+      "pronunciation_words": [
+        ["Cekura", "suh-KYUR-uh"],
+        ["HIPAA", "HIP-uh"],
+        ["AWS", "ay-double-you-ess"]
+      ]
+    }
+    ```
+
+    Include brand names, acronyms, or technical terms that have a specific expected pronunciation. The first element is the word as written; the second is its phonetic spelling.
+  </Accordion>
+
+  <Accordion title="Letterwise Pronunciation — spelling_word_types">
+    **Field**: `spelling_word_types` | **Type**: array of strings
+
+    Same effect as `configuration.word_types` — sets the word categories the **Letterwise Pronunciation** metric checks for letter-by-letter spelling. Use this field instead of `configuration.word_types` when you prefer a top-level field over a nested JSON object.
+
+    ```json
+    {
+      "spelling_word_types": ["name", "email", "confirmation_code"]
+    }
+    ```
+
+    If both `configuration.word_types` and `spelling_word_types` are provided in the same request, `spelling_word_types` (the top-level field) takes effect since it writes to the agent directly.
+  </Accordion>
+
+  <Accordion title="Hallucination — hallucination_kb_files">
+    **Field**: `hallucination_kb_files` | **Type**: array of KnowledgeBaseFile IDs (integers)
+
+    Sets the knowledge base files the **Hallucination** metric uses as the source of truth when checking whether the Main Agent's statements are factually supported. Replaces the entire set of knowledge base files on the agent — this is not an additive operation.
+
+    ```json
+    {
+      "hallucination_kb_files": [142, 143, 144]
+    }
+    ```
+
+    Use `GET /v1/aiagents/{id}/knowledge_base/` to list the available KnowledgeBaseFile IDs for an agent. To clear all KB files, send an empty array `[]`.
+  </Accordion>
+
+</AccordionGroup>

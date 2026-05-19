@@ -43,6 +43,7 @@ When writing your custom code, you have access to different variables depending 
 | <span title="ISO 8601 formatted timestamp">**timestamp**</span> | ✅ | ✅ |
 | <span title="Additional context metadata dictionary">**metadata**</span> | ✅ | ✅ |
 | <span title="Audio metadata and analysis results">**recording_data**</span> | ✅ | ✅ |
+| <span title="OpenTelemetry trace data (when trace_id is set)">**trace**</span> | ✅ | ✅ |
 | <span title="Results from evaluated metrics">**Metric Results**</span> | ✅ | ✅ |
 | <span title="Call topic/subject (Observability only)">**topic**</span> | ❌ | ✅ |
 | <span title="Average latency and detailed latency data">**Latency Metrics**</span> | ✅ | ✅ |
@@ -221,6 +222,44 @@ When writing your custom code, you have access to different variables depending 
       "testing_speaking": [[0.33, 8.44], [9.35, 9.5], [19.43, 20.29]]
     }
     ```
+  </Accordion>
+  <Accordion title="trace" href="#trace">
+    **Availability:** ✅ Simulation | ✅ Observability (when `trace_id` is set)
+
+    OpenTelemetry trace data from your observability backend. Only present when the call or run has an associated `trace_id`. Use this to correlate Cekura evaluations with distributed traces from your voice agent infrastructure.
+
+    The structure follows the OpenTelemetry trace format with batches and spans:
+
+    ```python
+    # Check if trace data is available
+    if "trace" in data:
+        trace = data["trace"]
+        # Access span data for analysis
+        for batch in trace.get("batches", []):
+            for span in batch.get("spans", []):
+                span_name = span.get("name")
+                # Analyze LLM calls, TTS requests, etc.
+    ```
+
+    **Example structure:**
+    ```python
+    {
+      "batches": [
+        {
+          "spans": [
+            {"name": "llm.call", "traceId": "4bf92f3577b34da6a3ce929d0e0e4736", ...},
+            {"name": "tts.request", ...}
+          ]
+        }
+      ]
+    }
+    ```
+
+    **Note:** The `trace` variable is only populated when:
+    1. The call or run has a `trace_id` field set
+    2. The trace data is successfully retrieved from the configured tracing backend
+
+    See the [OpenTelemetry Trace ID FAQ](/documentation/FAQ#how-can-i-correlate-cekura-calls-with-my-distributed-tracing-system-using-opentelemetry) for how to pass trace IDs when creating calls.
   </Accordion>
 </AccordionGroup>
 
@@ -555,6 +594,17 @@ Here's the complete structure of data available to your custom Python code:
     "total_duration": 70.2,
     "main_speaking": [[1.32, 8.39], [21.45, 23.6], [36.62, 37.05]],
     "testing_speaking": [[0.33, 8.44], [9.35, 9.5], [19.43, 20.29]]
+  },
+
+  // ---------- Trace Data (when trace_id is set) ----------
+  "trace": {
+    "batches": [
+      {
+        "spans": [
+          {"name": "llm.call", "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"}
+        ]
+      }
+    ]
   },
 
   // ---------- Metric Results ----------

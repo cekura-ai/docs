@@ -61,6 +61,25 @@
                 "description": "A8c8aef15013e2e52ccf6000350258a1eab6cd2a11e62f592c5e19092d7204d7"
             }
         },
+        "/app/otel/validate/": {
+            "get": {
+                "operationId": "app-otel-validate-retrieve",
+                "description": "Validate an API key owns the given agent or project.\n\nUsed by the OTel auth service. Returns 200 on success,\n401 on bad/missing key, 403 on ownership mismatch.\n\nQuery params: agent_id or project_id.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/app/v1/product-chat/": {
             "post": {
                 "operationId": "app-v1-product-chat-create",
@@ -1981,6 +2000,178 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/{id}/review_detail/": {
+            "get": {
+                "operationId": "alerts-review-detail-retrieve",
+                "description": "Per-alert review data — config snapshot, timeline, paginated fires.\n\nPowers the per-alert review page. Single-alert version of the bulk\n`review` action. Timeline is computed with a DB-side GROUP BY so the\nendpoint stays fast for noisy alerts (thousands of fires in 7d).\n\nQuery params:\n    hours: optional, defaults to 24. Capped at 7 days.\n    page: optional, defaults to 1.\n    page_size: optional, defaults to 50, capped at 200.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this alert.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/{id}/summarize/": {
+            "post": {
+                "operationId": "alerts-summarize-create",
+                "description": "Kick off an LLM summary of the last N hours of fires for this alert.\n\nReturns a progress_id. Frontend polls `summarize_progress` until status\nis 'completed' or 'error'. Cached for 1 hour keyed on (alert, hours,\nlatest fire id) — re-invocations within that window return the same\nprogress_id.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this alert.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/review/": {
+            "get": {
+                "operationId": "alerts-review-retrieve",
+                "description": "Aggregate fired-alert data for the review page.\n\nReturns deterministic SQL-only aggregates: KPI summary, time-bucketed\ntimeline, and a per-alert breakdown with sparkline. LLM summaries are\non-demand via the separate `summarize` action.\n\nQuery params:\n    project_id: required.\n    hours: optional, defaults to 24.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/summarize_progress/": {
+            "get": {
+                "operationId": "alerts-summarize-progress-retrieve",
+                "description": "Alerts summarize progress",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/trigger_summary/": {
+            "get": {
+                "operationId": "alerts-trigger-summary-retrieve",
+                "description": "Return fire counts per alert over a time window.\n\nPowers the \"Last 24h\" status pill on the alerts list. Counts CallLogAlert\nrows linked to each alert in the project, scoped to the window.\n\nQuery params:\n    project_id: required, scopes the result to alerts in this project.\n    hours: optional, defaults to 24. Window size in hours.\n\nReturns: { \"<alert_id>\": <fire_count>, ... }",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -4055,6 +4246,35 @@
                         "enabled": true,
                         "name": "call-logs-mark-metric-vote-create",
                         "description": "Record a thumbs-up or thumbs-down vote on a specific metric evaluation for this call log and optionally provide an expected value and free-text feedback. Updates the metric evaluation and marks the call log as reviewed."
+                    }
+                }
+            }
+        },
+        "/observability/v1/call-logs/{id}/trace/": {
+            "get": {
+                "operationId": "call-logs-trace-retrieve",
+                "description": "Proxy trace data from Grafana Tempo for a CallLog.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -16382,6 +16602,91 @@
                 }
             }
         },
+        "/test_framework/v1/metrics-external/generate_clean_description_bg/": {
+            "post": {
+                "operationId": "metrics-external-generate-clean-description-bg-create",
+                "description": "Enqueue a background job to generate a clean metric description. Returns a `progress_id`; poll `generate_clean_description_progress` until `status` is `completed` or `failed`.",
+                "summary": "Start async clean description generation",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenerateCleanDescriptionBgResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics-external/generate_clean_description_progress/": {
+            "get": {
+                "operationId": "metrics-external-generate-clean-description-progress-retrieve",
+                "description": "Poll the result of a `generate_clean_description_bg` job. `status` is one of: `queued`, `processing`, `completed`, `failed`. On `completed`, `clean_description` and `thinking` are present.",
+                "summary": "Poll async clean description generation",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "progress_id returned from generate_clean_description_bg",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenerateCleanDescriptionProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/metrics-external/generate_evaluation_trigger/": {
             "post": {
                 "operationId": "metrics-external-generate-evaluation-trigger-create",
@@ -17898,6 +18203,107 @@
                         "enabled": true,
                         "name": "metrics-generate-clean-description-create",
                         "description": "Generate a clean metric description based on agent description and metric description."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics/generate_clean_description_bg/": {
+            "post": {
+                "operationId": "metrics-generate-clean-description-bg-create",
+                "description": "Enqueue a background job to generate a clean metric description. Returns a `progress_id`; poll `generate_clean_description_progress` until `status` is `completed` or `failed`.",
+                "summary": "Start async clean description generation",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenerateCleanDescriptionBgResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metrics-generate-clean-description-bg-create",
+                        "description": "Enqueue a background job to generate a clean metric description. Returns a `progress_id`; poll `generate_clean_description_progress` until `status` is `completed` or `failed`."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics/generate_clean_description_progress/": {
+            "get": {
+                "operationId": "metrics-generate-clean-description-progress-retrieve",
+                "description": "Poll the result of a `generate_clean_description_bg` job. `status` is one of: `queued`, `processing`, `completed`, `failed`. On `completed`, `clean_description` and `thinking` are present.",
+                "summary": "Poll async clean description generation",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "progress_id returned from generate_clean_description_bg",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenerateCleanDescriptionProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metrics-generate-clean-description-progress-retrieve",
+                        "description": "Poll the result of a `generate_clean_description_bg` job. `status` is one of: `queued`, `processing`, `completed`, `failed`. On `completed`, `clean_description` and `thinking` are present."
                     }
                 }
             }
@@ -19420,50 +19826,6 @@
                         "description": ""
                     }
                 }
-            },
-            "post": {
-                "operationId": "phone-numbers-create",
-                "description": "Create a new phone number",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
             }
         },
         "/test_framework/v1/phone-numbers-external/": {
@@ -19487,50 +19849,6 @@
                                     "items": {
                                         "$ref": "#/components/schemas/PhoneNumber"
                                     }
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "post": {
-                "operationId": "phone-numbers-external-create",
-                "description": "Create a new phone number",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
                                 }
                             }
                         },
@@ -19572,143 +19890,6 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            },
-            "put": {
-                "operationId": "phone-numbers-external-update",
-                "description": "Update a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "patch": {
-                "operationId": "phone-numbers-external-partial-update",
-                "description": "Update a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "delete": {
-                "operationId": "phone-numbers-external-destroy",
-                "description": "Delete a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No response body"
                     }
                 }
             }
@@ -19843,143 +20024,6 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            },
-            "put": {
-                "operationId": "phone-numbers-update",
-                "description": "Update a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "patch": {
-                "operationId": "phone-numbers-partial-update",
-                "description": "Update a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "delete": {
-                "operationId": "phone-numbers-destroy",
-                "description": "Delete a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No response body"
                     }
                 }
             }
@@ -21993,6 +22037,122 @@
                 }
             }
         },
+        "/test_framework/v1/results-external/bulk_delete/": {
+            "post": {
+                "operationId": "bulk-delete-results",
+                "description": "⚠ Irreversible. Soft-deletes each result (and its non-deleted runs) with the same side-effects as deleting a single result: outbound phone numbers are released when no queued runs remain, capacity-manager slots are freed, and active_sessions / pending_demand counters are decremented in aggregate. Maximum 100 result IDs per request. Results that are already deleted or that the caller cannot access are silently skipped — the response is 204 even when no results are deleted.",
+                "summary": "Soft-delete multiple results",
+                "tags": [
+                    "Results"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/results-external/bulk_evaluate_metrics/": {
+            "post": {
+                "operationId": "bulk-evaluate-result-metrics",
+                "description": "Schedules re-evaluation of the given metrics against every completed/failed, non-deleted run of every selected result. Metrics are validated against each agent's metric scope; balance is checked for the full batch up front before any work is dispatched. Each affected result's status is flipped to RUNNING. Maximum 100 result IDs per request.",
+                "summary": "Re-evaluate metrics across multiple results",
+                "tags": [
+                    "Results"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/results-external/bulk_export_progress/": {
             "get": {
                 "operationId": "results-external-bulk-export-progress-retrieve",
@@ -22989,6 +23149,122 @@
                 }
             }
         },
+        "/test_framework/v1/results/bulk_delete/": {
+            "post": {
+                "operationId": "bulk-delete-results_2",
+                "description": "⚠ Irreversible. Soft-deletes each result (and its non-deleted runs) with the same side-effects as deleting a single result: outbound phone numbers are released when no queued runs remain, capacity-manager slots are freed, and active_sessions / pending_demand counters are decremented in aggregate. Maximum 100 result IDs per request. Results that are already deleted or that the caller cannot access are silently skipped — the response is 204 even when no results are deleted.",
+                "summary": "Soft-delete multiple results",
+                "tags": [
+                    "Results"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/results/bulk_evaluate_metrics/": {
+            "post": {
+                "operationId": "bulk-evaluate-result-metrics_2",
+                "description": "Schedules re-evaluation of the given metrics against every completed/failed, non-deleted run of every selected result. Metrics are validated against each agent's metric scope; balance is checked for the full batch up front before any work is dispatched. Each affected result's status is flipped to RUNNING. Maximum 100 result IDs per request.",
+                "summary": "Re-evaluate metrics across multiple results",
+                "tags": [
+                    "Results"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/results/bulk_export_progress/": {
             "get": {
                 "operationId": "results-bulk-export-progress-retrieve",
@@ -23224,7 +23500,7 @@
         "/test_framework/v1/runs/": {
             "get": {
                 "operationId": "runs-list",
-                "description": "List test runs. Each item's `id` is the integer `run_id` used at `/runs/{run_id}/`; the `call_id` field is a provider string identifier, NOT an endpoint ID.",
+                "description": "List test runs",
                 "parameters": [
                     {
                         "in": "query",
@@ -23582,7 +23858,7 @@
         "/test_framework/v1/runs-external/": {
             "get": {
                 "operationId": "runs-external-list",
-                "description": "List test runs. Each item's `id` is the integer `run_id` used at `/runs/{run_id}/`; the `call_id` field is a provider string identifier, NOT an endpoint ID.",
+                "description": "List test runs",
                 "parameters": [
                     {
                         "in": "query",
@@ -23940,7 +24216,7 @@
         "/test_framework/v1/runs-external/{id}/": {
             "get": {
                 "operationId": "runs-external-retrieve",
-                "description": "Retrieve a test run by `run_id` (the integer path parameter). The `call_id` field on the response is the provider's call identifier (string) — do NOT pass it where `run_id` is expected.",
+                "description": "Retrieve a test run by ID",
                 "parameters": [
                     {
                         "in": "path",
@@ -24813,7 +25089,7 @@
         "/test_framework/v1/runs/{id}/": {
             "get": {
                 "operationId": "runs-retrieve",
-                "description": "Retrieve a test run by `run_id` (the integer path parameter). The `call_id` field on the response is the provider's call identifier (string) — do NOT pass it where `run_id` is expected.",
+                "description": "Retrieve a test run by ID",
                 "parameters": [
                     {
                         "in": "path",
@@ -25393,6 +25669,35 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/runs/{id}/trace/": {
+            "get": {
+                "operationId": "runs-trace-retrieve",
+                "description": "Proxy trace data from Grafana Tempo for a Run.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -36032,7 +36337,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/AIAgentTestProfile"
+                                        "$ref": "#/components/schemas/AIAgentTestProfileList"
                                     }
                                 },
                                 "examples": {
@@ -36211,7 +36516,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/AIAgentTestProfile"
+                                        "$ref": "#/components/schemas/AIAgentTestProfileList"
                                     }
                                 },
                                 "examples": {
@@ -48288,10 +48593,68 @@
                         },
                         "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
                     },
-                    "scenarios": {
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "ID of the user who created this test profile"
+                    },
+                    "last_updated_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "ID of the user who last updated this test profile"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Timestamp when the test profile was created"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Timestamp when the test profile was last updated"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "AIAgentTestProfileList": {
+                "type": "object",
+                "description": "List variant that also embeds the scenarios attached to each profile.\n\nOnly used by `TestProfileViewSet.list` — retrieve/create/update and any\nnested usage (e.g. `ScenarioSerializer.test_profile_data`) should keep\nusing `AIAgentTestProfileSerializer`.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "project": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "agent": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "agent_name": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "List of scenarios using this test profile"
+                        "description": "\nName of the agent associated with this test profile\nExample: `\"Customer Support Agent\"`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "information": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
                     },
                     "created_by": {
                         "type": "integer",
@@ -48314,6 +48677,11 @@
                         "format": "date-time",
                         "readOnly": true,
                         "description": "Timestamp when the test profile was last updated"
+                    },
+                    "scenarios": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "List of scenarios using this test profile"
                     }
                 },
                 "required": [
@@ -49463,6 +49831,11 @@
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
                         "maxLength": 100
                     },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
+                    },
                     "agent": {
                         "type": [
                             "integer",
@@ -49555,6 +49928,11 @@
                         "type": "string",
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
                         "maxLength": 100
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
                     },
                     "timestamp": {
                         "type": "string",
@@ -49871,6 +50249,33 @@
                     }
                 }
             },
+            "CleanMetricDescriptionRequest": {
+                "type": "object",
+                "properties": {
+                    "agent": {
+                        "type": "integer"
+                    },
+                    "metric_description": {
+                        "type": "string"
+                    },
+                    "eval_type": {
+                        "enum": [
+                            "boolean",
+                            "numeric",
+                            "rating",
+                            "enum"
+                        ],
+                        "type": "string",
+                        "description": "* `boolean` - boolean\n* `numeric` - numeric\n* `rating` - rating\n* `enum` - enum",
+                        "x-spec-enum-id": "ae756482f906eddf"
+                    }
+                },
+                "required": [
+                    "agent",
+                    "eval_type",
+                    "metric_description"
+                ]
+            },
             "Condition": {
                 "type": "object",
                 "description": "One entry in a ConditionalActions flow.",
@@ -49963,6 +50368,12 @@
                         "type": "string",
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
                         "maxLength": 100
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "default": "",
+                        "description": "OpenTelemetry trace ID (32-char hex string). Example: \"4bf92f3577b34da6a3ce929d0e0e4736\"",
+                        "maxLength": 32
                     },
                     "agent": {
                         "type": "integer",
@@ -51185,6 +51596,37 @@
                     "explanation",
                     "outcome_alignments",
                     "score"
+                ]
+            },
+            "GenerateCleanDescriptionBgResponse": {
+                "type": "object",
+                "properties": {
+                    "progress_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "progress_id"
+                ]
+            },
+            "GenerateCleanDescriptionProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    },
+                    "clean_description": {
+                        "type": "string"
+                    },
+                    "thinking": {
+                        "type": "string"
+                    },
+                    "error": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "status"
                 ]
             },
             "ImportPlivoNumber": {
@@ -54881,6 +55323,11 @@
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
                         "maxLength": 100
                     },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
+                    },
                     "agent": {
                         "type": [
                             "integer",
@@ -56044,105 +56491,6 @@
                     }
                 }
             },
-            "PatchedPhoneNumber": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "readOnly": true
-                    },
-                    "scenario_id": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "scenario_name": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "number": {
-                        "type": "string",
-                        "maxLength": 15
-                    },
-                    "phone_number_id": {
-                        "type": "string",
-                        "maxLength": 255
-                    },
-                    "call_service_provider": {
-                        "enum": [
-                            "vapi",
-                            "patronus"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "f442d6949d5b96ff",
-                        "description": "Call service provider this phone number is associated with.\nExample: `\"vapi\"` or `\"retell\"`\n\n* `vapi` - VAPI\n* `patronus` - Patronus"
-                    },
-                    "name": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "description": "Name or identifier for this phone number",
-                        "maxLength": 255
-                    },
-                    "provider": {
-                        "enum": [
-                            "cekura",
-                            "twilio",
-                            "telnyx",
-                            "plivo",
-                            null
-                        ],
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "x-spec-enum-id": "0a9c3a00dd5354a9",
-                        "description": "Provider of this phone number (Cekura or Twilio)\n\n* `cekura` - Cekura\n* `twilio` - Twilio\n* `telnyx` - Telnyx\n* `plivo` - Plivo"
-                    },
-                    "sms_enabled": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ],
-                        "description": "Whether SMS is enabled for this phone number"
-                    },
-                    "metadata": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "description": "Encrypted provider credentials and other metadata"
-                    },
-                    "created_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time",
-                        "description": "When this record was created.\nExample: `2024-03-15T10:30:45Z`"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
-                    },
-                    "organization": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "user": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    }
-                }
-            },
             "PatchedPredefinedMetric": {
                 "type": "object",
                 "properties": {
@@ -56838,6 +57186,11 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "\nCall ID from the Assistant provider\nExample: `call_abc123`\n"
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
                     },
                     "scenario": {
                         "type": [
@@ -60033,6 +60386,11 @@
                         "readOnly": true,
                         "description": "\nCall ID from the Assistant provider\nExample: `call_abc123`\n"
                     },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
+                    },
                     "scenario": {
                         "type": [
                             "integer",
@@ -60269,6 +60627,11 @@
                         "type": "string",
                         "description": "\nCall ID from the Assistant provider\nExample: `call_abc123`\n",
                         "maxLength": 255
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
                     },
                     "scenario": {
                         "type": [
@@ -60704,11 +61067,6 @@
                     },
                     "tool_ids": {
                         "description": "\nList of tool IDs to associate with this scenario\nExample: `[\"TOOL_DTMF\", \"TOOL_END_CALL\"]`\n"
-                    },
-                    "runs": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "\nList of IDs for the last run of this scenario\nExample: `[123, 456]`\n"
                     },
                     "metrics": {
                         "writeOnly": true,
@@ -61800,11 +62158,6 @@
                     "tool_ids": {
                         "description": "\nList of tool IDs to associate with this scenario\nExample: `[\"TOOL_DTMF\", \"TOOL_END_CALL\"]`\n"
                     },
-                    "runs": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "\nList of IDs for the last run of this scenario\nExample: `[123, 456]`\n"
-                    },
                     "metrics": {
                         "writeOnly": true,
                         "description": "\nList of metric IDs to associate with this scenario\nExample: `[123, 456]`\n"
@@ -62413,6 +62766,49 @@
                 },
                 "required": [
                     "name"
+                ]
+            },
+            "SchemaPostBulkDeleteResults": {
+                "type": "object",
+                "properties": {
+                    "result_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of result IDs to soft-delete. Maximum 100 per request.",
+                        "maxItems": 100,
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "result_ids"
+                ]
+            },
+            "SchemaPostBulkEvaluateResultMetrics": {
+                "type": "object",
+                "properties": {
+                    "result_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Result IDs whose completed/failed runs should be re-evaluated. Maximum 100.",
+                        "maxItems": 100,
+                        "minItems": 1
+                    },
+                    "metric_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Metric IDs to re-evaluate against every eligible run of each result.",
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "metric_ids",
+                    "result_ids"
                 ]
             },
             "SchemaPostCopyAgent": {
@@ -63365,13 +63761,6 @@
                     },
                     "tool_ids": {
                         "description": "\nList of tool IDs to associate with this scenario\nExample: `[\"TOOL_DTMF\", \"TOOL_END_CALL\"]`\n"
-                    },
-                    "runs": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        },
-                        "description": "\nList of run IDs\nExample: `[123, 456, 789]`\n"
                     },
                     "metrics": {
                         "type": "array",

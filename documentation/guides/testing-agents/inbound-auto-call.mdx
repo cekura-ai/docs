@@ -1,0 +1,99 @@
+---
+title: 'Testing Inbound Agents'
+sidebarTitle: "Testing Inbound Agents"
+icon: "phone-arrow-down-left"
+iconType: "regular"
+description: "Test agents that receive calls. Cekura acts as the caller, dials your agent's configured number, and runs your evaluators end-to-end — no scripts required."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
+## What is Inbound Testing?
+
+If your agent is built to **receive** calls (a support line, a booking line, an IVR), Cekura tests it by placing the call itself. You select evaluators, hit run, and Cekura dials your agent's configured number as the simulated caller. Transcripts, metrics, and results land in your dashboard exactly the same way outbound runs do.
+
+If instead your agent is built to **make** calls, see [Auto Outbound Calls](/documentation/guides/testing-agents/outbound-auto-call) — the direction of the call decides which guide applies, not the testing framework you use.
+
+## How It Works
+
+<Steps>
+  <Step title="Set Inbound on the Agent">
+    In agent settings, set the **Inbound** flag to **ON** (`inbound: true`).
+  </Step>
+
+  <Step title="Configure the Phone Number">
+    Add the phone number Cekura should dial in Agent Settings. This is the number that reaches your agent. You can override it per run when needed.
+  </Step>
+
+  <Step title="Run Evaluators">
+    Trigger scenarios from the UI, the API, or your CI pipeline. Cekura places the call to your agent's configured number and runs the scenario.
+  </Step>
+
+  <Step title="Review Results">
+    Check transcripts, metric evaluations, and pass/fail status in your dashboard once the run completes.
+  </Step>
+</Steps>
+
+## Prerequisites
+
+- **Inbound mode enabled**: Agent's `inbound` must be set to `true`
+- **Reachable phone number**: A number on your stack that routes to the agent under test (your provider's number, a Twilio BYO number, or a Cekura-issued number)
+- **Evaluators ready**: Scenarios that define what the simulated caller should say and what the metrics should grade
+
+<Note>
+Inbound testing does **not** require voice-provider API keys on Cekura's side — Cekura is the caller, not the agent. Your agent answers the call using its own stack as it would in production.
+</Note>
+
+## Triggering a Run
+
+Once the agent is configured, any of the standard run-trigger surfaces will place a call:
+
+- **Dashboard** — open the scenario(s) and click Run.
+- **API** — call the standard scenario-run endpoint with the scenario IDs you want to execute.
+- **CI/CD** — use the [GitHub Actions integration](/documentation/guides/github-actions-ci-cd) to run on push, pull request, or schedule. The action is direction-agnostic; the agent's `inbound` flag is what controls who places the call.
+
+The trigger surface only decides **when** the run fires. The call direction is always determined by the agent's `inbound` flag.
+
+## Overriding the Number Per Run
+
+You can override the destination number on a per-scenario basis without changing the agent's default. This is useful when the same agent is deployed to multiple numbers (staging vs. production, region-specific lines).
+
+1. Edit the scenario.
+2. Open the **Configuration** section.
+3. Set the phone number you want Cekura to dial for this scenario.
+
+Bring-your-own-number setups are documented in [Twilio phone numbers](/documentation/key-concepts/phone-numbers/twilio) and [Plivo phone numbers](/documentation/key-concepts/phone-numbers/plivo).
+
+## Inbound vs. Outbound
+
+| Agent role | Direction of test call | Guide |
+|---|---|---|
+| Receives calls (support, IVR, booking line) | **Cekura → your agent** | This page |
+| Makes calls (lead follow-up, reminders, outreach) | **Your agent → Cekura's number** | [Auto Outbound Calls](/documentation/guides/testing-agents/outbound-auto-call) |
+
+The role Cekura plays in testing mirrors the role the caller plays in production: whoever picks up the phone is the agent.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Call Never Reaches the Agent">
+    Verify the phone number on the agent (or scenario override) routes to your agent in production. Place a manual call to the same number — if it doesn't reach the agent, the issue is upstream of Cekura.
+  </Accordion>
+
+  <Accordion title="Cekura Says the Agent Didn't Answer">
+    Check that the agent's transport (SIP trunk, Twilio number, provider webhook) is reachable from the public internet and is configured to answer the test number. Provider-side rate limits and number-blocking rules can silently drop test calls.
+  </Accordion>
+
+  <Accordion title="Run Triggers But Direction Looks Wrong">
+    The most common cause is `inbound: false` on the agent. Confirm the flag in Agent Settings. The same agent cannot be tested in both directions in a single run — duplicate the agent if you need both flows.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+- Set up [GitHub Actions CI/CD](/documentation/guides/github-actions-ci-cd) to run inbound scenarios on every push
+- Run the [Infrastructure Suite](/documentation/guides/testing-agents/infrastructure-suite) against your inbound number to validate latency and stability
+- Add [custom metrics](/documentation/key-concepts/metrics/custom-metrics) tailored to your agent's job

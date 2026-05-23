@@ -1,6 +1,5 @@
 import httpx
 from typing import Dict, Any, Optional
-import re
 import json
 
 
@@ -24,77 +23,50 @@ class CekuraAPIClient:
         self,
         method: str,
         path: str,
-        params: Optional[Dict[str, Any]] = None,
-        body: Optional[Dict[str, Any]] = None,
+        query_params: Optional[Dict[str, Any]] = None,
+        body: Any = None,
         property_types: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any]:
-        params = params or {}
-        resolved_path, query_params = self._prepare_request(path, params)
-        url = f"{self.base_url}{resolved_path}"
-        request_body = self._build_request_body(body, params, property_types) if body else None
+        url = f"{self.base_url}{path}"
+        request_body = self._coerce_body(body, property_types) if body is not None else None
 
         try:
             response = await self.client.request(
                 method=method,
                 url=url,
-                params=query_params,
+                params=self._serialize_query(query_params or {}),
                 json=request_body,
             )
             return self._handle_response(response)
-
         except httpx.TimeoutException:
             raise Exception(f"Request timeout: {method} {url}")
         except httpx.RequestError as e:
             raise Exception(f"Request failed: {method} {url} - {str(e)}")
 
-    def _prepare_request(self, path: str, params: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
-        path_params = re.findall(r'\{(\w+)\}', path)
-        resolved_path = path
-        query_params = {}
-
-        for key, value in params.items():
-            if key in path_params:
-                resolved_path = resolved_path.replace(f"{{{key}}}", str(value))
-            else:
-                if value is not None:
-                    if isinstance(value, list):
-                        # Comma-separate lists for query params (e.g. run_ids, call_ids)
-                        query_params[key] = ",".join(str(v) for v in value)
-                    elif isinstance(value, dict):
-                        # JSON-serialize dicts for query params (e.g. filters_v2, filters)
-                        query_params[key] = json.dumps(value)
-                    else:
-                        query_params[key] = value
-
-        return resolved_path, query_params
-
-    def _build_request_body(
-        self,
-        body_schema: Optional[Dict[str, Any]],
-        params: Dict[str, Any],
-        property_types: Optional[Dict[str, str]] = None,
-    ) -> Any:
-        types = property_types or {}
-        if not body_schema:
-            body = {}
-            for k, v in params.items():
-                if v is not None:
-                    body[k] = self._parse_json_field(k, v, types.get(k))
-            return body
-
-        # Detect top-level array schemas (e.g. bulk_create endpoints).
-        # The parser exposes these as a single `items` parameter; unwrap it
-        # and send the array directly as the JSON body.
-        content = body_schema.get("content", {})
-        json_schema = content.get("application/json", {}).get("schema", {})
-        if json_schema.get("type") == "array" and "items" in params:
-            raw = params["items"]
-            return self._parse_json_field("items", raw, "array") if isinstance(raw, str) else raw
-
-        body = {}
+    @staticmethod
+    def _serialize_query(params: Dict[str, Any]) -> Dict[str, Any]:
+        out = {}
         for k, v in params.items():
-            if v is not None:
-                body[k] = self._parse_json_field(k, v, types.get(k))
+            if v is None:
+                continue
+            if isinstance(v, list):
+                out[k] = ",".join(str(x) for x in v)
+            elif isinstance(v, dict):
+                out[k] = json.dumps(v)
+            else:
+                out[k] = v
+        return out
+
+    def _coerce_body(self, body: Any, property_types: Optional[Dict[str, str]]) -> Any:
+        # Claude occasionally serializes dict/list arguments as strings; recover
+        # them based on the field's declared schema type. Strings declared as
+        # `type: string` are passed through verbatim (e.g. scenarios.instructions
+        # stores a stringified JSON payload that the backend reads literally).
+        types = property_types or {}
+        if isinstance(body, dict):
+            return {k: self._parse_json_field(k, v, types.get(k)) for k, v in body.items()}
+        if isinstance(body, str):
+            return self._parse_json_field("items", body, "array")
         return body
 
     # Schemas with a declared primitive type must never have their value coerced —

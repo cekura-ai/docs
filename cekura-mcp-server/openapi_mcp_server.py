@@ -573,12 +573,11 @@ def setup_dynamic_tool_handlers():
                 return [{"type": "text", "text": json.dumps(result, default=str, ensure_ascii=False)}]
 
             except ValueError as e:
-                error_msg = f"Authentication Error: {str(e)}"
-                return [{"type": "text", "text": error_msg}]
+                return [{"type": "text", "text": f"Authentication Error: {e}"}]
             except Exception as e:
-                import traceback
-                error_msg = f"Error: {str(e)}\n{traceback.format_exc()}"
-                return [{"type": "text", "text": error_msg}]
+                # Log the traceback for ops; return only the actionable message to the LLM.
+                logger.exception("Tool %s failed", name)
+                return [{"type": "text", "text": f"Error: {e}"}]
         else:
             return await original_call_tool(name=name, arguments=arguments)
 

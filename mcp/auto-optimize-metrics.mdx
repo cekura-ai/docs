@@ -49,13 +49,20 @@ For each metric_id:
    roughly every 30s until status is "success" or "error". If "error", stop
    and report the error for that metric — continue to the next one.
 
-3. On success, read the returned `metric_description` and `evaluation_trigger`
-   from the progress output. Call `metrics_retrieve` for the same metric_id to
-   read the *current* description and trigger, and produce a unified diff
-   between current and proposed for both fields.
+3. On success, read these fields from the progress output:
+   - `output.improved_metric_description` and `output.improved_evaluation_trigger`
+   - `output.meta_harness.optimized_code` and `output.meta_harness.type`
+   - `output.meta_harness.score`, `num_correct`, `num_total` (the score after
+     optimisation against the labelled set)
 
-4. Do NOT call `metrics_partial_update` yet. Print the diff and stop for this
-   metric.
+   Call `metrics_retrieve` for the same metric_id to read the *current*
+   `description`, `evaluation_trigger`, `type`, and `custom_code`. Produce a
+   unified diff between current and proposed for each of those fields. Also
+   report the post-optimisation score (e.g. `7/7`) and whether the metric
+   type changed (e.g. `basic` → `custom_code`).
+
+4. Do NOT call `metrics_partial_update` yet. Print the diff and the score
+   and stop for this metric.
 
 After processing every metric, summarise: which had proposed changes, which
 were unchanged, which errored. Do not apply any changes.
@@ -88,8 +95,12 @@ A typical cadence:
 Once you trust the routine, swap step 4 for:
 
 ```
-4. Call `metrics_partial_update` with the metric_id and the proposed
-   `metric_description` and `evaluation_trigger` from the progress output.
+4. Call `metrics_partial_update` with the metric_id and every changed
+   field from step 3 — typically some combination of `description`,
+   `evaluation_trigger`, `type`, and `custom_code`. The optimiser may
+   convert a `basic` metric into a `custom_code` metric, so pass both
+   `type` and `custom_code` when they differ from current.
+
    Then call `metrics_run_reviews_create` for the same metric to re-score
    every linked test set against the new prompt. Report the before/after
    score delta from the run.
@@ -114,6 +125,8 @@ This applies the new prompt and immediately verifies it didn't regress the label
 ## Troubleshooting
 
 **The routine reports "no changes proposed" every run.** No new feedback has been added since the last run. The optimiser is deterministic on a fixed set of annotations.
+
+**The `improved_metric_description` looks identical to current, but the score went up.** The optimiser sometimes leaves the description untouched and instead converts the metric into a `custom_code` wrapper around an enhanced prompt. Check `output.meta_harness.optimized_code` and `output.meta_harness.type` — that's where the real change lives. Step 3 above already diffs these fields.
 
 **Progress polling times out.** The optimiser can take several minutes for metrics with many test sets. Increase the polling interval or raise your routine's timeout — do not retry mid-flight, that will start a second concurrent optimisation.
 

@@ -696,7 +696,6 @@ def get_request_credential() -> tuple[str, str]:
         "No credential found. Connect via X-CEKURA-API-KEY header, Bearer token, or OAuth."
     )
 
-
 def _resolve_client_identifier() -> str:
     """Best-effort client identifier from the active request context.
 
@@ -762,6 +761,52 @@ def _resolve_telemetry() -> Dict[str, Optional[str]]:
         "conversation_id": conversation_id if isinstance(conversation_id, str) and conversation_id else None,
     }
 
+
+_PATH_PARAM_RE = re.compile(r'\{(\w+)\}')
+
+
+def _dispatch_args(op, arguments: Dict[str, Any]) -> Tuple[str, Dict[str, Any], Any]:
+    """Classify tool args into (resolved_path, query_params, body_payload).
+
+    Classification rules:
+    - Path params (matched against `{name}` placeholders) substituted into the URL.
+    - Query params (declared in OpenAPI `parameters` with `in: query`) sent in the URL.
+    - Everything else: routed to JSON body if the op has a requestBody, else to query.
+
+    For top-level array bodies (bulk endpoints), the `items` arg is unwrapped so
+    the body is sent as a bare JSON array.
+    """
+    path_param_names = set(_PATH_PARAM_RE.findall(op.path))
+    query_param_names = {
+        p["name"] for p in (op.parameters or [])
+        if p.get("in") == "query" and "name" in p
+    }
+    has_body = bool(op.request_body)
+
+    resolved_path = op.path
+    query_args: Dict[str, Any] = {}
+    body_args: Dict[str, Any] = {}
+
+    for key, value in arguments.items():
+        if value is None:
+            continue
+        if key in path_param_names:
+            resolved_path = resolved_path.replace(f"{{{key}}}", str(value))
+        elif key in query_param_names:
+            query_args[key] = value
+        elif has_body:
+            body_args[key] = value
+        else:
+            query_args[key] = value
+
+    if has_body:
+        schema = op.request_body.get("content", {}).get("application/json", {}).get("schema", {})
+        if schema.get("type") == "array" and "items" in body_args:
+            return resolved_path, query_args, body_args["items"]
+
+    return resolved_path, query_args, (body_args if has_body else None)
+
+
 def setup_dynamic_tool_handlers():
     from mcp.types import Tool as MCPTool
 
@@ -823,12 +868,13 @@ def setup_dynamic_tool_handlers():
                 k: v.get('type') for k, v in schema_properties.items() if isinstance(v, dict)
             }
 
+            resolved_path, query_args, body_payload = _dispatch_args(op, arguments or {})
             try:
                 result = await user_api_client.execute_request(
                     method=op.method,
-                    path=op.path,
-                    params=arguments or {},
-                    body=op.request_body,
+                    path=resolved_path,
+                    query_params=query_args,
+                    body=body_payload,
                     property_types=property_types,
                 )
             finally:
@@ -840,11 +886,10 @@ def setup_dynamic_tool_handlers():
         except ValueError as e:
             return [{"type": "text", "text": f"Authentication Error: {e}{call_id_suffix}"}]
         except Exception as e:
-            import traceback
-            return [{
-                "type": "text",
-                "text": f"Error: {e}\n{traceback.format_exc()}{call_id_suffix}",
-            }]
+            # Log the traceback for ops; return only the actionable message to
+            # the LLM (no /app/ paths, no Python stack frames).
+            logger.exception("Tool %s failed", name)
+            return [{"type": "text", "text": f"Error: {e}{call_id_suffix}"}]
 
     mcp._mcp_server.list_tools()(list_tools_with_dynamic)
     mcp._mcp_server.call_tool(validate_input=False)(call_tool_with_dynamic)

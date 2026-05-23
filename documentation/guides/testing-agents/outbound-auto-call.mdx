@@ -39,18 +39,23 @@ Auto Outbound Call is an automated testing feature where Cekura automatically in
 
 - **Outbound mode enabled**: Agent's `inbound` must be set to `false`
 - **Voice provider configured**: Valid API key and Assistant ID for your provider (Vapi, Retell, or ElevenLabs)
+- **Agent `contact_number` set to your outbound caller ID**: Cekura validates the caller ID (ANI) of every incoming outbound-test call against the agent's `contact_number` field. If the provider dials from `+15551234567`, the agent's `contact_number` must be exactly `+15551234567` in E.164 format. Set this in Agent settings or via the [Update Agent API](/api-reference/test_framework/update-agent-partial).
 - **Evaluators ready**: Created evaluators with valid phone numbers
 
 <Warning>
 **API Key Permissions:** Ensure your API key has outbound call permissions enabled. For ElevenLabs, enable "Conversational AI" and "Phone Number" permissions at https://elevenlabs.io/app/settings/api-keys
 </Warning>
 
+<Warning>
+**Caller ID mismatch causes silent rejects.** If the `contact_number` on your agent is empty or doesn't match the `from_number` your voice provider uses to place the call, Cekura drops the incoming call without returning a SIP error. The symptom on the provider side is `Busy`, `NoAnswer`, or a generic failed dial — no audio, no descriptive error. Confirm `contact_number` matches the provider's outbound caller ID before debugging anything further.
+</Warning>
+
 ## Enabling Auto Outbound Call
 
-Navigate to your agent settings and toggle **Auto Outbound Call** to ON.
+Navigate to your Agent settings -> Right sidebar -> Connection -> Select **Telephony** under VOICE -> Toggle ON **Auto Outbound Call**.
 
 <Frame>
-  <img src="/images/outbound-auto-call/enable-auto-outbound.png" alt="Enable Auto Outbound" />
+  <img src="/images/outbound-calling.png" alt="Enable Auto Outbound" />
 </Frame>
 
 <Note>
@@ -80,7 +85,7 @@ Use trigger URLs when you need to:
     In your agent settings, enter your webhook URL in the **Trigger URL** field (below the Outbound Auto Call toggle).
 
     <Frame>
-      <img src="/images/outbound-auto-call/configure-trigger-url.png" alt="Configure Trigger URL in UI" />
+      <img src="/images/outbound-calling-trigger.png" alt="Configure Trigger URL in UI" />
     </Frame>
   </Step>
 
@@ -133,6 +138,10 @@ Your webhook should return:
 <AccordionGroup>
   <Accordion title="Calls Not Starting">
     Check that Auto Outbound Call is enabled, agent is in Outbound mode, and voice provider credentials are valid.
+  </Accordion>
+
+  <Accordion title="Calls Placed but Run Times Out (Busy / NoAnswer on Provider Side)">
+    The provider dialed but Cekura never picked up. Cekura rejects incoming outbound-test calls whose caller ID doesn't match a configured `contact_number` on any agent in your project. Open the agent under test and confirm its `contact_number` is set to the exact E.164 number the provider dials from (the `from_number` in the trigger webhook payload). An empty or mismatched `contact_number` causes every outbound attempt to be silently dropped — your provider logs will show `Busy` / `NoAnswer` / no-pickup with no audio and no SIP error explaining why. After correcting `contact_number`, trigger a fresh run; the timed-out runs cannot be recovered.
   </Accordion>
 
   <Accordion title="Failed to Initiate Call / Permission Errors">

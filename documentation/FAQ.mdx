@@ -664,6 +664,20 @@ To pause your subscription:
 You can return to this same section at any time to reactivate your plan and resume your AI agent testing and monitoring. This ensures that all your existing agent configurations, evaluators, and historical data remain intact for when you are ready to scale.
 
 
+## How do I cancel my subscription?
+
+You can cancel your subscription directly from the Cekura dashboard through the Stripe billing portal.
+
+To cancel your subscription:
+1. Log in to your Cekura account.
+2. Navigate to **Billing**.
+3. Click on **Manage Plan**.
+4. You will be redirected to our secure Stripe billing portal.
+5. Select the option to cancel your subscription.
+
+If the cancel option is not visible or you are unable to complete the cancellation, contact support and the team can assist directly.
+
+
 ## How can I bulk import scenarios and what file formats are supported?
 
 Cekura supports the bulk import of scenarios (also referred to as test cases or evaluators) to help you scale your testing and monitoring efforts efficiently. 
@@ -1040,5 +1054,20 @@ Currently, the **Improve Scenarios** tool is optimized for updating scenario con
 **Agents and metrics do not have a built-in UI duplication tool.** To replicate agent or metric configuration across projects, use the [REST API](https://docs.cekura.ai/api-reference/test_framework/create-agent) or the [MCP server](https://docs.cekura.ai/mcp/overview) to create them programmatically with the same settings.
 
 For environment separation (e.g., staging vs. production), another option is to keep all agents in a single shared project and use separate API keys or agent IDs to route webhook payloads to different backend environments. This avoids the need to keep multiple copies of metrics and evaluators in sync. See [Organizing Projects](/documentation/guides/organizing-projects) for recommended patterns.
+
+## I already post call data to the observability endpoint from my Pipecat agent — can I also add the Pipecat SDK?
+
+The Pipecat SDK (`observe_pipeline()` / `observe_and_create_task()`) and the direct observability endpoint (`POST /observability/v1/observe/`) are **alternative, mutually exclusive** integration paths — they cannot be combined for the same session.
+
+Each method independently creates its own call record in Cekura. If both run for the same session, Cekura creates two separate records; there is no deduplication or merging. The SDK is designed to replace the direct API for Pipecat-based agents.
+
+### Migrating from the direct API to the SDK
+
+If you have an existing integration that posts call data to `observability/v1/observe/` from a post-processing step, follow these steps before adding the SDK:
+
+1. Add `observe_pipeline()` (or `observe_and_create_task()`) to your Pipecat pipeline.
+2. Move any metadata from your direct API call to `set_custom_metadata({...})` — see [Custom Metadata](/documentation/integrations/pipecat/tracing#custom-metadata) in the Pipecat Tracing docs. This can be called in a cleanup or post-processing handler that runs before the pipeline closes.
+3. Remove the `observability/v1/observe/` call from your post-processing step.
+
 
 For more details on setting up and managing your testing environment, please visit the [Cekura Documentation](https://docs.cekura.ai/).

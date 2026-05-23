@@ -1,0 +1,60 @@
+---
+title: "Using Cekura with Cursor"
+sidebarTitle: "Cursor Guide"
+description: "End-to-end walkthrough: evaluate complex voice agents using Cursor and the Cekura MCP"
+icon: "code"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
+Use Cursor's agent mode together with the Cekura MCP to design evaluators, run them against your voice agents, and triage the results — all without leaving the editor.
+
+## Quick Guide
+
+<Steps>
+  <Step title="Connect Cursor to Cekura">
+    Add the Cekura MCP server to Cursor. Open **Cursor Settings → MCP → Add new MCP server** (or edit `~/.cursor/mcp.json` directly) and paste:
+
+    ```json
+    {
+      "mcpServers": {
+        "cekura": {
+          "command": "npx",
+          "args": ["mcp-remote", "https://api.cekura.ai/mcp"]
+        }
+      }
+    }
+    ```
+
+    On first use Cursor opens a browser to authorize against your Cekura dashboard. For API-key-based auth (project-scoped credentials, shared CI access), see the [MCP overview](/mcp/overview#configure-mcp-server-full-matrix).
+
+    Verify by asking Cursor's agent: *"List my Cekura agents."*
+  </Step>
+
+  <Step title="Set up mock data and cleanup hooks">
+    Complex agents depend on database state — users, accounts, sessions, entitlements. Stand up a lightweight webhook server that seeds mock data before a run and listens for Cekura's post-run webhook to reset the database. This keeps concurrent tests isolated and repeatable.
+  </Step>
+
+  <Step title="Let Cursor learn the schema">
+    Open your agent's repo in Cursor and ask the agent to read your tool definitions, prompts, and database schema. Then prompt it to generate scenario coverage through the Cekura MCP — for example: *"Read the agent's tools in `src/agent/tools.ts`, then create 10 Cekura evaluators covering the most common user flows."*
+  </Step>
+
+  <Step title="Run the full suite">
+    Kick off all evaluators at once through the MCP: *"Run every evaluator on agent X and stream the results."* Cekura executes them concurrently and surfaces pass/fail with full transcripts and traces.
+  </Step>
+
+  <Step title="Triage with Cursor">
+    Ask Cursor's agent to pull failing runs and classify them: *"Fetch the failures from the last run and tell me which are real bugs vs. flakes."* Because runs are non-deterministic, **rerun each failing test 3–4 times** and ask Cursor to compute a pass rate. One pass out of four usually points to a prompt or tool-routing bug, not infra.
+  </Step>
+
+  <Step title="Fix in-place and re-run">
+    Because Cursor has both your codebase and the Cekura MCP in the same context, you can go from failing transcript → suspected prompt or tool bug → edit → re-run the failing evaluator in a single thread.
+  </Step>
+</Steps>
+
+<Tip>
+A good first prompt: *"Use the Cekura MCP to list my agents, then read the prompt for the first one and propose 10 workflow evaluators covering the most common user flows."*
+</Tip>

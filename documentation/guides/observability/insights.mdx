@@ -3,7 +3,7 @@ title: "Failure-Mode Insights"
 sidebarTitle: "Insights"
 icon: "lightbulb"
 iconType: "regular"
-description: "Cluster non-passing calls into qualitative failure-mode themes per metric, generated daily by an LLM agent that reads your call logs."
+description: "Cluster failing calls into qualitative failure-mode themes per metric, generated daily by an LLM agent that reads your call logs."
 ---
 
 import { CopyPageButton } from "/snippets/copy-page-button.mdx";
@@ -12,43 +12,25 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 ## What it does
 
-For every project and every metric you've configured that emits a free-text explanation (LLM-judge metrics and a curated set of predefined metrics), Cekura runs a daily audit that:
+For every project and every LLM Judge metric, Cekura runs a daily audit that:
 
-1. Pulls all non-passing calls for that (project, metric) from the last 24 hours (falling back to 7 days if the day's pool is small).
+1. Pulls all failing calls for that (project, metric) from the last 24 hours (falling back to 7 days if the day's pool is small).
 2. Hands the transcripts, the metric card, and an audit prompt to an LLM agent.
-3. Has the agent read a sample of the calls, cluster them by **root cause** (not by score band), and write a 1-6 theme breakdown.
+3. Has the agent read a sample of the calls, cluster them by **root cause**, and write a 1-6 theme breakdown.
 4. Saves the result on the metric's Insights card in the dashboard.
 
-The themes answer **"why is this metric flagging?"** rather than restating the score distribution.
-
-## Where to see it
-
-Open your dashboard, pick a project, and click **Observability → Insights** in the left nav. You'll see one card per eligible metric, grouped into **Custom Metrics** and **Predefined Metrics**. Each card shows:
-
-- The latest headline (one-line summary of the metric's failures)
-- A 1-6 bullet list of failure-mode themes, with title + 1-2 sentence "why" + 2-3 example call IDs per theme
-- How many calls were analyzed and which window was used
-
-Cards auto-refresh after the daily run.
+The generated insights allow users to better understand the failure modes of their agent.
 
 ## Which metrics are eligible
 
-The audit only runs against metrics that produce a written explanation worth clustering. Specifically:
+Only supported for LLM Judge type metrics as of now. Code based metrics such as Latency, WPM, Talk Ratio are excluded.
 
 - **Custom metrics** with `type: llm_judge`.
-- A curated allowlist of predefined metrics: CSAT, Critical Deviations Continuous, Critical Info Check, Critical Info Check bool, Expected Outcome, Gibberish Detection, Hallucination, Letterwise Pronunciation Detection, Main Agent Early End Call, Not Early Termination, Pronunciation Analysis, Pronunciation test, Relevancy, Response Consistency, STT Errors, Tool call Accuracy, Unnecessary Repetition Count, Unnecessary Repetition Score.
-
-Pure numeric metrics that only emit a number (Latency, WPM, Talk Ratio, etc.) are excluded — clustering on a number only produces magnitude buckets, which isn't useful.
+- The following predefined metrics: **CSAT**, **Critical Deviations Continuous**, **Critical Info Check**, **Critical Info Check bool**, **Expected Outcome**, **Gibberish Detection**, **Hallucination**, **Letterwise Pronunciation Detection**, **Main Agent Early End Call**, **Not Early Termination**, **Pronunciation Analysis**, **Pronunciation test**, **Relevancy**, **Response Consistency**, **STT Errors**, **Tool call Accuracy**, **Unnecessary Repetition Count**, **Unnecessary Repetition Score**.
 
 ## How the daily run works
 
-A Celery Beat cron fires at **06:00 UTC** daily. For each (project, eligible-metric) pair, it:
-
-1. Scans the most recent 24 hours of call logs.
-2. If fewer than 500 calls flagged the metric, expands the window to the last 7 days.
-3. Random-samples up to 500 failing calls and ships their transcripts + metadata into an isolated cloud sandbox.
-4. Runs the audit prompt; the agent grep+reads its way through the data and writes a `failure_modes.json` file with the themes.
-5. Persists the result on the metric's Insights card.
+A Celery Beat cron fires at **06:00 UTC** daily. For each (project, eligible-metric) pair, our agent analyses the failing calls and writes the resulting themes to the metric's Insights card.
 
 If a metric has fewer than the minimum failing-call threshold even over 7 days, the card shows **"Not enough metric failure instances in last 7 days."**
 
@@ -77,11 +59,3 @@ curl https://api.cekura.ai/api/projects/<project_id>/metric_failure_mode_insight
 ```
 
 When `status` is `succeeded`, the `failure_modes` array contains the themes.
-
-## Privacy + data flow
-
-The audit ships call transcripts and metric scores into a third-party LLM provider (Cursor / Composer 2.5). Sensitive payloads (PII redaction, tool outputs) follow the same rules as the rest of the platform's LLM-evaluation pipeline. Contact [support@cekura.ai](mailto:support@cekura.ai) if you need to opt your organization out.
-
-## Costs
-
-Each per-(project, metric) audit costs roughly $0.05 in LLM provider tokens. At ~20 eligible metrics per project, the daily cron costs ~$1/project/day. On-demand "Generate all" runs charge the same per audit.

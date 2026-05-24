@@ -129,3 +129,79 @@ This iterative optimization process allows you to:
 - Improve metric accuracy from as low as 50% to 95% or higher
 - Ensure the labels you see from your AI assistant accurately reflect real performance
 - Make data-driven decisions based on reliable metrics
+
+## Scheduled Metric Optimization
+
+You can schedule Auto Improve to run on a recurring basis using the Metric Optimiser Cron Job API. This is useful for teams that label reviews regularly and want new feedback incorporated automatically.
+
+### How It Works
+
+Each scheduled job:
+- Is **project-scoped** — one job can optimise multiple metrics across agents in the same project
+- Runs the same Auto Improve logic as the UI button, using every test set in each metric's Lab
+- Emails a per-metric summary to project members when complete
+- Optionally auto-applies optimised prompts when they do not regress the labelled set
+
+### Regression Guard
+
+When `auto_apply` is enabled, the optimiser compares the new score against the baseline — how many annotations the current metric gets correct. The optimised prompt is saved only if the new score meets or exceeds the baseline. If the score regresses, the email flags it as "regressed — not applied" and the metric remains unchanged.
+
+### Creating a Scheduled Optimiser Job
+
+Use the API to create a cron job:
+
+```bash
+curl -X POST https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/ \
+  -H "X-CEKURA-API-KEY: <your-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project": <project_id>,
+    "name": "Weekly metric optimiser",
+    "metrics": [<metric_id_1>, <metric_id_2>],
+    "crontab_expression": "0 9 * * 1",
+    "timezone": "America/Los_Angeles",
+    "auto_apply": false,
+    "notify_on": "both"
+  }'
+```
+
+| Field | Description |
+|-------|-------------|
+| `project` | Project ID the cron job belongs to |
+| `name` | Display name for the job |
+| `metrics` | Array of metric IDs to optimise on each run |
+| `crontab_expression` | Standard 5-field cron expression (minute hour day month weekday) |
+| `timezone` | IANA timezone name (defaults to project timezone or UTC) |
+| `auto_apply` | When `true`, saves optimised prompts that do not regress. When `false` (default), the run is read-only and only emails a summary |
+| `skip_evaluation` | When `true`, skips the post-optimisation evaluation pass to speed up the run |
+| `notify_on` | When to email project members: `success`, `failure`, or `both` |
+
+### Typical Cadence
+
+- **Weekly** — if your team labels reviews regularly (recommended)
+- **Daily** — only if you have an active labelling workflow producing many new annotations per day
+- **Monthly** — if labelling is bursty (e.g., quarterly audits)
+
+### Managing Jobs
+
+List, update, or delete scheduled jobs through the API:
+
+```bash
+# List jobs for a project
+curl "https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/?project_id=<project_id>" \
+  -H "X-CEKURA-API-KEY: <your-api-key>"
+
+# Update a job
+curl -X PATCH "https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/<job_id>/" \
+  -H "X-CEKURA-API-KEY: <your-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"auto_apply": true}'
+
+# Delete a job
+curl -X DELETE "https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/<job_id>/" \
+  -H "X-CEKURA-API-KEY: <your-api-key>"
+```
+
+<Note>
+Metrics with no labelled test sets (no `MetricReview` rows in the Lab) are skipped during each run — they will not error, just appear as "skipped" in the email summary.
+</Note>

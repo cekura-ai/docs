@@ -61,6 +61,25 @@
                 "description": "A8c8aef15013e2e52ccf6000350258a1eab6cd2a11e62f592c5e19092d7204d7"
             }
         },
+        "/app/otel/validate/": {
+            "get": {
+                "operationId": "app-otel-validate-retrieve",
+                "description": "Validate an API key owns the given agent or project.\n\nUsed by the OTel auth service. Returns 200 on success,\n401 on bad/missing key, 403 on ownership mismatch.\n\nQuery params: agent_id or project_id.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/app/v1/product-chat/": {
             "post": {
                 "operationId": "app-v1-product-chat-create",
@@ -1981,6 +2000,178 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/{id}/review_detail/": {
+            "get": {
+                "operationId": "alerts-review-detail-retrieve",
+                "description": "Per-alert review data — config snapshot, timeline, paginated fires.\n\nPowers the per-alert review page. Single-alert version of the bulk\n`review` action. Timeline is computed with a DB-side GROUP BY so the\nendpoint stays fast for noisy alerts (thousands of fires in 7d).\n\nQuery params:\n    hours: optional, defaults to 24. Capped at 7 days.\n    page: optional, defaults to 1.\n    page_size: optional, defaults to 50, capped at 200.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this alert.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/{id}/summarize/": {
+            "post": {
+                "operationId": "alerts-summarize-create",
+                "description": "Kick off an LLM summary of the last N hours of fires for this alert.\n\nReturns a progress_id. Frontend polls `summarize_progress` until status\nis 'completed' or 'error'. Cached for 1 hour keyed on (alert, hours,\nlatest fire id) — re-invocations within that window return the same\nprogress_id.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this alert.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/review/": {
+            "get": {
+                "operationId": "alerts-review-retrieve",
+                "description": "Aggregate fired-alert data for the review page.\n\nReturns deterministic SQL-only aggregates: KPI summary, time-bucketed\ntimeline, and a per-alert breakdown with sparkline. LLM summaries are\non-demand via the separate `summarize` action.\n\nQuery params:\n    project_id: required.\n    hours: optional, defaults to 24.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/summarize_progress/": {
+            "get": {
+                "operationId": "alerts-summarize-progress-retrieve",
+                "description": "Alerts summarize progress",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/trigger_summary/": {
+            "get": {
+                "operationId": "alerts-trigger-summary-retrieve",
+                "description": "Return fire counts per alert over a time window.\n\nPowers the \"Last 24h\" status pill on the alerts list. Counts CallLogAlert\nrows linked to each alert in the project, scoped to the window.\n\nQuery params:\n    project_id: required, scopes the result to alerts in this project.\n    hours: optional, defaults to 24. Window size in hours.\n\nReturns: { \"<alert_id>\": <fire_count>, ... }",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -4055,6 +4246,35 @@
                         "enabled": true,
                         "name": "call-logs-mark-metric-vote-create",
                         "description": "Record a thumbs-up or thumbs-down vote on a specific metric evaluation for this call log and optionally provide an expected value and free-text feedback. Updates the metric evaluation and marks the call log as reviewed."
+                    }
+                }
+            }
+        },
+        "/observability/v1/call-logs/{id}/trace/": {
+            "get": {
+                "operationId": "call-logs-trace-retrieve",
+                "description": "Proxy trace data from Grafana Tempo for a CallLog.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -7994,7 +8214,7 @@
         "/test_framework/billing/info/": {
             "get": {
                 "operationId": "billing-info-retrieve",
-                "description": "Returns credits remaining, credits used, and subscription status for the organization. The organization is automatically determined from the API key. Only organization-scoped API keys are supported.",
+                "description": "Returns credits remaining, credits used, balance expiry, and subscription status for an organization. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization.",
                 "summary": "Get billing information",
                 "tags": [
                     "test_framework"
@@ -8027,7 +8247,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "billing-info-retrieve",
-                        "description": "Returns credits remaining, credits used, and subscription status for the organization. The organization is automatically determined from the API key. Only organization-scoped API keys are supported."
+                        "description": "Returns credits remaining, credits used, balance expiry, and subscription status for an organization. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization."
                     }
                 }
             }
@@ -11615,8 +11835,9 @@
         },
         "/test_framework/v1/aiagents/{agent_id}/mcp/{mock_index}/": {
             "post": {
-                "operationId": "aiagents-mcp-create",
-                "description": "Mock MCP server endpoint.\n\nImplements the MCP JSON-RPC 2.0 protocol so VAPI can use a Cekura-hosted\nmock in place of a real MCP server.  Handles three methods:\n\n  initialize   — standard MCP handshake\n  tools/list   — returns Tool records for this specific MCP endpoint only\n  tools/call   — looks up the named Tool and returns its mock output\n\nURL: /v1/aiagents/{agent_id}/mcp/{mock_index}/\nEach original VAPI MCP tool gets its own sequential index (1, 2, 3 ...) so\nthat different MCP tools on the same assistant each serve only their own\nsub-tools and never mix with each other.\n\nNo authentication is required — this endpoint must be reachable by VAPI.",
+                "operationId": "aiagents-mock-mcp-invoke",
+                "description": "JSON-RPC 2.0 endpoint that serves mocked sub-tools for one MCP tool on the agent. Supports `initialize`, `tools/list`, and `tools/call`. Primarily used as a VAPI provider callback during simulation runs; can also be invoked directly to verify mock setup. Each MCP tool on the agent has its own sequential `mock_index` — call `mock-status` first to discover valid indices and their sub-tool scopes.",
+                "summary": "Invoke an agent's mock MCP endpoint (JSON-RPC 2.0)",
                 "parameters": [
                     {
                         "in": "path",
@@ -11640,6 +11861,26 @@
                 "tags": [
                     "test_framework"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MockMCPRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MockMCPRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MockMCPRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "api_key": []
@@ -11647,15 +11888,22 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "No response body"
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MockMCPResponse"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 },
                 "x-mcp-expose": true,
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "aiagents-mcp-create",
-                        "description": "Mock MCP server endpoint.\n\nImplements the MCP JSON-RPC 2.0 protocol so VAPI can use a Cekura-hosted\nmock in place of a real MCP server.  Handles three methods:\n\n  initialize   — standard MCP handshake\n  tools/list   — returns Tool records for this specific MCP endpoint only\n  tools/call   — looks up the named Tool and returns its mock output\n\nURL: /v1/aiagents/{agent_id}/mcp/{mock_index}/\nEach original VAPI MCP tool gets its own sequential index (1, 2, 3 ...) so\nthat different MCP tools on the same assistant each serve only their own\nsub-tools and never mix with each other.\n\nNo authentication is required — this endpoint must be reachable by VAPI."
+                        "name": "aiagents-mock-mcp-invoke",
+                        "description": "JSON-RPC 2.0 endpoint that serves mocked sub-tools for one MCP tool on the agent. Supports `initialize`, `tools/list`, and `tools/call`. Primarily used as a VAPI provider callback during simulation runs; can also be invoked directly to verify mock setup. Each MCP tool on the agent has its own sequential `mock_index` — call `mock-status` first to discover valid indices and their sub-tool scopes."
                     }
                 }
             }
@@ -12181,26 +12429,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/AutoFetchToolsRequest"
-                            },
-                            "examples": {
-                                "Auto-FetchToolsRequest": {
-                                    "value": {
-                                        "provider": "retell",
-                                        "assistant_id": "agent_abc123"
-                                    },
-                                    "summary": "Auto-Fetch Tools Request"
-                                }
+                                "$ref": "#/components/schemas/Tool"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/AutoFetchToolsRequest"
+                                "$ref": "#/components/schemas/Tool"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/AutoFetchToolsRequest"
+                                "$ref": "#/components/schemas/Tool"
                             }
                         }
                     },
@@ -12216,25 +12455,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AutoFetchToolsResponse"
-                                },
-                                "examples": {
-                                    "Auto-FetchToolsSuccessResponse": {
-                                        "value": {
-                                            "progress_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                                        },
-                                        "summary": "Auto-Fetch Tools Success Response"
-                                    }
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AutoFetchErrorResponse"
+                                    "$ref": "#/components/schemas/Tool"
                                 }
                             }
                         },
@@ -12256,14 +12477,6 @@
                             "pattern": "^\\d+$"
                         },
                         "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "required": true
                     }
                 ],
                 "tags": [
@@ -12279,17 +12492,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AutoFetchProgressResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AutoFetchProgressErrorResponse"
+                                    "$ref": "#/components/schemas/Tool"
                                 }
                             }
                         },
@@ -12301,7 +12504,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/disable-mock/": {
             "post": {
                 "operationId": "aiagents-tools-disable-mock-create",
-                "description": "Kick off a background task to disable mock tools for this agent.\nReturns a progress_id to poll disable-mock-progress/ for status.",
+                "description": "Restore the agent's original provider tools and delete the cloned mock tools that `enable-mock` created. Supported providers: VAPI, Retell, and ElevenLabs. Returns a `progress_id`; poll `disable-mock-progress/` for status. ⚠ Cannot be undone — the cloned mock tools are permanently removed from the provider.",
+                "summary": "Disable mock tools for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -12361,13 +12565,23 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-tools-disable-mock-create",
+                        "description": "Restore the agent's original provider tools and delete the cloned mock tools that `enable-mock` created. Supported providers: VAPI, Retell, and ElevenLabs. Returns a `progress_id`; poll `disable-mock-progress/` for status. ⚠ Cannot be undone — the cloned mock tools are permanently removed from the provider."
+                    }
                 }
             }
         },
         "/test_framework/v1/aiagents/{agent_id}/tools/disable-mock-progress/": {
             "get": {
                 "operationId": "aiagents-tools-disable-mock-progress-retrieve",
-                "description": "Poll the status of a background disable-mock task.",
+                "description": "Returns the current state of a background `disable-mock` task. Pass the `progress_id` returned by `disable-mock/`. Status is one of `in_progress`, `completed`, or `failed`.",
+                "summary": "Poll the status of a disable-mock job",
                 "parameters": [
                     {
                         "in": "path",
@@ -12376,6 +12590,15 @@
                             "type": "string",
                             "pattern": "^\\d+$"
                         },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Progress token returned by disable-mock/.",
                         "required": true
                     }
                 ],
@@ -12392,11 +12615,29 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/DisableMockProgressResponse"
                                 }
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DisableMockProgressErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-tools-disable-mock-progress-retrieve",
+                        "description": "Returns the current state of a background `disable-mock` task. Pass the `progress_id` returned by `disable-mock/`. Status is one of `in_progress`, `completed`, or `failed`."
                     }
                 }
             }
@@ -12404,7 +12645,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/enable-mock/": {
             "post": {
                 "operationId": "aiagents-tools-enable-mock-create",
-                "description": "Kick off a background task to enable mock tools for this agent.\nReturns a progress_id to poll enable-mock-progress/ for status.\nAuto-fetch must be run first to populate tool mock data.",
+                "description": "Kick off a background job that clones the agent's provider tools and points them at Cekura-hosted mock endpoints, so simulation runs can exercise the agent without calling real external services. Supported providers: VAPI, Retell, and ElevenLabs. Returns a `progress_id`; poll `enable-mock-progress/` until status is `completed`. Requires `auto-fetch` to have populated tool definitions first.",
+                "summary": "Enable mock tools for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -12464,13 +12706,22 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-tools-enable-mock-create",
+                        "description": "Kick off a background job that clones the agent's provider tools and points them at Cekura-hosted mock endpoints, so simulation runs can exercise the agent without calling real external services. Supported providers: VAPI, Retell, and ElevenLabs. Returns a `progress_id`; poll `enable-mock-progress/` until status is `completed`. Requires `auto-fetch` to have populated tool definitions first."
+                    }
                 }
             }
         },
         "/test_framework/v1/aiagents/{agent_id}/tools/enable-mock-progress/": {
             "get": {
                 "operationId": "aiagents-tools-enable-mock-progress-retrieve",
-                "description": "Poll the status of a background enable-mock task.",
+                "description": "Returns the current state of a background `enable-mock` task. Pass the `progress_id` returned by `enable-mock/`. Status is one of `in_progress`, `completed`, or `failed`.",
+                "summary": "Poll the status of an enable-mock job",
                 "parameters": [
                     {
                         "in": "path",
@@ -12479,6 +12730,15 @@
                             "type": "string",
                             "pattern": "^\\d+$"
                         },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Progress token returned by enable-mock/.",
                         "required": true
                     }
                 ],
@@ -12495,11 +12755,29 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/EnableMockProgressResponse"
                                 }
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EnableMockProgressErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-tools-enable-mock-progress-retrieve",
+                        "description": "Returns the current state of a background `enable-mock` task. Pass the `progress_id` returned by `enable-mock/`. Status is one of `in_progress`, `completed`, or `failed`."
                     }
                 }
             }
@@ -12507,7 +12785,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/mock-status/": {
             "get": {
                 "operationId": "aiagents-tools-mock-status-retrieve",
-                "description": "Get the current mock tools status for this agent.",
+                "description": "Returns whether mock tools are currently enabled for the agent, the bound provider (`vapi`, `retell`, or `elevenlabs`), the provider-side assistant id, and — for VAPI agents that have MCP-typed tools mocked — a map of `mcp_indices` listing each Cekura-hosted mock MCP endpoint and the sub-tools it serves. Use `mcp_indices` to discover valid `mock_index` values before calling `aiagents_mock_mcp_invoke`.",
+                "summary": "Get current mock-tools status for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -12532,11 +12811,19 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/MockStatusResponse"
                                 }
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-tools-mock-status-retrieve",
+                        "description": "Returns whether mock tools are currently enabled for the agent, the bound provider (`vapi`, `retell`, or `elevenlabs`), the provider-side assistant id, and — for VAPI agents that have MCP-typed tools mocked — a map of `mcp_indices` listing each Cekura-hosted mock MCP endpoint and the sub-tools it serves. Use `mcp_indices` to discover valid `mock_index` values before calling `aiagents_mock_mcp_invoke`."
                     }
                 }
             }
@@ -16427,6 +16714,91 @@
                 }
             }
         },
+        "/test_framework/v1/metrics-external/generate_clean_description_bg/": {
+            "post": {
+                "operationId": "metrics-external-generate-clean-description-bg-create",
+                "description": "Enqueue a background job to generate a clean metric description. Returns a `progress_id`; poll `generate_clean_description_progress` until `status` is `completed` or `failed`.",
+                "summary": "Start async clean description generation",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenerateCleanDescriptionBgResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics-external/generate_clean_description_progress/": {
+            "get": {
+                "operationId": "metrics-external-generate-clean-description-progress-retrieve",
+                "description": "Poll the result of a `generate_clean_description_bg` job. `status` is one of: `queued`, `processing`, `completed`, `failed`. On `completed`, `clean_description` and `thinking` are present.",
+                "summary": "Poll async clean description generation",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "progress_id returned from generate_clean_description_bg",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenerateCleanDescriptionProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/metrics-external/generate_evaluation_trigger/": {
             "post": {
                 "operationId": "metrics-external-generate-evaluation-trigger-create",
@@ -17943,6 +18315,107 @@
                         "enabled": true,
                         "name": "metrics-generate-clean-description-create",
                         "description": "Generate a clean metric description based on agent description and metric description."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics/generate_clean_description_bg/": {
+            "post": {
+                "operationId": "metrics-generate-clean-description-bg-create",
+                "description": "Enqueue a background job to generate a clean metric description. Returns a `progress_id`; poll `generate_clean_description_progress` until `status` is `completed` or `failed`.",
+                "summary": "Start async clean description generation",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenerateCleanDescriptionBgResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metrics-generate-clean-description-bg-create",
+                        "description": "Enqueue a background job to generate a clean metric description. Returns a `progress_id`; poll `generate_clean_description_progress` until `status` is `completed` or `failed`."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics/generate_clean_description_progress/": {
+            "get": {
+                "operationId": "metrics-generate-clean-description-progress-retrieve",
+                "description": "Poll the result of a `generate_clean_description_bg` job. `status` is one of: `queued`, `processing`, `completed`, `failed`. On `completed`, `clean_description` and `thinking` are present.",
+                "summary": "Poll async clean description generation",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "progress_id returned from generate_clean_description_bg",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/GenerateCleanDescriptionProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metrics-generate-clean-description-progress-retrieve",
+                        "description": "Poll the result of a `generate_clean_description_bg` job. `status` is one of: `queued`, `processing`, `completed`, `failed`. On `completed`, `clean_description` and `thinking` are present."
                     }
                 }
             }
@@ -19465,50 +19938,6 @@
                         "description": ""
                     }
                 }
-            },
-            "post": {
-                "operationId": "phone-numbers-create",
-                "description": "Create a new phone number",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
             }
         },
         "/test_framework/v1/phone-numbers-external/": {
@@ -19532,50 +19961,6 @@
                                     "items": {
                                         "$ref": "#/components/schemas/PhoneNumber"
                                     }
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "post": {
-                "operationId": "phone-numbers-external-create",
-                "description": "Create a new phone number",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
                                 }
                             }
                         },
@@ -19617,143 +20002,6 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            },
-            "put": {
-                "operationId": "phone-numbers-external-update",
-                "description": "Update a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "patch": {
-                "operationId": "phone-numbers-external-partial-update",
-                "description": "Update a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "delete": {
-                "operationId": "phone-numbers-external-destroy",
-                "description": "Delete a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No response body"
                     }
                 }
             }
@@ -19888,143 +20136,6 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            },
-            "put": {
-                "operationId": "phone-numbers-update",
-                "description": "Update a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PhoneNumber"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "patch": {
-                "operationId": "phone-numbers-partial-update",
-                "description": "Update a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedPhoneNumber"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/PhoneNumber"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
-            "delete": {
-                "operationId": "phone-numbers-destroy",
-                "description": "Delete a phone number",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this phone number.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No response body"
                     }
                 }
             }
@@ -23501,7 +23612,7 @@
         "/test_framework/v1/runs/": {
             "get": {
                 "operationId": "runs-list",
-                "description": "List test runs. Each item's `id` is the integer `run_id` used at `/runs/{run_id}/`; the `call_id` field is a provider string identifier, NOT an endpoint ID.",
+                "description": "List test runs",
                 "parameters": [
                     {
                         "in": "query",
@@ -23859,7 +23970,7 @@
         "/test_framework/v1/runs-external/": {
             "get": {
                 "operationId": "runs-external-list",
-                "description": "List test runs. Each item's `id` is the integer `run_id` used at `/runs/{run_id}/`; the `call_id` field is a provider string identifier, NOT an endpoint ID.",
+                "description": "List test runs",
                 "parameters": [
                     {
                         "in": "query",
@@ -24217,7 +24328,7 @@
         "/test_framework/v1/runs-external/{id}/": {
             "get": {
                 "operationId": "runs-external-retrieve",
-                "description": "Retrieve a test run by `run_id` (the integer path parameter). The `call_id` field on the response is the provider's call identifier (string) — do NOT pass it where `run_id` is expected.",
+                "description": "Retrieve a test run by ID",
                 "parameters": [
                     {
                         "in": "path",
@@ -25090,7 +25201,7 @@
         "/test_framework/v1/runs/{id}/": {
             "get": {
                 "operationId": "runs-retrieve",
-                "description": "Retrieve a test run by `run_id` (the integer path parameter). The `call_id` field on the response is the provider's call identifier (string) — do NOT pass it where `run_id` is expected.",
+                "description": "Retrieve a test run by ID",
                 "parameters": [
                     {
                         "in": "path",
@@ -25674,6 +25785,35 @@
                 }
             }
         },
+        "/test_framework/v1/runs/{id}/trace/": {
+            "get": {
+                "operationId": "runs-trace-retrieve",
+                "description": "Proxy trace data from Grafana Tempo for a Run.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/test_framework/v1/runs/{id}/unmark_critical_scenario_wrong/": {
             "post": {
                 "operationId": "runs-unmark-critical-scenario-wrong-create",
@@ -25726,6 +25866,35 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/runs/{run_id}/datadog-logs/": {
+            "get": {
+                "operationId": "runs-datadog-logs-retrieve",
+                "description": "Fetch Datadog logs for a given simulation run ID.\n\nRestricted to OAuth tokens minted by the `cekura-support-bot` client via\nthe client_credentials grant. Even though the support-bot client can\nimpersonate any user, the token's subject user must be a member of the\nrun's organization — so support agents only see logs for runs belonging\nto the customer they're currently helping.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "run_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
                     }
                 }
             }
@@ -48161,12 +48330,13 @@
                             "cisco",
                             "bland",
                             "livekit",
+                            "amazon_connect",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "a7ddfee511394575",
+                        "x-spec-enum-id": "c7db069ffdec596e",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `amazon_connect` - Amazon Connect"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -48276,6 +48446,19 @@
                     "agentforce_data": {
                         "type": "string",
                         "description": "\nAgentforce additional data - client_id, domain, and agent_id\nExample: `{\"client_id\": \"sd7a8...\", \"domain\": \"https://example.sandbox.my.salesforce.com\", \"agent_id\": \"0Xx...\"}`\n"
+                    },
+                    "amazon_connect_security_token": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "x-amz-security-token for Amazon Connect authenticated chat widgets."
+                    },
+                    "amazon_connect_security_token_configured": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "amazon_connect_data": {
+                        "type": "string",
+                        "description": "Amazon Connect config: snippet_id (required), connect_host (required), region (default us-east-1)."
                     },
                     "custom_provider_api_key": {
                         "type": "string",
@@ -49079,102 +49262,6 @@
                     }
                 }
             },
-            "AutoFetchProgressErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "AutoFetchProgressResponse": {
-                "type": "object",
-                "properties": {
-                    "status": {
-                        "enum": [
-                            "in_progress",
-                            "completed",
-                            "failed"
-                        ],
-                        "type": "string",
-                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
-                        "x-spec-enum-id": "6e9575e5767aaee0"
-                    },
-                    "tools_created": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "tools_updated": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "message": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "error": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    }
-                },
-                "required": [
-                    "error",
-                    "message",
-                    "status",
-                    "tools_created",
-                    "tools_updated"
-                ]
-            },
-            "AutoFetchToolsRequest": {
-                "type": "object",
-                "properties": {
-                    "provider": {
-                        "enum": [
-                            "vapi",
-                            "retell",
-                            "elevenlabs"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "ff667bd2cd27b9d3",
-                        "description": "Provider to fetch tools from\n\n* `vapi` - vapi\n* `retell` - retell\n* `elevenlabs` - elevenlabs"
-                    },
-                    "assistant_id": {
-                        "type": "string",
-                        "description": "Assistant/Agent ID from the provider (e.g., VAPI Assistant ID)"
-                    },
-                    "api_key": {
-                        "type": "string",
-                        "description": "Optional API key for the provider. If not provided, will use stored credentials."
-                    }
-                },
-                "required": [
-                    "assistant_id",
-                    "provider"
-                ]
-            },
-            "AutoFetchToolsResponse": {
-                "type": "object",
-                "properties": {
-                    "progress_id": {
-                        "type": "string",
-                        "description": "Poll auto-fetch-progress/?progress_id=<value> to track completion"
-                    }
-                },
-                "required": [
-                    "progress_id"
-                ]
-            },
             "Billing": {
                 "type": "object",
                 "properties": {
@@ -49733,7 +49820,6 @@
             },
             "CallLogDetail": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -49899,6 +49985,11 @@
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
                         "maxLength": 100
                     },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
+                    },
                     "agent": {
                         "type": [
                             "integer",
@@ -49920,7 +50011,6 @@
             },
             "CallLogList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -49991,6 +50081,11 @@
                         "type": "string",
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
                         "maxLength": 100
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
                     },
                     "timestamp": {
                         "type": "string",
@@ -50307,6 +50402,33 @@
                     }
                 }
             },
+            "CleanMetricDescriptionRequest": {
+                "type": "object",
+                "properties": {
+                    "agent": {
+                        "type": "integer"
+                    },
+                    "metric_description": {
+                        "type": "string"
+                    },
+                    "eval_type": {
+                        "enum": [
+                            "boolean",
+                            "numeric",
+                            "rating",
+                            "enum"
+                        ],
+                        "type": "string",
+                        "description": "* `boolean` - boolean\n* `numeric` - numeric\n* `rating` - rating\n* `enum` - enum",
+                        "x-spec-enum-id": "ae756482f906eddf"
+                    }
+                },
+                "required": [
+                    "agent",
+                    "eval_type",
+                    "metric_description"
+                ]
+            },
             "Condition": {
                 "type": "object",
                 "description": "One entry in a ConditionalActions flow.",
@@ -50399,6 +50521,12 @@
                         "type": "string",
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
                         "maxLength": 100
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "default": "",
+                        "description": "OpenTelemetry trace ID (32-char hex string). Example: \"4bf92f3577b34da6a3ce929d0e0e4736\"",
+                        "maxLength": 32
                     },
                     "agent": {
                         "type": "integer",
@@ -51021,7 +51149,6 @@
             },
             "Dashboard": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -51153,7 +51280,6 @@
             },
             "DashboardList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -51328,6 +51454,59 @@
                     "detail"
                 ]
             },
+            "DisableMockProgressErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "DisableMockProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "6e9575e5767aaee0",
+                        "description": "Current job state.\n\n* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed"
+                    },
+                    "mock_enabled": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "description": "False if mocks were successfully disabled; null while in progress."
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Human-readable success summary; null if not completed."
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Error detail; populated only when status is failed."
+                    }
+                },
+                "required": [
+                    "error",
+                    "message",
+                    "mock_enabled",
+                    "status"
+                ]
+            },
             "DisableMockToolsRequest": {
                 "type": "object",
                 "properties": {
@@ -51341,7 +51520,8 @@
                 "type": "object",
                 "properties": {
                     "progress_id": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Token to pass to disable-mock-progress to poll job status."
                     }
                 },
                 "required": [
@@ -51450,6 +51630,59 @@
                     "detail"
                 ]
             },
+            "EnableMockProgressErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "EnableMockProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "6e9575e5767aaee0",
+                        "description": "Current job state.\n\n* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed"
+                    },
+                    "mock_enabled": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "description": "True if mocks are now active; null while in progress."
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Human-readable success summary; null if not completed."
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Error detail; populated only when status is failed."
+                    }
+                },
+                "required": [
+                    "error",
+                    "message",
+                    "mock_enabled",
+                    "status"
+                ]
+            },
             "EnableMockToolsRequest": {
                 "type": "object",
                 "properties": {
@@ -51463,7 +51696,8 @@
                 "type": "object",
                 "properties": {
                     "progress_id": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "Token to pass to enable-mock-progress to poll job status."
                     }
                 },
                 "required": [
@@ -51621,6 +51855,37 @@
                     "explanation",
                     "outcome_alignments",
                     "score"
+                ]
+            },
+            "GenerateCleanDescriptionBgResponse": {
+                "type": "object",
+                "properties": {
+                    "progress_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "progress_id"
+                ]
+            },
+            "GenerateCleanDescriptionProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    },
+                    "clean_description": {
+                        "type": "string"
+                    },
+                    "thinking": {
+                        "type": "string"
+                    },
+                    "error": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "status"
                 ]
             },
             "ImportPlivoNumber": {
@@ -52897,7 +53162,6 @@
             },
             "MetricList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -53536,6 +53800,116 @@
                 },
                 "required": [
                     "metric"
+                ]
+            },
+            "MockMCPIndexEntry": {
+                "type": "object",
+                "properties": {
+                    "index": {
+                        "type": "integer",
+                        "description": "Path segment for /mcp/{index}/."
+                    },
+                    "sub_tools": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Mocked sub-tool names served by this index."
+                    }
+                },
+                "required": [
+                    "index",
+                    "sub_tools"
+                ]
+            },
+            "MockMCPRequest": {
+                "type": "object",
+                "description": "JSON-RPC 2.0 envelope for the mock MCP endpoint.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "description": "JSON-RPC version. Must be '2.0'."
+                    },
+                    "id": {
+                        "description": "Request id (string or integer) echoed back in the response."
+                    },
+                    "method": {
+                        "enum": [
+                            "initialize",
+                            "tools/list",
+                            "tools/call"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "54b38dd18333af53",
+                        "description": "JSON-RPC method to invoke.\n\n* `initialize` - initialize\n* `tools/list` - tools/list\n* `tools/call` - tools/call"
+                    },
+                    "params": {
+                        "description": "Method-specific params. For tools/call: {name, arguments}. For tools/list: empty object. For initialize: {protocolVersion}."
+                    }
+                },
+                "required": [
+                    "id",
+                    "jsonrpc",
+                    "method"
+                ]
+            },
+            "MockMCPResponse": {
+                "type": "object",
+                "description": "JSON-RPC 2.0 response envelope returned by the mock MCP endpoint.",
+                "properties": {
+                    "jsonrpc": {
+                        "type": "string",
+                        "description": "Always '2.0'."
+                    },
+                    "id": {
+                        "description": "Echoes the request id."
+                    },
+                    "result": {
+                        "description": "Present on success. Shape depends on the method."
+                    },
+                    "error": {
+                        "description": "Present on failure. {code, message}."
+                    }
+                },
+                "required": [
+                    "id",
+                    "jsonrpc"
+                ]
+            },
+            "MockStatusResponse": {
+                "type": "object",
+                "properties": {
+                    "mock_enabled": {
+                        "type": "boolean",
+                        "description": "True if mock tools are currently active for this agent."
+                    },
+                    "provider": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Provider the agent is bound to (vapi, retell, or elevenlabs); null if not yet configured."
+                    },
+                    "assistant_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Provider-side assistant/agent id; null if not yet configured."
+                    },
+                    "mcp_indices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MockMCPIndexEntry"
+                        },
+                        "description": "Per-MCP-tool mock endpoints discovered for this agent (VAPI only). Empty if no MCP-typed tools are mocked."
+                    }
+                },
+                "required": [
+                    "assistant_id",
+                    "mcp_indices",
+                    "mock_enabled",
+                    "provider"
                 ]
             },
             "MoveFolderRequest": {
@@ -55151,7 +55525,6 @@
             },
             "PatchedCallLogDetail": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -55316,6 +55689,11 @@
                         "type": "string",
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
                         "maxLength": 100
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
                     },
                     "agent": {
                         "type": [
@@ -55604,7 +55982,6 @@
             },
             "PatchedDashboard": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -56480,105 +56857,6 @@
                     }
                 }
             },
-            "PatchedPhoneNumber": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "readOnly": true
-                    },
-                    "scenario_id": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "scenario_name": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "number": {
-                        "type": "string",
-                        "maxLength": 15
-                    },
-                    "phone_number_id": {
-                        "type": "string",
-                        "maxLength": 255
-                    },
-                    "call_service_provider": {
-                        "enum": [
-                            "vapi",
-                            "patronus"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "f442d6949d5b96ff",
-                        "description": "Call service provider this phone number is associated with.\nExample: `\"vapi\"` or `\"retell\"`\n\n* `vapi` - VAPI\n* `patronus` - Patronus"
-                    },
-                    "name": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "description": "Name or identifier for this phone number",
-                        "maxLength": 255
-                    },
-                    "provider": {
-                        "enum": [
-                            "cekura",
-                            "twilio",
-                            "telnyx",
-                            "plivo",
-                            null
-                        ],
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "x-spec-enum-id": "0a9c3a00dd5354a9",
-                        "description": "Provider of this phone number (Cekura or Twilio)\n\n* `cekura` - Cekura\n* `twilio` - Twilio\n* `telnyx` - Telnyx\n* `plivo` - Plivo"
-                    },
-                    "sms_enabled": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ],
-                        "description": "Whether SMS is enabled for this phone number"
-                    },
-                    "metadata": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "description": "Encrypted provider credentials and other metadata"
-                    },
-                    "created_at": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time",
-                        "description": "When this record was created.\nExample: `2024-03-15T10:30:45Z`"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
-                    },
-                    "organization": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "user": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    }
-                }
-            },
             "PatchedPredefinedMetric": {
                 "type": "object",
                 "properties": {
@@ -57043,11 +57321,12 @@
                             "agentforce",
                             "trillet",
                             "genesys",
-                            "chirp"
+                            "chirp",
+                            "amazon_connect"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp",
-                        "x-spec-enum-id": "399049906f2153fc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
+                        "x-spec-enum-id": "54d743ac3bc6a2cc"
                     },
                     "key": {
                         "type": "string",
@@ -57274,6 +57553,11 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "\nCall ID from the Assistant provider\nExample: `call_abc123`\n"
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
                     },
                     "scenario": {
                         "type": [
@@ -57884,7 +58168,6 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -58184,12 +58467,13 @@
                             "cisco",
                             "bland",
                             "livekit",
+                            "amazon_connect",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "a7ddfee511394575",
+                        "x-spec-enum-id": "c7db069ffdec596e",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `amazon_connect` - Amazon Connect"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -58299,6 +58583,19 @@
                     "agentforce_data": {
                         "type": "string",
                         "description": "\nAgentforce additional data - client_id, domain, and agent_id\nExample: `{\"client_id\": \"sd7a8...\", \"domain\": \"https://example.sandbox.my.salesforce.com\", \"agent_id\": \"0Xx...\"}`\n"
+                    },
+                    "amazon_connect_security_token": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "x-amz-security-token for Amazon Connect authenticated chat widgets."
+                    },
+                    "amazon_connect_security_token_configured": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "amazon_connect_data": {
+                        "type": "string",
+                        "description": "Amazon Connect config: snippet_id (required), connect_host (required), region (default us-east-1)."
                     },
                     "custom_provider_api_key": {
                         "type": "string",
@@ -59983,11 +60280,12 @@
                             "agentforce",
                             "trillet",
                             "genesys",
-                            "chirp"
+                            "chirp",
+                            "amazon_connect"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp",
-                        "x-spec-enum-id": "399049906f2153fc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
+                        "x-spec-enum-id": "54d743ac3bc6a2cc"
                     },
                     "key": {
                         "type": "string",
@@ -60037,11 +60335,12 @@
                             "agentforce",
                             "trillet",
                             "genesys",
-                            "chirp"
+                            "chirp",
+                            "amazon_connect"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp",
-                        "x-spec-enum-id": "399049906f2153fc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
+                        "x-spec-enum-id": "54d743ac3bc6a2cc"
                     },
                     "created_at": {
                         "type": "string",
@@ -60469,6 +60768,11 @@
                         "readOnly": true,
                         "description": "\nCall ID from the Assistant provider\nExample: `call_abc123`\n"
                     },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
+                    },
                     "scenario": {
                         "type": [
                             "integer",
@@ -60695,7 +60999,6 @@
             },
             "RunList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -60705,6 +61008,11 @@
                         "type": "string",
                         "description": "\nCall ID from the Assistant provider\nExample: `call_abc123`\n",
                         "maxLength": 255
+                    },
+                    "trace_id": {
+                        "type": "string",
+                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
+                        "maxLength": 32
                     },
                     "scenario": {
                         "type": [
@@ -61095,7 +61403,6 @@
             },
             "Scenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -61965,7 +62272,6 @@
             },
             "ScenarioList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -62185,7 +62491,6 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -63403,7 +63708,6 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -63627,7 +63931,6 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -63787,7 +64090,6 @@
             },
             "SchemaScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -64208,12 +64510,13 @@
                             "cisco",
                             "bland",
                             "livekit",
+                            "amazon_connect",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "a7ddfee511394575",
+                        "x-spec-enum-id": "c7db069ffdec596e",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `amazon_connect` - Amazon Connect"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -64323,6 +64626,19 @@
                     "agentforce_data": {
                         "type": "string",
                         "description": "\nAgentforce additional data - client_id, domain, and agent_id\nExample: `{\"client_id\": \"sd7a8...\", \"domain\": \"https://example.sandbox.my.salesforce.com\", \"agent_id\": \"0Xx...\"}`\n"
+                    },
+                    "amazon_connect_security_token": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "x-amz-security-token for Amazon Connect authenticated chat widgets."
+                    },
+                    "amazon_connect_security_token_configured": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "amazon_connect_data": {
+                        "type": "string",
+                        "description": "Amazon Connect config: snippet_id (required), connect_host (required), region (default us-east-1)."
                     },
                     "custom_provider_api_key": {
                         "type": "string",

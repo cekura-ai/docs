@@ -132,7 +132,7 @@ This iterative optimization process allows you to:
 
 ## Scheduled Metric Optimization
 
-You can schedule Auto Improve to run on a recurring basis using the Metric Optimiser Cron Job API. This is useful for teams that label reviews regularly and want new feedback incorporated automatically.
+You can schedule Auto Improve to run on a recurring basis. This is useful for teams that label reviews regularly and want new feedback incorporated automatically.
 
 ### How It Works
 
@@ -144,37 +144,50 @@ Each scheduled job:
 
 ### Regression Guard
 
-When `auto_apply` is enabled, the optimiser compares the new score against the baseline — how many annotations the current metric gets correct. The optimised prompt is saved only if the new score meets or exceeds the baseline. If the score regresses, the email flags it as "regressed — not applied" and the metric remains unchanged.
+When auto-apply is enabled, the optimiser compares the new score against the baseline — how many annotations the current metric gets correct. The optimised prompt is saved only if the new score meets or exceeds the baseline. If the score regresses, the email flags it as "regressed — not applied" and the metric remains unchanged.
 
 ### Creating a Scheduled Optimiser Job
 
-Use the API to create a cron job:
+<Steps>
+  <Step title="Navigate to Project Settings">
+    Go to **Project Settings > General**. Scroll down to the **Auto-optimise Metrics** section.
+  </Step>
 
-```bash
-curl -X POST https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/ \
-  -H "X-CEKURA-API-KEY: <your-api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "project": <project_id>,
-    "name": "Weekly metric optimiser",
-    "metrics": [<metric_id_1>, <metric_id_2>],
-    "crontab_expression": "0 9 * * 1",
-    "timezone": "America/Los_Angeles",
-    "auto_apply": false,
-    "notify_on": "both"
-  }'
-```
+  <Step title="Add a Schedule">
+    Click **Add schedule** to open the creation dialog.
+  </Step>
 
-| Field | Description |
-|-------|-------------|
-| `project` | Project ID the cron job belongs to |
-| `name` | Display name for the job |
-| `metrics` | Array of metric IDs to optimise on each run |
-| `crontab_expression` | Standard 5-field cron expression (minute hour day month weekday) |
-| `timezone` | IANA timezone name (defaults to project timezone or UTC) |
-| `auto_apply` | When `true`, saves optimised prompts that do not regress. When `false` (default), the run is read-only and only emails a summary |
-| `skip_evaluation` | When `true`, skips the post-optimisation evaluation pass to speed up the run |
-| `notify_on` | When to email project members: `success`, `failure`, or `both` |
+  <Step title="Configure the Schedule">
+    Fill in the schedule details:
+    - **Name**: A descriptive name for the job (e.g., "Weekly metric optimiser")
+    - **Metrics**: Select one or more metrics to optimise. Only LLM-judge and custom-code metrics are eligible.
+    - **Schedule**: Enter a cron expression or use a quick preset (Daily 9am, Weekly Mon 9am, etc.)
+    - **Timezone**: Select your preferred timezone
+    - **Notify on**: Choose when to receive email notifications — success, failure, both, or never
+    - **Auto-apply optimised prompts**: When enabled, the optimiser will save improved prompts automatically if they do not regress. Leave unchecked for read-only runs that only email a summary.
+
+    <Warning>
+      Enabling auto-apply will overwrite your live metric prompt when the optimised score meets or exceeds the baseline. If you prefer to review changes before applying, leave this unchecked.
+    </Warning>
+  </Step>
+
+  <Step title="Save the Schedule">
+    Click **Create schedule**. The job will appear in the list and run automatically according to your cron expression.
+  </Step>
+</Steps>
+
+### Managing Schedules
+
+From the **Auto-optimise Metrics** section, you can:
+- **Toggle active/inactive**: Use the switch to pause or resume a schedule without deleting it
+- **Edit**: Click the pencil icon to modify schedule settings
+- **Delete**: Click the trash icon to remove a schedule
+
+Each row in the list shows the schedule name, number of metrics, cron expression, timezone, and whether auto-apply is enabled.
+
+<Note>
+View-only members can see the schedules but cannot create, edit, or delete them.
+</Note>
 
 ### Typical Cadence
 
@@ -182,26 +195,10 @@ curl -X POST https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/ \
 - **Daily** — only if you have an active labelling workflow producing many new annotations per day
 - **Monthly** — if labelling is bursty (e.g., quarterly audits)
 
-### Managing Jobs
+### Programmatic Access
 
-List, update, or delete scheduled jobs through the API:
-
-```bash
-# List jobs for a project
-curl "https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/?project_id=<project_id>" \
-  -H "X-CEKURA-API-KEY: <your-api-key>"
-
-# Update a job
-curl -X PATCH "https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/<job_id>/" \
-  -H "X-CEKURA-API-KEY: <your-api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{"auto_apply": true}'
-
-# Delete a job
-curl -X DELETE "https://api.cekura.ai/schedules/v1/metric-optimiser-cron-jobs/<job_id>/" \
-  -H "X-CEKURA-API-KEY: <your-api-key>"
-```
+For programmatic access, use the `/schedules/v1/metric-optimiser-cron-jobs/` API endpoints to create, list, update, and delete scheduled optimiser jobs.
 
 <Note>
-Metrics with no labelled test sets (no `MetricReview` rows in the Lab) are skipped during each run — they will not error, just appear as "skipped" in the email summary.
+Metrics with no labelled test sets in the Lab are skipped during each run — they will not error, just appear as "skipped" in the email summary.
 </Note>

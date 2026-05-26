@@ -292,6 +292,48 @@ cekura.set_custom_metadata({"bot_version": "1.0", "environment": "staging"})
   If you currently send call data to `observability/v1/observe/` and want to adopt the SDK — or are wondering whether both can run simultaneously — see [Can I also add the Pipecat SDK if I already post to the observability endpoint?](/documentation/FAQ#i-already-post-call-data-to-the-observability-endpoint-from-my-pipecat-agent-can-i-also-add-the-pipecat-sdk) in the FAQ.
 </Note>
 
+## Webhook Payload Fields
+
+If you post directly to `/observability/v1/pipecat/observe/` instead of using the SDK, you can include these additional fields in your webhook payload:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `customer_number` | string | Caller or callee phone number in E.164 format (e.g., `+14155551234`). Displayed in call details for identification. |
+| `dynamic_variables` | object | Runtime variables injected into the agent (LLM config, scenario type, provider settings). Shown alongside the transcript in the UI. |
+| `metadata` | object | Freeform call metadata for filtering and analytics. Merged with `provider_data` where `provider_data` keys take precedence. |
+| `call_ended_reason` | string | Reason for call termination (e.g., `completed`, `user-hangup`, `agent-hangup`, `session_ended`). |
+
+All fields are optional. When omitted, `customer_number` and `call_ended_reason` default to empty strings; `dynamic_variables` and `metadata` default to empty objects.
+
+### Metadata Merge Behavior
+
+The `metadata` field merges with `provider_data` to produce the final stored metadata:
+
+1. Start with top-level `metadata` fields
+2. Merge in `provider_data` fields (these override any conflicting keys from `metadata`)
+3. Flatten `custom_metadata` from inside `provider_data` to the top level (without overriding existing keys)
+
+```json
+{
+  "metadata": {"source": "pipecat", "environment": "production"},
+  "provider_data": {
+    "environment": "staging",
+    "session_id": "abc123",
+    "custom_metadata": {"bot_version": "2.0"}
+  }
+}
+```
+
+Results in stored metadata:
+```json
+{
+  "source": "pipecat",
+  "environment": "staging",
+  "session_id": "abc123",
+  "bot_version": "2.0"
+}
+```
+
 ## Best Practices
 
 1. **Use the right method for your environment**: Use `track_pipeline()` / `track_and_create_task()` in your test/UAT environments for simulation testing. Use `observe_pipeline()` / `observe_and_create_task()` in your production environment for monitoring live calls with audio recording.

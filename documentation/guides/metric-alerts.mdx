@@ -13,10 +13,11 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 ## Overview
 
-Metric Alerts notify you when your AI agent's performance metrics need attention. Cekura supports two alert types:
+Metric Alerts notify you when your AI agent's performance metrics need attention. Cekura supports three alert types:
 
 - **Failure Alert**: Fires when a metric evaluation fails on a call
 - **Drift Alert**: Fires when a metric's value shifts significantly from its historical baseline
+- **Threshold Alert**: Fires when metric values cross a configured boundary across multiple calls
 
 ## Alert Types
 
@@ -32,6 +33,12 @@ Drift Alerts use statistical analysis to detect when a metric's performance shif
 
 **When to use:** Monitoring trends in continuous metrics like satisfaction scores, latency, or talk ratio where occasional variation is expected but sustained shifts indicate problems.
 
+### Threshold Alert
+
+Threshold Alerts fire when a metric crosses a configured boundary in a specified number of recent calls. Unlike Drift Alerts that detect statistical anomalies, Threshold Alerts use explicit ceiling or floor values that you define.
+
+**When to use:** Enforcing hard limits on numeric metrics like latency (must stay under 500ms), satisfaction scores (must stay above 70%), or any metric with a specific acceptable range.
+
 ## Creating an Alert
 
 <Steps>
@@ -44,13 +51,15 @@ Drift Alerts use statistical analysis to detect when a metric's performance shif
   </Step>
 
   <Step title="Choose Alert Type">
-    Select either **Failure Alert** or **Drift Alert** based on your monitoring needs.
+    Select **Failure Alert**, **Drift Alert**, or **Threshold Alert** based on your monitoring needs.
   </Step>
 
   <Step title="Configure Settings">
     For Failure Alerts, no additional configuration is needed.
     
     For Drift Alerts, choose a preset or customize the detection parameters.
+    
+    For Threshold Alerts, configure the operator, threshold value, and breach requirements.
   </Step>
 
   <Step title="Enable the Alert">
@@ -100,6 +109,65 @@ The number of recent calls used to calculate the baseline statistics. Larger sam
 - Smaller values: Faster reaction, more volatile
 - Larger values: More stable, slower to detect shifts
 
+## Threshold Alert Configuration
+
+Threshold Alerts fire when metric values cross boundaries you define. Unlike Drift Alerts that detect statistical anomalies, Threshold Alerts enforce hard limits.
+
+<Note>
+Threshold Alerts only work with numeric metrics (Numeric and Continuous Qualitative eval types). They are not available for binary or enum metrics.
+</Note>
+
+### Operator Types
+
+Choose how the threshold is evaluated:
+
+| Operator | Behavior | Value Format |
+|----------|----------|--------------|
+| **Greater than** | Fires when value exceeds the threshold | Single number |
+| **Less than** | Fires when value falls below the threshold | Single number |
+| **Outside band** | Fires when value falls outside a range | Low and high bounds |
+
+### Configuration Parameters
+
+**Threshold Value**
+
+For Greater than or Less than operators, specify a single number. For Outside band, specify both a low and high bound—the alert fires when the value is below the low bound or above the high bound.
+
+**Minimum Breaches (min_breaches)**
+
+The number of recent calls that must breach the threshold before the alert fires. Set to 1 to alert on any single breach, or increase to require sustained violations.
+
+- Default: 1 (fires on first breach)
+- Higher values: Requires consistent threshold violations before alerting
+
+**Window Size (window_size)**
+
+The number of recent calls to check for breaches. The alert fires when at least `min_breaches` of the last `window_size` calls crossed the threshold.
+
+- Default: 50 calls
+- Smaller values: Faster detection, more sensitive to recent behavior
+- Larger values: Smooths out temporary spikes, focuses on sustained patterns
+
+### Examples
+
+**Latency ceiling**: Alert when p95 latency exceeds 500ms in 3 of the last 50 calls.
+- Operator: Greater than
+- Value: 500
+- Min breaches: 3
+- Window size: 50
+
+**Satisfaction floor**: Alert when satisfaction drops below 70% in any of the last 25 calls.
+- Operator: Less than
+- Value: 70
+- Min breaches: 1
+- Window size: 25
+
+**Acceptable range**: Alert when talk ratio falls outside 30–70% in 5 of the last 100 calls.
+- Operator: Outside band
+- Value: Low 30, High 70
+- Min breaches: 5
+- Window size: 100
+
 ## Reviewing Alerts
 
 When alerts fire, use the **Alert Review** page to understand what triggered them and take action.
@@ -141,9 +209,11 @@ This helps you quickly understand systemic issues without manually reviewing eac
 
 ## Best Practices
 
-- **Start with Balanced preset**: The Balanced preset works well for most metrics. Adjust only after observing alert behavior.
+- **Start with Balanced preset for Drift Alerts**: The Balanced preset works well for most metrics. Adjust only after observing alert behavior.
 - **Use Failure Alerts for binary metrics**: When any failure matters, use Failure Alerts rather than trying to detect "drift" in pass/fail patterns.
+- **Use Threshold Alerts for hard limits**: When you have specific acceptable ranges (latency under 500ms, satisfaction above 70%), Threshold Alerts provide clearer guarantees than Drift Alerts.
 - **Tune Drift Alerts based on traffic**: High-traffic metrics can use more aggressive settings since the sample sizes are naturally larger. Low-traffic metrics benefit from conservative settings to avoid false positives.
+- **Set min_breaches > 1 to reduce noise**: For Threshold Alerts on volatile metrics, requiring multiple breaches prevents alerts on momentary spikes.
 - **Review alerts regularly**: Use the Alert Review page to triage fires and identify patterns. The AI Summary feature helps surface root causes quickly.
 - **Combine with Slack notifications**: Connect Slack to receive real-time notifications when alerts fire.
 
@@ -161,3 +231,6 @@ This helps you quickly understand systemic issues without manually reviewing eac
 
 **Drift Alert shows "Custom" instead of a preset**
 - Your current settings don't match any preset. This is normal if you've fine-tuned the parameters. The alert will still function correctly.
+
+**Threshold Alert not available for my metric**
+- Threshold Alerts only work with numeric metrics (Numeric and Continuous Qualitative types). For binary metrics, use Failure Alerts instead.

@@ -228,9 +228,30 @@ class OpenAPIParser:
                 properties[prop_name]["default"] = prop_schema["default"]
 
             if prop_type == "array" and "items" in prop_schema:
-                properties[prop_name]["items"] = {
-                    "type": self._convert_openapi_type(prop_schema["items"].get("type", "string"))
-                }
+                items_schema = prop_schema["items"]
+                if isinstance(items_schema, dict) and "$ref" in items_schema:
+                    try:
+                        items_schema = self.resolve_schema_ref(items_schema["$ref"])
+                    except (ValueError, KeyError):
+                        items_schema = {}
+                # Preserve nested object-item shape (name/required/properties) so
+                # callers know per-item structure for array-of-object fields.
+                if (
+                    isinstance(items_schema, dict)
+                    and items_schema.get("type") == "object"
+                    and items_schema.get("properties")
+                ):
+                    nested = self._extract_schema_properties(items_schema)
+                    item_entry: Dict[str, Any] = {"type": "object", "properties": nested}
+                    if items_schema.get("required"):
+                        item_entry["required"] = list(items_schema["required"])
+                    properties[prop_name]["items"] = item_entry
+                else:
+                    properties[prop_name]["items"] = {
+                        "type": self._convert_openapi_type(items_schema.get("type", "string"))
+                        if isinstance(items_schema, dict)
+                        else "string"
+                    }
 
         return properties
 

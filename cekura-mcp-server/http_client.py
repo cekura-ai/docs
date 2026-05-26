@@ -4,15 +4,42 @@ import json
 
 
 class CekuraAPIClient:
-    def __init__(self, base_url: str, credential: str, credential_type: str = "api_key", timeout: int = 30):
+    def __init__(
+        self,
+        base_url: str,
+        credential: str,
+        credential_type: str = "api_key",
+        timeout: int = 30,
+        mcp_call_id: Optional[str] = None,
+        mcp_client_id: Optional[str] = None,
+        mcp_tool: Optional[str] = None,
+        mcp_skill: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+    ):
         self.base_url = base_url
         auth_header = (
             {"Authorization": f"Bearer {credential}"}
             if credential_type == "bearer"
             else {"X-CEKURA-API-KEY": credential}
         )
+        telemetry_headers = {
+            name: value
+            for name, value in (
+                ("X-MCP-Call-Id", mcp_call_id),
+                ("X-MCP-Client", mcp_client_id),
+                ("X-MCP-Tool", mcp_tool),
+                ("X-MCP-Skill", mcp_skill),
+                ("X-Cekura-Conversation-Id", conversation_id),
+            )
+            if value
+        }
         self.client = httpx.AsyncClient(
-            headers={**auth_header, "Content-Type": "application/json", "X-Client-Source": "mcp"},
+            headers={
+                **auth_header,
+                "Content-Type": "application/json",
+                "X-Client-Source": "mcp",
+                **telemetry_headers,
+            },
             timeout=timeout,
         )
 
@@ -145,5 +172,25 @@ class CekuraAPIClient:
             raise Exception(f"Request failed ({response.status_code}): {response.text[:200]}")
 
 
-def create_client(base_url: str, credential: str, credential_type: str = "api_key", timeout: int = 30) -> CekuraAPIClient:
-    return CekuraAPIClient(base_url, credential, credential_type, timeout)
+def create_client(
+    base_url: str,
+    credential: str,
+    credential_type: str = "api_key",
+    timeout: int = 30,
+    mcp_call_id: Optional[str] = None,
+    mcp_client_id: Optional[str] = None,
+    mcp_tool: Optional[str] = None,
+    mcp_skill: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+) -> CekuraAPIClient:
+    return CekuraAPIClient(
+        base_url,
+        credential,
+        credential_type,
+        timeout,
+        mcp_call_id=mcp_call_id,
+        mcp_client_id=mcp_client_id,
+        mcp_tool=mcp_tool,
+        mcp_skill=mcp_skill,
+        conversation_id=conversation_id,
+    )

@@ -1,12 +1,15 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import re
 import sys
+import time
+import uuid
 from contextvars import ContextVar
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 from mcp.server.fastmcp import FastMCP
@@ -51,6 +54,11 @@ class HealthCheckFilter(logging.Filter):
 request_api_key: ContextVar[str] = ContextVar('request_api_key', default=None)
 request_bearer_token: ContextVar[str] = ContextVar('request_bearer_token', default=None)
 request_base_url: ContextVar[str] = ContextVar('request_base_url', default=None)
+# Connection-level conversation identifier. Set by hosts that have a stable
+# notion of conversation across multiple tool calls (e.g. the Cekura sandbox
+# wires its conversation_id here). Per-call `_meta["com.cekura/conversation_id"]`
+# wins when both are present.
+request_conversation_id: ContextVar[str] = ContextVar('request_conversation_id', default=None)
 
 # X-CEKURA-BASE-URL override is only allowed when explicitly enabled (dev/staging only)
 _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower() in ("1", "true", "yes")
@@ -350,6 +358,224 @@ async def test_simple_tool(message: str) -> str:
     return f"Hello from Cekura MCP Server! You said: {message}"
 
 
+def _append_call_id_to_text(result: Any, mcp_call_id: str) -> Any:
+    """Append ``[cekura_mcp_call_id: …]`` to the trailing text content block.
+
+    Leaves non-list / non-text results untouched so this is safe to apply
+    blindly to any tool response shape.
+    """
+    if isinstance(result, list) and result:
+        for block in reversed(result):
+            if isinstance(block, dict) and block.get("type") == "text":
+                block["text"] = f"{block.get('text', '')}\n\n[cekura_mcp_call_id: {mcp_call_id}]"
+                return result
+    return result
+
+
+# -- Agent self-escalation ("scream tool") -----------------------------------
+
+SLACK_ESCALATIONS_WEBHOOK = os.environ.get("SLACK_ESCALATIONS_WEBHOOK")
+
+_ESCALATION_LIMITS = {  # severity -> (max_calls, window_seconds)
+    "low": (20, 3600),
+    "medium": (20, 3600),
+    "high": (5, 3600),
+    "critical": (5, 3600),
+}
+_VALID_SEVERITIES = tuple(_ESCALATION_LIMITS.keys())
+_escalation_history: Dict[Tuple[str, str], List[float]] = {}
+
+_PII_PATTERNS: Tuple[Tuple[re.Pattern, str], ...] = (
+    (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "[email]"),
+    (re.compile(r"\+?\d[\d\s().-]{7,}\d"), "[phone]"),
+    (re.compile(r"\b(?:sk|pk|api)[-_][A-Za-z0-9]{8,}\b"), "[token]"),
+    (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._\-]+"), "[bearer]"),
+)
+
+
+def _redact_pii(text: Optional[str]) -> Optional[str]:
+    if not text:
+        return text
+    redacted = text
+    for pattern, replacement in _PII_PATTERNS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+
+
+def _credential_fingerprint() -> str:
+    """Stable 16-char fingerprint of the active credential, or ``anon``."""
+    try:
+        credential, _ = get_request_credential()
+    except ValueError:
+        return "anon"
+    return hashlib.sha256(credential.encode()).hexdigest()[:16]
+
+
+def _check_escalation_rate_limit(cred_hash: str, severity: str) -> bool:
+    """Return True when the caller is within the per-severity budget.
+
+    Buckets are kept in-process; resets per replica. Acceptable for v1 — the
+    Slack severity gate plus the 2s post timeout cap blast radius. Upgrade to
+    Redis if real-world abuse appears.
+    """
+    limits = _ESCALATION_LIMITS.get(severity)
+    if not limits:
+        return True
+    max_calls, window = limits
+    key = (cred_hash, severity)
+    now = time.monotonic()
+    history = _escalation_history.get(key, [])
+    pruned = [ts for ts in history if now - ts < window]
+    if len(pruned) >= max_calls:
+        _escalation_history[key] = pruned
+        return False
+    pruned.append(now)
+    _escalation_history[key] = pruned
+    return True
+
+
+@mcp.tool(
+    name="cekura_report_issue",
+    description=(
+        "Self-report a concern about Cekura tools, skills, or documentation. "
+        "Use this LIBERALLY — do not second-guess yourself. Severity 'low' and "
+        "'medium' reports are just as valuable as 'high' and 'critical'.\n\n"
+        "USE WHEN:\n"
+        "1. A tool's input schema or description is ambiguous and you guessed.\n"
+        "2. You tried tool A but had to fall back to tool B; the right tool was unclear.\n"
+        "3. A tool returned an error that the description didn't predict.\n"
+        "4. Two tools look like they do the same thing and you weren't sure which to pick.\n"
+        "5. A required field's expected format wasn't documented.\n"
+        "6. The docs and the tool behaviour disagreed.\n"
+        "7. A skill instruction couldn't be followed (no matching tool / wrong shape).\n"
+        "8. You retried a tool more than twice because of unclear errors.\n"
+        "9. A workflow needs a tool that doesn't exist.\n"
+        "10. A tool's response shape changed mid-flow.\n"
+        "11. You produced a workaround that you suspect isn't the intended path.\n"
+        "12. Any other moment where you wished the platform had told you something.\n\n"
+        "If reporting about a prior tool call, pass that call's "
+        "cekura_mcp_call_id (visible at the end of every Cekura tool response) "
+        "as related_mcp_call_id."
+    ),
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False),
+)
+async def cekura_report_issue(
+    concern: str,
+    severity: str,
+    cekura_resource_attempted: Optional[str] = None,
+    workaround_used: Optional[str] = None,
+    related_mcp_call_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    severity_norm = (severity or "").strip().lower()
+    if severity_norm not in _VALID_SEVERITIES:
+        return {
+            "status": "invalid_severity",
+            "expected_one_of": list(_VALID_SEVERITIES),
+        }
+
+    cred_hash = _credential_fingerprint()
+
+    if not _check_escalation_rate_limit(cred_hash, severity_norm):
+        return {"status": "rate_limited", "retry_after_s": 60}
+
+    concern_redacted = (_redact_pii(concern) or "")[:2000]
+    workaround_redacted = (_redact_pii(workaround_used) or "")[:1000] or None
+    resource_redacted = (_redact_pii(cekura_resource_attempted) or "")[:500] or None
+
+    report_mcp_call_id = f"call_{uuid.uuid4().hex[:16]}"
+    event_id = f"esc_{uuid.uuid4().hex[:12]}"
+
+    logger.info(json.dumps({
+        "event": "agent_escalation",
+        "event_id": event_id,
+        "report_mcp_call_id": report_mcp_call_id,
+        "related_mcp_call_id": related_mcp_call_id,
+        "severity": severity_norm,
+        "resource": resource_redacted,
+        "concern": concern_redacted,
+        "workaround": workaround_redacted,
+        "cred_hash": cred_hash,
+        "client_id": _resolve_client_identifier(),
+    }))
+
+    if SLACK_ESCALATIONS_WEBHOOK and severity_norm in ("medium", "high", "critical"):
+        slack_payload = {
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {"type": "plain_text", "text": f"Agent escalation: {severity_norm}"},
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {"type": "mrkdwn", "text": f"*event_id*\n`{event_id}`"},
+                        {"type": "mrkdwn", "text": f"*resource*\n{resource_redacted or '—'}"},
+                        {"type": "mrkdwn", "text": f"*related*\n`{related_mcp_call_id or '—'}`"},
+                        {"type": "mrkdwn", "text": f"*cred_hash*\n`{cred_hash}`"},
+                    ],
+                },
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": f"*Concern*\n```{concern_redacted}```"},
+                },
+            ]
+        }
+        if workaround_redacted:
+            slack_payload["blocks"].append({
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*Workaround*\n```{workaround_redacted}```"},
+            })
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(2.0, connect=1.0)) as client:
+                await client.post(SLACK_ESCALATIONS_WEBHOOK, json=slack_payload)
+        except Exception:
+            logger.exception("slack_post_failed event_id=%s", event_id)
+
+    return {
+        "status": "reported",
+        "event_id": event_id,
+        "report_mcp_call_id": report_mcp_call_id,
+    }
+
+
+# -- Skill activation beacon -------------------------------------------------
+
+
+@mcp.tool(
+    name="cekura_skill_started",
+    description=(
+        "Call this as the FIRST action of any Cekura skill or command. Lets us "
+        "know which skills are actually being used. Returns immediately.\n\n"
+        "Args:\n"
+        "  skill_name: the slug of the skill — e.g. \"autogen-eval\".\n"
+        "  triggering_intent: optional one-sentence description of what the "
+        "user wanted that led you to pick this skill.\n"
+        "  conversation_id: optional Cekura sandbox / chat conversation ID."
+    ),
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False),
+)
+async def cekura_skill_started(
+    skill_name: str,
+    triggering_intent: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    cred_hash = _credential_fingerprint()
+    intent_redacted = (_redact_pii(triggering_intent) or "")[:200] or None
+    event_id = f"skill_{uuid.uuid4().hex[:12]}"
+
+    logger.info(json.dumps({
+        "event": "skill_started",
+        "event_id": event_id,
+        "skill": skill_name,
+        "triggering_intent": intent_redacted,
+        "conversation_id": conversation_id,
+        "client_id": _resolve_client_identifier(),
+        "cred_hash": cred_hash,
+    }))
+
+    return {"status": "ok", "event_id": event_id}
+
+
 def _claude_jsonl_to_cekura_transcript(jsonl_text: str) -> List[Dict[str, object]]:
     """Convert a Claude Code session transcript (JSONL) to the cekura transcript
     shape: a list of {role, content, start_time, end_time} entries. Roles are
@@ -470,6 +696,72 @@ def get_request_credential() -> tuple[str, str]:
         "No credential found. Connect via X-CEKURA-API-KEY header, Bearer token, or OAuth."
     )
 
+def _resolve_client_identifier() -> str:
+    """Best-effort client identifier from the active request context.
+
+    Falls back to ``unknown`` when the context isn't available (e.g. unit tests).
+    """
+    try:
+        # `request_context` is a property that returns the current RequestContext
+        # via the underlying ContextVar — no `.get()` needed.
+        req_ctx = mcp._mcp_server.request_context
+        session = getattr(req_ctx, "session", None)
+        params = getattr(session, "client_params", None) if session else None
+        ci = getattr(params, "clientInfo", None) if params else None
+        if ci is None:
+            return "unknown"
+        name = getattr(ci, "name", None) or "unknown"
+        version = getattr(ci, "version", None) or "unknown"
+        return f"{name}/{version}"
+    except (LookupError, AttributeError):
+        return "unknown"
+
+
+def _read_request_meta() -> Dict[str, Any]:
+    """Return the ``_meta`` dict from the current MCP request, or ``{}``.
+
+    The MCP protocol allows callers to attach arbitrary key/value metadata
+    on a tool call under ``_meta``. We use the ``com.cekura/*`` namespace
+    for fields like ``skill`` and ``conversation_id``. The SDK exposes
+    these via ``request.params.meta``; access defensively so handler still
+    works when nothing was supplied.
+    """
+    try:
+        req_ctx = mcp._mcp_server.request_context
+        params = getattr(req_ctx.request, "params", None)
+        meta_obj = getattr(params, "meta", None) if params is not None else None
+        if meta_obj is None:
+            return {}
+        if isinstance(meta_obj, dict):
+            return meta_obj
+        # Pydantic model — surface declared + extra fields.
+        if hasattr(meta_obj, "model_dump"):
+            return meta_obj.model_dump(exclude_none=True)
+        extra = getattr(meta_obj, "model_extra", None)
+        return dict(extra) if isinstance(extra, dict) else {}
+    except (LookupError, AttributeError):
+        return {}
+
+
+def _resolve_telemetry() -> Dict[str, Optional[str]]:
+    """Resolve per-call telemetry fields once at the top of the handler.
+
+    Returns a dict with keys: ``call_id``, ``client_id``, ``skill``,
+    ``conversation_id``. ``skill`` is read from ``_meta["com.cekura/skill"]``;
+    ``conversation_id`` falls back to the connection-level
+    ``X-Cekura-Conversation-Id`` header when not supplied per-call.
+    """
+    meta = _read_request_meta()
+    skill = meta.get("com.cekura/skill")
+    conversation_id = meta.get("com.cekura/conversation_id") or request_conversation_id.get()
+    return {
+        "call_id": f"call_{uuid.uuid4().hex[:16]}",
+        "client_id": _resolve_client_identifier(),
+        "skill": skill if isinstance(skill, str) and skill else None,
+        "conversation_id": conversation_id if isinstance(conversation_id, str) and conversation_id else None,
+    }
+
+
 _PATH_PARAM_RE = re.compile(r'\{(\w+)\}')
 
 
@@ -537,30 +829,47 @@ def setup_dynamic_tool_handlers():
         return regular_tools + dynamic_tools
 
     async def call_tool_with_dynamic(name: str, arguments: dict):
-        if name in operations_registry:
+        if name not in operations_registry:
+            return await original_call_tool(name=name, arguments=arguments)
+
+        telemetry = _resolve_telemetry()
+        mcp_call_id = telemetry["call_id"]
+        call_id_suffix = f"\n\n[cekura_mcp_call_id: {mcp_call_id}]"
+        try:
+            tool_data = operations_registry[name]
+
+            if tool_data.get('is_proxy'):
+                query = (arguments or {}).get('query', '')
+                proxy_result = await call_mintlify_search(query)
+                # Proxy tools don't traverse the API client, so the visible
+                # call identifier is appended directly to the response text.
+                return _append_call_id_to_text(proxy_result, mcp_call_id)
+
+            credential, credential_type = get_request_credential()
+            op = tool_data['operation']
+
+            base_url = request_base_url.get() or server_config.base_url
+            user_api_client = create_client(
+                base_url,
+                credential,
+                credential_type=credential_type,
+                mcp_call_id=mcp_call_id,
+                mcp_client_id=telemetry["client_id"],
+                mcp_tool=name,
+                mcp_skill=telemetry["skill"],
+                conversation_id=telemetry["conversation_id"],
+            )
+
+            # Forward the resolved per-property types so the HTTP client can respect
+            # `type: string` fields (e.g. scenarios.instructions, which carries a
+            # stringified JSON body) instead of auto-parsing JSON-looking strings.
+            schema_properties = tool_data['schema'].get('properties', {}) or {}
+            property_types = {
+                k: v.get('type') for k, v in schema_properties.items() if isinstance(v, dict)
+            }
+
+            resolved_path, query_args, body_payload = _dispatch_args(op, arguments or {})
             try:
-                tool_data = operations_registry[name]
-
-                if tool_data.get('is_proxy'):
-                    query = arguments.get('query', '')
-                    return await call_mintlify_search(query)
-
-                credential, credential_type = get_request_credential()
-                op = tool_data['operation']
-
-                base_url = request_base_url.get() or server_config.base_url
-                user_api_client = create_client(base_url, credential, credential_type=credential_type)
-
-                # Forward the resolved per-property types so the HTTP client can respect
-                # `type: string` fields (e.g. scenarios.instructions, which carries a
-                # stringified JSON body) instead of auto-parsing JSON-looking strings.
-                schema_properties = tool_data['schema'].get('properties', {}) or {}
-                property_types = {
-                    k: v.get('type') for k, v in schema_properties.items() if isinstance(v, dict)
-                }
-
-                resolved_path, query_args, body_payload = _dispatch_args(op, arguments)
-
                 result = await user_api_client.execute_request(
                     method=op.method,
                     path=resolved_path,
@@ -568,18 +877,19 @@ def setup_dynamic_tool_handlers():
                     body=body_payload,
                     property_types=property_types,
                 )
-
+            finally:
                 await user_api_client.close()
-                return [{"type": "text", "text": json.dumps(result, default=str, ensure_ascii=False)}]
 
-            except ValueError as e:
-                return [{"type": "text", "text": f"Authentication Error: {e}"}]
-            except Exception as e:
-                # Log the traceback for ops; return only the actionable message to the LLM.
-                logger.exception("Tool %s failed", name)
-                return [{"type": "text", "text": f"Error: {e}"}]
-        else:
-            return await original_call_tool(name=name, arguments=arguments)
+            text = json.dumps(result, default=str, ensure_ascii=False)
+            return [{"type": "text", "text": f"{text}{call_id_suffix}"}]
+
+        except ValueError as e:
+            return [{"type": "text", "text": f"Authentication Error: {e}{call_id_suffix}"}]
+        except Exception as e:
+            # Log the traceback for ops; return only the actionable message to
+            # the LLM (no /app/ paths, no Python stack frames).
+            logger.exception("Tool %s failed", name)
+            return [{"type": "text", "text": f"Error: {e}{call_id_suffix}"}]
 
     mcp._mcp_server.list_tools()(list_tools_with_dynamic)
     mcp._mcp_server.call_tool(validate_input=False)(call_tool_with_dynamic)
@@ -649,6 +959,15 @@ def main():
                 base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
                 if base_url_override:
                     request_base_url.set(base_url_override.rstrip("/"))
+
+            # Connection-level conversation identifier (e.g. set by the Cekura
+            # sandbox at sandbox start). Per-call ``_meta`` overrides this.
+            conversation_header = (
+                request.headers.get('X-Cekura-Conversation-Id')
+                or request.headers.get('x-cekura-conversation-id')
+            )
+            if conversation_header:
+                request_conversation_id.set(conversation_header)
 
             # Enforce auth at the transport layer for MCP traffic. Without this,
             # FastMCP's `initialize` and `tools/list` succeed unauthenticated,

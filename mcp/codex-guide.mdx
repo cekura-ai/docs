@@ -1,0 +1,59 @@
+---
+title: "Using Cekura with Codex"
+sidebarTitle: "Codex Guide"
+description: "End-to-end walkthrough: evaluate complex voice agents using OpenAI Codex CLI and the Cekura MCP"
+icon: "code"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
+Use OpenAI's Codex CLI together with the Cekura MCP to design evaluators, run them against your voice agents, and triage the results — all from your terminal.
+
+## Quick Guide
+
+<Steps>
+  <Step title="Connect Codex to Cekura">
+    Add the Cekura MCP server to Codex. Edit `~/.codex/config.toml` and add:
+
+    ```toml
+    [mcp_servers.cekura]
+    url = "https://api.cekura.ai/mcp"
+    ```
+
+    On first use Codex opens a browser to authorize against your Cekura dashboard. For API-key-based auth (project-scoped credentials, shared CI access), use the CLI form instead:
+
+    ```bash
+    codex mcp add cekura --env CEKURA_API_KEY=YOUR_API_KEY_HERE -- \
+      sh -c 'npx -y mcp-remote https://api.cekura.ai/mcp --header "X-CEKURA-API-KEY:$CEKURA_API_KEY"'
+    ```
+
+    Verify by starting Codex and asking: *"List my Cekura agents."*
+  </Step>
+
+  <Step title="Set up mock data and cleanup hooks">
+    Complex agents depend on database state — users, accounts, sessions, entitlements. Stand up a lightweight webhook server that seeds mock data before a run and listens for Cekura's post-run webhook to reset the database. This keeps concurrent tests isolated and repeatable.
+  </Step>
+
+  <Step title="Let Codex learn the schema">
+    Run Codex from your agent's repo so it can read your tool definitions, prompts, and database schema directly. Then prompt it to generate scenario coverage through the Cekura MCP — for example: *"Read the agent's tools and prompts in this repo, then create 10 Cekura evaluators covering the most common user flows."*
+  </Step>
+
+  <Step title="Run the full suite">
+    Kick off all evaluators at once through the MCP: *"Run every evaluator on agent X and report pass/fail."* Cekura executes them concurrently and surfaces pass/fail with full transcripts and traces.
+  </Step>
+
+  <Step title="Triage with Codex">
+    Ask Codex to pull failing runs and classify them: *"Fetch the failures from the last run and tell me which are real bugs vs. flakes."* Because runs are non-deterministic, **rerun each failing test 3–4 times** and ask Codex to compute a pass rate. One pass out of four usually points to a prompt or tool-routing bug, not infra.
+  </Step>
+
+  <Step title="Fix in-place and re-run">
+    With both your codebase and the Cekura MCP in the same Codex session, you can go from failing transcript → suspected prompt or tool bug → edit → re-run the failing evaluator without leaving the terminal.
+  </Step>
+</Steps>
+
+<Tip>
+A good first prompt: *"Use the Cekura MCP to list my agents, then read the prompt for the first one and propose 10 workflow evaluators covering the most common user flows."*
+</Tip>

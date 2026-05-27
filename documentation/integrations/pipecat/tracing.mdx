@@ -149,8 +149,8 @@ See the [Pipecat Automated Testing](/documentation/integrations/pipecat/automate
 
 Run tests using your preferred connection type:
 
-- **Run with Pipecat**: For WebRTC-based testing
-- **Run with Voice**: For telephony-based testing
+- **WebRTC**: Select WebRTC under Voice connections in the Configure Run dialog for WebRTC-based testing
+- **Telephony**: Select Telephony under Voice connections for phone-based testing
 
 Test results will appear in the Runs section with enhanced data including transcripts and tool calls.
 
@@ -272,7 +272,7 @@ With tracing enabled, you'll see enriched information in the Cekura platform:
 
 ## Custom Metadata
 
-Pass custom metadata at initialization or update it anytime during the session:
+Pass custom metadata at initialization or update it anytime before the session tears down:
 
 ```python
 # At initialization
@@ -281,9 +281,16 @@ task = cekura.observe_and_create_task(
     custom_metadata={"bot_version": "1.0", "environment": "staging"}
 )
 
-# Or update anytime during the session
+# Or update anytime before the session ends (including post-processing handlers
+# that run before the pipeline closes)
 cekura.set_custom_metadata({"bot_version": "1.0", "environment": "staging"})
 ```
+
+`set_custom_metadata()` can be called at any point before the pipeline session finalizes — including in cleanup or post-processing handlers that execute before the session tears down. Once the session has ended and data has been submitted to Cekura, the record is immutable and metadata cannot be updated.
+
+<Note>
+  If you currently send call data to `observability/v1/observe/` and want to adopt the SDK — or are wondering whether both can run simultaneously — see [Can I also add the Pipecat SDK if I already post to the observability endpoint?](/documentation/FAQ#i-already-post-call-data-to-the-observability-endpoint-from-my-pipecat-agent-can-i-also-add-the-pipecat-sdk) in the FAQ.
+</Note>
 
 ## Best Practices
 
@@ -294,6 +301,8 @@ cekura.set_custom_metadata({"bot_version": "1.0", "environment": "staging"})
 3. **Keep the SDK updated**: Run `pip install --upgrade cekura` periodically for the latest features
 
 4. **Use session IDs**: The SDK resolves the session ID in this order: explicit `session_id` parameter > `runner_args.session_id` > auto-generated. Pass a custom session ID to correlate Cekura data with your application logs
+
+5. **Create one `PipecatTracer` instance per call — do not share instances across concurrent sessions**: `PipecatTracer` is not thread-safe to share. When running multiple concurrent calls in the same event loop, instantiate a fresh `PipecatTracer` for each call (with its own `session_id`) inside the function that handles that call. With this pattern the SDK is safe for concurrent use — each instance holds its own session state and submits data independently.
 
 ## SDK Reference
 
@@ -323,6 +332,8 @@ pipeline = tracer.observe_pipeline(
     custom_metadata=None   # Optional: Dict of custom metadata
 )
 ```
+
+Speaker channel assignment is handled automatically — the SDK identifies agent-side and user-side audio from the positions of the LLM aggregators in your Pipecat pipeline. No explicit `bot_channel` or `user_channel` parameters are required.
 
 ### track_pipeline()
 

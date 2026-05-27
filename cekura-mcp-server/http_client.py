@@ -15,6 +15,7 @@ class CekuraAPIClient:
         mcp_tool: Optional[str] = None,
         mcp_skill: Optional[str] = None,
         conversation_id: Optional[str] = None,
+        mcp_session_id: Optional[str] = None,
     ):
         self.base_url = base_url
         auth_header = (
@@ -30,6 +31,7 @@ class CekuraAPIClient:
                 ("X-MCP-Tool", mcp_tool),
                 ("X-MCP-Skill", mcp_skill),
                 ("X-Cekura-Conversation-Id", conversation_id),
+                ("X-MCP-Session-Id", mcp_session_id),
             )
             if value
         }
@@ -182,6 +184,7 @@ def create_client(
     mcp_tool: Optional[str] = None,
     mcp_skill: Optional[str] = None,
     conversation_id: Optional[str] = None,
+    mcp_session_id: Optional[str] = None,
 ) -> CekuraAPIClient:
     return CekuraAPIClient(
         base_url,
@@ -193,4 +196,5 @@ def create_client(
         mcp_tool=mcp_tool,
         mcp_skill=mcp_skill,
         conversation_id=conversation_id,
+        mcp_session_id=mcp_session_id,
     )

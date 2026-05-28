@@ -32,7 +32,7 @@ If you are importing external calls (e.g., from Retell or Twilio) for quality as
 #### 3. Overages and Manual Top-ups
 To ensure your testing and monitoring are never interrupted, Cekura provides flexible credit management options:
 
-*   **Overages:** When enabled, overages allow the platform to continue processing calls and metrics even after your base credit limit is reached. This is critical for production monitoring to ensure you don't lose data during high-volume periods. Overages are typically billed at your standard unit rate.
+*   **Overages:** When enabled, overages allow the platform to continue processing calls and metrics even after your base credit limit is reached. This is critical for production monitoring to ensure you don't lose data during high-volume periods. Overages are billed at **2× your committed credit rate** for your tier. On annual contracts, unused credits roll over to the following month; an overage occurs when usage in a month exceeds your monthly credit allocation plus any rolled-over credits from prior months. Overages are invoiced monthly; if a card is on file, it can be charged directly.
 *   **Manual Top-ups:** If you are in a sandbox or trial phase and run out of credits, our support team can manually add credits to your account to ensure your development work continues without delay.
 
 #### 4. BestPractices for Credit Optimization
@@ -664,6 +664,20 @@ To pause your subscription:
 You can return to this same section at any time to reactivate your plan and resume your AI agent testing and monitoring. This ensures that all your existing agent configurations, evaluators, and historical data remain intact for when you are ready to scale.
 
 
+## How do I cancel my subscription?
+
+You can cancel your subscription directly from the Cekura dashboard through the Stripe billing portal.
+
+To cancel your subscription:
+1. Log in to your Cekura account.
+2. Navigate to **Billing**.
+3. Click on **Manage Plan**.
+4. You will be redirected to our secure Stripe billing portal.
+5. Select the option to cancel your subscription.
+
+If the cancel option is not visible or you are unable to complete the cancellation, contact support and the team can assist directly.
+
+
 ## How can I bulk import scenarios and what file formats are supported?
 
 Cekura supports the bulk import of scenarios (also referred to as test cases or evaluators) to help you scale your testing and monitoring efforts efficiently. 
@@ -1041,4 +1055,33 @@ Currently, the **Improve Scenarios** tool is optimized for updating scenario con
 
 For environment separation (e.g., staging vs. production), another option is to keep all agents in a single shared project and use separate API keys or agent IDs to route webhook payloads to different backend environments. This avoids the need to keep multiple copies of metrics and evaluators in sync. See [Organizing Projects](/documentation/guides/organizing-projects) for recommended patterns.
 
+## How do I find or create my Cekura API key?
+
+Navigate to **Settings** → **Organization** → **API Key** in the Cekura dashboard (direct link: [dashboard.cekura.ai/dashboard/settings/org/api-key](https://dashboard.cekura.ai/dashboard/settings/org/api-key)). From there you can copy an existing key or create a new one.
+
+**Admin access required.** The Organization section of Settings is only visible to users with Admin role. If you don't see it, ask an admin on your organization to create or share a key with you. For more on role permissions, see [Enterprise Setup](/documentation/advanced/enterprise-setup).
+
+## I already post call data to the observability endpoint from my Pipecat agent — can I also add the Pipecat SDK?
+
+The Pipecat SDK (`observe_pipeline()` / `observe_and_create_task()`) and the direct observability endpoint (`POST /observability/v1/observe/`) are **alternative, mutually exclusive** integration paths — they cannot be combined for the same session.
+
+Each method independently creates its own call record in Cekura. If both run for the same session, Cekura creates two separate records; there is no deduplication or merging. The SDK is designed to replace the direct API for Pipecat-based agents.
+
+### Migrating from the direct API to the SDK
+
+If you have an existing integration that posts call data to `observability/v1/observe/` from a post-processing step, follow these steps before adding the SDK:
+
+1. Add `observe_pipeline()` (or `observe_and_create_task()`) to your Pipecat pipeline.
+2. Move any metadata from your direct API call to `set_custom_metadata({...})` — see [Custom Metadata](/documentation/integrations/pipecat/tracing#custom-metadata) in the Pipecat Tracing docs. This can be called in a cleanup or post-processing handler that runs before the pipeline closes.
+3. Remove the `observability/v1/observe/` call from your post-processing step.
+
+
+## Can I assign the same contact number to multiple agents?
+
+Yes — `contact_number` does not need to be unique per agent. The same phone number can be assigned to multiple agents without causing conflicts. When you run a scenario, the agent attached to that scenario is what Cekura evaluates, so there is no ambiguity about which agent is under test regardless of shared numbers. Make sure each evaluator (scenario) has the correct agent selected before triggering a run.
+
 For more details on setting up and managing your testing environment, please visit the [Cekura Documentation](https://docs.cekura.ai/).
+
+## How do I submit a bug report or feature request?
+
+Email [support@cekura.ai](mailto:support@cekura.ai) — this routes directly to the engineering team. For bugs, include a brief description of the issue, any relevant run IDs, evaluator URLs, or dashboard links, and your expected vs. actual behavior. For feature requests, a short description of the use case is sufficient. The team will triage and follow up in your support channel.

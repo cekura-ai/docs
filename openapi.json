@@ -11291,7 +11291,7 @@
         "/test_framework/v1/aiagents-external/{id}/upload_knowledge_base/": {
             "post": {
                 "operationId": "aiagents-upload-knowledge-base",
-                "description": "Upload one or more files to the agent's knowledge base. Supports multiple file uploads.",
+                "description": "Upload one or more files to the agent's knowledge base. Accepts either a `multipart/form-data` body (used by the web dashboard) or an `application/json` body where each entry carries base64-encoded file content.",
                 "parameters": [
                     {
                         "in": "path",
@@ -11337,6 +11337,38 @@
                                             "format": "binary"
                                         },
                                         "description": "List of files to upload to the knowledge base"
+                                    }
+                                },
+                                "required": [
+                                    "files"
+                                ]
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "files": {
+                                        "type": "array",
+                                        "description": "List of files to upload, each provided as base64-encoded content.",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "name",
+                                                "content_base64"
+                                            ],
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "Filename including extension (e.g. `manual.pdf`)."
+                                                },
+                                                "content_base64": {
+                                                    "type": "string",
+                                                    "contentEncoding": "base64",
+                                                    "description": "Base64-encoded file content. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                                                }
+                                            }
+                                        }
                                     }
                                 },
                                 "required": [
@@ -13208,7 +13240,7 @@
         "/test_framework/v1/aiagents/{id}/upload_knowledge_base/": {
             "post": {
                 "operationId": "aiagents-upload-knowledge-base_2",
-                "description": "Upload one or more files to the agent's knowledge base. Supports multiple file uploads.",
+                "description": "Upload one or more files to the agent's knowledge base. Accepts either a `multipart/form-data` body (used by the web dashboard) or an `application/json` body where each entry carries base64-encoded file content.",
                 "parameters": [
                     {
                         "in": "path",
@@ -13260,6 +13292,38 @@
                                     "files"
                                 ]
                             }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "files": {
+                                        "type": "array",
+                                        "description": "List of files to upload, each provided as base64-encoded content.",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "name",
+                                                "content_base64"
+                                            ],
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "Filename including extension (e.g. `manual.pdf`)."
+                                                },
+                                                "content_base64": {
+                                                    "type": "string",
+                                                    "contentEncoding": "base64",
+                                                    "description": "Base64-encoded file content. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "files"
+                                ]
+                            }
                         }
                     }
                 },
@@ -13303,7 +13367,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "aiagents-upload-knowledge-base",
-                        "description": "Upload one or more files to the agent's knowledge base. Supports multiple file uploads."
+                        "description": "Upload one or more files to the agent's knowledge base. Accepts either a `multipart/form-data` body (used by the web dashboard) or an `application/json` body where each entry carries base64-encoded file content."
                     }
                 }
             }
@@ -21993,6 +22057,122 @@
                 }
             }
         },
+        "/test_framework/v1/results-external/bulk_delete/": {
+            "post": {
+                "operationId": "bulk-delete-results",
+                "description": "⚠ Irreversible. Soft-deletes each result (and its non-deleted runs) with the same side-effects as deleting a single result: outbound phone numbers are released when no queued runs remain, capacity-manager slots are freed, and active_sessions / pending_demand counters are decremented in aggregate. Maximum 100 result IDs per request. Results that are already deleted or that the caller cannot access are silently skipped — the response is 204 even when no results are deleted.",
+                "summary": "Soft-delete multiple results",
+                "tags": [
+                    "Results"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/results-external/bulk_evaluate_metrics/": {
+            "post": {
+                "operationId": "bulk-evaluate-result-metrics",
+                "description": "Schedules re-evaluation of the given metrics against every completed/failed, non-deleted run of every selected result. Metrics are validated against each agent's metric scope; balance is checked for the full batch up front before any work is dispatched. Each affected result's status is flipped to RUNNING. Maximum 100 result IDs per request.",
+                "summary": "Re-evaluate metrics across multiple results",
+                "tags": [
+                    "Results"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/results-external/bulk_export_progress/": {
             "get": {
                 "operationId": "results-external-bulk-export-progress-retrieve",
@@ -22985,6 +23165,122 @@
                         "enabled": true,
                         "name": "results-rerun-create",
                         "description": "Re-run a test result evaluation"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/results/bulk_delete/": {
+            "post": {
+                "operationId": "bulk-delete-results_2",
+                "description": "⚠ Irreversible. Soft-deletes each result (and its non-deleted runs) with the same side-effects as deleting a single result: outbound phone numbers are released when no queued runs remain, capacity-manager slots are freed, and active_sessions / pending_demand counters are decremented in aggregate. Maximum 100 result IDs per request. Results that are already deleted or that the caller cannot access are silently skipped — the response is 204 even when no results are deleted.",
+                "summary": "Soft-delete multiple results",
+                "tags": [
+                    "Results"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkDeleteResults"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/results/bulk_evaluate_metrics/": {
+            "post": {
+                "operationId": "bulk-evaluate-result-metrics_2",
+                "description": "Schedules re-evaluation of the given metrics against every completed/failed, non-deleted run of every selected result. Metrics are validated against each agent's metric scope; balance is checked for the full batch up front before any work is dispatched. Each affected result's status is flipped to RUNNING. Maximum 100 result IDs per request.",
+                "summary": "Re-evaluate metrics across multiple results",
+                "tags": [
+                    "Results"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostBulkEvaluateResultMetrics"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -36032,7 +36328,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/AIAgentTestProfile"
+                                        "$ref": "#/components/schemas/AIAgentTestProfileList"
                                     }
                                 },
                                 "examples": {
@@ -36211,7 +36507,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/AIAgentTestProfile"
+                                        "$ref": "#/components/schemas/AIAgentTestProfileList"
                                     }
                                 },
                                 "examples": {
@@ -48288,10 +48584,68 @@
                         },
                         "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
                     },
-                    "scenarios": {
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "ID of the user who created this test profile"
+                    },
+                    "last_updated_by": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "ID of the user who last updated this test profile"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Timestamp when the test profile was created"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Timestamp when the test profile was last updated"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "AIAgentTestProfileList": {
+                "type": "object",
+                "description": "List variant that also embeds the scenarios attached to each profile.\n\nOnly used by `TestProfileViewSet.list` — retrieve/create/update and any\nnested usage (e.g. `ScenarioSerializer.test_profile_data`) should keep\nusing `AIAgentTestProfileSerializer`.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "project": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "agent": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "agent_name": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "List of scenarios using this test profile"
+                        "description": "\nName of the agent associated with this test profile\nExample: `\"Customer Support Agent\"`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255
+                    },
+                    "information": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
                     },
                     "created_by": {
                         "type": "integer",
@@ -48314,6 +48668,11 @@
                         "format": "date-time",
                         "readOnly": true,
                         "description": "Timestamp when the test profile was last updated"
+                    },
+                    "scenarios": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "List of scenarios using this test profile"
                     }
                 },
                 "required": [
@@ -49297,6 +49656,7 @@
             },
             "CallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -49483,6 +49843,7 @@
             },
             "CallLogList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -50583,6 +50944,7 @@
             },
             "Dashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -50714,6 +51076,7 @@
             },
             "DashboardList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -52457,6 +52820,7 @@
             },
             "MetricList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -54710,6 +55074,7 @@
             },
             "PatchedCallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -55162,6 +55527,7 @@
             },
             "PatchedDashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -57441,6 +57807,7 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -60251,6 +60618,7 @@
             },
             "RunList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -60650,6 +61018,7 @@
             },
             "Scenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -60694,11 +61063,6 @@
                     },
                     "tool_ids": {
                         "description": "\nList of tool IDs to associate with this scenario\nExample: `[\"TOOL_DTMF\", \"TOOL_END_CALL\"]`\n"
-                    },
-                    "runs": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "\nList of IDs for the last run of this scenario\nExample: `[123, 456]`\n"
                     },
                     "metrics": {
                         "writeOnly": true,
@@ -61524,6 +61888,7 @@
             },
             "ScenarioList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -61743,6 +62108,7 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -61787,11 +62153,6 @@
                     },
                     "tool_ids": {
                         "description": "\nList of tool IDs to associate with this scenario\nExample: `[\"TOOL_DTMF\", \"TOOL_END_CALL\"]`\n"
-                    },
-                    "runs": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "\nList of IDs for the last run of this scenario\nExample: `[123, 456]`\n"
                     },
                     "metrics": {
                         "writeOnly": true,
@@ -62403,6 +62764,49 @@
                     "name"
                 ]
             },
+            "SchemaPostBulkDeleteResults": {
+                "type": "object",
+                "properties": {
+                    "result_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of result IDs to soft-delete. Maximum 100 per request.",
+                        "maxItems": 100,
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "result_ids"
+                ]
+            },
+            "SchemaPostBulkEvaluateResultMetrics": {
+                "type": "object",
+                "properties": {
+                    "result_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Result IDs whose completed/failed runs should be re-evaluated. Maximum 100.",
+                        "maxItems": 100,
+                        "minItems": 1
+                    },
+                    "metric_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Metric IDs to re-evaluate against every eligible run of each result.",
+                        "minItems": 1
+                    }
+                },
+                "required": [
+                    "metric_ids",
+                    "result_ids"
+                ]
+            },
             "SchemaPostCopyAgent": {
                 "type": "object",
                 "properties": {
@@ -62922,6 +63326,7 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -63145,6 +63550,7 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -63304,6 +63710,7 @@
             },
             "SchemaScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -63350,13 +63757,6 @@
                     },
                     "tool_ids": {
                         "description": "\nList of tool IDs to associate with this scenario\nExample: `[\"TOOL_DTMF\", \"TOOL_END_CALL\"]`\n"
-                    },
-                    "runs": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        },
-                        "description": "\nList of run IDs\nExample: `[123, 456, 789]`\n"
                     },
                     "metrics": {
                         "type": "array",

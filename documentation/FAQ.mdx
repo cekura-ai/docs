@@ -1099,6 +1099,58 @@ Yes — `contact_number` does not need to be unique per agent. The same phone nu
 
 For more details on setting up and managing your testing environment, please visit the [Cekura Documentation](https://docs.cekura.ai/).
 
+## What is the v2 Agent API and how does it differ from v1?
+
+The v2 Agent API (`/v2/aiagents`) provides a cleaner, more structured way to create and update AI agents. The v1 API remains fully functional and unchanged, but v2 is the recommended API for new integrations.
+
+### Key differences
+
+**Nested provider block:** v2 replaces the 26 flat provider credential fields from v1 with a single nested `provider` object containing `type`, `agent_id`, and `credentials`.
+
+**Nested telephony block:** Phone number and SIP configuration are grouped under a `telephony` object.
+
+**Cleaner field names:** Several fields have been renamed for clarity:
+
+| v1 field | v2 field |
+|---|---|
+| `agent_name` | `name` |
+| `contact_number` | `telephony.phone_number` |
+| `sip_endpoint` | `telephony.sip_uri` |
+| `outbound_auto_call` | `provider.auto_dial_outbound` |
+| `auto_fetch_calls_enabled` | `provider.auto_import_calls` |
+| `auto_sync_prompt_enabled` | `provider.auto_sync_prompt` |
+| `agent_gives_first_message` | `agent_speaks_first` |
+| `assistant_provider` + credential fields | `provider.type` + `provider.credentials` |
+| `websocket_url` / `websocket_headers` | `provider.chat_agent_details.config.url` / `.headers` |
+
+### Example v2 request
+
+```json
+POST /v2/aiagents/
+{
+  "name": "Support Bot",
+  "description": "Handles inbound support calls",
+  "project": 42,
+  "telephony": {
+    "inbound": true,
+    "phone_number": "+14155551234"
+  },
+  "provider": {
+    "type": "vapi",
+    "agent_id": "asst_abc123",
+    "credentials": {
+      "api_key": "vapi_key_...",
+      "config": { "public_key": "pk_..." }
+    }
+  }
+}
+```
+
+### Which API should I use?
+
+Use v2 for new integrations. The nested structure makes provider configuration easier to understand and maintain. Existing v1 integrations continue to work without changes.
+
+
 ## How do I submit a bug report or feature request?
 
 Email [support@cekura.ai](mailto:support@cekura.ai) — this routes directly to the engineering team. For bugs, include a brief description of the issue, any relevant run IDs, evaluator URLs, or dashboard links, and your expected vs. actual behavior. For feature requests, a short description of the use case is sufficient. The team will triage and follow up in your support channel.

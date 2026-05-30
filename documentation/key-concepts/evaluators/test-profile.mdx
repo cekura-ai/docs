@@ -102,6 +102,43 @@ A test profile can include:
 **Keep Test Profiles Organized**: Use clear naming conventions like "Customer-Banking-Premium" or "Patient-Dental-Regular" to easily identify which test profile to use for different scenarios.
 </Tip>
 
+## Variable Sections
+
+Test profiles organize variables into two sections based on where they are used:
+
+### Main Agent Variables
+
+Variables in this section are sent to your agent under test as dynamic variables. They populate `{{...}}` placeholders in your agent's system prompt and appear in provider-specific fields (VAPI `variableValues`, Retell `dynamic_variables`, ElevenLabs `dynamic_variables`, Pipecat `session_config`, LiveKit dispatch metadata, or custom HTTP headers).
+
+Use this section for values your agent needs at runtime:
+- Customer IDs or account numbers
+- Session tokens
+- Configuration flags
+
+### Testing Agent Variables
+
+Variables in this section are used by the evaluator to play a convincing caller. They shape the evaluator's instructions and context but are never sent to your agent.
+
+Use this section for persona details the evaluator needs:
+- The caller's name and personal information
+- Appointment dates and order numbers
+- Security question answers
+
+This separation ensures your agent receives only the values it needs, while the evaluator has the full persona context to respond naturally.
+
+### Creating a Test Profile
+
+When you create or edit a test profile, the dialog displays both sections with labeled fields:
+
+1. **Main agent variables** — Dynamic variables sent to the agent under test
+2. **Testing agent variables** — Persona and context used by the simulated caller
+
+Add key-value pairs to each section based on where the variable should be used.
+
+<Note>
+Existing test profiles created before this feature will show all variables in the **Testing agent variables** section when opened. Move any variables that should reach your agent into **Main agent variables** before saving.
+</Note>
+
 ## Using Test Profile Variables in Instructions
 
 You can reference test profile fields directly in your evaluator instructions using template variables. This gives you precise control over which values appear in your instructions.
@@ -215,14 +252,21 @@ When your system's data structure changes, update your test profiles accordingly
 
 ```json
 {
-  "name": "Sarah Johnson",
-  "email": "sarah.j@email.com",
-  "order_number": "ORD-2024-98765",
-  "order_date": "February 10, 2025",
-  "phone": "+1-555-0123",
-  "shipping_address": "123 Main St, Apt 4B, New York, NY 10001"
+  "main_agent_variables": {
+    "customer_id": "CUST-98765"
+  },
+  "testing_agent_variables": {
+    "name": "Sarah Johnson",
+    "email": "sarah.j@email.com",
+    "order_number": "ORD-2024-98765",
+    "order_date": "February 10, 2025",
+    "phone": "+1-555-0123",
+    "shipping_address": "123 Main St, Apt 4B, New York, NY 10001"
+  }
 }
 ```
+
+In this example, `customer_id` is sent to the agent under test as a dynamic variable, while the persona details (name, email, order info) are used by the evaluator to play the role of a customer.
 
 **Corresponding System Data:**
 

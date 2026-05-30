@@ -34,6 +34,10 @@ Testing outbound calls involves two main steps:
 - **Agent `contact_number` set to your outbound caller ID**: Cekura validates the caller ID (ANI) of every incoming outbound-test call against the agent's `contact_number` field. If your agent dials from `+15551234567`, the agent's `contact_number` must be exactly `+15551234567` in E.164 format. Set this in Agent settings or via the [Update Agent API](/api-reference/test_framework/update-agent-partial).
 - **Evaluators ready**: Created evaluators with valid phone numbers
 
+<Note>
+  If you need to test from a non-US number (for example, an Indian +91 number), you can import your own number from [Plivo](/documentation/key-concepts/phone-numbers/plivo) or [Twilio](/documentation/key-concepts/phone-numbers/twilio) and use it as your agent's `contact_number`. No additional integration is required on your side beyond placing a regular call to the Cekura-provided number.
+</Note>
+
 <Warning>
   **Caller ID mismatch causes silent rejects.** If the `contact_number` on your agent is empty or doesn't match the number your agent dials from, Cekura drops the incoming call without returning a SIP error your telephony provider can surface. The symptom on the provider side (Twilio, Telnyx, etc.) is `Busy`, `NoAnswer`, or a generic failed dial — no audio, no answer, no descriptive error. Confirm `contact_number` matches your actual outbound caller ID before debugging anything further downstream.
 </Warning>
@@ -187,6 +191,27 @@ Once you have your list of evaluators and phone numbers:
 <Card title="API Reference" icon="link">
 Learn more about the [Running Evaluators API](/api-reference/test_framework/post-test_frameworkv1scenarios-externalrun_scenarios)
 </Card>
+
+## Understanding Run Statuses
+
+When you launch a simulation with multiple evaluators, each run moves through a lifecycle of statuses. The dashboard UI displays human-readable labels that differ from the raw `status` values returned by the bulk runs API — which matters when writing polling logic.
+
+| Dashboard label | What it means | API `status` value |
+|---|---|---|
+| Running | Queued — the run has been created but the call has not started yet. This state is brief; the run should move on quickly. | `running` |
+| Waiting for call | Ready — Cekura has allocated a phone number for this run and is waiting for your system to dial it. **This is the state you poll for.** | `pending` |
+| In progress | Active — the call is happening right now. | `in_progress` |
+| Evaluating | Post-call — the run has finished; metrics are being scored. | `evaluating` |
+| Completed | Done — all metrics have been scored and results are available. | `completed` |
+| Failed / Timeout | The run ended without completing successfully. | `failed` / `timeout` |
+
+<Note>
+**"Running" does not mean the call is active.** A run showing "Running" in the dashboard is still initialising — no call has been placed or received yet. This label is a known naming issue; treat it as "queued."
+</Note>
+
+**Polling pattern**: In your outbound polling loop, check for `status == "pending"` (the API value) to identify runs where your system should place the outbound call. The example code above uses this pattern.
+
+**Run ordering with concurrency limits**: When `Max concurrent calls` is set to less than the total number of runs, Cekura activates runs one at a time as slots open up. In the dashboard list, the run that becomes ready first (status "Waiting for call") appears at the **bottom** of the list, not the top — the display order is newest-first. If you see two runs and the lower one shows "Waiting for call" while the upper one shows "Running", that is correct: the lower run is ready for your call and the upper run is still queued. Your polling logic should not rely on list order; use the `status` field on each run.
 
 ## Troubleshooting
 

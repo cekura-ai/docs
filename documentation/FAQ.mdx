@@ -191,7 +191,7 @@ To change the inbound number used to make calls to your main agent, you need to 
 2. **Go to Configuration**: Locate and click on the **Configuration** section.
 3. **Update Phone Number**: Find the phone number field and select your preferred number from the list of available phone numbers.
 
-**Note:** If you want to use your own phone numbers (Bring Your Own Number), you can find instructions on how to integrate with Twilio here: https://docs.cekura.ai/documentation/key-concepts/phone-numbers/twilio
+**Note:** If you want to use your own phone numbers (Bring Your Own Number), you can find import instructions for [Twilio](/documentation/key-concepts/phone-numbers/twilio) and [Plivo](/documentation/key-concepts/phone-numbers/plivo). Both providers let you import any number — including non-US numbers such as Indian (+91) numbers — into Cekura. No additional integration is required on your side: once the number is imported, outbound tests simply place a regular phone call to the Cekura-provided number using your imported number as the caller ID.
 
 
 ## How can I integrate Cekura Cronjob success and failure notifications directly into a Datadog dashboard using webhooks?
@@ -1074,6 +1074,14 @@ If you have an existing integration that posts call data to `observability/v1/ob
 1. Add `observe_pipeline()` (or `observe_and_create_task()`) to your Pipecat pipeline.
 2. Move any metadata from your direct API call to `set_custom_metadata({...})` — see [Custom Metadata](/documentation/integrations/pipecat/tracing#custom-metadata) in the Pipecat Tracing docs. This can be called in a cleanup or post-processing handler that runs before the pipeline closes.
 3. Remove the `observability/v1/observe/` call from your post-processing step.
+
+## What does the `NORMAL_TEMPORARY_FAILURE` hangup cause mean, and how can I reduce it?
+
+`NORMAL_TEMPORARY_FAILURE` is a telephony error that originates from the carrier network, not from Cekura or your agent configuration. It indicates the carrier temporarily could not route the call — typically due to network congestion or transient routing issues. It is intermittent by nature and usually resolves on its own, but you can take steps to reduce the frequency:
+
+1. **Enable High Availability Numbers** — In your telephony provider's console (for example, the Plivo console), enable high-availability routing for your phone numbers. This activates more resilient carrier paths so calls are less likely to hit a temporary failure.
+2. **Configure carrier failover** — Enable fallback carrier routing. When the primary carrier returns a temporary failure, the call is automatically rerouted through a secondary carrier instead of dropping.
+3. **Monitor via call metadata** — Track `hangup_cause` values by analysing call metadata in Cekura. This lets you identify whether failures are concentrated on specific carriers, numbers, or regions, which helps narrow down whether the issue is environmental or systematic. See [Metadata in metrics](/documentation/key-concepts/metrics/basic-advanced-metrics#2-metadata) for details on accessing metadata in your evaluations.
 
 
 ## If I already capture and store audio in my own Pipecat pipeline, will the Cekura SDK record it again?

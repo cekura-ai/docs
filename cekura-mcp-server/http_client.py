@@ -2,14 +2,6 @@ import httpx
 from typing import Dict, Any, Optional
 import json
 
-import jwt
-
-
-class OAuthRefreshNeeded(Exception):
-    """Raised when the backend rejects an oauth_access JWT. The MCP tool wrapper
-    catches this and emits a sentinel string in the response body; an ASGI
-    middleware then converts the response to HTTP 401 + WWW-Authenticate so the
-    MCP client refreshes its token."""
 
 
 class CekuraAPIClient:
@@ -28,7 +20,6 @@ class CekuraAPIClient:
     ):
         self.base_url = base_url
         self.credential_type = credential_type
-        self._bearer_token = credential if credential_type == "bearer" else None
         auth_header = (
             {"Authorization": f"Bearer {credential}"}
             if credential_type == "bearer"
@@ -58,17 +49,6 @@ class CekuraAPIClient:
 
     async def close(self):
         await self.client.aclose()
-
-    def _is_oauth_access_token(self) -> bool:
-        if not self._bearer_token:
-            return False
-        try:
-            payload = jwt.decode(
-                self._bearer_token, options={"verify_signature": False}
-            )
-        except jwt.PyJWTError:
-            return False
-        return payload.get("type") == "oauth_access"
 
     async def execute_request(
         self,
@@ -174,10 +154,6 @@ class CekuraAPIClient:
                 return {"result": response.text}
 
         if response.status_code == 401:
-            if self._is_oauth_access_token():
-                raise OAuthRefreshNeeded(
-                    "OAuth access token rejected. Refresh required."
-                )
             if self.credential_type == "bearer":
                 raise Exception(
                     "Authentication failed (401). Bearer token rejected — "

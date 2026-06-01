@@ -166,7 +166,6 @@ class CekuraAPIClient:
             return {
                 "error": "authentication_failed",
                 "status_code": 401,
-                "credential_type": self.credential_type,
                 "message": message,
             }
 

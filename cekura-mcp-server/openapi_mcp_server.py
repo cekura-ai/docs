@@ -25,7 +25,15 @@ if os.getenv("AWS_SECRET_NAME"):
     os.environ.update({key: str(value) for key, value in _config.items()})
 
 from config import load_config
-from http_client import create_client
+from http_client import create_client, OAuthRefreshNeeded
+
+# Private sentinel emitted by the tool wrapper when the backend rejects an
+# oauth_access JWT. OAuthRefreshSignalMiddleware scans the response body for
+# this byte sequence and converts the response into HTTP 401 + WWW-Authenticate
+# so the MCP client refreshes its OAuth token. The string is deliberately
+# verbose and version-tagged to avoid colliding with any legitimate tool output.
+OAUTH_REFRESH_SENTINEL = "__cekura_mcp_internal_oauth_refresh_required_v1__"
+OAUTH_REFRESH_SENTINEL_BYTES = OAUTH_REFRESH_SENTINEL.encode()
 from openapi_parser import load_openapi_spec
 from tool_generator import (
     apply_overlay_to_description,
@@ -892,6 +900,8 @@ def setup_dynamic_tool_handlers():
 
         except ValueError as e:
             return [{"type": "text", "text": f"Authentication Error: {e}{call_id_suffix}"}]
+        except OAuthRefreshNeeded:
+            return [{"type": "text", "text": OAUTH_REFRESH_SENTINEL}]
         except Exception as e:
             # Log the traceback for ops; return only the actionable message to
             # the LLM (no /app/ paths, no Python stack frames).
@@ -1000,46 +1010,93 @@ def main():
 
             return await call_next(request)
 
-    OAUTH_REFRESH_MARKER = b"oauth_refresh_required"
-
     class OAuthRefreshSignalMiddleware:
+        """Pure-ASGI middleware. Scans POST responses for the OAuth refresh
+        sentinel and replaces matching responses with HTTP 401 + WWW-Authenticate
+        so MCP clients trigger reactive OAuth token refresh.
+
+        Scoped to keep memory cost bounded:
+          - Only POST requests carrying `Authorization: Bearer …` are buffered.
+            API-key, anonymous, and GET (SSE long-poll) traffic passes through
+            unbuffered.
+          - Buffer is capped at MAX_SCAN_BYTES. Larger responses flush early
+            and pass through; a tool-result body large enough to exceed the
+            cap can't be the small auth-error payload that carries the sentinel.
+        """
+
+        MAX_SCAN_BYTES = 64 * 1024
+
         def __init__(self, app):
             self.app = app
 
         async def __call__(self, scope, receive, send):
-            if scope["type"] != "http":
+            if scope["type"] != "http" or scope.get("method") != "POST":
                 return await self.app(scope, receive, send)
 
-            start = None
-            chunks: list[bytes] = []
+            auth = b""
+            for k, v in scope.get("headers", []):
+                if k.lower() == b"authorization":
+                    auth = v
+                    break
+            if not auth.lower().startswith(b"bearer "):
+                return await self.app(scope, receive, send)
+
+            start_msg = None
+            chunks: List[bytes] = []
+            buffered_bytes = 0
+            flushed = False
+            cap = self.MAX_SCAN_BYTES
+
+            async def flush_buffered():
+                nonlocal flushed
+                if flushed:
+                    return
+                flushed = True
+                if start_msg is not None:
+                    await send(start_msg)
+                for chunk in chunks:
+                    await send({"type": "http.response.body", "body": chunk, "more_body": True})
 
             async def wrapped_send(message):
-                nonlocal start
+                nonlocal start_msg, buffered_bytes, flushed
+                if flushed:
+                    return await send(message)
                 if message["type"] == "http.response.start":
-                    start = message
+                    start_msg = message
                     return
-                chunks.append(message.get("body", b""))
-                if message.get("more_body"):
+                if message["type"] != "http.response.body":
+                    return await send(message)
+
+                chunk = message.get("body", b"")
+                chunks.append(chunk)
+                buffered_bytes += len(chunk)
+
+                if not message.get("more_body"):
+                    body = b"".join(chunks)
+                    if OAUTH_REFRESH_SENTINEL_BYTES in body:
+                        refresh_body = json.dumps({
+                            "error": "invalid_token",
+                            "error_description": "OAuth access token rejected — refresh required",
+                        }).encode()
+                        await send({
+                            "type": "http.response.start",
+                            "status": 401,
+                            "headers": [
+                                (b"content-type", b"application/json"),
+                                (b"www-authenticate", WWW_AUTH_HEADER.encode()),
+                                (b"content-length", str(len(refresh_body)).encode()),
+                            ],
+                        })
+                        await send({"type": "http.response.body", "body": refresh_body})
+                    else:
+                        if start_msg is not None:
+                            await send(start_msg)
+                        await send({"type": "http.response.body", "body": body})
                     return
-                body = b"".join(chunks)
-                if OAUTH_REFRESH_MARKER in body:
-                    refresh_body = json.dumps({
-                        "error": "invalid_token",
-                        "error_description": "OAuth access token rejected — refresh required",
-                    }).encode()
-                    await send({
-                        "type": "http.response.start",
-                        "status": 401,
-                        "headers": [
-                            (b"content-type", b"application/json"),
-                            (b"www-authenticate", WWW_AUTH_HEADER.encode()),
-                            (b"content-length", str(len(refresh_body)).encode()),
-                        ],
-                    })
-                    await send({"type": "http.response.body", "body": refresh_body})
-                else:
-                    await send(start)
-                    await send({"type": "http.response.body", "body": body})
+
+                if buffered_bytes > cap:
+                    await flush_buffered()
+                    chunks.clear()
 
             await self.app(scope, receive, wrapped_send)
 
@@ -1171,6 +1228,9 @@ def main():
     app.router.routes.insert(5, Route("/mcp/healthz", health_check))
     app.router.routes.insert(6, Route("/mcp/monitoring/sessions", monitoring_session_create, methods=["POST"]))
 
+    # Starlette stacks middleware so the last added is outermost. We want
+    # CredentialMiddleware outer (reject unauth requests early) and
+    # OAuthRefreshSignalMiddleware inner (wrap the tool dispatch response).
     app.add_middleware(OAuthRefreshSignalMiddleware)
     app.add_middleware(CredentialMiddleware)
     logger.info("Credential middleware added (API key + Bearer token support)")

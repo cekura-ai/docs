@@ -5,6 +5,13 @@ import json
 import jwt
 
 
+class OAuthRefreshNeeded(Exception):
+    """Raised when the backend rejects an oauth_access JWT. The MCP tool wrapper
+    catches this and emits a sentinel string in the response body; an ASGI
+    middleware then converts the response to HTTP 401 + WWW-Authenticate so the
+    MCP client refreshes its token."""
+
+
 class CekuraAPIClient:
     def __init__(
         self,
@@ -167,29 +174,19 @@ class CekuraAPIClient:
                 return {"result": response.text}
 
         if response.status_code == 401:
-            payload: Dict[str, Any] = {
-                "error": "authentication_failed",
-                "status_code": 401,
-            }
             if self._is_oauth_access_token():
-                payload["message"] = (
-                    "OAuth access token rejected. The client should refresh "
-                    "the token and retry."
+                raise OAuthRefreshNeeded(
+                    "OAuth access token rejected. Refresh required."
                 )
-                # Marker scanned by OAuthRefreshSignalMiddleware to convert this
-                # tool-level error into a transport-level 401 with WWW-Authenticate.
-                payload["oauth_refresh_required"] = True
-            elif self.credential_type == "bearer":
-                payload["message"] = (
+            if self.credential_type == "bearer":
+                raise Exception(
                     "Authentication failed (401). Bearer token rejected — "
                     "it may have expired or been revoked. Re-authenticate and retry."
                 )
-            else:
-                payload["message"] = (
-                    "Authentication failed (401). API key rejected for this endpoint. "
-                    "Verify CEKURA_API_KEY is valid and authorized for this operation."
-                )
-            return payload
+            raise Exception(
+                "Authentication failed (401). API key rejected for this endpoint. "
+                "Verify CEKURA_API_KEY is valid and authorized for this operation."
+            )
 
         if response.status_code == 403:
             raise Exception("Access forbidden (403). You may not have permission for this endpoint.")

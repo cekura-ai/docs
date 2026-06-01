@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
+import jwt
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
@@ -26,12 +27,6 @@ if os.getenv("AWS_SECRET_NAME"):
 
 from config import load_config
 from http_client import create_client
-
-import jwt as _jwt
-import time as _time
-
-# Clock-skew grace for local oauth_access JWT expiry check.
-OAUTH_EXP_SKEW_SECONDS = 10
 from openapi_parser import load_openapi_spec
 from tool_generator import (
     apply_overlay_to_description,
@@ -75,6 +70,9 @@ _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower()
 
 MCP_ISSUER_URL = os.environ.get("MCP_ISSUER_URL", "https://api.cekura.ai")
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "https://api.cekura.ai/mcp")
+
+# Clock-skew grace (seconds) for the local oauth_access JWT expiry check.
+OAUTH_EXP_SKEW_SECONDS = 10
 
 # Derive allowed hosts from MCP_ISSUER_URL and MCP_SERVER_URL (covers prod, ngrok, local).
 from urllib.parse import urlparse as _urlparse
@@ -960,22 +958,19 @@ def main():
                 has_bearer = True
                 logger.debug("Bearer token credential set for request")
 
-                # Local expiry check for oauth_access JWTs. Unsigned peek;
-                # signature/audience validation stays the backend's job. Catching
-                # expiry here short-circuits the request and emits 401 +
+                # Short-circuit expired oauth_access JWTs with 401 +
                 # WWW-Authenticate so the MCP client refreshes the token.
+                # Signature validation stays the backend's job.
                 try:
-                    claims = _jwt.decode(token, options={"verify_signature": False})
-                except _jwt.PyJWTError:
+                    claims = jwt.decode(token, options={"verify_signature": False})
+                except jwt.PyJWTError:
                     claims = None
-                if claims is not None and claims.get("type") == "oauth_access":
+                if claims and claims.get("type") == "oauth_access":
                     exp = claims.get("exp")
-                    if isinstance(exp, (int, float)) and exp < _time.time() - OAUTH_EXP_SKEW_SECONDS:
+                    if isinstance(exp, (int, float)) and exp < time.time() - OAUTH_EXP_SKEW_SECONDS:
                         return JSONResponse(
-                            {
-                                "error": "invalid_token",
-                                "error_description": "OAuth access token expired",
-                            },
+                            {"error": "invalid_token",
+                             "error_description": "OAuth access token expired"},
                             status_code=401,
                             headers={"WWW-Authenticate": WWW_AUTH_HEADER},
                         )

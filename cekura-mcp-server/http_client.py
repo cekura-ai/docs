@@ -3,7 +3,6 @@ from typing import Dict, Any, Optional
 import json
 
 
-
 class CekuraAPIClient:
     def __init__(
         self,

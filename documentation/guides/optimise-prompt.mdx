@@ -1,0 +1,146 @@
+---
+title: "Optimise Prompt"
+sidebarTitle: "Optimise Prompt"
+icon: "wand-magic-sparkles"
+iconType: "regular"
+description: "Close the loop on agent quality. The Optimise Prompt button takes failing evaluators, diagnoses where the agent's prompt or config has gaps, applies edits, and re-validates — iterating until the agent passes."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+The **Optimise Prompt** button hands a set of failing evaluators to the Cekura AI Assistant, which runs a diagnose → propose → apply → re-validate loop against your agent's prompt and configuration. The loop continues until the agent reaches **100% pass rate** on the validation set or the iteration cap is reached.
+
+<Note>
+**Optimise Prompt is BETA.** The optimiser edits a live agent (VAPI assistants directly via the VAPI API, self-hosted websocket agents via source-file edits). Review proposed diffs before applying for the first few runs.
+</Note>
+
+## Where the button lives
+
+Two surfaces in the dashboard expose the button. Both route into the same workflow.
+
+<Steps>
+  <Step title="Evaluators list — bulk action">
+    Open an agent's **Evaluators** tab, select one or more evaluators (the scenario rows), and the **Optimise Prompt** button appears in the bulk-action bar next to **Run** and the delete control. The optimiser will use every selected evaluator as the validation set.
+  </Step>
+  <Step title="Run result page">
+    Open any completed evaluator run and click **Optimise Prompt** in the header. The optimiser receives the failing scenarios *and* the original `result_id`, so it starts from the call transcripts that already exist — no fresh run needed before the first diagnosis.
+  </Step>
+</Steps>
+
+Clicking the button opens the **AI Assistant** in a new chat with a prefilled prompt that names the evaluators (and result, when present). The assistant then drives the loop end-to-end.
+
+## What the loop does
+
+The AI Assistant runs the **self-improving agent** workflow. Each iteration walks the same phases:
+
+| Phase | What happens |
+|---|---|
+| **Setup** | Resolves the agent's provider mode (VAPI or self-hosted), loads the system prompt and tool definitions. For self-hosted agents, asks once for the **redeploy command** so later iterations can restart the live process automatically. |
+| **Collect** | Pulls the runs for the selected evaluators, filters out passing runs, and inspects each failed call's provider state (transcript, tool calls, end-of-call attribution). |
+| **Early-End-Call Diagnose** | Triages failures where the main agent ended the call before the scenario's required steps completed — usually a closure-rule problem in the prompt. |
+| **Diagnose** | Classifies remaining failures as **Gap** (missing instruction), **Conflict** (contradictory instructions), **Ambiguity** (under-specified instruction), **CodeBug** (orchestration code, self-hosted only), or **Upstream** (data / infra / out-of-scope). Proposes minimal scoped edits per failure and presents the combined diff. |
+| **Apply** | Lands the approved edits. VAPI: PATCH the assistant / tools directly. Self-hosted websocket: edits the system-prompt and orchestration code in your source file, then runs your redeploy command. |
+| **Sync** | Re-fetches the just-edited artifacts and verifies each changed field actually landed (catches VAPI nested-object replacement and ambiguous source-file anchors). |
+| **Overfitting Gate** | Scrubs the just-applied edits for transcript-specific phrasing, scenario IDs, hardcoded test data, hyper-narrow case clauses, and transcript-cloned few-shot examples. Cleans up by revising or stripping the offending edit before validation. |
+| **Eval** | Re-runs the failing evaluators against the new prompt. On 100% pass, runs a regression sweep across the original full set. Decides: hand back to **Collect** (failures remain), declare success, or surface a stop condition. |
+
+The loop exits on:
+
+- **100% pass** on the full evaluator set (after a regression sweep) — success.
+- **Iteration cap** reached (default 10).
+- **Oscillation** (same scenario flipping pass/fail across iterations).
+- **No change** (identical post-edit failures two iterations in a row).
+- **Three consecutive same-shape failures** at the same edit surface — the assistant surfaces larger architectural options (model swap, programmatic guard, flow restructure) instead of producing another similar prompt edit.
+- **All-Upstream classification** — every remaining failure is data / infra and not fixable from the prompt or config.
+
+## Supported agent modes
+
+| Mode | Editable surfaces | How edits land |
+|---|---|---|
+| **VAPI** | System prompts on every squad member, tool function declarations, tool spoken `messages` (`request-start` / `request-complete` / `request-failed`), squad `model.toolIds`, handoff `destinations`. | VAPI PATCH — the live assistant picks up edits immediately. |
+| **Self-hosted (websocket)** | The system prompt string constant in your source file, tool schemas, **and** orchestration code (conversation-history management, message wiring, state preservation, keepalive / retry plumbing). Business logic, auth code, and dependencies stay out of scope. | Direct edit on your source file, followed by your **redeploy command**. |
+
+<Note>
+**Retell is not currently supported by Optimise Prompt** and will be re-enabled in a future revision. ElevenLabs, LiveKit, and Pipecat are routed through the self-hosted path when applicable.
+</Note>
+
+## What you need before clicking
+
+<Steps>
+  <Step title="The agent must be set up on Cekura">
+    The optimiser reads the agent's provider configuration to know how to fetch and apply edits. See [Cekura Agent](/documentation/guides/cekura-agent).
+  </Step>
+  <Step title="At least one failing evaluator">
+    The loop's input is failing runs. If every selected evaluator passes, the optimiser exits immediately.
+  </Step>
+  <Step title="For self-hosted agents — the live source file open in the IDE">
+    The optimiser locates the system prompt by first checking the file open in your editor, then grepping the workspace for the prompt string constant. Files like `original_*.py`, `*.bak`, anything under `archive/` are skipped — the assistant will pause and confirm if there's ambiguity.
+  </Step>
+  <Step title="For self-hosted agents — a redeploy command">
+    Provide the shell command that restarts your websocket server (e.g. `pkill -f my_agent && python my_agent.py &`). The assistant asks once at setup. Pass `"manual"` instead to gate each iteration on a manual restart.
+  </Step>
+</Steps>
+
+## Iteration controls
+
+The assistant accepts a few optional knobs when you mention them in the chat:
+
+| Setting | Default | Effect |
+|---|---|---|
+| `max_iterations` | 10 | Caps the loop. Each **Eval → Optimise** hand-back counts as one iteration. |
+| `auto_mode` | `true` | When true, skips per-iteration diff approval and routine restart pauses (the one-time setup question for `redeploy_command` still fires). Set to `false` to gate every iteration's diff on explicit approval. |
+| `mode` | auto-detected | Explicit override (`vapi` / `self_hosted`) when detection is ambiguous. |
+
+The Setup hard gate, the Overfitting Gate's tension-case pauses, oscillation / no-change detection, low-confidence diagnoses, and all-Upstream failure sets still pause the loop for confirmation even in auto mode.
+
+## Reading the assistant's output
+
+Each iteration emits the same structure in the chat:
+
+1. **Phase header** — e.g. `Iteration 3 · Diagnose` — names what's happening so you can follow along.
+2. **Failure summary** — the kept failures from this iteration's runs, grouped by failure shape, with end-of-call attribution for each.
+3. **Proposed combined diff** — every edit the optimiser wants to apply, before / after, scoped to the smallest viable surface. In `auto_mode: false` this is the approval gate.
+4. **Apply + sync confirmation** — which fields landed, plus the redeploy step's exit code for self-hosted agents.
+5. **Overfitting gate verdict** — which edits passed the gate, which were revised, which were stripped, and why.
+6. **Eval decision** — loop, declare success, or surface a stop condition.
+
+Each phase header is a hard checkpoint — if you don't see one for a given phase, that phase did not run and the loop is missing a step.
+
+## Limits and current behavior
+
+- **One agent per session.** The loop operates on one `agent_id` at a time. Open separate chats for separate agents.
+- **Validation set is the evaluators you selected.** The optimiser does not silently widen the set mid-loop; if widening is needed, it asks first.
+- **Edits to dynamic-variable placeholders (`{{...}}`) are skipped.** Those are owned by your calling system, not the agent prompt.
+- **Tool `messages`, `destinations`, and squad `model.toolIds` only apply to VAPI.** In self-hosted mode, findings against those surfaces are surfaced as hand-offs rather than direct edits.
+- **The Cekura agent record's `description` field is treated as a mirror, not the source of truth, for self-hosted agents.** The optimiser edits the prompt in your source file directly; updating the description without updating the file does not change live behavior.
+
+## How it maps to the AI Assistant chat
+
+| Dashboard action | Equivalent in the AI Assistant chat |
+|---|---|
+| Click **Optimise Prompt** on the evaluators list with N evaluators selected | New chat opens with `/self-improve via these evaluators - <N evaluator IDs>` |
+| Click **Optimise Prompt** on a run result page | New chat opens with `/self-improve via these evaluators - <IDs> (result ids: <result_id>)` |
+| Approving the iteration's diff in `auto_mode: false` | Replying "approve" / "apply" to the combined-diff message |
+| Stopping the loop early | Sending `stop` (or using the **Stop** control on the chat) |
+
+## Troubleshooting
+
+**The button is disabled.** No evaluators are selected, or every selected evaluator is mid-run. Wait for runs to finish, or select at least one row.
+
+**The chat opens but immediately exits with "all failures classify as Upstream".** Every kept failure is rooted in data or infrastructure, not the prompt. The optimiser surfaces the upstream hand-offs (e.g. KB content, dynamic-variable wiring) instead of producing phantom prompt edits.
+
+**Iter 1 lands edits but the iter-2 transcripts look identical.** The most likely cause is the deploy path: the file was edited but the live process is still running the old code. For self-hosted agents, verify the `redeploy_command` actually ran and exited 0. The optimiser's no-change detector catches this after the fact and pauses, but verifying first saves an iteration.
+
+**The optimiser asks me to disambiguate which file is the live source.** The IDE-opened file did not match the prompt-string constant uniquely (multiple matches in the workspace, or strong "not the live source" filename signals like `*.bak`). Confirm which file the running server actually reads.
+
+**The loop hits the iteration cap without converging.** The same failure shape has persisted across multiple iterations of prompt-layer edits — the prompt layer is demonstrably not where the fix lives. The assistant surfaces architectural alternatives (stronger model, programmatic guard in code, flow restructure, evaluator hand-off) for you to choose.
+
+**Most failures cluster on one metric whose explanations look subjective.** The metric is probably miscalibrated. Hand off to the [Metric Lab](/documentation/guides/metric-lab) improvement flow before iterating further on the agent.
+
+## Related
+
+- [Cekura Agent](/documentation/guides/cekura-agent) — set up an agent before optimising it.
+- [Metric Lab](/documentation/guides/metric-lab) — improve evaluator quality when failures cluster on a noisy metric.
+- [Auto-optimise Metrics](/mcp/auto-optimize-metrics) — the equivalent recurring workflow for metric prompts, run via Claude Code on a schedule.

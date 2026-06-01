@@ -906,7 +906,7 @@ def main():
 
     import uvicorn
     from starlette.middleware.base import BaseHTTPMiddleware
-    from starlette.responses import JSONResponse
+    from starlette.responses import JSONResponse, Response
     from starlette.routing import Route
 
     parser = argparse.ArgumentParser(description="Cekura OpenAPI MCP Server")
@@ -1088,15 +1088,23 @@ def main():
         logger.info(f"observe: forwarded session {session_id} as call_id={call_id} (skill={skill}, turns={len(transcript)})")
         return JSONResponse({"status": "ok", "call_id": call_id, "upstream_status": resp.status_code})
 
+    def _has_api_key(request) -> bool:
+        return bool(
+            request.headers.get('X-CEKURA-API-KEY')
+            or request.headers.get('x-cekura-api-key')
+        )
+
     async def oauth_protected_resource(request):
-        # RFC 9728 — resource server advertises its authorization server
+        if _has_api_key(request):
+            return Response(status_code=404)
         return JSONResponse({
             "resource": MCP_SERVER_URL,
             "authorization_servers": [MCP_ISSUER_URL],
         })
 
     async def oauth_as_metadata(request):
-        # Convenience fallback for clients that check AS metadata directly on resource server
+        if _has_api_key(request):
+            return Response(status_code=404)
         return JSONResponse({
             "issuer": MCP_ISSUER_URL,
             "authorization_endpoint": f"{MCP_ISSUER_URL}/user/oauth/authorize",

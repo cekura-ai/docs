@@ -18,6 +18,7 @@ class CekuraAPIClient:
         mcp_session_id: Optional[str] = None,
     ):
         self.base_url = base_url
+        self.credential_type = credential_type
         auth_header = (
             {"Authorization": f"Bearer {credential}"}
             if credential_type == "bearer"
@@ -152,7 +153,22 @@ class CekuraAPIClient:
                 return {"result": response.text}
 
         if response.status_code == 401:
-            raise Exception("Authentication failed (401). Check your CEKURA_API_KEY.")
+            if self.credential_type == "bearer":
+                message = (
+                    "Authentication failed (401). Your OAuth/Bearer token was rejected — "
+                    "it may have expired or been revoked. Re-authenticate and retry."
+                )
+            else:
+                message = (
+                    "Authentication failed (401). Your API key was rejected for this endpoint. "
+                    "Verify CEKURA_API_KEY is valid and authorized for this operation."
+                )
+            return {
+                "error": "authentication_failed",
+                "status_code": 401,
+                "credential_type": self.credential_type,
+                "message": message,
+            }
 
         if response.status_code == 403:
             raise Exception("Access forbidden (403). You may not have permission for this endpoint.")

@@ -1694,7 +1694,8 @@
         "/observability/v1/alerts/": {
             "get": {
                 "operationId": "alerts-list",
-                "description": "List alerts",
+                "description": "Return all alerts configured in the project, including their sub_type (`normal` | `significant_change` | `threshold`), source metric, current Slack/notification config, and trigger counters. Use before creating a new alert to check if one already exists on the same metric.",
+                "summary": "List alerts in a project",
                 "parameters": [
                     {
                         "in": "query",
@@ -1764,11 +1765,20 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "alerts-list",
+                        "description": "Return all alerts configured in the project, including their sub_type (`normal` | `significant_change` | `threshold`), source metric, current Slack/notification config, and trigger counters. Use before creating a new alert to check if one already exists on the same metric."
+                    }
                 }
             },
             "post": {
                 "operationId": "alerts-create",
-                "description": "Create a new alert",
+                "description": "Create an alert that fires when a metric crosses a threshold. Three sub_types:\n\n- `normal` — Failure alert. Fires per failing call. Only for binary metrics (eval_type starts with `binary_`) plus the latency / infrastructure / critical-deviation built-ins.\n- `significant_change` — Trend alert. Fires when a numeric/continuous metric's rolling mean deviates from history. Pass `preset: \"balanced\"` (or `\"conservative\"` / `\"aggressive\"`) to skip manual std_multiplier / ewma_alpha / window_size math — the server expands the preset. Balanced is the safe default.\n- `threshold` — Hard ceiling/floor. Fires when ≥ `min_breaches` of the last `window_size` evaluations cross `value`. Use for numeric metrics where the user has a known good range. Operator is `gt` | `lt` | `outside` ({low, high}).\n\n**Slack delivery requires** `notifications.slack.workspace_id` (+ optional `channel_id`). Alerts with empty `notifications` are silent — fire counters still increment but no message is sent. Pick a workspace_id from `slack_workspaces_list`.",
+                "summary": "Create an alert on a metric",
                 "tags": [
                     "observability"
                 ],
@@ -1808,13 +1818,22 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "alerts-create",
+                        "description": "Create an alert that fires when a metric crosses a threshold. Three sub_types:\n\n- `normal` — Failure alert. Fires per failing call. Only for binary metrics (eval_type starts with `binary_`) plus the latency / infrastructure / critical-deviation built-ins.\n- `significant_change` — Trend alert. Fires when a numeric/continuous metric's rolling mean deviates from history. Pass `preset: \"balanced\"` (or `\"conservative\"` / `\"aggressive\"`) to skip manual std_multiplier / ewma_alpha / window_size math — the server expands the preset. Balanced is the safe default.\n- `threshold` — Hard ceiling/floor. Fires when ≥ `min_breaches` of the last `window_size` evaluations cross `value`. Use for numeric metrics where the user has a known good range. Operator is `gt` | `lt` | `outside` ({low, high}).\n\n**Slack delivery requires** `notifications.slack.workspace_id` (+ optional `channel_id`). Alerts with empty `notifications` are silent — fire counters still increment but no message is sent. Pick a workspace_id from `slack_workspaces_list`."
+                    }
                 }
             }
         },
         "/observability/v1/alerts/{id}/": {
             "get": {
                 "operationId": "alerts-retrieve",
-                "description": "Retrieve an alert by ID",
+                "description": "Return one alert with its source / threshold / notifications JSON expanded. Use this before updating to confirm the current shape — `partial_update` merges into existing JSON, so you need to know what's already there.",
+                "summary": "Get an alert's full config",
                 "parameters": [
                     {
                         "in": "path",
@@ -1845,11 +1864,19 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "alerts-retrieve",
+                        "description": "Return one alert with its source / threshold / notifications JSON expanded. Use this before updating to confirm the current shape — `partial_update` merges into existing JSON, so you need to know what's already there."
+                    }
                 }
             },
             "put": {
                 "operationId": "alerts-update",
-                "description": "Update an alert",
+                "description": "Manage alerts that fire when metric thresholds are crossed.",
                 "parameters": [
                     {
                         "in": "path",
@@ -1904,7 +1931,8 @@
             },
             "patch": {
                 "operationId": "alerts-partial-update",
-                "description": "Update an alert",
+                "description": "Update fields on an existing alert. Common uses from chat:\n\n- Tune sensitivity: pass `preset: \"conservative\"` to make a noisy trend alert quieter (or `\"aggressive\"` to catch smaller shifts). Explicit `threshold.std_multiplier` / `ewma_alpha` / `source.window_size` override the preset.\n- Change Slack routing: pass a new `notifications.slack` block.\n- Disable temporarily: pass `enabled: false`.\n\nChanging `sub_type` requires the matching `source` + `threshold` shape — see `alerts_create` for the field matrix per sub_type. Partial updates merge JSON, so omitted nested keys keep their existing values.",
+                "summary": "Update an alert (partial)",
                 "parameters": [
                     {
                         "in": "path",
@@ -1954,11 +1982,20 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "alerts-partial-update",
+                        "description": "Update fields on an existing alert. Common uses from chat:\n\n- Tune sensitivity: pass `preset: \"conservative\"` to make a noisy trend alert quieter (or `\"aggressive\"` to catch smaller shifts). Explicit `threshold.std_multiplier` / `ewma_alpha` / `source.window_size` override the preset.\n- Change Slack routing: pass a new `notifications.slack` block.\n- Disable temporarily: pass `enabled: false`.\n\nChanging `sub_type` requires the matching `source` + `threshold` shape — see `alerts_create` for the field matrix per sub_type. Partial updates merge JSON, so omitted nested keys keep their existing values."
+                    }
                 }
             },
             "delete": {
                 "operationId": "alerts-destroy",
-                "description": "Delete an alert",
+                "description": "Permanently delete an alert. ⚠ Irreversible. The chat agent refuses this operation at the SDK layer; direct API/SDK callers can still use it.",
+                "summary": "Delete an alert",
                 "parameters": [
                     {
                         "in": "path",
@@ -1981,6 +2018,15 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "alerts-destroy",
+                        "description": "Permanently delete an alert. ⚠ Irreversible. The chat agent refuses this operation at the SDK layer; direct API/SDK callers can still use it."
                     }
                 }
             }
@@ -6816,6 +6862,8 @@
         "/slack/slack-workspaces/": {
             "get": {
                 "operationId": "slack-slack-workspaces-list",
+                "description": "Return every Slack workspace connected to the project, with the bot's default `channel_id`, `team_name`, and verification status. Use to pick a `workspace_id` (and optionally a different `channel_id`) for the `notifications.slack` block on `alerts_create`. Access tokens and bot IDs are not returned.",
+                "summary": "List Slack workspaces configured for a project",
                 "tags": [
                     "slack"
                 ],
@@ -6839,7 +6887,14 @@
                         "description": ""
                     }
                 },
-                "description": "List slack slack workspaces"
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "slack-slack-workspaces-list",
+                        "description": "Return every Slack workspace connected to the project, with the bot's default `channel_id`, `team_name`, and verification status. Use to pick a `workspace_id` (and optionally a different `channel_id`) for the `notifications.slack` block on `alerts_create`. Access tokens and bot IDs are not returned."
+                    }
+                }
             },
             "post": {
                 "operationId": "slack-slack-workspaces-create",
@@ -47970,6 +48025,187 @@
                 },
                 "description": "Delete a workflows workflow"
             }
+        },
+        "/observability/v1/alerts/{id}/review_detail/": {
+            "get": {
+                "operationId": "alerts-review-detail-retrieve",
+                "description": "Per-alert review data — config snapshot, timeline, paginated fires.\n\nPowers the per-alert review page. Single-alert version of the bulk\n`review` action. Timeline is computed with a DB-side GROUP BY so the\nendpoint stays fast for noisy alerts (thousands of fires in 7d).\n\nQuery params:\n    hours: optional, defaults to 24. Capped at 7 days.\n    page: optional, defaults to 1.\n    page_size: optional, defaults to 50, capped at 200.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this alert.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/{id}/summarize/": {
+            "post": {
+                "operationId": "alerts-summarize-create",
+                "description": "Kick off an LLM summary of the last N hours of fires for this alert.\n\nReturns a progress_id. Frontend polls `summarize_progress` until status\nis 'completed' or 'error'. Cached for 1 hour keyed on (alert, hours,\nlatest fire id) — re-invocations within that window return the same\nprogress_id.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this alert.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/review/": {
+            "get": {
+                "operationId": "alerts-review-retrieve",
+                "description": "Aggregate every alert's fire activity over a rolling window. Returns KPI totals (total fires, unique alerts that fired, top firing alert), a time-bucketed timeline (hourly for 24h, 3-hour for 3d, 6-hour for 7d), and a per-alert breakdown with a sparkline of fires-per-bucket. Use to answer 'what alerts fired this week?' or 'is anything noisy right now?'. Pass `hours` (default 24, capped at 168) to widen the window. The response shape lets you compose a written report in a single call.",
+                "summary": "Review alert activity in a project",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "alerts-review-retrieve",
+                        "description": "Aggregate every alert's fire activity over a rolling window. Returns KPI totals (total fires, unique alerts that fired, top firing alert), a time-bucketed timeline (hourly for 24h, 3-hour for 3d, 6-hour for 7d), and a per-alert breakdown with a sparkline of fires-per-bucket. Use to answer 'what alerts fired this week?' or 'is anything noisy right now?'. Pass `hours` (default 24, capped at 168) to widen the window. The response shape lets you compose a written report in a single call."
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/summarize_progress/": {
+            "get": {
+                "operationId": "alerts-summarize-progress-retrieve",
+                "description": "Manage alerts that fire when metric thresholds are crossed.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/trigger_summary/": {
+            "get": {
+                "operationId": "alerts-trigger-summary-retrieve",
+                "description": "Return fire counts per alert over a time window.\n\nPowers the \"Last 24h\" status pill on the alerts list. Counts CallLogAlert\nrows linked to each alert in the project, scoped to the window.\n\nQuery params:\n    project_id: required, scopes the result to alerts in this project.\n    hours: optional, defaults to 24. Window size in hours.\n\nReturns: { \"<alert_id>\": <fire_count>, ... }",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -48718,13 +48954,24 @@
                         "description": "ID of monitored object"
                     },
                     "source": {
-                        "description": "Source config. For metrics: {\"sub_type\": \"normal\"|\"significant_change\", \"filters\": {...}, \"window_size\": 50}"
+                        "description": "Source config keyed on `sub_type`. `normal`: {sub_type, filters?}. `significant_change`: {sub_type, window_size, filters?}. `threshold`: {sub_type, window_size, filters?}. `filters` is an optional CallLogQueryFilter expression."
                     },
                     "threshold": {
-                        "description": "Threshold config. Normal metric: {\"condition\": \"value_lt_5\"}. Significant change: {\"std_multiplier\": 2.0, \"ewma_alpha\": 0.1, \"direction\": \"both\"}. Duration/volume: {\"operator\": \"gt\", \"value\": 300}"
+                        "description": "Threshold config keyed on the source's `sub_type`. `normal`: {} (fires on every failing eval). `significant_change`: {std_multiplier, ewma_alpha, direction}. `threshold`: {operator (gt|lt|outside), value (number | {low, high}), min_breaches}."
                     },
                     "notifications": {
-                        "description": "Notification config. Slack: {\"slack\": {\"workspace_id\": 10, \"channel_id\": \"C123\"}}. Empty = all project workspaces"
+                        "description": "Notification routing. `{slack: {workspace_id, channel_id?}}` to send to a specific workspace/channel. Empty fans out to every project workspace; empty + no project workspaces means the alert is silent."
+                    },
+                    "preset": {
+                        "enum": [
+                            "conservative",
+                            "balanced",
+                            "aggressive"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "a6fd953985219e0b",
+                        "writeOnly": true,
+                        "description": "Optional shorthand for trend alerts: 'conservative' | 'balanced' | 'aggressive'. Expands to std_multiplier / ewma_alpha / window_size. Explicit values in `source` or `threshold` override the preset. Ignored unless sub_type == 'significant_change'.\n\n* `conservative` - conservative\n* `balanced` - balanced\n* `aggressive` - aggressive"
                     }
                 },
                 "required": [
@@ -48786,13 +49033,13 @@
                         "readOnly": true
                     },
                     "source": {
-                        "description": "Source config. For metrics: {\"sub_type\": \"normal\"|\"significant_change\", \"filters\": {...}, \"window_size\": 50}"
+                        "description": "Source config keyed on `sub_type`. `normal`: {sub_type, filters?}. `significant_change`: {sub_type, window_size, filters?}. `threshold`: {sub_type, window_size, filters?}. `filters` is an optional CallLogQueryFilter expression."
                     },
                     "threshold": {
-                        "description": "Threshold config. Normal metric: {\"condition\": \"value_lt_5\"}. Significant change: {\"std_multiplier\": 2.0, \"ewma_alpha\": 0.1, \"direction\": \"both\"}. Duration/volume: {\"operator\": \"gt\", \"value\": 300}"
+                        "description": "Threshold config keyed on the source's `sub_type`. `normal`: {} (fires on every failing eval). `significant_change`: {std_multiplier, ewma_alpha, direction}. `threshold`: {operator (gt|lt|outside), value (number | {low, high}), min_breaches}."
                     },
                     "notifications": {
-                        "description": "Notification config. Slack: {\"slack\": {\"workspace_id\": 10, \"channel_id\": \"C123\"}}. Empty = all project workspaces"
+                        "description": "Notification routing. `{slack: {workspace_id, channel_id?}}` to send to a specific workspace/channel. Empty fans out to every project workspace; empty + no project workspaces means the alert is silent."
                     },
                     "last_triggered_at": {
                         "type": [
@@ -48884,13 +49131,13 @@
                         "readOnly": true
                     },
                     "source": {
-                        "description": "Source config. For metrics: {\"sub_type\": \"normal\"|\"significant_change\", \"filters\": {...}, \"window_size\": 50}"
+                        "description": "Source config keyed on `sub_type`. `normal`: {sub_type, filters?}. `significant_change`: {sub_type, window_size, filters?}. `threshold`: {sub_type, window_size, filters?}. `filters` is an optional CallLogQueryFilter expression."
                     },
                     "threshold": {
-                        "description": "Threshold config. Normal metric: {\"condition\": \"value_lt_5\"}. Significant change: {\"std_multiplier\": 2.0, \"ewma_alpha\": 0.1, \"direction\": \"both\"}. Duration/volume: {\"operator\": \"gt\", \"value\": 300}"
+                        "description": "Threshold config keyed on the source's `sub_type`. `normal`: {} (fires on every failing eval). `significant_change`: {std_multiplier, ewma_alpha, direction}. `threshold`: {operator (gt|lt|outside), value (number | {low, high}), min_breaches}."
                     },
                     "notifications": {
-                        "description": "Notification config. Slack: {\"slack\": {\"workspace_id\": 10, \"channel_id\": \"C123\"}}. Empty = all project workspaces"
+                        "description": "Notification routing. `{slack: {workspace_id, channel_id?}}` to send to a specific workspace/channel. Empty fans out to every project workspace; empty + no project workspaces means the alert is silent."
                     },
                     "trigger_count": {
                         "type": "integer",
@@ -48942,13 +49189,24 @@
                         "description": "Enable/disable alert"
                     },
                     "source": {
-                        "description": "Source config. For metrics: {\"sub_type\": \"normal\"|\"significant_change\", \"filters\": {...}, \"window_size\": 50}"
+                        "description": "Source config keyed on `sub_type`. `normal`: {sub_type, filters?}. `significant_change`: {sub_type, window_size, filters?}. `threshold`: {sub_type, window_size, filters?}. `filters` is an optional CallLogQueryFilter expression."
                     },
                     "threshold": {
-                        "description": "Threshold config. Normal metric: {\"condition\": \"value_lt_5\"}. Significant change: {\"std_multiplier\": 2.0, \"ewma_alpha\": 0.1, \"direction\": \"both\"}. Duration/volume: {\"operator\": \"gt\", \"value\": 300}"
+                        "description": "Threshold config keyed on the source's `sub_type`. `normal`: {} (fires on every failing eval). `significant_change`: {std_multiplier, ewma_alpha, direction}. `threshold`: {operator (gt|lt|outside), value (number | {low, high}), min_breaches}."
                     },
                     "notifications": {
-                        "description": "Notification config. Slack: {\"slack\": {\"workspace_id\": 10, \"channel_id\": \"C123\"}}. Empty = all project workspaces"
+                        "description": "Notification routing. `{slack: {workspace_id, channel_id?}}` to send to a specific workspace/channel. Empty fans out to every project workspace; empty + no project workspaces means the alert is silent."
+                    },
+                    "preset": {
+                        "enum": [
+                            "conservative",
+                            "balanced",
+                            "aggressive"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "a6fd953985219e0b",
+                        "writeOnly": true,
+                        "description": "Optional shorthand for trend alerts: 'conservative' | 'balanced' | 'aggressive'. Expands to std_multiplier / ewma_alpha / window_size. Explicit values in `source` or `threshold` override the preset. Ignored unless the alert's sub_type == 'significant_change'.\n\n* `conservative` - conservative\n* `balanced` - balanced\n* `aggressive` - aggressive"
                     }
                 },
                 "required": [
@@ -55062,13 +55320,24 @@
                         "description": "Enable/disable alert"
                     },
                     "source": {
-                        "description": "Source config. For metrics: {\"sub_type\": \"normal\"|\"significant_change\", \"filters\": {...}, \"window_size\": 50}"
+                        "description": "Source config keyed on `sub_type`. `normal`: {sub_type, filters?}. `significant_change`: {sub_type, window_size, filters?}. `threshold`: {sub_type, window_size, filters?}. `filters` is an optional CallLogQueryFilter expression."
                     },
                     "threshold": {
-                        "description": "Threshold config. Normal metric: {\"condition\": \"value_lt_5\"}. Significant change: {\"std_multiplier\": 2.0, \"ewma_alpha\": 0.1, \"direction\": \"both\"}. Duration/volume: {\"operator\": \"gt\", \"value\": 300}"
+                        "description": "Threshold config keyed on the source's `sub_type`. `normal`: {} (fires on every failing eval). `significant_change`: {std_multiplier, ewma_alpha, direction}. `threshold`: {operator (gt|lt|outside), value (number | {low, high}), min_breaches}."
                     },
                     "notifications": {
-                        "description": "Notification config. Slack: {\"slack\": {\"workspace_id\": 10, \"channel_id\": \"C123\"}}. Empty = all project workspaces"
+                        "description": "Notification routing. `{slack: {workspace_id, channel_id?}}` to send to a specific workspace/channel. Empty fans out to every project workspace; empty + no project workspaces means the alert is silent."
+                    },
+                    "preset": {
+                        "enum": [
+                            "conservative",
+                            "balanced",
+                            "aggressive"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "a6fd953985219e0b",
+                        "writeOnly": true,
+                        "description": "Optional shorthand for trend alerts: 'conservative' | 'balanced' | 'aggressive'. Expands to std_multiplier / ewma_alpha / window_size. Explicit values in `source` or `threshold` override the preset. Ignored unless the alert's sub_type == 'significant_change'.\n\n* `conservative` - conservative\n* `balanced` - balanced\n* `aggressive` - aggressive"
                     }
                 }
             },

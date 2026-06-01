@@ -15,8 +15,10 @@ class CekuraAPIClient:
         mcp_tool: Optional[str] = None,
         mcp_skill: Optional[str] = None,
         conversation_id: Optional[str] = None,
+        mcp_session_id: Optional[str] = None,
     ):
         self.base_url = base_url
+        self.credential_type = credential_type
         auth_header = (
             {"Authorization": f"Bearer {credential}"}
             if credential_type == "bearer"
@@ -30,6 +32,7 @@ class CekuraAPIClient:
                 ("X-MCP-Tool", mcp_tool),
                 ("X-MCP-Skill", mcp_skill),
                 ("X-Cekura-Conversation-Id", conversation_id),
+                ("X-MCP-Session-Id", mcp_session_id),
             )
             if value
         }
@@ -150,7 +153,15 @@ class CekuraAPIClient:
                 return {"result": response.text}
 
         if response.status_code == 401:
-            raise Exception("Authentication failed (401). Check your CEKURA_API_KEY.")
+            if self.credential_type == "bearer":
+                raise Exception(
+                    "Authentication failed (401). Bearer token rejected — "
+                    "it may have expired or been revoked. Re-authenticate and retry."
+                )
+            raise Exception(
+                "Authentication failed (401). API key rejected for this endpoint. "
+                "Verify CEKURA_API_KEY is valid and authorized for this operation."
+            )
 
         if response.status_code == 403:
             raise Exception("Access forbidden (403). You may not have permission for this endpoint.")
@@ -182,6 +193,7 @@ def create_client(
     mcp_tool: Optional[str] = None,
     mcp_skill: Optional[str] = None,
     conversation_id: Optional[str] = None,
+    mcp_session_id: Optional[str] = None,
 ) -> CekuraAPIClient:
     return CekuraAPIClient(
         base_url,
@@ -193,4 +205,5 @@ def create_client(
         mcp_tool=mcp_tool,
         mcp_skill=mcp_skill,
         conversation_id=conversation_id,
+        mcp_session_id=mcp_session_id,
     )

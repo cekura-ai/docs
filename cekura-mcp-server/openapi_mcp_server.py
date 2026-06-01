@@ -1000,6 +1000,49 @@ def main():
 
             return await call_next(request)
 
+    OAUTH_REFRESH_MARKER = b"oauth_refresh_required"
+
+    class OAuthRefreshSignalMiddleware:
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] != "http":
+                return await self.app(scope, receive, send)
+
+            start = None
+            chunks: list[bytes] = []
+
+            async def wrapped_send(message):
+                nonlocal start
+                if message["type"] == "http.response.start":
+                    start = message
+                    return
+                chunks.append(message.get("body", b""))
+                if message.get("more_body"):
+                    return
+                body = b"".join(chunks)
+                if OAUTH_REFRESH_MARKER in body:
+                    refresh_body = json.dumps({
+                        "error": "invalid_token",
+                        "error_description": "OAuth access token rejected — refresh required",
+                    }).encode()
+                    await send({
+                        "type": "http.response.start",
+                        "status": 401,
+                        "headers": [
+                            (b"content-type", b"application/json"),
+                            (b"www-authenticate", WWW_AUTH_HEADER.encode()),
+                            (b"content-length", str(len(refresh_body)).encode()),
+                        ],
+                    })
+                    await send({"type": "http.response.body", "body": refresh_body})
+                else:
+                    await send(start)
+                    await send({"type": "http.response.body", "body": body})
+
+            await self.app(scope, receive, wrapped_send)
+
     async def health_check(request):
         return JSONResponse({
             "status": "healthy",
@@ -1128,6 +1171,7 @@ def main():
     app.router.routes.insert(5, Route("/mcp/healthz", health_check))
     app.router.routes.insert(6, Route("/mcp/monitoring/sessions", monitoring_session_create, methods=["POST"]))
 
+    app.add_middleware(OAuthRefreshSignalMiddleware)
     app.add_middleware(CredentialMiddleware)
     logger.info("Credential middleware added (API key + Bearer token support)")
     logger.info(f"OAuth discovery: {MCP_SERVER_URL}/.well-known/oauth-protected-resource → {MCP_ISSUER_URL}")

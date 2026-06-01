@@ -2,6 +2,8 @@ import httpx
 from typing import Dict, Any, Optional
 import json
 
+import jwt
+
 
 class CekuraAPIClient:
     def __init__(
@@ -19,6 +21,7 @@ class CekuraAPIClient:
     ):
         self.base_url = base_url
         self.credential_type = credential_type
+        self._bearer_token = credential if credential_type == "bearer" else None
         auth_header = (
             {"Authorization": f"Bearer {credential}"}
             if credential_type == "bearer"
@@ -48,6 +51,17 @@ class CekuraAPIClient:
 
     async def close(self):
         await self.client.aclose()
+
+    def _is_oauth_access_token(self) -> bool:
+        if not self._bearer_token:
+            return False
+        try:
+            payload = jwt.decode(
+                self._bearer_token, options={"verify_signature": False}
+            )
+        except jwt.PyJWTError:
+            return False
+        return payload.get("type") == "oauth_access"
 
     async def execute_request(
         self,
@@ -153,21 +167,29 @@ class CekuraAPIClient:
                 return {"result": response.text}
 
         if response.status_code == 401:
-            if self.credential_type == "bearer":
-                message = (
-                    "Authentication failed (401). Your OAuth/Bearer token was rejected — "
+            payload: Dict[str, Any] = {
+                "error": "authentication_failed",
+                "status_code": 401,
+            }
+            if self._is_oauth_access_token():
+                payload["message"] = (
+                    "OAuth access token rejected. The client should refresh "
+                    "the token and retry."
+                )
+                # Marker scanned by OAuthRefreshSignalMiddleware to convert this
+                # tool-level error into a transport-level 401 with WWW-Authenticate.
+                payload["oauth_refresh_required"] = True
+            elif self.credential_type == "bearer":
+                payload["message"] = (
+                    "Authentication failed (401). Bearer token rejected — "
                     "it may have expired or been revoked. Re-authenticate and retry."
                 )
             else:
-                message = (
-                    "Authentication failed (401). Your API key was rejected for this endpoint. "
+                payload["message"] = (
+                    "Authentication failed (401). API key rejected for this endpoint. "
                     "Verify CEKURA_API_KEY is valid and authorized for this operation."
                 )
-            return {
-                "error": "authentication_failed",
-                "status_code": 401,
-                "message": message,
-            }
+            return payload
 
         if response.status_code == 403:
             raise Exception("Access forbidden (403). You may not have permission for this endpoint.")

@@ -14,7 +14,7 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 For every project and every LLM Judge metric, Cekura runs a daily audit that:
 
-1. Pulls all failing calls for that (project, metric) from the last 24 hours (falling back to 7 days if the day's pool is small).
+1. Pulls all failing calls for that (project, metric) from the last 24 hours.
 2. Hands the transcripts, the metric card, and an audit prompt to an LLM agent.
 3. Has the agent read a sample of the calls, cluster them by **root cause**, and write a 1-6 theme breakdown.
 4. Saves the result on the metric's Insights card in the dashboard.
@@ -29,8 +29,7 @@ Use the **View** dropdown at the top of the page to filter by view. When a view 
 
 Each card shows one of the following:
 - The latest failure-mode audit with identified themes
-- A "No failures in the last 24 hours" message when the metric had no failing calls during that period
-- A message indicating not enough failures were found in the analyzed window
+- A "No failing calls in the last 24 hours" message when the metric had no failures during that period
 - A **Generate** button if no audit has run yet
 
 Click **Generate** (or **Regenerate** for an existing audit) to run a new analysis on demand. The page polls automatically until the audit completes.
@@ -48,7 +47,7 @@ Only supported for LLM Judge type metrics as of now. Code based metrics such as 
 
 A Celery Beat cron fires at **06:00 UTC** daily. For each (project, eligible-metric) pair, our agent analyses the failing calls and writes the resulting themes to the metric's Insights card.
 
-If a metric has fewer than the minimum failing-call threshold even over 7 days, the card shows **"Not enough metric failure instances in last 7 days."**
+If a metric has no failing calls in the last 24 hours, the card displays a clean "No failing calls in the last 24 hours" message.
 
 ## On-demand generation via API
 
@@ -60,12 +59,11 @@ curl -X POST https://api.cekura.ai/api/projects/<project_id>/metric_failure_mode
   -H "Content-Type: application/json" \
   -d '{
     "metric_name": "Hallucination",
-    "window_days": 7,
-    "max_calls": 100
+    "max_calls": 20
   }'
 ```
 
-Poll the returned row's `status` field until it's `succeeded` or `failed`:
+Poll the returned row's `status` field until it resolves (`succeeded`, `failed`, or `skipped_no_failures`):
 
 ```bash
 curl https://api.cekura.ai/api/projects/<project_id>/metric_failure_mode_insights/<id>/ \

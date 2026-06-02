@@ -1,0 +1,327 @@
+---
+title: 'Agora RTC Testing'
+sidebarTitle: "Agora Testing"
+icon: "satellite-dish"
+iconType: "regular"
+description: 'Test agents in Agora RTC channels with dynamic session credentials'
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
+## Overview
+
+Test your voice agents in Agora RTC channels. Cekura joins the channel as a participant and runs evaluators against your agent. Per-call join details (app ID, channel, token, encryption) come from your session endpoint at run time—Cekura never stores them.
+
+Use Agora testing when:
+- Your agent uses Agora RTC for real-time voice communication
+- You want to test through Agora channels without exposing static credentials
+- Your infrastructure mints per-session Agora tokens dynamically
+
+<Tabs>
+<Tab title="No-code">
+
+Run tests directly from the dashboard without writing code.
+
+<Steps>
+<Step title="Configure Agora credentials">
+Go to your agent settings and configure Agora integration:
+
+**Required fields:**
+- **Provider**: Select Agora from the dropdown
+- **Session Endpoint URL**: Your endpoint that mints per-call Agora join details
+- **Client ID**: Identifier sent in the request body to your session endpoint
+- **Secret**: The secret value sent in the authentication header (encrypted at rest)
+
+**Optional fields:**
+- **Auth Header Name**: Header name for the secret (default: `X-Cekura-Secret`)
+- **Extra Headers**: Additional static headers to send with the request (JSON object)
+- **Join UID**: The UID Cekura uses when joining the channel (default: `"1"`)
+
+</Step>
+
+<Step title="Implement your session endpoint">
+Your session endpoint must accept POST requests and return Agora join details. Cekura calls this endpoint at the start of each test run.
+
+**Request format:**
+```
+POST <session_endpoint_url>
+X-Cekura-Secret: <your_secret>
+Content-Type: application/json
+
+{ "client_id": "<your_client_id>" }
+```
+
+**Required response fields:**
+```json
+{
+  "agora_app_id": "your-agora-app-id",
+  "agora_channel": "channel-name",
+  "agora_token": "generated-rtc-token"
+}
+```
+
+**Optional response fields for encryption:**
+```json
+{
+  "agora_app_id": "your-agora-app-id",
+  "agora_channel": "channel-name",
+  "agora_token": "generated-rtc-token",
+  "encryption_key": "your-encryption-key",
+  "encryption_salt": "your-encryption-salt",
+  "encryption_mode": "aes_128_gcm2"
+}
+```
+
+<Note>
+Supported encryption modes: `aes_128_xts`, `aes_128_ecb`, `aes_256_xts`, `sm4_128_ecb`, `aes_128_gcm`, `aes_256_gcm`, `aes_128_gcm2`, `aes_256_gcm2`
+</Note>
+
+</Step>
+
+<Step title="Run tests from the dashboard">
+In the **Configure Run** dialog, select **WebRTC** under Voice connections and click **Run**.
+
+Cekura automatically:
+- Calls your session endpoint to get fresh join credentials
+- Joins the Agora channel as a participant
+- Executes evaluators against your agent
+- Cleans up the session when complete
+
+<Note>Greyed out connection options have not been configured in Agent Settings yet—set them up there to enable them.</Note>
+</Step>
+
+<Step title="View results">
+Results appear in your dashboard. Track test status, metrics, and conversation details in real-time.
+</Step>
+</Steps>
+
+</Tab>
+
+<Tab title="Code">
+
+Use the API to integrate Agora testing into your workflow.
+
+## Prerequisites
+
+Configure Agora credentials on your agent first (same as the **No-code** tab):
+
+**Required fields:**
+- **Provider**: Select Agora from the dropdown
+- **Session Endpoint URL**: Your endpoint that mints per-call Agora join details
+- **Client ID**: Identifier sent in the request body to your session endpoint
+- **Secret**: The secret value sent in the authentication header
+
+**Optional fields:**
+- **Auth Header Name**: Header name for the secret (default: `X-Cekura-Secret`)
+- **Extra Headers**: Additional static headers to send (JSON object)
+- **Join UID**: The UID Cekura uses when joining (default: `"1"`)
+
+## API Endpoint
+
+```
+POST https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_agora/
+```
+
+## Authentication
+
+Include your Cekura API key in the request header:
+```
+X-CEKURA-API-KEY: <YOUR_API_KEY>
+```
+
+## Request Parameters
+
+**scenarios** (array, required): Array of test configurations
+
+Each scenario object contains:
+- **scenario** (number, required): Scenario ID
+
+**agent_id** (number, required): Your Agent ID in Cekura
+
+**frequency** (number, optional): Number of times to run each scenario. Defaults to 1 if not specified.
+
+**personality_ids** (array, optional): Array of personality IDs to use.
+
+**test_profile_ids** (array, optional): Array of test profile IDs to use.
+
+**concurrency_limit** (number, optional): Cap on parallel runs.
+
+## Examples
+
+### Single Run (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_agora/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agent_id": 12,
+    "scenarios": [101],
+    "frequency": 1
+  }'
+```
+
+### Multiple Runs (cURL)
+
+```bash
+curl -X POST \
+  'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_agora/' \
+  -H 'X-CEKURA-API-KEY: <YOUR_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agent_id": 12,
+    "scenarios": [101, 102, 103],
+    "frequency": 2
+  }'
+```
+
+### Python Example
+
+```python
+import requests
+
+API_KEY = "<YOUR_API_KEY>"
+BASE_URL = "https://api.cekura.ai/test_framework"
+
+headers = {
+    "X-CEKURA-API-KEY": API_KEY,
+    "Content-Type": "application/json",
+}
+
+payload = {
+    "agent_id": 12,
+    "scenarios": [101, 102],
+    "frequency": 1,
+}
+
+resp = requests.post(
+    f"{BASE_URL}/v1/scenarios/run_scenarios_agora/",
+    headers=headers,
+    json=payload,
+)
+result = resp.json()
+print(result)
+```
+
+## Response
+
+```json
+{
+  "id": 16870,
+  "name": "",
+  "agent": 12,
+  "status": "in_progress",
+  "success_rate": 0.0,
+  "run_as_text": false,
+  "is_cronjob": false,
+  "runs": [
+    {
+      "id": 34625,
+      "status": "running",
+      "scenario": 101,
+      "scenario_name": "Customer Support Scenario",
+      "test_profile_data": null
+    }
+  ],
+  "created_at": "2026-06-02T09:32:59.484534Z",
+  "updated_at": "2026-06-02T09:32:59.484942Z"
+}
+```
+
+## Error Responses
+
+### Missing Agora Credentials
+
+```json
+{
+  "agent": ["Agent must have Agora credentials configured (agora_data with session_endpoint_url)."]
+}
+```
+
+### Missing Session Endpoint URL
+
+```json
+{
+  "agent": ["Agent agora_data must include session_endpoint_url."]
+}
+```
+
+### Session Endpoint Failure
+
+If your session endpoint returns an error or invalid response, the run will fail with a message indicating the failure reason.
+
+## Monitor Results
+
+Poll for results using the [List Runs with IDs API](/api-reference/test_framework/list-runs-with-ids).
+
+</Tab>
+</Tabs>
+
+## Session Endpoint Contract
+
+Your session endpoint is the key integration point. It must return valid Agora join credentials for each test run.
+
+### Request
+
+Cekura sends a POST request to your configured `session_endpoint_url`:
+
+```http
+POST /your-session-endpoint HTTP/1.1
+Host: your-api.example.com
+Content-Type: application/json
+X-Cekura-Secret: your_configured_secret
+
+{
+  "client_id": "your_configured_client_id"
+}
+```
+
+If you configured a custom `auth_header_name`, that header name is used instead of `X-Cekura-Secret`.
+
+### Response
+
+Return a JSON object with the Agora join details:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `agora_app_id` | string | Yes | Your Agora App ID |
+| `agora_channel` | string | Yes | The channel name for this session |
+| `agora_token` | string | Yes | A valid RTC token for joining the channel |
+| `encryption_key` | string | No | Encryption key if using media encryption |
+| `encryption_salt` | string | No | Encryption salt if using media encryption |
+| `encryption_mode` | string | No | Encryption algorithm (see supported modes below) |
+
+### Supported Encryption Modes
+
+| Mode | Description |
+|------|-------------|
+| `aes_128_xts` | 128-bit AES in XTS mode |
+| `aes_128_ecb` | 128-bit AES in ECB mode |
+| `aes_256_xts` | 256-bit AES in XTS mode |
+| `sm4_128_ecb` | 128-bit SM4 in ECB mode |
+| `aes_128_gcm` | 128-bit AES in GCM mode |
+| `aes_256_gcm` | 256-bit AES in GCM mode |
+| `aes_128_gcm2` | 128-bit AES in GCM mode (version 2) |
+| `aes_256_gcm2` | 256-bit AES in GCM mode (version 2) |
+
+## Credential Security
+
+Agora credentials are handled securely:
+
+- Your **secret** is encrypted at rest and never logged
+- Per-call join details (app ID, channel, token) are fetched at run time and not persisted
+- Each test run gets fresh credentials from your session endpoint
+
+<Note>
+The token returned by your session endpoint should be scoped for the specific channel and have an appropriate expiry. Cekura requests new credentials for each test run.
+</Note>
+
+## Next Steps
+
+- [Custom metrics](/documentation/key-concepts/metrics/custom-metrics)
+- [Instruction following metric](/documentation/key-concepts/metrics/instruction-following-metric)
+- [Load testing](/documentation/guides/testing-agents/load-testing)

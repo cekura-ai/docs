@@ -8387,6 +8387,61 @@
                 "description": "Subscriptions subscriptions reactivate"
             }
         },
+        "/subscriptions/subscriptions/{id}/renew/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-renew-create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "description": "Subscriptions subscriptions renew"
+            }
+        },
         "/subscriptions/subscriptions/{id}/update_payment_method/": {
             "post": {
                 "operationId": "subscriptions-subscriptions-update-payment-method-create",
@@ -12910,7 +12965,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/auto-fetch/": {
             "post": {
                 "operationId": "aiagents-tools-auto-fetch-create",
-                "description": "Auto-fetch tools from provider and generate mock data asynchronously.\n\nValidates inputs, fires a background Celery task for the slow provider API calls\nand LLM mock-data generation, and returns a progress_id immediately.\nPoll auto-fetch-progress/ with the progress_id to check completion.\nThis does NOT enable mock mode in the provider. Use the enable-mock endpoint for that.",
+                "description": "Discover the agent's tools (from a managed provider or a customer-hosted MCP server) and LLM-generate mock input/output data for each. Persists Tool rows and records the provider configuration on the agent. ⚠ Overwrites empty Tool rows; existing rows with mock data are kept. For provider=\"custom\", supply `mcp_server_url`; the URL is SSRF-validated (no private/loopback targets).",
+                "summary": "Auto-fetch mock tools for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -12932,12 +12988,22 @@
                                 "$ref": "#/components/schemas/AutoFetchToolsRequest"
                             },
                             "examples": {
-                                "Auto-FetchToolsRequest": {
+                                "Auto-FetchToolsRequest(managedProvider)": {
                                     "value": {
                                         "provider": "retell",
                                         "assistant_id": "agent_abc123"
                                     },
-                                    "summary": "Auto-Fetch Tools Request"
+                                    "summary": "Auto-Fetch Tools Request (managed provider)"
+                                },
+                                "Auto-FetchToolsRequest(customMCPServer)": {
+                                    "value": {
+                                        "provider": "custom",
+                                        "mcp_server_url": "https://customer.example.com/mcp",
+                                        "mcp_server_headers": {
+                                            "Authorization": "Bearer ..."
+                                        }
+                                    },
+                                    "summary": "Auto-Fetch Tools Request (custom MCP server)"
                                 }
                             }
                         },
@@ -13049,7 +13115,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/disable-mock/": {
             "post": {
                 "operationId": "aiagents-tools-disable-mock-create",
-                "description": "Kick off a background task to disable mock tools for this agent.\nReturns a progress_id to poll disable-mock-progress/ for status.",
+                "description": "Restore the agent's tools to their original (non-mock) state. For managed providers this PATCHes the provider assistant back to its `original_tool_ids` and deletes the cloned tools. For provider=\"custom\" this only flips `mock_enabled` off; the `mcp_server_url` is preserved so re-enable works.",
+                "summary": "Disable mock tools for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -13116,6 +13183,7 @@
             "get": {
                 "operationId": "aiagents-tools-disable-mock-progress-retrieve",
                 "description": "Poll the status of a background disable-mock task.",
+                "summary": "Poll status of a disable-mock task",
                 "parameters": [
                     {
                         "in": "path",
@@ -13123,6 +13191,14 @@
                         "schema": {
                             "type": "string",
                             "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
                         },
                         "required": true
                     }
@@ -13140,7 +13216,17 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/DisableMockProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DisableMockProgressErrorResponse"
                                 }
                             }
                         },
@@ -13152,7 +13238,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/enable-mock/": {
             "post": {
                 "operationId": "aiagents-tools-enable-mock-create",
-                "description": "Kick off a background task to enable mock tools for this agent.\nReturns a progress_id to poll enable-mock-progress/ for status.\nAuto-fetch must be run first to populate tool mock data.",
+                "description": "Activate mock-tool mode using the data created by `auto-fetch`. For managed providers (vapi/retell/elevenlabs) this clones the provider's tools at the provider and swaps URLs to Cekura-hosted endpoints. For provider=\"custom\" it just registers `mcp_sub_tool_map` so MockMCPView can serve `/mcp/N/` calls. Returns a `progress_id`; poll `enable-mock-progress/` for the resulting `mcp_endpoints`. Run `auto-fetch` first.",
+                "summary": "Enable mock tools for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -13219,6 +13306,7 @@
             "get": {
                 "operationId": "aiagents-tools-enable-mock-progress-retrieve",
                 "description": "Poll the status of a background enable-mock task.",
+                "summary": "Poll status of an enable-mock task",
                 "parameters": [
                     {
                         "in": "path",
@@ -13226,6 +13314,14 @@
                         "schema": {
                             "type": "string",
                             "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
                         },
                         "required": true
                     }
@@ -13243,7 +13339,17 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/EnableMockProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EnableMockProgressErrorResponse"
                                 }
                             }
                         },
@@ -13255,7 +13361,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/mock-status/": {
             "get": {
                 "operationId": "aiagents-tools-mock-status-retrieve",
-                "description": "Get the current mock tools status for this agent.",
+                "description": "Single source of truth for \"what mock-tool runtime URLs do I have, and what are they configured for?\". `mcp_endpoints[]` lists each Cekura-hosted MCP JSON-RPC endpoint with the sub-tools it serves; `tool_endpoints[]` lists standalone (non-MCP) per-tool webhook URLs. URLs are computed from `settings.CEKURA_BASE_URL`, so each environment renders the correct host.",
+                "summary": "Current mock-tools state for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -13280,7 +13387,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/MockStatusResponse"
                                 }
                             }
                         },
@@ -38193,10 +38300,10 @@
             },
             "post": {
                 "operationId": "test-framework-v2-aiagents-create",
-                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\nSee examples below for full per-provider payloads.",
+                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `import-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
                 "summary": "Create an AI voice agent",
                 "tags": [
-                    "AI Agents"
+                    "test_framework"
                 ],
                 "requestBody": {
                     "content": {
@@ -38205,103 +38312,20 @@
                                 "$ref": "#/components/schemas/AIAgentV2"
                             },
                             "examples": {
-                                "Self-hosted(contactNumberOnly—MostCommon)": {
+                                "CloudAuto-import(configureFromProvider)": {
                                     "value": {
-                                        "agent_name": "Support Bot",
-                                        "description": "Handles inbound support calls for ACME Inc.",
-                                        "inbound": true,
-                                        "project": 1376,
-                                        "contact_number": "+14155551234",
-                                        "language": "en",
-                                        "assistant_provider": "self_hosted"
-                                    },
-                                    "summary": "Self-hosted (contact number only — most common)",
-                                    "description": "Typical onboarding: your agent is already deployed on your own stack with a phone number. Cekura just observes and evaluates; no provider credentials needed."
-                                },
-                                "VAPIAgent": {
-                                    "value": {
-                                        "agent_name": "VAPI Sales Agent",
-                                        "description": "Outbound sales qualification calls",
-                                        "inbound": false,
-                                        "project": 1376,
-                                        "contact_number": "+14155551234",
-                                        "language": "en",
-                                        "assistant_provider": "vapi",
-                                        "vapi_api_key": "vapi_sk_xxx",
-                                        "vapi_data": {
-                                            "public_key": "vapi_pk_xxx"
-                                        },
-                                        "assistant_id": "asst_abc123"
-                                    },
-                                    "summary": "VAPI agent"
-                                },
-                                "RetellAgent": {
-                                    "value": {
-                                        "agent_name": "Retell Booking Agent",
-                                        "description": "Schedules dental appointments",
-                                        "inbound": true,
-                                        "project": 1376,
-                                        "contact_number": "+14155551234",
-                                        "language": "en",
-                                        "assistant_provider": "retell",
-                                        "retell_api_key": "key_xxx",
-                                        "chat_assistant_id": "retell_agent_abc123",
-                                        "retell_data": {
-                                            "trigger_url": "https://api.retellai.com/create-phone-call"
+                                        "project": 42,
+                                        "provider": {
+                                            "type": "retell",
+                                            "agent_id": "agent_abc123",
+                                            "credentials": {
+                                                "api_key": "key_xxx"
+                                            },
+                                            "configure_from_provider": true
                                         }
                                     },
-                                    "summary": "Retell agent",
-                                    "description": "Retell requires BOTH retell_api_key AND chat_assistant_id (used for voice too, despite the field's name)."
-                                },
-                                "BlandAgent": {
-                                    "value": {
-                                        "agent_name": "Bland Support Agent",
-                                        "description": "Handles tier-1 billing questions",
-                                        "inbound": true,
-                                        "project": 1376,
-                                        "contact_number": "+14155551234",
-                                        "language": "en",
-                                        "assistant_provider": "bland",
-                                        "bland_api_key": "bland_xxx",
-                                        "chat_assistant_id": "bland_pathway_xyz",
-                                        "bland_data": {
-                                            "encrypted_key": "twilio_encrypted_key_xxx"
-                                        }
-                                    },
-                                    "summary": "Bland agent",
-                                    "description": "Bland requires bland_api_key AND chat_assistant_id (Bland calls this field pathway_id internally). bland_data.encrypted_key is the Twilio credential bundle."
-                                },
-                                "LiveKitAgent": {
-                                    "value": {
-                                        "agent_name": "LiveKit Concierge",
-                                        "description": "Multi-modal front-desk agent",
-                                        "inbound": true,
-                                        "project": 1376,
-                                        "language": "en",
-                                        "assistant_provider": "livekit",
-                                        "livekit_api_key": "APIxxx",
-                                        "livekit_data": {
-                                            "api_secret": "secret_xxx",
-                                            "url": "wss://acme.livekit.cloud"
-                                        }
-                                    },
-                                    "summary": "LiveKit agent"
-                                },
-                                "Self-hostedViaWebsocketURL": {
-                                    "value": {
-                                        "agent_name": "Internal Test Agent",
-                                        "description": "Staging build of the support flow",
-                                        "inbound": false,
-                                        "project": 1376,
-                                        "assistant_provider": "self_hosted",
-                                        "websocket_url": "wss://staging.example.com/agent",
-                                        "websocket_headers": {
-                                            "Authorization": "Bearer token_xxx"
-                                        },
-                                        "language": "en"
-                                    },
-                                    "summary": "Self-hosted via websocket URL",
-                                    "description": "Your agent exposes a websocket endpoint for text-mode testing."
+                                    "summary": "Cloud auto-import (configure_from_provider)",
+                                    "description": "Fetch & configure everything from the provider; returns 202 + progress_id."
                                 },
                                 "Self-hosted(observation-only,MostCommon)": {
                                     "value": {
@@ -38470,6 +38494,16 @@
                         },
                         "description": ""
                     },
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AIAgentConfigureFromProviderResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
                     "400": {
                         "content": {
                             "application/json": {
@@ -38494,7 +38528,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-v2-aiagents-create",
-                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\nSee examples below for full per-provider payloads."
+                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `import-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
                     }
                 }
             }
@@ -39345,75 +39379,10 @@
                 }
             }
         },
-        "/test_framework/v2/aiagents/import-from-provider/": {
-            "post": {
-                "operationId": "test-framework-v2-aiagents-import-from-provider-create",
-                "description": "Create an agent from an existing cloud-provider assistant. Supply the provider type and assistant ID (under `provider.type` / `provider.agent_id`) plus credentials, and Cekura fetches the system prompt, language/first-message settings, tool calls and dynamic variables from the provider and configures the agent automatically.\n\nSupported providers: vapi, retell, elevenlabs, synthflow. Request body is the same shape as `aiagents_create`. Returns the created agent immediately plus a `progress_id`; poll `import-progress/` with it to follow the per-step import status.",
-                "summary": "Import an AI agent from a cloud provider",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AIAgentV2"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AIAgentV2"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AIAgentV2"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ImportFromProviderResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "field_name": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/test_framework/v2/aiagents/import-progress/": {
             "get": {
                 "operationId": "test-framework-v2-aiagents-import-progress-retrieve",
-                "description": "Returns the staged status of a background agent import started by `import-from-provider`. Each stage reports pending / in_progress / completed / skipped / failed so a step-by-step loader can be rendered.",
+                "description": "Returns the staged status of a background agent import started via `configure_from_provider`. Each stage reports pending / in_progress / completed / skipped / failed so a step-by-step loader can be rendered.",
                 "summary": "Poll cloud-provider import progress",
                 "parameters": [
                     {
@@ -50623,6 +50592,22 @@
                     "inbound"
                 ]
             },
+            "AIAgentConfigureFromProviderResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "progress_id": {
+                        "type": "string",
+                        "description": "Poll import-progress/ with this to follow the staged import."
+                    }
+                },
+                "required": [
+                    "id",
+                    "progress_id"
+                ]
+            },
             "AIAgentDynamicVariable": {
                 "type": "object",
                 "properties": {
@@ -50905,7 +50890,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Agent name.",
+                        "description": "Agent name. Optional when configure_from_provider is set — it's fetched from the provider.",
                         "maxLength": 255
                     },
                     "description": {
@@ -51021,8 +51006,7 @@
                     }
                 },
                 "required": [
-                    "description",
-                    "name"
+                    "description"
                 ]
             },
             "AgentCredentials": {
@@ -51117,7 +51101,12 @@
                             "boolean",
                             "null"
                         ],
-                        "description": "Auto-sync agent prompt from the provider every 30s. Supported for: vapi, retell, elevenlabs, synthflow."
+                        "description": "Auto-sync the agent from the provider on a schedule. Supported for: vapi, retell, elevenlabs, synthflow."
+                    },
+                    "configure_from_provider": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "When true on create for a cloud provider (vapi/retell/elevenlabs/synthflow), Cekura fetches the assistant's prompt, settings, phone, tools, dynamic variables and knowledge base and configures the agent automatically. Requires agent_id + credentials.api_key. The create response includes a progress_id to poll import-progress/."
                     },
                     "send_post_conversation_metadata": {
                         "type": [
@@ -51743,23 +51732,32 @@
                         "enum": [
                             "vapi",
                             "retell",
-                            "elevenlabs"
+                            "elevenlabs",
+                            "custom"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "ff667bd2cd27b9d3",
-                        "description": "Provider to fetch tools from\n\n* `vapi` - vapi\n* `retell` - retell\n* `elevenlabs` - elevenlabs"
+                        "x-spec-enum-id": "e3f60d118bb06f46",
+                        "description": "Provider to fetch tools from. Use \"custom\" for self-hosted agents that expose an MCP server directly.\n\n* `vapi` - vapi\n* `retell` - retell\n* `elevenlabs` - elevenlabs\n* `custom` - custom"
                     },
                     "assistant_id": {
                         "type": "string",
-                        "description": "Assistant/Agent ID from the provider (e.g., VAPI Assistant ID)"
+                        "description": "Provider assistant/agent ID. Required for vapi/retell/elevenlabs; ignored for custom."
                     },
                     "api_key": {
                         "type": "string",
-                        "description": "Optional API key for the provider. If not provided, will use stored credentials."
+                        "description": "Optional API key for the managed provider. Ignored for custom. If not provided, stored credentials are used."
+                    },
+                    "mcp_server_url": {
+                        "type": "string",
+                        "description": "Required when provider=\"custom\". URL of the customer-hosted MCP server (JSON-RPC 2.0)."
+                    },
+                    "mcp_server_headers": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Optional auth/custom headers forwarded to the MCP server during tool discovery (provider=\"custom\" only)."
                     }
                 },
                 "required": [
-                    "assistant_id",
                     "provider"
                 ]
             },
@@ -54071,6 +54069,56 @@
                     "detail"
                 ]
             },
+            "DisableMockProgressErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "DisableMockProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
+                        "x-spec-enum-id": "6e9575e5767aaee0"
+                    },
+                    "mock_enabled": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "error",
+                    "message",
+                    "mock_enabled",
+                    "status"
+                ]
+            },
             "DisableMockToolsRequest": {
                 "type": "object",
                 "properties": {
@@ -54206,6 +54254,63 @@
                 },
                 "required": [
                     "detail"
+                ]
+            },
+            "EnableMockProgressErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "EnableMockProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
+                        "x-spec-enum-id": "6e9575e5767aaee0"
+                    },
+                    "mock_enabled": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "mcp_endpoints": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MockMCPEndpoint"
+                        },
+                        "description": "MCP mock endpoints registered for this agent (one per MCP-typed tool). Empty for agents without MCP tools."
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "error",
+                    "message",
+                    "mock_enabled",
+                    "status"
                 ]
             },
             "EnableMockToolsRequest": {
@@ -54430,21 +54535,6 @@
                     "region"
                 ],
                 "title": "Genesys"
-            },
-            "ImportFromProviderResponse": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "integer"
-                    },
-                    "progress_id": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "id",
-                    "progress_id"
-                ]
             },
             "ImportPlivoNumber": {
                 "type": "object",
@@ -56698,6 +56788,106 @@
                     "metric"
                 ]
             },
+            "MockMCPEndpoint": {
+                "type": "object",
+                "properties": {
+                    "mock_index": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "mock_index",
+                    "tool_names",
+                    "url"
+                ]
+            },
+            "MockStatusMCPEndpoint": {
+                "type": "object",
+                "properties": {
+                    "mock_index": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "mock_index",
+                    "tool_names",
+                    "url"
+                ]
+            },
+            "MockStatusResponse": {
+                "type": "object",
+                "properties": {
+                    "mock_enabled": {
+                        "type": "boolean"
+                    },
+                    "provider": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "assistant_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "mcp_endpoints": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MockStatusMCPEndpoint"
+                        },
+                        "description": "MCP JSON-RPC endpoints registered on the agent. Empty if no MCP-typed tools are mocked."
+                    },
+                    "tool_endpoints": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MockStatusToolEndpoint"
+                        },
+                        "description": "Per-tool webhook endpoints for standalone (non-MCP) tools. Excludes MCP sub-tools, which are listed under mcp_endpoints[].tool_names."
+                    }
+                },
+                "required": [
+                    "assistant_id",
+                    "mcp_endpoints",
+                    "mock_enabled",
+                    "provider",
+                    "tool_endpoints"
+                ]
+            },
+            "MockStatusToolEndpoint": {
+                "type": "object",
+                "properties": {
+                    "tool_name": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "tool_name",
+                    "url"
+                ]
+            },
             "MoveFolderRequest": {
                 "type": "object",
                 "properties": {
@@ -58372,7 +58562,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Agent name.",
+                        "description": "Agent name. Optional when configure_from_provider is set — it's fetched from the provider.",
                         "maxLength": 255
                     },
                     "description": {
@@ -61959,6 +62149,16 @@
                     },
                     "freetext_params": {
                         "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"
+                    },
+                    "mock_url": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Per-tool webhook URL. None if this Tool is served through an MCP endpoint."
+                    },
+                    "served_via": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "How this tool is accessed at runtime. `{'type': 'direct'}` for standalone tools; `{'type': 'mcp', 'mock_index': N, 'url': '.../mcp/N/'}` for MCP sub-tools."
                     }
                 }
             },
@@ -68607,6 +68807,16 @@
                     },
                     "freetext_params": {
                         "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"
+                    },
+                    "mock_url": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Per-tool webhook URL. None if this Tool is served through an MCP endpoint."
+                    },
+                    "served_via": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "How this tool is accessed at runtime. `{'type': 'direct'}` for standalone tools; `{'type': 'mcp', 'mock_index': N, 'url': '.../mcp/N/'}` for MCP sub-tools."
                     }
                 },
                 "required": [

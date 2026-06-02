@@ -1,0 +1,435 @@
+---
+title: "OpenTelemetry Traces"
+sidebarTitle: "OpenTelemetry Traces"
+icon: "chart-waterfall"
+iconType: "regular"
+description: "Instrument your voice AI agents with OpenTelemetry to capture detailed span-level traces in Cekura"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+import { CopyLlmPromptButton } from "/snippets/copy-llm-prompt-button.mdx";
+
+export const otelPrompt = [
+  "You are integrating OpenTelemetry tracing into an existing voice AI agent codebase to export traces to Cekura.",
+  "",
+  "OBJECTIVE",
+  "Instrument the agent with OpenTelemetry so that every call produces a trace with span-level timing for STT, LLM, TTS, and tool calls. Export traces to Cekura and link them to call logs via trace_id.",
+  "",
+  "BEFORE YOU START",
+  '1. Ask the user: "What is your Cekura agent ID (or project ID)? You can find it in the Cekura dashboard. If you don\'t know it, I can look it up for you."',
+  '2. Ask the user: "Do you prefer gRPC or HTTP for the OTel exporter? gRPC is recommended for most cases."',
+  "3. Find the main conversation loop or call handler in the codebase (where STT, LLM, and TTS calls happen).",
+  "4. Check if OpenTelemetry is already configured in the codebase. If so, reuse the existing TracerProvider and just add the Cekura exporter.",
+  "5. Find existing error handling and service patterns in the codebase. Follow them.",
+  "",
+  "IMPLEMENTATION REQUIREMENTS",
+  "",
+  "1. Install dependencies:",
+  "   - gRPC: pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc",
+  "   - HTTP: pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http",
+  "",
+  "2. Configure the OTel exporter with Cekura auth headers:",
+  "   - gRPC endpoint: otel.cekura.ai:443",
+  "   - HTTP endpoint: https://otel-http.cekura.ai/v1/traces",
+  "   - Required headers: x-cekura-api-key (your API key) and x-cekura-agent-id (your agent ID)",
+  "   - Alternative: use x-cekura-project-id instead of x-cekura-agent-id for project-level scoping.",
+  "",
+  "3. Set up TracerProvider with a BatchSpanProcessor and a Resource with service.name.",
+  "",
+  "4. Instrument agent code with spans using these naming conventions (Cekura renders specialized UI for these):",
+  '   - "stt" for speech-to-text calls — set stt.provider, stt.transcript',
+  '   - "llm" for LLM calls — set gen_ai.system, gen_ai.request.model, gen_ai.usage.input_tokens, gen_ai.usage.output_tokens',
+  '   - "tts" for text-to-speech calls — set tts.provider, tts.characters',
+  '   - "tool_call" for tool/function calls — set function.name, function.input, function.output',
+  '   - Wrap the entire call in a root "conversation" span.',
+  "",
+  "5. Extract the trace_id from the root span using format_trace_id().",
+  "",
+  "6. When sending call logs to Cekura via the observe API (POST https://api.cekura.ai/observability/v1/observe/), include the trace_id field to link the trace to the call.",
+  "",
+  "7. Call provider.force_flush() before sending the call log to ensure all spans are exported.",
+  "",
+  "8. Store CEKURA_API_KEY and CEKURA_AGENT_ID in environment variables — never hardcode them.",
+  "",
+  "INTEGRATION POINTS",
+  "- The OTel setup should be initialized once at module/application startup, not per-call.",
+  "- Spans wrap existing service calls (STT, LLM, TTS) — insert them around the existing code, do not restructure.",
+  "- The trace_id links OTel traces to call logs in the Cekura dashboard — include it in the observe API payload.",
+  "- If the codebase already has an OTel TracerProvider, add the Cekura exporter as an additional span processor rather than replacing the existing setup.",
+  "",
+  "SUCCESS CRITERIA",
+  "- Every call produces an OTel trace with a root conversation span and child spans for STT, LLM, TTS, and tool calls.",
+  "- Traces appear in the Cekura dashboard linked to their corresponding call logs.",
+  "- Span attributes include provider names, token usage, and timing information.",
+  "- Credentials are read from environment variables.",
+  "- Existing agent logic and call flow are unchanged.",
+  "",
+  "CONSTRAINTS",
+  "- DO NOT restructure the existing agent or call handling logic.",
+  "- DO NOT replace an existing OTel setup — add to it.",
+  "- DO NOT hardcode API keys or agent IDs.",
+  "- DO NOT add spans for code that is not a service call (no spans for internal logic or data transformations).",
+  "- Custom span names work but won't have specialized styling in the Cekura UI — prefer the standard names above.",
+  "",
+  "REFERENCE IMPLEMENTATION",
+  "",
+  "```python",
+  "import os",
+  "from opentelemetry.sdk.trace import TracerProvider",
+  "from opentelemetry.sdk.trace.export import BatchSpanProcessor",
+  "from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter",
+  "from opentelemetry.sdk.resources import Resource",
+  "from opentelemetry.trace import format_trace_id",
+  "",
+  "CEKURA_API_KEY = os.getenv('CEKURA_API_KEY')",
+  "AGENT_ID = os.getenv('CEKURA_AGENT_ID')",
+  "",
+  "exporter = OTLPSpanExporter(",
+  "    endpoint='otel.cekura.ai:443',",
+  "    headers=(",
+  "        ('x-cekura-api-key', CEKURA_API_KEY),",
+  "        ('x-cekura-agent-id', AGENT_ID),",
+  "    ),",
+  ")",
+  "",
+  "provider = TracerProvider(",
+  "    resource=Resource.create({'service.name': 'my-voice-agent'})",
+  ")",
+  "provider.add_span_processor(BatchSpanProcessor(exporter))",
+  "tracer = provider.get_tracer('my-voice-agent')",
+  "",
+  "def run_call(call_id, user_audio_stream):",
+  "    with tracer.start_as_current_span('conversation') as root_span:",
+  "        trace_id = format_trace_id(root_span.get_span_context().trace_id)",
+  "        transcript = []",
+  "",
+  "        for audio_chunk in user_audio_stream:",
+  "            with tracer.start_as_current_span('stt') as span:",
+  "                text = stt.transcribe(audio_chunk)",
+  "                span.set_attribute('stt.provider', 'deepgram')",
+  "                span.set_attribute('stt.transcript', text)",
+  "",
+  "            with tracer.start_as_current_span('llm') as span:",
+  "                response = llm.chat(transcript)",
+  "                span.set_attribute('gen_ai.request.model', 'gpt-4o')",
+  "                span.set_attribute('gen_ai.usage.input_tokens', response.usage.prompt_tokens)",
+  "                span.set_attribute('gen_ai.usage.output_tokens', response.usage.completion_tokens)",
+  "",
+  "            with tracer.start_as_current_span('tts') as span:",
+  "                audio = tts.synthesize(response.text)",
+  "                span.set_attribute('tts.provider', 'elevenlabs')",
+  "",
+  "    provider.force_flush()",
+  "    # Then POST call log to https://api.cekura.ai/observability/v1/observe/ with trace_id",
+  "```",
+  "",
+  "NEXT STEPS",
+  "Once tracing is integrated, use the Cekura MCP tools to:",
+  "- Monitor production calls and evaluate agent performance from the Cekura dashboard.",
+  "- Set up custom metrics to track latency, token usage, and quality across calls.",
+  "If the Cekura MCP server is available in your environment, use its tools/skills to review call logs, set up metrics, and configure alerts — all without leaving your coding agent.",
+  "",
+  "ADDITIONAL REFERENCE",
+  "For full setup details, span naming conventions, HTTP exporter config, and a complete example see: https://docs.cekura.ai/documentation/guides/tracing",
+].join("\n");
+
+<CopyPageButton />
+
+<Info>
+**Using a coding agent?** Paste this prompt directly in your voice agent codebase to jumpstart your Cekura OTel integration.
+
+<CopyLlmPromptButton prompt={otelPrompt} />
+</Info>
+
+## Overview
+
+OpenTelemetry (OTel) tracing gives you deep visibility into your voice agent's execution - every LLM call, TTS request, STT transcription, and tool invocation captured as spans with timing, token usage, and metadata.
+
+Once traces are flowing into Cekura, you can:
+
+- View span timelines and waterfall diagrams for each call
+- Identify latency bottlenecks (slow LLM responses, TTS delays)
+- Track token usage and model performance across calls
+- Debug tool call failures with full input/output context
+
+<Info>
+**Using Pipecat?** The Cekura Python SDK instruments your pipeline automatically - no manual setup needed. See the [Pipecat Tracing](/documentation/integrations/pipecat/tracing) guide.
+</Info>
+
+## Prerequisites
+
+- A Cekura account with an API key
+- An Agent ID or Project ID from the Cekura dashboard
+- Python 3.8+ (examples use Python, but any OTel-compatible language works)
+
+## Install Dependencies
+
+<Tabs>
+<Tab title="gRPC (Recommended)">
+```bash
+pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc
+```
+</Tab>
+<Tab title="HTTP">
+```bash
+pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+```
+</Tab>
+</Tabs>
+
+## Endpoints
+
+| Protocol | Endpoint | When to use |
+|----------|----------|-------------|
+| gRPC | `otel.cekura.ai:443` | Recommended for most use cases. Lower overhead, better for high-volume tracing. |
+| HTTP | `otel-http.cekura.ai:443` | Use when gRPC is not available (e.g. environments that don't support HTTP/2). |
+
+## Authentication
+
+Every request to the OTel endpoint requires two headers:
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `x-cekura-api-key` | Yes | Your Cekura API key |
+| `x-cekura-agent-id` | Yes* | The agent ID to associate traces with |
+| `x-cekura-project-id` | Yes* | Alternative to agent ID - use project-level scoping |
+
+\* Provide either `x-cekura-agent-id` or `x-cekura-project-id`.
+
+These are passed as exporter headers (HTTP) or gRPC metadata, not as span attributes.
+
+## Setup
+
+<Steps>
+<Step title="Configure the OTel exporter">
+
+Set up the exporter with your Cekura credentials:
+
+<Tabs>
+<Tab title="gRPC">
+```python
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+
+# Create the exporter with Cekura auth headers
+exporter = OTLPSpanExporter(
+    endpoint="otel.cekura.ai:443",
+    headers=(
+        ("x-cekura-api-key", "your-api-key"),
+        ("x-cekura-agent-id", "your-agent-id"),
+    ),
+)
+
+# Set up the tracer provider
+resource = Resource.create({"service.name": "my-voice-agent"})
+provider = TracerProvider(resource=resource)
+provider.add_span_processor(BatchSpanProcessor(exporter))
+
+# Get a tracer
+tracer = provider.get_tracer("my-voice-agent")
+```
+</Tab>
+<Tab title="HTTP">
+```python
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+
+# Create the exporter with Cekura auth headers
+exporter = OTLPSpanExporter(
+    endpoint="https://otel-http.cekura.ai/v1/traces",
+    headers={
+        "x-cekura-api-key": "your-api-key",
+        "x-cekura-agent-id": "your-agent-id",
+    },
+)
+
+# Set up the tracer provider
+resource = Resource.create({"service.name": "my-voice-agent"})
+provider = TracerProvider(resource=resource)
+provider.add_span_processor(BatchSpanProcessor(exporter))
+
+# Get a tracer
+tracer = provider.get_tracer("my-voice-agent")
+```
+</Tab>
+</Tabs>
+
+</Step>
+
+<Step title="Instrument your agent code">
+
+Create spans around each service call in your agent. Use the span names from the [naming conventions](#span-naming-conventions) for best results in the Cekura UI.
+
+```python
+def handle_conversation_turn(user_audio):
+    # Speech-to-text
+    with tracer.start_as_current_span("stt") as stt_span:
+        transcript = stt_service.transcribe(user_audio)
+        stt_span.set_attribute("stt.provider", "deepgram")
+        stt_span.set_attribute("stt.transcript", transcript)
+
+    # LLM call
+    with tracer.start_as_current_span("llm") as llm_span:
+        response = llm_service.chat(transcript)
+        llm_span.set_attribute("gen_ai.system", "openai")
+        llm_span.set_attribute("gen_ai.request.model", "gpt-4o")
+        llm_span.set_attribute("gen_ai.usage.input_tokens", response.usage.prompt_tokens)
+        llm_span.set_attribute("gen_ai.usage.output_tokens", response.usage.completion_tokens)
+
+    # Text-to-speech
+    with tracer.start_as_current_span("tts") as tts_span:
+        audio = tts_service.synthesize(response.text)
+        tts_span.set_attribute("tts.provider", "elevenlabs")
+        tts_span.set_attribute("tts.characters", len(response.text))
+
+    return audio
+```
+
+</Step>
+
+<Step title="Capture the trace ID">
+
+Extract the trace ID from your root span - you'll need this to correlate the trace with the call log in Cekura.
+
+```python
+from opentelemetry.trace import format_trace_id
+
+# Start a root span for the entire call
+with tracer.start_as_current_span("conversation") as root_span:
+    # Get the trace ID (32-character hex string)
+    trace_id = format_trace_id(root_span.get_span_context().trace_id)
+
+    # Run your agent conversation loop
+    while call_active:
+        handle_conversation_turn(user_audio)
+
+# trace_id is now something like "4bf92f3577b34da6a3ce929d0e0e4736"
+```
+
+</Step>
+
+<Step title="Send the trace ID with your call log">
+
+When sending the call log to Cekura via the [Send Calls](/api-reference/observability/send-calls) API, include the `trace_id` field. This links the OTel trace to the call in the dashboard.
+
+```python
+import requests
+
+requests.post(
+    "https://api.cekura.ai/observability/v1/observe/",
+    headers={
+        "x-cekura-api-key": "your-api-key",
+    },
+    json={
+        "agent": your_agent_id,
+        "call_id": "unique-call-id",
+        "trace_id": trace_id,  # 32-char hex from step 3
+        "transcript_json": transcript_data,
+        # ... other fields
+    },
+)
+```
+
+Once the call log is submitted with a `trace_id`, the trace will be visible in the call details page in the Cekura dashboard.
+
+</Step>
+</Steps>
+
+## Span Naming Conventions
+
+Cekura recognizes these span names and renders them with specialized UI:
+
+| Span Name | Purpose | Recommended Attributes |
+|-----------|---------|----------------------|
+| `stt` | Speech-to-text | `stt.provider`, `stt.transcript`, `stt.confidence` |
+| `llm` | LLM / model call | `gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` |
+| `tts` | Text-to-speech | `tts.provider`, `tts.characters` |
+| `tool_call` | Tool / function call | `function.name`, `function.input`, `function.output` |
+
+Custom span names work too - they just won't have specialized styling in the UI.
+
+## Example: Full Voice Agent
+
+Here's a complete example showing a voice agent with OTel tracing and Cekura integration:
+
+```python
+import os
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.trace import format_trace_id
+
+CEKURA_API_KEY = os.getenv("CEKURA_API_KEY")
+AGENT_ID = os.getenv("CEKURA_AGENT_ID")
+
+# 1. Set up OTel tracing
+exporter = OTLPSpanExporter(
+    endpoint="otel.cekura.ai:443",
+    headers=(
+        ("x-cekura-api-key", CEKURA_API_KEY),
+        ("x-cekura-agent-id", AGENT_ID),
+    ),
+)
+
+provider = TracerProvider(
+    resource=Resource.create({"service.name": "my-voice-agent"})
+)
+provider.add_span_processor(BatchSpanProcessor(exporter))
+tracer = provider.get_tracer("my-voice-agent")
+
+
+# 2. Agent conversation with tracing
+def run_call(call_id, user_audio_stream):
+    with tracer.start_as_current_span("conversation") as root_span:
+        trace_id = format_trace_id(root_span.get_span_context().trace_id)
+        transcript = []
+
+        for audio_chunk in user_audio_stream:
+            # STT
+            with tracer.start_as_current_span("stt") as span:
+                text = stt.transcribe(audio_chunk)
+                span.set_attribute("stt.provider", "deepgram")
+                span.set_attribute("stt.transcript", text)
+                transcript.append({"role": "user", "content": text})
+
+            # LLM
+            with tracer.start_as_current_span("llm") as span:
+                response = llm.chat(transcript)
+                span.set_attribute("gen_ai.request.model", "gpt-4o")
+                span.set_attribute("gen_ai.usage.input_tokens", response.usage.prompt_tokens)
+                span.set_attribute("gen_ai.usage.output_tokens", response.usage.completion_tokens)
+                transcript.append({"role": "assistant", "content": response.text})
+
+            # TTS
+            with tracer.start_as_current_span("tts") as span:
+                audio = tts.synthesize(response.text)
+                span.set_attribute("tts.provider", "elevenlabs")
+
+            yield audio
+
+    # 3. Flush traces and send call log to Cekura
+    provider.force_flush()
+
+    requests.post(
+        "https://api.cekura.ai/observability/v1/observe/",
+        headers={"x-cekura-api-key": CEKURA_API_KEY},
+        json={
+            "agent": int(AGENT_ID),
+            "call_id": call_id,
+            "trace_id": trace_id,
+            "transcript_json": transcript,
+        },
+    )
+```
+
+## Next Steps
+
+- [Pipecat Tracing](/documentation/integrations/pipecat/tracing) - auto-instrumentation for Pipecat agents
+- [Send Calls API](/api-reference/observability/send-calls) - full API reference for the observe endpoint
+- [Custom Metrics](/documentation/key-concepts/metrics/custom-metrics) - evaluate agent performance from your call data
+- [Cekura MCP Server](/mcp/introduction) - use MCP tools to create tests, run simulations, and monitor production calls directly from your IDE or AI assistant

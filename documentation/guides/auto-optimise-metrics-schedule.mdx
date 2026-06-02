@@ -1,0 +1,87 @@
+---
+title: "Schedule Metric Optimiser Runs"
+sidebarTitle: "Auto-optimise Metrics"
+icon: "wand-magic-sparkles"
+iconType: "regular"
+description: "Schedule the Metric Lab Auto-Improve optimiser to run on a recurring cron — directly from Cekura, no Claude Code required."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+The [Metric Lab](/documentation/guides/metric-lab) **Auto Improve** button rewrites a metric's prompt based on the feedback annotations on its test sets. This page covers running that optimiser on a recurring schedule **from within Cekura** — no external tooling needed.
+
+<Note>
+There are two ways to schedule the optimiser. Pick one:
+
+- **In-product cron** (this page): you select metrics + cron + auto-apply in the dashboard. Cekura's scheduler fires the optimiser and emails a summary.
+- **[Claude Code routine](/mcp/auto-optimize-metrics)**: a routine prompt that calls the same MCP endpoints on a `/schedule`-managed cron. Use this if you live in Claude Code and want the diffs in your inbox.
+
+The in-product version is the right default for most teams.
+</Note>
+
+## When to use this
+
+- You label calls in the [Metric Lab](/documentation/guides/metric-lab) regularly and want those annotations to feed back into the metric prompt without manual clicks.
+- You want the optimiser to run on a fixed cadence (weekly is a sensible default).
+- You want a non-developer team member to manage the schedule from the dashboard.
+
+If feedback annotations on a metric haven't changed since the last run, the optimiser is deterministic and the schedule will report "no changes proposed."
+
+## Create a scheduled optimiser
+
+<Steps>
+  <Step title="Open Project > General settings">
+    Go to **Settings → General** for the project containing the metrics you want to optimise.
+  </Step>
+  <Step title="Add a metric-optimiser schedule">
+    Under **Auto-optimise metrics**, click **Add schedule**. Pick:
+    - **Metrics** — one or more LLM-judge metrics in this project. The optimiser will use every test set already in each metric's Lab.
+    - **Cron expression** — standard 5-field cron (`minute hour day-of-month month day-of-week`).
+    - **Timezone** — IANA name (e.g. `America/Los_Angeles`).
+    - **Auto-apply** — see below.
+    - **Notify on** — success, failure, or both. Project members with email notifications enabled will receive the summary.
+  </Step>
+  <Step title="Choose read-only vs auto-apply">
+    - **Read-only** (default): the optimiser runs, the proposed prompt and score are emailed to project members, the live metric is **not** modified. Use this for the first few runs while you build confidence.
+    - **Auto-apply**: the optimiser overwrites the live metric prompt automatically when the optimised score is at least as good as the baseline on the labelled set. If the optimiser would regress the metric, the save is skipped and the run is reported in the summary email as "regressed — not applied."
+  </Step>
+  <Step title="Save">
+    The schedule begins firing at the next matching cron tick.
+  </Step>
+</Steps>
+
+## What each run does
+
+For every metric on the schedule:
+
+1. Collects every test set in the metric's Lab (every `MetricReview` row).
+2. Runs the same optimiser the **Auto Improve** button uses.
+3. Computes a baseline score (current prompt vs. labelled answers) and an optimised score (proposed prompt vs. labelled answers).
+4. If `auto_apply` is on **and** the optimised score is not lower than the baseline, saves the optimised `description`, `evaluation_trigger`, `type`, and `custom_code` back to the metric.
+5. Adds a row to the summary email: status, baseline score, optimised score, whether the change was applied.
+
+## Cadence recommendations
+
+- **Weekly** if your team labels reviews regularly. This is the default.
+- **Daily** only if you have an active labelling workflow producing dozens of new annotations per day.
+- **Monthly** if labelling is bursty (quarterly audits, post-incident reviews).
+
+## Auto-apply safety
+
+The score-regression guard means auto-apply will **never** overwrite your live prompt with one that scores worse on your labelled set. That said:
+
+- Auto-apply is destructive — it overwrites the production prompt your agent evaluates against.
+- Run a few weeks in read-only mode first to see the kind of changes the optimiser typically proposes.
+- If a metric is critical (you alert on it, it gates deploys), keep it on read-only and apply manually after reviewing the diff.
+
+## Troubleshooting
+
+**The schedule reports "no changes proposed" every run.** No new feedback has been added to the metric's Lab since the last run. The optimiser is deterministic on a fixed annotation set.
+
+**A run reports "regressed — not applied" for a metric.** The optimised prompt scored lower than the current prompt on the labelled set. This is the regression guard working as intended — review the diff in the email and either rewrite the metric prompt by hand or add more annotations to clarify the failing cases.
+
+**I want the diff but not the auto-save.** Set the schedule to `auto_apply=false`. The optimiser still runs and emails the diff; only the save step is skipped.
+
+**I prefer Claude Code.** Use the [Claude Code routine](/mcp/auto-optimize-metrics) instead. Both paths call the same backend optimiser.

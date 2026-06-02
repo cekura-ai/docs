@@ -88,67 +88,58 @@ class TestParseJsonField:
         assert out == "[1, 2, 3]"
 
 
-class TestBuildRequestBodyPropertyTypes:
-    def test_property_types_routed_to_parse_json_field(self, client):
-        # Body with `instructions: string` should not be auto-parsed even when
-        # the value looks like JSON.
-        body_schema = {
-            "content": {
-                "application/json": {
-                    "schema": {"type": "object", "properties": {}}
-                }
-            }
-        }
-        instructions_payload = json.dumps({"role": "x"})
-        result = client._build_request_body(
-            body_schema,
-            {"name": "n", "instructions": instructions_payload},
+class TestCoerceBody:
+    """The HTTP client only applies field-level JSON coercion now. Classification
+    (path/query/body) is done upstream in the MCP server."""
+
+    def test_string_typed_field_not_coerced(self, client):
+        # `instructions` is `type: string` — even a JSON-looking value stays a string.
+        payload = json.dumps({"role": "x"})
+        result = client._coerce_body(
+            {"name": "n", "instructions": payload},
             property_types={"name": "string", "instructions": "string"},
         )
-        assert result["instructions"] == instructions_payload
+        assert result["instructions"] == payload
         assert isinstance(result["instructions"], str)
 
-    def test_property_types_allow_object_parse(self, client):
-        body_schema = {
-            "content": {
-                "application/json": {
-                    "schema": {"type": "object", "properties": {}}
-                }
-            }
-        }
+    def test_object_typed_field_coerced_from_string(self, client):
         payload = json.dumps({"role": "x"})
-        result = client._build_request_body(
-            body_schema,
+        result = client._coerce_body(
             {"conditional_actions": payload},
             property_types={"conditional_actions": "object"},
         )
         assert result["conditional_actions"] == {"role": "x"}
 
-    def test_top_level_array_body_still_unwrapped(self, client):
-        body_schema = {
-            "content": {
-                "application/json": {
-                    "schema": {"type": "array", "items": {"type": "object"}}
-                }
-            }
-        }
-        result = client._build_request_body(
-            body_schema,
-            {"items": json.dumps([{"a": 1}])},
-            property_types={"items": "array"},
+    def test_array_body_string_coerced(self, client):
+        # Top-level array body — caller unwrapped `items`, so we get a string here.
+        result = client._coerce_body(
+            json.dumps([{"a": 1}, {"b": 2}]),
+            property_types=None,
         )
+        assert result == [{"a": 1}, {"b": 2}]
+
+    def test_array_body_list_passthrough(self, client):
+        result = client._coerce_body([{"a": 1}], property_types=None)
         assert result == [{"a": 1}]
 
-    def test_no_property_types_falls_back_to_legacy_behavior(self, client):
-        body_schema = {
-            "content": {
-                "application/json": {
-                    "schema": {"type": "object", "properties": {}}
-                }
-            }
-        }
-        # Without type info, JSON-looking strings still get parsed (existing behaviour).
-        result = client._build_request_body(
-            body_schema, {"instructions": '{"role": "x"}'}, property_types=None
+    def test_no_property_types_legacy_parse(self, client):
+        # Without type info, JSON-looking strings still get parsed (legacy heuristic).
+        result = client._coerce_body(
+            {"instructions": '{"role": "x"}'}, property_types=None
         )
         assert result["instructions"] == {"role": "x"}
+
+
+class TestSerializeQuery:
+    def test_list_comma_separated(self, client):
+        assert client._serialize_query({"run_ids": [1, 2, 3]}) == {"run_ids": "1,2,3"}
+
+    def test_dict_json_serialized(self, client):
+        result = client._serialize_query({"filters": {"x": 1}})
+        assert result == {"filters": '{"x": 1}'}
+
+    def test_none_dropped(self, client):
+        assert client._serialize_query({"page": None, "size": 10}) == {"size": 10}
+
+    def test_scalar_passthrough(self, client):
+        assert client._serialize_query({"page": 1, "name": "x"}) == {"page": 1, "name": "x"}

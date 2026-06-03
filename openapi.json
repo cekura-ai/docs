@@ -2050,6 +2050,187 @@
                 }
             }
         },
+        "/observability/v1/alerts/{id}/review_detail/": {
+            "get": {
+                "operationId": "alerts-review-detail-retrieve",
+                "description": "Per-alert review data — config snapshot, timeline, paginated fires.\n\nPowers the per-alert review page. Single-alert version of the bulk\n`review` action. Timeline is computed with a DB-side GROUP BY so the\nendpoint stays fast for noisy alerts (thousands of fires in 7d).\n\nQuery params:\n    hours: optional, defaults to 24. Capped at 7 days.\n    page: optional, defaults to 1.\n    page_size: optional, defaults to 50, capped at 200.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this alert.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/{id}/summarize/": {
+            "post": {
+                "operationId": "alerts-summarize-create",
+                "description": "Kick off an LLM summary of the last N hours of fires for this alert.\n\nReturns a progress_id. Frontend polls `summarize_progress` until status\nis 'completed' or 'error'. Cached for 1 hour keyed on (alert, hours,\nlatest fire id) — re-invocations within that window return the same\nprogress_id.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this alert.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AlertDetail"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/review/": {
+            "get": {
+                "operationId": "alerts-review-retrieve",
+                "description": "Aggregate every alert's fire activity over a rolling window. Returns KPI totals (total fires, unique alerts that fired, top firing alert), a time-bucketed timeline (hourly for 24h, 3-hour for 3d, 6-hour for 7d), and a per-alert breakdown with a sparkline of fires-per-bucket. Use to answer 'what alerts fired this week?' or 'is anything noisy right now?'. Pass `hours` (default 24, capped at 168) to widen the window. The response shape lets you compose a written report in a single call.",
+                "summary": "Review alert activity in a project",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "alerts-review-retrieve",
+                        "description": "Aggregate every alert's fire activity over a rolling window. Returns KPI totals (total fires, unique alerts that fired, top firing alert), a time-bucketed timeline (hourly for 24h, 3-hour for 3d, 6-hour for 7d), and a per-alert breakdown with a sparkline of fires-per-bucket. Use to answer 'what alerts fired this week?' or 'is anything noisy right now?'. Pass `hours` (default 24, capped at 168) to widen the window. The response shape lets you compose a written report in a single call."
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/summarize_progress/": {
+            "get": {
+                "operationId": "alerts-summarize-progress-retrieve",
+                "description": "Manage alerts that fire when metric thresholds are crossed.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/alerts/trigger_summary/": {
+            "get": {
+                "operationId": "alerts-trigger-summary-retrieve",
+                "description": "Return fire counts per alert over a time window.\n\nPowers the \"Last 24h\" status pill on the alerts list. Counts CallLogAlert\nrows linked to each alert in the project, scoped to the window.\n\nQuery params:\n    project_id: required, scopes the result to alerts in this project.\n    hours: optional, defaults to 24. Window size in hours.\n\nReturns: { \"<alert_id>\": <fire_count>, ... }",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AlertDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/observability/v1/call-logs/": {
             "get": {
                 "operationId": "call-logs-list",
@@ -5784,7 +5965,7 @@
         "/observability/v1/observe/": {
             "post": {
                 "operationId": "observe-create",
-                "description": "Primary ingestion endpoint for production call logs. Your agent (or its provider's post-call webhook) POSTs here with the transcript, recording URL, and metadata; Cekura stores it as a `CallLog`, schedules metric evaluation, and surfaces it in Observability.\n\n**Identifying the agent (pick one):**\n- `agent` — Cekura agent ID (preferred when you've already registered via `POST /aiagents/`)\n- `assistant_id` — external assistant identifier (VAPI/Retell/OpenAI-style `asst_...`). Cekura resolves it to your agent.\n\n**Transcript formats** (via `transcript_type`):\n- `vapi`, `retell`, `elevenlabs`, `bland`, `livekit`, `pipecat`, `koreai`, `trillet` — provider-native shapes; pass `transcript_json` exactly as the provider emits it.\n- `cekura` (default) — `[{role, content, start_time, end_time}, ...]`. Valid roles: `\"Testing Agent\"` (the caller) and `\"Main Agent\"` (the agent under test). Note: `\"agent\"` and `\"user\"` are **not** valid for this format.\n\n**Provider-specific alternatives:**\n- LiveKit webhooks: `POST /observability/v1/livekit/observe/` (raw LiveKit webhook shape)\n- Pipecat webhooks: `POST /observability/v1/pipecat/observe/` (raw Pipecat webhook shape)\n\n**Fields to know:**\n- `voice_recording_url` — link to the call audio; enables audio-based metrics.\n- `metadata` — freeform tags for filtering in Observability (`customer_id`, `campaign_id`, etc.).\n- `dynamic_variables` — values injected into the agent at runtime; shown alongside the transcript.\n- `customer_number` — caller's number in E.164 format, e.g. `+14155551234`.\n- `call_ended_reason` — reason for call termination (`completed`, `user-hangup`, `agent-hangup`, etc.).\n- `metric_ids` — comma-separated metric IDs to evaluate immediately (e.g. `\"1,2,3\"`).\n\n**Async processing:** metrics are evaluated in the background. The initial response shows `status: \"evaluating\"` with an empty `metrics` list. Retrieve the call log again after 30–60 seconds to see completed metric results.\n\n**Billing:** each ingested call consumes observability credits. Calls with audio cost more than text-only calls. Check your balance via `GET /test_framework/v1/billing_info`.",
+                "description": "Primary ingestion endpoint for production call logs. Your agent (or its provider's post-call webhook) POSTs here with the transcript, recording URL, and metadata; Cekura stores it as a `CallLog`, schedules metric evaluation, and surfaces it in Observability.\n\n**Identifying the agent (pick one):**\n- `agent` — Cekura agent ID (preferred when you've already registered via `POST /aiagents/`)\n- `assistant_id` — external assistant identifier (VAPI/Retell/OpenAI-style `asst_...`). Cekura resolves it to your agent.\n\n**Transcript formats** (via `transcript_type`):\n- `vapi`, `retell`, `elevenlabs`, `bland`, `livekit`, `pipecat`, `koreai` — provider-native shapes; pass `transcript_json` exactly as the provider emits it.\n- `cekura` (default) — `[{role, content, start_time, end_time}, ...]`. Valid roles: `\"Testing Agent\"` (the caller) and `\"Main Agent\"` (the agent under test). Note: `\"agent\"` and `\"user\"` are **not** valid for this format.\n\n**Provider-specific alternatives:**\n- LiveKit webhooks: `POST /observability/v1/livekit/observe/` (raw LiveKit webhook shape)\n- Pipecat webhooks: `POST /observability/v1/pipecat/observe/` (raw Pipecat webhook shape)\n\n**Fields to know:**\n- `voice_recording_url` — link to the call audio; enables audio-based metrics.\n- `metadata` — freeform tags for filtering in Observability (`customer_id`, `campaign_id`, etc.).\n- `dynamic_variables` — values injected into the agent at runtime; shown alongside the transcript.\n- `customer_number` — caller's number in E.164 format, e.g. `+14155551234`.\n- `call_ended_reason` — reason for call termination (`completed`, `user-hangup`, `agent-hangup`, etc.).\n- `metric_ids` — comma-separated metric IDs to evaluate immediately (e.g. `\"1,2,3\"`).\n\n**Async processing:** metrics are evaluated in the background. The initial response shows `status: \"evaluating\"` with an empty `metrics` list. Retrieve the call log again after 30–60 seconds to see completed metric results.\n\n**Billing:** each ingested call consumes observability credits. Calls with audio cost more than text-only calls. Check your balance via `GET /test_framework/v1/billing_info`.",
                 "summary": "Ingest a production call (webhook)",
                 "tags": [
                     "Observability"
@@ -5901,7 +6082,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "observe-create",
-                        "description": "Primary ingestion endpoint for production call logs. Your agent (or its provider's post-call webhook) POSTs here with the transcript, recording URL, and metadata; Cekura stores it as a `CallLog`, schedules metric evaluation, and surfaces it in Observability.\n\n**Identifying the agent (pick one):**\n- `agent` — Cekura agent ID (preferred when you've already registered via `POST /aiagents/`)\n- `assistant_id` — external assistant identifier (VAPI/Retell/OpenAI-style `asst_...`). Cekura resolves it to your agent.\n\n**Transcript formats** (via `transcript_type`):\n- `vapi`, `retell`, `elevenlabs`, `bland`, `livekit`, `pipecat`, `koreai`, `trillet` — provider-native shapes; pass `transcript_json` exactly as the provider emits it.\n- `cekura` (default) — `[{role, content, start_time, end_time}, ...]`. Valid roles: `\"Testing Agent\"` (the caller) and `\"Main Agent\"` (the agent under test). Note: `\"agent\"` and `\"user\"` are **not** valid for this format.\n\n**Provider-specific alternatives:**\n- LiveKit webhooks: `POST /observability/v1/livekit/observe/` (raw LiveKit webhook shape)\n- Pipecat webhooks: `POST /observability/v1/pipecat/observe/` (raw Pipecat webhook shape)\n\n**Fields to know:**\n- `voice_recording_url` — link to the call audio; enables audio-based metrics.\n- `metadata` — freeform tags for filtering in Observability (`customer_id`, `campaign_id`, etc.).\n- `dynamic_variables` — values injected into the agent at runtime; shown alongside the transcript.\n- `customer_number` — caller's number in E.164 format, e.g. `+14155551234`.\n- `call_ended_reason` — reason for call termination (`completed`, `user-hangup`, `agent-hangup`, etc.).\n- `metric_ids` — comma-separated metric IDs to evaluate immediately (e.g. `\"1,2,3\"`).\n\n**Async processing:** metrics are evaluated in the background. The initial response shows `status: \"evaluating\"` with an empty `metrics` list. Retrieve the call log again after 30–60 seconds to see completed metric results.\n\n**Billing:** each ingested call consumes observability credits. Calls with audio cost more than text-only calls. Check your balance via `GET /test_framework/v1/billing_info`."
+                        "description": "Primary ingestion endpoint for production call logs. Your agent (or its provider's post-call webhook) POSTs here with the transcript, recording URL, and metadata; Cekura stores it as a `CallLog`, schedules metric evaluation, and surfaces it in Observability.\n\n**Identifying the agent (pick one):**\n- `agent` — Cekura agent ID (preferred when you've already registered via `POST /aiagents/`)\n- `assistant_id` — external assistant identifier (VAPI/Retell/OpenAI-style `asst_...`). Cekura resolves it to your agent.\n\n**Transcript formats** (via `transcript_type`):\n- `vapi`, `retell`, `elevenlabs`, `bland`, `livekit`, `pipecat`, `koreai` — provider-native shapes; pass `transcript_json` exactly as the provider emits it.\n- `cekura` (default) — `[{role, content, start_time, end_time}, ...]`. Valid roles: `\"Testing Agent\"` (the caller) and `\"Main Agent\"` (the agent under test). Note: `\"agent\"` and `\"user\"` are **not** valid for this format.\n\n**Provider-specific alternatives:**\n- LiveKit webhooks: `POST /observability/v1/livekit/observe/` (raw LiveKit webhook shape)\n- Pipecat webhooks: `POST /observability/v1/pipecat/observe/` (raw Pipecat webhook shape)\n\n**Fields to know:**\n- `voice_recording_url` — link to the call audio; enables audio-based metrics.\n- `metadata` — freeform tags for filtering in Observability (`customer_id`, `campaign_id`, etc.).\n- `dynamic_variables` — values injected into the agent at runtime; shown alongside the transcript.\n- `customer_number` — caller's number in E.164 format, e.g. `+14155551234`.\n- `call_ended_reason` — reason for call termination (`completed`, `user-hangup`, `agent-hangup`, etc.).\n- `metric_ids` — comma-separated metric IDs to evaluate immediately (e.g. `\"1,2,3\"`).\n\n**Async processing:** metrics are evaluated in the background. The initial response shows `status: \"evaluating\"` with an empty `metrics` list. Retrieve the call log again after 30–60 seconds to see completed metric results.\n\n**Billing:** each ingested call consumes observability credits. Calls with audio cost more than text-only calls. Check your balance via `GET /test_framework/v1/billing_info`."
                     }
                 }
             }
@@ -6990,6 +7171,274 @@
                 }
             }
         },
+        "/schedules/v1/metric-optimiser-cron-jobs/": {
+            "get": {
+                "operationId": "metric-optimiser-cron-jobs-list",
+                "description": "List all scheduled metric-optimiser jobs.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "organization_id",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "tags": [
+                    "schedules"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "metric-optimiser-cron-jobs-create",
+                "description": "Create a cron job that runs the Metric Lab optimiser against one or more metrics on a recurring schedule. The optimiser uses every test set already in each metric's Lab (every MetricReview row). Set `auto_apply` to overwrite the live metric prompt when the optimised score is at least as good as the baseline on the labelled set — otherwise the run is read-only and emails a diff summary.",
+                "summary": "Schedule a recurring metric optimiser run",
+                "tags": [
+                    "schedules"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/schedules/v1/metric-optimiser-cron-jobs/{id}/": {
+            "get": {
+                "operationId": "metric-optimiser-cron-jobs-retrieve",
+                "description": "Retrieve a scheduled metric-optimiser job by id.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric optimiser cron job.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "schedules"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "put": {
+                "operationId": "metric-optimiser-cron-jobs-update",
+                "description": "Update an existing scheduled metric-optimiser job.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric optimiser cron job.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "schedules"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "metric-optimiser-cron-jobs-partial-update",
+                "description": "Partially update an existing scheduled metric-optimiser job.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric optimiser cron job.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "schedules"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMetricOptimiserCronJob"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMetricOptimiserCronJob"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatchedMetricOptimiserCronJob"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricOptimiserCronJob"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "metric-optimiser-cron-jobs-destroy",
+                "description": "Irreversible. Deletes the cron job and stops it from firing. Past optimiser runs are retained.",
+                "summary": "Delete a scheduled metric-optimiser job",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric optimiser cron job.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "schedules"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    },
+                    "404": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/slack/events/": {
             "post": {
                 "operationId": "slack-events-create",
@@ -7936,6 +8385,61 @@
                     }
                 },
                 "description": "Subscriptions subscriptions reactivate"
+            }
+        },
+        "/subscriptions/subscriptions/{id}/renew/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-renew-create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "description": "Subscriptions subscriptions renew"
             }
         },
         "/subscriptions/subscriptions/{id}/update_payment_method/": {
@@ -10451,7 +10955,7 @@
             },
             "post": {
                 "operationId": "aiagents-create",
-                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (yes — Retell uses this field even for voice).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the serializer exposes fields for some providers (`pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*`) that are NOT currently in the `assistant_provider` enum. Those fields exist for response/config purposes but the matching provider value cannot be selected today.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | trillet | cisco | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell only).\n- `auto_sync_prompt_enabled` — auto-sync prompts from the provider every 30s.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
+                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (yes — Retell uses this field even for voice).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the serializer exposes fields for some providers (`pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*`) that are NOT currently in the `assistant_provider` enum. Those fields exist for response/config purposes but the matching provider value cannot be selected today.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell only).\n- `auto_sync_prompt_enabled` — auto-sync prompts from the provider every 30s.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "AI Agents"
@@ -10684,7 +11188,7 @@
             },
             "post": {
                 "operationId": "aiagents-external-create",
-                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (yes — Retell uses this field even for voice).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the serializer exposes fields for some providers (`pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*`) that are NOT currently in the `assistant_provider` enum. Those fields exist for response/config purposes but the matching provider value cannot be selected today.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | trillet | cisco | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell only).\n- `auto_sync_prompt_enabled` — auto-sync prompts from the provider every 30s.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
+                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (yes — Retell uses this field even for voice).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the serializer exposes fields for some providers (`pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*`) that are NOT currently in the `assistant_provider` enum. Those fields exist for response/config purposes but the matching provider value cannot be selected today.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell only).\n- `auto_sync_prompt_enabled` — auto-sync prompts from the provider every 30s.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "AI Agents"
@@ -11518,7 +12022,7 @@
         "/test_framework/v1/aiagents-external/{id}/upload_knowledge_base/": {
             "post": {
                 "operationId": "aiagents-upload-knowledge-base",
-                "description": "Aiagents upload knowledge base",
+                "description": "Upload one or more files to the agent's knowledge base. Accepts either a `multipart/form-data` body (used by the web dashboard) or an `application/json` body where each entry carries base64-encoded file content.",
                 "parameters": [
                     {
                         "in": "path",
@@ -11564,6 +12068,38 @@
                                             "format": "binary"
                                         },
                                         "description": "List of files to upload to the knowledge base"
+                                    }
+                                },
+                                "required": [
+                                    "files"
+                                ]
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "files": {
+                                        "type": "array",
+                                        "description": "List of files to upload, each provided as base64-encoded content.",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "name",
+                                                "content_base64"
+                                            ],
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "Filename including extension (e.g. `manual.pdf`)."
+                                                },
+                                                "content_base64": {
+                                                    "type": "string",
+                                                    "contentEncoding": "base64",
+                                                    "description": "Base64-encoded file content. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                                                }
+                                            }
+                                        }
                                     }
                                 },
                                 "required": [
@@ -12429,7 +12965,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/auto-fetch/": {
             "post": {
                 "operationId": "aiagents-tools-auto-fetch-create",
-                "description": "Auto-fetch tools from provider and generate mock data asynchronously.\n\nValidates inputs, fires a background Celery task for the slow provider API calls\nand LLM mock-data generation, and returns a progress_id immediately.\nPoll auto-fetch-progress/ with the progress_id to check completion.\nThis does NOT enable mock mode in the provider. Use the enable-mock endpoint for that.",
+                "description": "Discover the agent's tools (from a managed provider or a customer-hosted MCP server) and LLM-generate mock input/output data for each. Persists Tool rows and records the provider configuration on the agent. ⚠ Overwrites empty Tool rows; existing rows with mock data are kept. For provider=\"custom\", supply `mcp_server_url`; the URL is SSRF-validated (no private/loopback targets).",
+                "summary": "Auto-fetch mock tools for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -12451,12 +12988,22 @@
                                 "$ref": "#/components/schemas/AutoFetchToolsRequest"
                             },
                             "examples": {
-                                "Auto-FetchToolsRequest": {
+                                "Auto-FetchToolsRequest(managedProvider)": {
                                     "value": {
                                         "provider": "retell",
                                         "assistant_id": "agent_abc123"
                                     },
-                                    "summary": "Auto-Fetch Tools Request"
+                                    "summary": "Auto-Fetch Tools Request (managed provider)"
+                                },
+                                "Auto-FetchToolsRequest(customMCPServer)": {
+                                    "value": {
+                                        "provider": "custom",
+                                        "mcp_server_url": "https://customer.example.com/mcp",
+                                        "mcp_server_headers": {
+                                            "Authorization": "Bearer ..."
+                                        }
+                                    },
+                                    "summary": "Auto-Fetch Tools Request (custom MCP server)"
                                 }
                             }
                         },
@@ -12568,7 +13115,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/disable-mock/": {
             "post": {
                 "operationId": "aiagents-tools-disable-mock-create",
-                "description": "Kick off a background task to disable mock tools for this agent.\nReturns a progress_id to poll disable-mock-progress/ for status.",
+                "description": "Restore the agent's tools to their original (non-mock) state. For managed providers this PATCHes the provider assistant back to its `original_tool_ids` and deletes the cloned tools. For provider=\"custom\" this only flips `mock_enabled` off; the `mcp_server_url` is preserved so re-enable works.",
+                "summary": "Disable mock tools for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -12635,6 +13183,7 @@
             "get": {
                 "operationId": "aiagents-tools-disable-mock-progress-retrieve",
                 "description": "Poll the status of a background disable-mock task.",
+                "summary": "Poll status of a disable-mock task",
                 "parameters": [
                     {
                         "in": "path",
@@ -12642,6 +13191,14 @@
                         "schema": {
                             "type": "string",
                             "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
                         },
                         "required": true
                     }
@@ -12659,7 +13216,17 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/DisableMockProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DisableMockProgressErrorResponse"
                                 }
                             }
                         },
@@ -12671,7 +13238,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/enable-mock/": {
             "post": {
                 "operationId": "aiagents-tools-enable-mock-create",
-                "description": "Kick off a background task to enable mock tools for this agent.\nReturns a progress_id to poll enable-mock-progress/ for status.\nAuto-fetch must be run first to populate tool mock data.",
+                "description": "Activate mock-tool mode using the data created by `auto-fetch`. For managed providers (vapi/retell/elevenlabs) this clones the provider's tools at the provider and swaps URLs to Cekura-hosted endpoints. For provider=\"custom\" it just registers `mcp_sub_tool_map` so MockMCPView can serve `/mcp/N/` calls. Returns a `progress_id`; poll `enable-mock-progress/` for the resulting `mcp_endpoints`. Run `auto-fetch` first.",
+                "summary": "Enable mock tools for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -12738,6 +13306,7 @@
             "get": {
                 "operationId": "aiagents-tools-enable-mock-progress-retrieve",
                 "description": "Poll the status of a background enable-mock task.",
+                "summary": "Poll status of an enable-mock task",
                 "parameters": [
                     {
                         "in": "path",
@@ -12745,6 +13314,14 @@
                         "schema": {
                             "type": "string",
                             "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
                         },
                         "required": true
                     }
@@ -12762,7 +13339,17 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/EnableMockProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EnableMockProgressErrorResponse"
                                 }
                             }
                         },
@@ -12774,7 +13361,8 @@
         "/test_framework/v1/aiagents/{agent_id}/tools/mock-status/": {
             "get": {
                 "operationId": "aiagents-tools-mock-status-retrieve",
-                "description": "Get the current mock tools status for this agent.",
+                "description": "Single source of truth for \"what mock-tool runtime URLs do I have, and what are they configured for?\". `mcp_endpoints[]` lists each Cekura-hosted MCP JSON-RPC endpoint with the sub-tools it serves; `tool_endpoints[]` lists standalone (non-MCP) per-tool webhook URLs. URLs are computed from `settings.CEKURA_BASE_URL`, so each environment renders the correct host.",
+                "summary": "Current mock-tools state for an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -12799,7 +13387,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Tool"
+                                    "$ref": "#/components/schemas/MockStatusResponse"
                                 }
                             }
                         },
@@ -13480,7 +14068,7 @@
         "/test_framework/v1/aiagents/{id}/upload_knowledge_base/": {
             "post": {
                 "operationId": "aiagents-upload-knowledge-base_2",
-                "description": "Aiagents upload knowledge base",
+                "description": "Upload one or more files to the agent's knowledge base. Accepts either a `multipart/form-data` body (used by the web dashboard) or an `application/json` body where each entry carries base64-encoded file content.",
                 "parameters": [
                     {
                         "in": "path",
@@ -13526,6 +14114,38 @@
                                             "format": "binary"
                                         },
                                         "description": "List of files to upload to the knowledge base"
+                                    }
+                                },
+                                "required": [
+                                    "files"
+                                ]
+                            }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "files": {
+                                        "type": "array",
+                                        "description": "List of files to upload, each provided as base64-encoded content.",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "name",
+                                                "content_base64"
+                                            ],
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "Filename including extension (e.g. `manual.pdf`)."
+                                                },
+                                                "content_base64": {
+                                                    "type": "string",
+                                                    "contentEncoding": "base64",
+                                                    "description": "Base64-encoded file content. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                                                }
+                                            }
+                                        }
                                     }
                                 },
                                 "required": [
@@ -15866,6 +16486,68 @@
                 }
             }
         },
+        "/test_framework/v1/metrics-external/{id}/apply_optimisation_proposal/": {
+            "post": {
+                "operationId": "metrics-external-apply-optimisation-proposal-create",
+                "description": "Copies the fields from `pending_optimisation_proposal` (description, evaluation_trigger, type, custom_code) into the live metric columns and clears the proposal. 400 if no pending proposal exists.",
+                "summary": "Apply a pending optimisation proposal",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Metric updated; pending proposal cleared."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics-external/{id}/dismiss_optimisation_proposal/": {
+            "post": {
+                "operationId": "metrics-external-dismiss-optimisation-proposal-create",
+                "description": "Discards the metric's `pending_optimisation_proposal` without applying. Idempotent — a metric with no pending proposal returns 200.",
+                "summary": "Dismiss a pending optimisation proposal",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Proposal cleared."
+                    }
+                }
+            }
+        },
         "/test_framework/v1/metrics-external/{id}/evaluate_advance_metric/": {
             "post": {
                 "operationId": "metrics-external-evaluate-advance-metric-create",
@@ -17443,6 +18125,68 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics/{id}/apply_optimisation_proposal/": {
+            "post": {
+                "operationId": "metrics-apply-optimisation-proposal-create",
+                "description": "Copies the fields from `pending_optimisation_proposal` (description, evaluation_trigger, type, custom_code) into the live metric columns and clears the proposal. 400 if no pending proposal exists.",
+                "summary": "Apply a pending optimisation proposal",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Metric updated; pending proposal cleared."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/metrics/{id}/dismiss_optimisation_proposal/": {
+            "post": {
+                "operationId": "metrics-dismiss-optimisation-proposal-create",
+                "description": "Discards the metric's `pending_optimisation_proposal` without applying. Idempotent — a metric with no pending proposal returns 200.",
+                "summary": "Dismiss a pending optimisation proposal",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Proposal cleared."
                     }
                 }
             }
@@ -25805,7 +26549,7 @@
         "/test_framework/v1/runs/{run_id}/datadog-logs/": {
             "get": {
                 "operationId": "runs-datadog-logs-retrieve",
-                "description": "Fetch Datadog logs for a given simulation run ID.\n\nRestricted to OAuth tokens minted by the `cekura-support-bot` client via\nthe client_credentials grant. Even though the support-bot client can\nimpersonate any user, the token's subject user must be a member of the\nrun's organization — so support agents only see logs for runs belonging\nto the customer they're currently helping.",
+                "description": "Fetch Datadog logs for a given simulation run ID.\n\nRestricted to OAuth tokens minted by the `cekura-support-bot` client via\nthe client_credentials grant. Even though the support-bot client can\nimpersonate any user, the token's subject user must have access to the\nrun's project — either as an org-admin or via a direct project membership.\nOrg-level membership alone is not enough: a user added to project A\nshould not see logs for runs in project B in the same org.",
                 "parameters": [
                     {
                         "in": "path",
@@ -36373,6 +37117,35 @@
                 }
             }
         },
+        "/test_framework/v1/share-tokens/{token}/resolve/": {
+            "get": {
+                "operationId": "share-tokens-resolve-retrieve",
+                "description": "Resolve a shareable-link token to the underlying source object(s).\n\nGiven the opaque token from a `https://<host>/share/results/<token>` URL,\nreturns the result_id (or other source object IDs) the token grants access\nto, plus org/agent context and expiry state.\n\nRestricted to OAuth tokens minted by the `cekura-support-bot` client via\nthe client_credentials grant. The support-bot's subject user must be a\nmember of the source object's organization — so support agents can only\nresolve tokens for results belonging to the customer they're helping.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "token",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/test_framework/v1/test-profiles/": {
             "get": {
                 "operationId": "test-profiles-list",
@@ -37527,10 +38300,10 @@
             },
             "post": {
                 "operationId": "test-framework-v2-aiagents-create",
-                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- trillet: api_key + config.{workspace_id}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\nSee examples below for full per-provider payloads.",
+                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `import-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
                 "summary": "Create an AI voice agent",
                 "tags": [
-                    "AI Agents"
+                    "test_framework"
                 ],
                 "requestBody": {
                     "content": {
@@ -37539,103 +38312,20 @@
                                 "$ref": "#/components/schemas/AIAgentV2"
                             },
                             "examples": {
-                                "Self-hosted(contactNumberOnly—MostCommon)": {
+                                "CloudAuto-import(configureFromProvider)": {
                                     "value": {
-                                        "agent_name": "Support Bot",
-                                        "description": "Handles inbound support calls for ACME Inc.",
-                                        "inbound": true,
-                                        "project": 1376,
-                                        "contact_number": "+14155551234",
-                                        "language": "en",
-                                        "assistant_provider": "self_hosted"
-                                    },
-                                    "summary": "Self-hosted (contact number only — most common)",
-                                    "description": "Typical onboarding: your agent is already deployed on your own stack with a phone number. Cekura just observes and evaluates; no provider credentials needed."
-                                },
-                                "VAPIAgent": {
-                                    "value": {
-                                        "agent_name": "VAPI Sales Agent",
-                                        "description": "Outbound sales qualification calls",
-                                        "inbound": false,
-                                        "project": 1376,
-                                        "contact_number": "+14155551234",
-                                        "language": "en",
-                                        "assistant_provider": "vapi",
-                                        "vapi_api_key": "vapi_sk_xxx",
-                                        "vapi_data": {
-                                            "public_key": "vapi_pk_xxx"
-                                        },
-                                        "assistant_id": "asst_abc123"
-                                    },
-                                    "summary": "VAPI agent"
-                                },
-                                "RetellAgent": {
-                                    "value": {
-                                        "agent_name": "Retell Booking Agent",
-                                        "description": "Schedules dental appointments",
-                                        "inbound": true,
-                                        "project": 1376,
-                                        "contact_number": "+14155551234",
-                                        "language": "en",
-                                        "assistant_provider": "retell",
-                                        "retell_api_key": "key_xxx",
-                                        "chat_assistant_id": "retell_agent_abc123",
-                                        "retell_data": {
-                                            "trigger_url": "https://api.retellai.com/create-phone-call"
+                                        "project": 42,
+                                        "provider": {
+                                            "type": "retell",
+                                            "agent_id": "agent_abc123",
+                                            "credentials": {
+                                                "api_key": "key_xxx"
+                                            },
+                                            "configure_from_provider": true
                                         }
                                     },
-                                    "summary": "Retell agent",
-                                    "description": "Retell requires BOTH retell_api_key AND chat_assistant_id (used for voice too, despite the field's name)."
-                                },
-                                "BlandAgent": {
-                                    "value": {
-                                        "agent_name": "Bland Support Agent",
-                                        "description": "Handles tier-1 billing questions",
-                                        "inbound": true,
-                                        "project": 1376,
-                                        "contact_number": "+14155551234",
-                                        "language": "en",
-                                        "assistant_provider": "bland",
-                                        "bland_api_key": "bland_xxx",
-                                        "chat_assistant_id": "bland_pathway_xyz",
-                                        "bland_data": {
-                                            "encrypted_key": "twilio_encrypted_key_xxx"
-                                        }
-                                    },
-                                    "summary": "Bland agent",
-                                    "description": "Bland requires bland_api_key AND chat_assistant_id (Bland calls this field pathway_id internally). bland_data.encrypted_key is the Twilio credential bundle."
-                                },
-                                "LiveKitAgent": {
-                                    "value": {
-                                        "agent_name": "LiveKit Concierge",
-                                        "description": "Multi-modal front-desk agent",
-                                        "inbound": true,
-                                        "project": 1376,
-                                        "language": "en",
-                                        "assistant_provider": "livekit",
-                                        "livekit_api_key": "APIxxx",
-                                        "livekit_data": {
-                                            "api_secret": "secret_xxx",
-                                            "url": "wss://acme.livekit.cloud"
-                                        }
-                                    },
-                                    "summary": "LiveKit agent"
-                                },
-                                "Self-hostedViaWebsocketURL": {
-                                    "value": {
-                                        "agent_name": "Internal Test Agent",
-                                        "description": "Staging build of the support flow",
-                                        "inbound": false,
-                                        "project": 1376,
-                                        "assistant_provider": "self_hosted",
-                                        "websocket_url": "wss://staging.example.com/agent",
-                                        "websocket_headers": {
-                                            "Authorization": "Bearer token_xxx"
-                                        },
-                                        "language": "en"
-                                    },
-                                    "summary": "Self-hosted via websocket URL",
-                                    "description": "Your agent exposes a websocket endpoint for text-mode testing."
+                                    "summary": "Cloud auto-import (configure_from_provider)",
+                                    "description": "Fetch & configure everything from the provider; returns 202 + progress_id."
                                 },
                                 "Self-hosted(observation-only,MostCommon)": {
                                     "value": {
@@ -37804,6 +38494,16 @@
                         },
                         "description": ""
                     },
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AIAgentConfigureFromProviderResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
                     "400": {
                         "content": {
                             "application/json": {
@@ -37828,7 +38528,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-v2-aiagents-create",
-                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- trillet: api_key + config.{workspace_id}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\nSee examples below for full per-provider payloads."
+                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `import-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
                     }
                 }
             }
@@ -38547,7 +39247,7 @@
         "/test_framework/v2/aiagents/{id}/upload_knowledge_base/": {
             "post": {
                 "operationId": "aiagents-upload-knowledge-base_3",
-                "description": "Aiagents upload knowledge base",
+                "description": "Upload one or more files to the agent's knowledge base. Accepts either a `multipart/form-data` body (used by the web dashboard) or an `application/json` body where each entry carries base64-encoded file content.",
                 "parameters": [
                     {
                         "in": "path",
@@ -38599,6 +39299,38 @@
                                     "files"
                                 ]
                             }
+                        },
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "files": {
+                                        "type": "array",
+                                        "description": "List of files to upload, each provided as base64-encoded content.",
+                                        "items": {
+                                            "type": "object",
+                                            "required": [
+                                                "name",
+                                                "content_base64"
+                                            ],
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "description": "Filename including extension (e.g. `manual.pdf`)."
+                                                },
+                                                "content_base64": {
+                                                    "type": "string",
+                                                    "contentEncoding": "base64",
+                                                    "description": "Base64-encoded file content. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "files"
+                                ]
+                            }
                         }
                     }
                 },
@@ -38642,7 +39374,62 @@
                     "mcp": {
                         "enabled": true,
                         "name": "aiagents-upload-knowledge-base",
-                        "description": "Aiagents upload knowledge base"
+                        "description": "Upload one or more files to the agent's knowledge base. Accepts either a `multipart/form-data` body (used by the web dashboard) or an `application/json` body where each entry carries base64-encoded file content."
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/aiagents/import-progress/": {
+            "get": {
+                "operationId": "test-framework-v2-aiagents-import-progress-retrieve",
+                "description": "Returns the staged status of a background agent import started via `configure_from_provider`. Each stage reports pending / in_progress / completed / skipped / failed so a step-by-step loader can be rendered.",
+                "summary": "Poll cloud-provider import progress",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -49332,187 +50119,6 @@
                 },
                 "description": "Delete a workflows workflow"
             }
-        },
-        "/observability/v1/alerts/{id}/review_detail/": {
-            "get": {
-                "operationId": "alerts-review-detail-retrieve",
-                "description": "Per-alert review data — config snapshot, timeline, paginated fires.\n\nPowers the per-alert review page. Single-alert version of the bulk\n`review` action. Timeline is computed with a DB-side GROUP BY so the\nendpoint stays fast for noisy alerts (thousands of fires in 7d).\n\nQuery params:\n    hours: optional, defaults to 24. Capped at 7 days.\n    page: optional, defaults to 1.\n    page_size: optional, defaults to 50, capped at 200.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this alert.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "observability"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AlertDetail"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/observability/v1/alerts/{id}/summarize/": {
-            "post": {
-                "operationId": "alerts-summarize-create",
-                "description": "Kick off an LLM summary of the last N hours of fires for this alert.\n\nReturns a progress_id. Frontend polls `summarize_progress` until status\nis 'completed' or 'error'. Cached for 1 hour keyed on (alert, hours,\nlatest fire id) — re-invocations within that window return the same\nprogress_id.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this alert.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "observability"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AlertDetail"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AlertDetail"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AlertDetail"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AlertDetail"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/observability/v1/alerts/review/": {
-            "get": {
-                "operationId": "alerts-review-retrieve",
-                "description": "Aggregate every alert's fire activity over a rolling window. Returns KPI totals (total fires, unique alerts that fired, top firing alert), a time-bucketed timeline (hourly for 24h, 3-hour for 3d, 6-hour for 7d), and a per-alert breakdown with a sparkline of fires-per-bucket. Use to answer 'what alerts fired this week?' or 'is anything noisy right now?'. Pass `hours` (default 24, capped at 168) to widen the window. The response shape lets you compose a written report in a single call.",
-                "summary": "Review alert activity in a project",
-                "tags": [
-                    "observability"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AlertDetail"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mcp-expose": true,
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "alerts-review-retrieve",
-                        "description": "Aggregate every alert's fire activity over a rolling window. Returns KPI totals (total fires, unique alerts that fired, top firing alert), a time-bucketed timeline (hourly for 24h, 3-hour for 3d, 6-hour for 7d), and a per-alert breakdown with a sparkline of fires-per-bucket. Use to answer 'what alerts fired this week?' or 'is anything noisy right now?'. Pass `hours` (default 24, capped at 168) to widen the window. The response shape lets you compose a written report in a single call."
-                    }
-                }
-            }
-        },
-        "/observability/v1/alerts/summarize_progress/": {
-            "get": {
-                "operationId": "alerts-summarize-progress-retrieve",
-                "description": "Manage alerts that fire when metric thresholds are crossed.",
-                "tags": [
-                    "observability"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AlertDetail"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/observability/v1/alerts/trigger_summary/": {
-            "get": {
-                "operationId": "alerts-trigger-summary-retrieve",
-                "description": "Return fire counts per alert over a time window.\n\nPowers the \"Last 24h\" status pill on the alerts list. Counts CallLogAlert\nrows linked to each alert in the project, scoped to the window.\n\nQuery params:\n    project_id: required, scopes the result to alerts in this project.\n    hours: optional, defaults to 24. Window size in hours.\n\nReturns: { \"<alert_id>\": <fire_count>, ... }",
-                "tags": [
-                    "observability"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AlertDetail"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
         }
     },
     "components": {
@@ -49698,16 +50304,15 @@
                             "pipecat",
                             "koreai",
                             "custom",
-                            "trillet",
                             "cisco",
                             "genesys",
                             "chirp",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "43adf9cc06494c10",
+                        "x-spec-enum-id": "64a9d3237300a426",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -49719,7 +50324,6 @@
                             "whatsapp",
                             "self_hosted",
                             "agentforce",
-                            "trillet",
                             "cisco",
                             "bland",
                             "livekit",
@@ -49732,9 +50336,9 @@
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "bc2108e52d1eb0bc",
+                        "x-spec-enum-id": "e4a9e996f7d53c98",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `chirp` - Chirp\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `chirp` - Chirp\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -49883,19 +50487,6 @@
                         "type": "string",
                         "description": "\nElevenLabs additional configuration data\nExample: `{\"trigger_url\": \"https://example.com/trigger\"}`\n"
                     },
-                    "trillet_api_key": {
-                        "type": "string",
-                        "writeOnly": true,
-                        "description": "\nAPI key for Trillet AI service provider\nExample: `\"trillet_api_key_123\"`\n"
-                    },
-                    "trillet_api_key_configured": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "trillet_data": {
-                        "type": "string",
-                        "description": "\nTrillet AI additional data including Workspace ID\nExample: `{\"workspace_id\": \"1234567890\"}`\n"
-                    },
                     "chirp_data": {
                         "type": "string",
                         "description": "\nConfiguration for CHIRP WebSocket voice integration.\nSupported keys:\n  `chirp_websocket_url` (required): the wss:// endpoint to dial.\n  `chirp_basic_auth_username` (optional): username for Basic Auth on WS upgrade.\n  `chirp_basic_auth_password` (optional): password for Basic Auth on WS upgrade.\nExample: `{\"chirp_websocket_url\": \"wss://your-host/voice\", \"chirp_basic_auth_username\": \"user\", \"chirp_basic_auth_password\": \"secret\"}`\n"
@@ -49999,6 +50590,22 @@
                     "agent_name",
                     "description",
                     "inbound"
+                ]
+            },
+            "AIAgentConfigureFromProviderResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "progress_id": {
+                        "type": "string",
+                        "description": "Poll import-progress/ with this to follow the staged import."
+                    }
+                },
+                "required": [
+                    "id",
+                    "progress_id"
                 ]
             },
             "AIAgentDynamicVariable": {
@@ -50283,7 +50890,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Agent name.",
+                        "description": "Agent name. Optional when configure_from_provider is set — it's fetched from the provider.",
                         "maxLength": 255
                     },
                     "description": {
@@ -50399,8 +51006,7 @@
                     }
                 },
                 "required": [
-                    "description",
-                    "name"
+                    "description"
                 ]
             },
             "AgentCredentials": {
@@ -50410,7 +51016,7 @@
                     "api_key": {
                         "type": "string",
                         "writeOnly": true,
-                        "description": "API key or client secret for the provider (write-only — never returned). Required for: vapi, retell, elevenlabs, bland, livekit, trillet, pipecat, synthflow. koreai uses client_secret (passed as api_key). Not needed for: cisco, chirp, self_hosted."
+                        "description": "API key or client secret for the provider (write-only — never returned). Required for: vapi, retell, elevenlabs, bland, livekit, pipecat, synthflow. koreai uses client_secret (passed as api_key). Not needed for: cisco, chirp, self_hosted."
                     },
                     "config": {
                         "oneOf": [
@@ -50433,7 +51039,6 @@
                             "retell",
                             "elevenlabs",
                             "self_hosted",
-                            "trillet",
                             "cisco",
                             "bland",
                             "livekit",
@@ -50446,15 +51051,15 @@
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "f40f4da0eb683af9",
-                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, trillet, cisco, synthflow, chirp, koreai, genesys, self_hosted, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. Text-only channels (sms, whatsapp, agentforce, amazon_connect) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `self_hosted` - Self Hosted\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `chirp` - Chirp\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `custom` - Custom (chat-only, no voice provider)"
+                        "x-spec-enum-id": "115e139d63e24b68",
+                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, synthflow, chirp, koreai, genesys, self_hosted, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. Text-only channels (sms, whatsapp, agentforce, amazon_connect) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `self_hosted` - Self Hosted\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `chirp` - Chirp\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `custom` - Custom (chat-only, no voice provider)"
                     },
                     "agent_id": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, self_hosted, synthflow, trillet, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
+                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, self_hosted, synthflow, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
                     },
                     "credentials": {
                         "oneOf": [
@@ -50496,7 +51101,12 @@
                             "boolean",
                             "null"
                         ],
-                        "description": "Auto-sync agent prompt from the provider every 30s. Supported for: vapi, retell, elevenlabs, synthflow."
+                        "description": "Auto-sync the agent from the provider on a schedule. Supported for: vapi, retell, elevenlabs, synthflow."
+                    },
+                    "configure_from_provider": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "When true on create for a cloud provider (vapi/retell/elevenlabs/synthflow), Cekura fetches the assistant's prompt, settings, phone, tools, dynamic variables and knowledge base and configures the agent automatically. Requires agent_id + credentials.api_key. The create response includes a progress_id to poll import-progress/."
                     },
                     "send_post_conversation_metadata": {
                         "type": [
@@ -51122,23 +51732,32 @@
                         "enum": [
                             "vapi",
                             "retell",
-                            "elevenlabs"
+                            "elevenlabs",
+                            "custom"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "ff667bd2cd27b9d3",
-                        "description": "Provider to fetch tools from\n\n* `vapi` - vapi\n* `retell` - retell\n* `elevenlabs` - elevenlabs"
+                        "x-spec-enum-id": "e3f60d118bb06f46",
+                        "description": "Provider to fetch tools from. Use \"custom\" for self-hosted agents that expose an MCP server directly.\n\n* `vapi` - vapi\n* `retell` - retell\n* `elevenlabs` - elevenlabs\n* `custom` - custom"
                     },
                     "assistant_id": {
                         "type": "string",
-                        "description": "Assistant/Agent ID from the provider (e.g., VAPI Assistant ID)"
+                        "description": "Provider assistant/agent ID. Required for vapi/retell/elevenlabs; ignored for custom."
                     },
                     "api_key": {
                         "type": "string",
-                        "description": "Optional API key for the provider. If not provided, will use stored credentials."
+                        "description": "Optional API key for the managed provider. Ignored for custom. If not provided, stored credentials are used."
+                    },
+                    "mcp_server_url": {
+                        "type": "string",
+                        "description": "Required when provider=\"custom\". URL of the customer-hosted MCP server (JSON-RPC 2.0)."
+                    },
+                    "mcp_server_headers": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Optional auth/custom headers forwarded to the MCP server during tool discovery (provider=\"custom\" only)."
                     }
                 },
                 "required": [
-                    "assistant_id",
                     "provider"
                 ]
             },
@@ -53446,6 +54065,56 @@
                     "detail"
                 ]
             },
+            "DisableMockProgressErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "DisableMockProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
+                        "x-spec-enum-id": "6e9575e5767aaee0"
+                    },
+                    "mock_enabled": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "error",
+                    "message",
+                    "mock_enabled",
+                    "status"
+                ]
+            },
             "DisableMockToolsRequest": {
                 "type": "object",
                 "properties": {
@@ -53581,6 +54250,63 @@
                 },
                 "required": [
                     "detail"
+                ]
+            },
+            "EnableMockProgressErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "EnableMockProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
+                        "x-spec-enum-id": "6e9575e5767aaee0"
+                    },
+                    "mock_enabled": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "mcp_endpoints": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MockMCPEndpoint"
+                        },
+                        "description": "MCP mock endpoints registered for this agent (one per MCP-typed tool). Empty for agents without MCP tools."
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "error",
+                    "message",
+                    "mock_enabled",
+                    "status"
                 ]
             },
             "EnableMockToolsRequest": {
@@ -53840,6 +54566,47 @@
                     "plivo_auth_id",
                     "plivo_auth_token",
                     "plivo_phone_number"
+                ]
+            },
+            "ImportProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
+                        "x-spec-enum-id": "6e9575e5767aaee0"
+                    },
+                    "current_stage": {
+                        "type": "string"
+                    },
+                    "stages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "agent_id",
+                    "current_stage",
+                    "error",
+                    "stages",
+                    "status"
                 ]
             },
             "ImportTelnyxNumber": {
@@ -54813,6 +55580,16 @@
                             "null"
                         ],
                         "description": "When enabled, this metric is automatically assigned to new agents created in the project."
+                    },
+                    "pending_optimisation_proposal": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "Unsaved proposal from a metric-optimiser cron run. Shape: {description, evaluation_trigger, type, custom_code, score, baseline_score, cron_job_id, cron_job_name, proposed_at}."
                     }
                 },
                 "required": [
@@ -54868,11 +55645,12 @@
                             "pending",
                             "running",
                             "succeeded",
-                            "failed"
+                            "failed",
+                            "skipped_no_failures"
                         ],
                         "type": "string",
-                        "description": "* `pending` - Pending\n* `running` - Running\n* `succeeded` - Succeeded\n* `failed` - Failed",
-                        "x-spec-enum-id": "7a7ee2ea425ee5c6",
+                        "description": "* `pending` - Pending\n* `running` - Running\n* `succeeded` - Succeeded\n* `failed` - Failed\n* `skipped_no_failures` - Skipped No Failures",
+                        "x-spec-enum-id": "7052652d8ca01a2a",
                         "readOnly": true
                     },
                     "headline": {
@@ -55529,6 +56307,98 @@
                     "name"
                 ]
             },
+            "MetricOptimiserCronJob": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "project": {
+                        "type": "integer",
+                        "description": "Project ID this cron job belongs to."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Display name for the cronjob.",
+                        "maxLength": 255
+                    },
+                    "metrics": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Metric IDs the cron job will optimise on each firing."
+                    },
+                    "crontab_expression": {
+                        "type": "string",
+                        "description": "Standard 5-field cron expression (minute hour dom mon dow).",
+                        "maxLength": 255
+                    },
+                    "timezone": {
+                        "type": "string",
+                        "description": "IANA timezone name (e.g. America/Los_Angeles). Defaults to UTC."
+                    },
+                    "auto_apply": {
+                        "type": "boolean",
+                        "description": "If true, overwrite the live metric prompt with the optimised one whenever the optimised score is >= baseline on the labelled set. Defaults to false (read-only)."
+                    },
+                    "skip_evaluation": {
+                        "type": "boolean",
+                        "description": "Skip the post-optimisation evaluation pass to speed up the cron."
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "notify_on": {
+                        "enum": [
+                            "never",
+                            "success",
+                            "failure",
+                            "both"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "d06ae6855e4121c0",
+                        "description": "When to email project members about the run outcome.\n\n* `never` - Never\n* `success` - Success\n* `failure` - Failure\n* `both` - Both"
+                    },
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "created_via": {
+                        "enum": [
+                            "user",
+                            "api",
+                            "mcp",
+                            "cli",
+                            "sdk",
+                            null
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "* `user` - User\n* `api` - API\n* `mcp` - MCP\n* `cli` - CLI\n* `sdk` - SDK",
+                        "x-spec-enum-id": "360ac7f2b69a95cc",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "crontab_expression",
+                    "metrics",
+                    "project"
+                ]
+            },
             "MetricPreview": {
                 "type": "object",
                 "properties": {
@@ -55911,6 +56781,106 @@
                 },
                 "required": [
                     "metric"
+                ]
+            },
+            "MockMCPEndpoint": {
+                "type": "object",
+                "properties": {
+                    "mock_index": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "mock_index",
+                    "tool_names",
+                    "url"
+                ]
+            },
+            "MockStatusMCPEndpoint": {
+                "type": "object",
+                "properties": {
+                    "mock_index": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "mock_index",
+                    "tool_names",
+                    "url"
+                ]
+            },
+            "MockStatusResponse": {
+                "type": "object",
+                "properties": {
+                    "mock_enabled": {
+                        "type": "boolean"
+                    },
+                    "provider": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "assistant_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "mcp_endpoints": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MockStatusMCPEndpoint"
+                        },
+                        "description": "MCP JSON-RPC endpoints registered on the agent. Empty if no MCP-typed tools are mocked."
+                    },
+                    "tool_endpoints": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MockStatusToolEndpoint"
+                        },
+                        "description": "Per-tool webhook endpoints for standalone (non-MCP) tools. Excludes MCP sub-tools, which are listed under mcp_endpoints[].tool_names."
+                    }
+                },
+                "required": [
+                    "assistant_id",
+                    "mcp_endpoints",
+                    "mock_enabled",
+                    "provider",
+                    "tool_endpoints"
+                ]
+            },
+            "MockStatusToolEndpoint": {
+                "type": "object",
+                "properties": {
+                    "tool_name": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "tool_name",
+                    "url"
                 ]
             },
             "MoveFolderRequest": {
@@ -56697,6 +57667,15 @@
                         "type": "boolean",
                         "description": "Allow VIEW_ONLY role for memberships/invites on this pack. When False, view-only seats are blocked."
                     },
+                    "data_retention_days": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "description": "Data retention period in days. Leave blank to skip archival for this plan."
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -56870,6 +57849,15 @@
                     "allow_view_only_role": {
                         "type": "boolean",
                         "description": "Allow VIEW_ONLY role for memberships/invites on this pack. When False, view-only seats are blocked."
+                    },
+                    "data_retention_days": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "description": "Data retention period in days. Leave blank to skip archival for this plan."
                     },
                     "extra_member_price": {
                         "type": "string",
@@ -57569,7 +58557,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Agent name.",
+                        "description": "Agent name. Optional when configure_from_provider is set — it's fetched from the provider.",
                         "maxLength": 255
                     },
                     "description": {
@@ -58528,6 +59516,93 @@
                             "string",
                             "null"
                         ]
+                    }
+                }
+            },
+            "PatchedMetricOptimiserCronJob": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "project": {
+                        "type": "integer",
+                        "description": "Project ID this cron job belongs to."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Display name for the cronjob.",
+                        "maxLength": 255
+                    },
+                    "metrics": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Metric IDs the cron job will optimise on each firing."
+                    },
+                    "crontab_expression": {
+                        "type": "string",
+                        "description": "Standard 5-field cron expression (minute hour dom mon dow).",
+                        "maxLength": 255
+                    },
+                    "timezone": {
+                        "type": "string",
+                        "description": "IANA timezone name (e.g. America/Los_Angeles). Defaults to UTC."
+                    },
+                    "auto_apply": {
+                        "type": "boolean",
+                        "description": "If true, overwrite the live metric prompt with the optimised one whenever the optimised score is >= baseline on the labelled set. Defaults to false (read-only)."
+                    },
+                    "skip_evaluation": {
+                        "type": "boolean",
+                        "description": "Skip the post-optimisation evaluation pass to speed up the cron."
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "notify_on": {
+                        "enum": [
+                            "never",
+                            "success",
+                            "failure",
+                            "both"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "d06ae6855e4121c0",
+                        "description": "When to email project members about the run outcome.\n\n* `never` - Never\n* `success` - Success\n* `failure` - Failure\n* `both` - Both"
+                    },
+                    "created_by": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "created_via": {
+                        "enum": [
+                            "user",
+                            "api",
+                            "mcp",
+                            "cli",
+                            "sdk",
+                            null
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "* `user` - User\n* `api` - API\n* `mcp` - MCP\n* `cli` - CLI\n* `sdk` - SDK",
+                        "x-spec-enum-id": "360ac7f2b69a95cc",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
                     }
                 }
             },
@@ -59518,14 +60593,13 @@
                             "koreai",
                             "custom",
                             "agentforce",
-                            "trillet",
                             "genesys",
                             "chirp",
                             "amazon_connect"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
-                        "x-spec-enum-id": "54d743ac3bc6a2cc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
+                        "x-spec-enum-id": "762c611fc8db42f9"
                     },
                     "key": {
                         "type": "string",
@@ -60641,16 +61715,15 @@
                             "pipecat",
                             "koreai",
                             "custom",
-                            "trillet",
                             "cisco",
                             "genesys",
                             "chirp",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "43adf9cc06494c10",
+                        "x-spec-enum-id": "64a9d3237300a426",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -60662,7 +61735,6 @@
                             "whatsapp",
                             "self_hosted",
                             "agentforce",
-                            "trillet",
                             "cisco",
                             "bland",
                             "livekit",
@@ -60675,9 +61747,9 @@
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "bc2108e52d1eb0bc",
+                        "x-spec-enum-id": "e4a9e996f7d53c98",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `chirp` - Chirp\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `chirp` - Chirp\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -60825,19 +61897,6 @@
                     "elevenlabs_data": {
                         "type": "string",
                         "description": "\nElevenLabs additional configuration data\nExample: `{\"trigger_url\": \"https://example.com/trigger\"}`\n"
-                    },
-                    "trillet_api_key": {
-                        "type": "string",
-                        "writeOnly": true,
-                        "description": "\nAPI key for Trillet AI service provider\nExample: `\"trillet_api_key_123\"`\n"
-                    },
-                    "trillet_api_key_configured": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "trillet_data": {
-                        "type": "string",
-                        "description": "\nTrillet AI additional data including Workspace ID\nExample: `{\"workspace_id\": \"1234567890\"}`\n"
                     },
                     "chirp_data": {
                         "type": "string",
@@ -61082,6 +62141,16 @@
                     },
                     "freetext_params": {
                         "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"
+                    },
+                    "mock_url": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Per-tool webhook URL. None if this Tool is served through an MCP endpoint."
+                    },
+                    "served_via": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "How this tool is accessed at runtime. `{'type': 'direct'}` for standalone tools; `{'type': 'mcp', 'mock_index': N, 'url': '.../mcp/N/'}` for MCP sub-tools."
                     }
                 }
             },
@@ -62053,8 +63122,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "List of test set IDs to process feedbacks from",
-                        "minItems": 1
+                        "description": "Test set IDs whose feedback drives the optimization. If omitted, defaults to every test set already added to this metric's Lab."
                     },
                     "simplified_prompt": {
                         "type": "string",
@@ -62067,8 +63135,7 @@
                     }
                 },
                 "required": [
-                    "metric_id",
-                    "test_set_ids"
+                    "metric_id"
                 ]
             },
             "ProcessFeedbacksResponse": {
@@ -62507,14 +63574,13 @@
                             "koreai",
                             "custom",
                             "agentforce",
-                            "trillet",
                             "genesys",
                             "chirp",
                             "amazon_connect"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
-                        "x-spec-enum-id": "54d743ac3bc6a2cc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
+                        "x-spec-enum-id": "762c611fc8db42f9"
                     },
                     "key": {
                         "type": "string",
@@ -62562,14 +63628,13 @@
                             "koreai",
                             "custom",
                             "agentforce",
-                            "trillet",
                             "genesys",
                             "chirp",
                             "amazon_connect"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
-                        "x-spec-enum-id": "54d743ac3bc6a2cc"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `chirp` - Chirp\n* `amazon_connect` - Amazon Connect",
+                        "x-spec-enum-id": "762c611fc8db42f9"
                     },
                     "created_at": {
                         "type": "string",
@@ -62594,9 +63659,6 @@
                     },
                     {
                         "$ref": "#/components/schemas/LiveKitConfig"
-                    },
-                    {
-                        "$ref": "#/components/schemas/TrilletConfig"
                     },
                     {
                         "$ref": "#/components/schemas/SynthflowConfig"
@@ -63909,6 +64971,7 @@
                     "folder_path": {
                         "type": [
                             "string",
+                            "null",
                             "null"
                         ],
                         "description": "Dot-separated path of the folder to assign this evaluator to (e.g. \"Sales.Inbound\"). Folders must be created before use — they are not auto-created. Use `scenarios_create_folder_create` to create each level before assigning evaluators. Example: to use \"Sales.Inbound\", first create \"Sales\", then create \"Inbound\" inside it."
@@ -64763,6 +65826,7 @@
                     "folder_path": {
                         "type": [
                             "string",
+                            "null",
                             "null"
                         ],
                         "description": "Dot-separated path of the folder to assign this evaluator to (e.g. \"Sales.Inbound\"). Folders must be created before use — they are not auto-created. Use `scenarios_create_folder_create` to create each level before assigning evaluators. Example: to use \"Sales.Inbound\", first create \"Sales\", then create \"Inbound\" inside it."
@@ -64998,6 +66062,7 @@
                     "folder_path": {
                         "type": [
                             "string",
+                            "null",
                             "null"
                         ],
                         "description": "Dot-separated path of the folder to assign this evaluator to (e.g. \"Sales.Inbound\"). Folders must be created before use — they are not auto-created. Use `scenarios_create_folder_create` to create each level before assigning evaluators. Example: to use \"Sales.Inbound\", first create \"Sales\", then create \"Inbound\" inside it."
@@ -66593,6 +67658,7 @@
                     "folder_path": {
                         "type": [
                             "string",
+                            "null",
                             "null"
                         ],
                         "description": "Dot-separated path of the folder to assign this evaluator to (e.g. \"Sales.Inbound\"). Folders must be created before use — they are not auto-created. Use `scenarios_create_folder_create` to create each level before assigning evaluators. Example: to use \"Sales.Inbound\", first create \"Sales\", then create \"Inbound\" inside it."
@@ -66779,16 +67845,15 @@
                             "pipecat",
                             "koreai",
                             "custom",
-                            "trillet",
                             "cisco",
                             "genesys",
                             "chirp",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "43adf9cc06494c10",
+                        "x-spec-enum-id": "64a9d3237300a426",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `chirp` - Chirp"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -66800,7 +67865,6 @@
                             "whatsapp",
                             "self_hosted",
                             "agentforce",
-                            "trillet",
                             "cisco",
                             "bland",
                             "livekit",
@@ -66813,9 +67877,9 @@
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "bc2108e52d1eb0bc",
+                        "x-spec-enum-id": "e4a9e996f7d53c98",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `trillet` — requires `trillet_api_key` + `trillet_data.workspace_id`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `trillet` - Trillet\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `chirp` - Chirp\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (used for voice too).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the serializer also exposes `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*` fields, but those provider values are not currently selectable in this enum.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `chirp` - Chirp\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -66963,19 +68027,6 @@
                     "elevenlabs_data": {
                         "type": "string",
                         "description": "\nElevenLabs additional configuration data\nExample: `{\"trigger_url\": \"https://example.com/trigger\"}`\n"
-                    },
-                    "trillet_api_key": {
-                        "type": "string",
-                        "writeOnly": true,
-                        "description": "\nAPI key for Trillet AI service provider\nExample: `\"trillet_api_key_123\"`\n"
-                    },
-                    "trillet_api_key_configured": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "trillet_data": {
-                        "type": "string",
-                        "description": "\nTrillet AI additional data including Workspace ID\nExample: `{\"workspace_id\": \"1234567890\"}`\n"
                     },
                     "chirp_data": {
                         "type": "string",
@@ -67741,6 +68792,16 @@
                     },
                     "freetext_params": {
                         "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"
+                    },
+                    "mock_url": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Per-tool webhook URL. None if this Tool is served through an MCP endpoint."
+                    },
+                    "served_via": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "How this tool is accessed at runtime. `{'type': 'direct'}` for standalone tools; `{'type': 'mcp', 'mock_index': N, 'url': '.../mcp/N/'}` for MCP sub-tools."
                     }
                 },
                 "required": [
@@ -67773,20 +68834,6 @@
                         ]
                     }
                 }
-            },
-            "TrilletConfig": {
-                "type": "object",
-                "description": "Trillet provider configuration.",
-                "properties": {
-                    "workspace_id": {
-                        "type": "string",
-                        "description": "Trillet workspace ID. Find this in your Trillet dashboard."
-                    }
-                },
-                "required": [
-                    "workspace_id"
-                ],
-                "title": "Trillet"
             },
             "UsageChartResponse": {
                 "type": "object",

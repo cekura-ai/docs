@@ -1,0 +1,279 @@
+---
+title: 'Agora Simulations'
+sidebarTitle: "Agora"
+icon: "tower-broadcast"
+iconType: "regular"
+description: 'Test agents that live in an Agora RTC channel via WebRTC'
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
+## Overview
+
+Cekura can simulate calls against any voice agent that runs inside an **Agora RTC channel**. Cekura joins the channel as a participant over WebRTC and exchanges 16 kHz mono PCM audio with your agent, then transcribes the conversation and runs your evaluators against it.
+
+Unlike static credentials, the per-call join details (app id, channel, token, and optional encryption) are **minted at run time by an endpoint you configure** — they are fetched for each run and never stored by Cekura.
+
+Use Agora Simulations when:
+- Your agent joins an Agora channel and you mint short-lived join tokens per session.
+- You want Cekura's tester to converse with the agent directly in the channel.
+
+The page below has two parts:
+
+- **How to test** — configure your agent and trigger runs from the dashboard or the API.
+- **Session endpoint contract** — what your endpoint must return so Cekura can join.
+
+<Tabs>
+<Tab title="How to test">
+
+<Tabs>
+<Tab title="Dashboard">
+
+<Steps>
+<Step title="Configure Agora credentials">
+Open your agent settings and pick **Agora** in the provider grid:
+
+<Frame>
+  <img src="/images/agora/agora-select.png" alt="Select Agora in the provider grid" />
+</Frame>
+
+Then fill in the session-endpoint configuration:
+
+<Frame>
+  <img src="/images/agora/agora-session.png" alt="Agora session endpoint configuration" />
+</Frame>
+
+**Required:**
+- **Session Endpoint URL** — the endpoint Cekura calls per run to mint the Agora channel + token (see **Session endpoint contract**).
+- **Client ID** — sent in the request body as `{"client_id": "..."}`.
+- **Secret** — sent in the auth header to your endpoint. Stored **encrypted**; write-only.
+
+**Optional:**
+- **Request Method** — `POST` (default) or `GET`. Cekura uses this verb when calling your session endpoint.
+- **Secret Header Name** — the header the secret is sent in. Defaults to `X-Cekura-Secret`.
+
+<Note>
+Your agent must be a live participant in the Agora channel the endpoint returns, exchanging raw `pcm_s16le` audio at **16 kHz mono**. See **Session endpoint contract** for the exact response shape.
+</Note>
+
+</Step>
+
+<Step title="Run tests from the dashboard">
+  1. Select scenarios for your agent and click **Run**.
+  2. With Agora configured, you will see a **WebRTC** option under **VOICE** in the **Configure Run** dialog.
+  3. Select **WebRTC** and click **Run**.
+
+For each run Cekura will:
+- Call your session endpoint to fetch fresh join details (app id / channel / token / encryption).
+- Join the Agora channel as a participant and converse with your agent.
+- Capture the conversation, transcribe it, and run your evaluators against the result.
+</Step>
+
+<Step title="View results">
+Results appear in your dashboard like any other run — status, metrics, transcripts, and audio playback. The run type is shown as **Agora**.
+</Step>
+</Steps>
+
+</Tab>
+
+<Tab title="Code">
+
+Use the API to trigger Agora runs from your own code or CI.
+
+## Prerequisites
+
+Configure Agora credentials on your agent first (same as the **Dashboard** tab): a **Session Endpoint URL**, **Client ID**, and **Secret**.
+
+## API Endpoint
+
+```
+POST https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_agora/
+```
+
+## Authentication
+
+Include your Cekura API key in the request header:
+```
+X-CEKURA-API-KEY: <YOUR_API_KEY>
+```
+
+## Request Parameters
+
+**scenarios** (array | integer | string, required): Test scenarios to run
+- **Array format**: List of scenario IDs `[123, 456, 789]`
+- **Integer format**: Run the first N scenarios for the agent `5`
+- **String format**: Run all scenarios for the agent `"all"`
+
+**agent_id** (integer, optional): Your Agent ID in Cekura. Required when using integer or `"all"` format for scenarios.
+
+**frequency** (integer, optional): Number of times to run each scenario (default: `1`).
+
+**name** (string, optional): Custom name for this test run.
+
+**concurrency_limit** (integer, optional): Cap on parallel runs.
+
+## Examples
+
+### Single Run (cURL)
+
+```bash
+curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_agora/" \
+  -H "X-CEKURA-API-KEY: <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": 12, "scenarios": [101], "frequency": 1}'
+```
+
+### Run All Scenarios (cURL)
+
+```bash
+curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios-external/run_scenarios_agora/" \
+  -H "X-CEKURA-API-KEY: <YOUR_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": 12, "scenarios": "all", "frequency": 1}'
+```
+
+### Python Example
+
+```python
+import requests
+
+API_KEY = "<YOUR_API_KEY>"
+BASE_URL = "https://api.cekura.ai/test_framework"
+
+headers = {
+    "X-CEKURA-API-KEY": API_KEY,
+    "Content-Type": "application/json",
+}
+
+payload = {
+    "agent_id": 12,
+    "scenarios": [101, 102],
+    "frequency": 1,
+    "name": "Agora Test Run",
+}
+
+resp = requests.post(
+    f"{BASE_URL}/v1/scenarios-external/run_scenarios_agora/",
+    headers=headers,
+    json=payload,
+)
+print(resp.json())
+```
+
+## Response
+
+```json
+{
+  "id": 16870,
+  "name": "Agora Test Run",
+  "agent": 12,
+  "status": "in_progress",
+  "success_rate": 0.0,
+  "run_as_text": false,
+  "is_cronjob": false,
+  "runs": [
+    {
+      "id": 34625,
+      "status": "running",
+      "scenario": 101,
+      "scenario_name": "Customer Support Scenario"
+    }
+  ],
+  "created_at": "2026-06-03T09:32:59.484534Z",
+  "updated_at": "2026-06-03T09:32:59.484942Z"
+}
+```
+
+## Error Responses
+
+### Missing Agora credentials
+
+```json
+{
+  "agent": ["Agent must have Agora credentials configured (agora_data with session_endpoint_url)."]
+}
+```
+
+### Missing session endpoint URL
+
+```json
+{
+  "agent": ["Agent agora_data must include session_endpoint_url."]
+}
+```
+
+### Invalid scenarios
+
+```json
+{
+  "scenarios": ["Invalid scenario IDs or scenarios not found"]
+}
+```
+
+### Insufficient balance
+
+```json
+{
+  "detail": "Insufficient balance for this operation"
+}
+```
+
+## Monitor Results
+
+Poll for results using the [List Runs with IDs API](/api-reference/test_framework/list-runs-with-ids).
+
+</Tab>
+</Tabs>
+
+</Tab>
+<Tab title="Session endpoint contract">
+
+For every run, Cekura calls your configured **Session Endpoint URL** to obtain fresh Agora join details. This keeps tokens short-lived and lets you start the agent in the channel on demand.
+
+### Request
+
+Cekura sends (method configurable, `POST` by default):
+
+```
+POST <session_endpoint_url>
+X-Cekura-Secret: <your secret>            # header name configurable
+Content-Type: application/json
+
+{ "client_id": "<your client id>" }
+```
+
+For `GET`, `client_id` is sent as a query parameter and the secret header is unchanged.
+
+### Response
+
+Return JSON with the join details. Cekura joins the channel as uid `1` (override with `join_uid` in the agent's Agora config); your token must authorize that uid.
+
+| Field | Required | Description |
+|---|---|---|
+| `agora_app_id` | yes | Agora App ID for the channel |
+| `agora_channel` | yes | Channel name to join |
+| `agora_token` | yes | RTC token valid for the channel + join uid |
+| `encryption_mode` | no | Channel encryption mode name, e.g. `aes_256_gcm2` |
+| `encryption_key` | no | Encryption key (when encryption is enabled) |
+| `encryption_salt` | no | Base64-encoded KDF salt (when encryption is enabled) |
+
+```json
+{
+  "agora_app_id": "5bfbb040c5e34dd6917e05060bc05b97",
+  "agora_channel": "your-channel-name",
+  "agora_token": "007eJxTY...",
+  "encryption_mode": "aes_256_gcm2",
+  "encryption_key": "<base64 key>",
+  "encryption_salt": "<base64 salt>"
+}
+```
+
+<Note>
+Encryption is optional. Omit the `encryption_*` fields for an unencrypted channel. When present, `encryption_mode` must be a recognized Agora mode name and `encryption_salt` must be base64-encoded.
+</Note>
+
+</Tab>
+</Tabs>

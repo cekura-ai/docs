@@ -5867,6 +5867,52 @@
                 }
             }
         },
+        "/observability/v1/metric-failure-mode-insights/bulk_generate/": {
+            "post": {
+                "operationId": "metric-failure-mode-insights-bulk-generate-create",
+                "description": "Fan out audits to every eligible metric in the project.\n\nTriggered by the Insights page's \"Generate\" button. Uses the\nsliding ``T-24h`` to ``T`` window (where ``T`` is now), so the\nresult is fresh even between the daily cron firings. Returns\nthe new insight rows so the FE can poll their status.\n\nMetrics with no failing calls in the window get a\n``skipped_no_failures`` marker row (no Celery task queued);\nmetrics already mid-run from a recent cron are returned as-is\ninstead of being re-queued (dedupe inside the kickoff helper).",
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeInsightBulkGenerate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeInsightBulkGenerate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeInsightBulkGenerate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricFailureModeInsightBulkGenerate"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/observability/v1/metric-failure-mode-insights/generate/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-generate-create",
@@ -51236,11 +51282,7 @@
                         "maxLength": 255
                     },
                     "information": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
-                        "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
+                        "description": "\nVariables for the test profile, split by which agent receives them.\n```json\n{\n    \"main_agent_variables\": {\"user_id\": \"U-123\"},\n    \"testing_agent_variables\": {\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\"}\n}\n```\n`main_agent_variables` are sent to the agent under test as dynamic variables. `testing_agent_variables` shape the simulated caller's persona. A legacy flat dict (no section keys) is accepted for backward compatibility and is sent to both agents.\n"
                     },
                     "created_by": {
                         "type": "integer",
@@ -51299,11 +51341,7 @@
                         "maxLength": 255
                     },
                     "information": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
-                        "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
+                        "description": "\nVariables for the test profile, split by which agent receives them.\n```json\n{\n    \"main_agent_variables\": {\"user_id\": \"U-123\"},\n    \"testing_agent_variables\": {\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\"}\n}\n```\n`main_agent_variables` are sent to the agent under test as dynamic variables. `testing_agent_variables` shape the simulated caller's persona. A legacy flat dict (no section keys) is accepted for backward compatibility and is sent to both agents.\n"
                     },
                     "created_by": {
                         "type": "integer",
@@ -55470,54 +55508,6 @@
                 ],
                 "title": "LiveKit"
             },
-            "LiveKitEgressCredentialsResponse": {
-                "type": "object",
-                "properties": {
-                    "access_key": {
-                        "type": "string"
-                    },
-                    "secret_key": {
-                        "type": "string"
-                    },
-                    "session_token": {
-                        "type": "string"
-                    },
-                    "expires_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "bucket": {
-                        "type": "string"
-                    },
-                    "key": {
-                        "type": "string"
-                    },
-                    "region": {
-                        "type": "string"
-                    },
-                    "livekit_url": {
-                        "type": "string"
-                    },
-                    "livekit_api_key": {
-                        "type": "string"
-                    },
-                    "livekit_api_secret": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "access_key",
-                    "bucket",
-                    "expires_at",
-                    "key",
-                    "livekit_api_key",
-                    "livekit_api_secret",
-                    "livekit_url",
-                    "region",
-                    "secret_key",
-                    "session_token"
-                ]
-            },
             "LivekitScenario": {
                 "type": "object",
                 "description": "",
@@ -56068,6 +56058,10 @@
                         "type": "integer",
                         "readOnly": true
                     },
+                    "total_failures_in_window": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "status": {
                         "enum": [
                             "pending",
@@ -56116,6 +56110,30 @@
                     }
                 }
             },
+            "MetricFailureModeInsightBulkGenerate": {
+                "type": "object",
+                "description": "Request body for ``POST /metric-failure-mode-insights/bulk_generate/``.\n\nTriggers an insight audit for every eligible metric in the project\nusing a sliding T-24h to T window. Returns the new insight rows so\nthe FE can poll them.",
+                "properties": {
+                    "project": {
+                        "type": "integer",
+                        "description": "Project ID — fan out audits to every eligible metric in it."
+                    },
+                    "metric_names": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "maxLength": 255
+                        },
+                        "description": "Optional metric-name allowlist. If provided, only those metrics are audited (used by the FE to keep the toast count aligned with the cards on screen when a view filter is applied)."
+                    }
+                },
+                "required": [
+                    "project"
+                ]
+            },
             "MetricFailureModeInsightGenerate": {
                 "type": "object",
                 "description": "Request body for ``POST /metric-failure-mode-insights/generate/``.",
@@ -56147,13 +56165,15 @@
                         "type": "integer",
                         "maximum": 90,
                         "minimum": 1,
-                        "default": 7
+                        "default": 1,
+                        "description": "Deprecated — audits now always use the last 24 hours."
                     },
                     "max_calls": {
                         "type": "integer",
-                        "maximum": 2000,
-                        "minimum": 10,
-                        "default": 500
+                        "maximum": 50,
+                        "minimum": 1,
+                        "default": 20,
+                        "description": "Upper bound on failing calls fed to the agent. If the 24h window has more than this, a random sample is taken."
                     }
                 },
                 "required": [

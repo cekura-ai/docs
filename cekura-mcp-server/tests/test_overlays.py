@@ -138,3 +138,25 @@ def test_generate_improve_tools_have_clarifying_suffix(tool):
     )
     suffix = overlays[tool].get("description_suffix", "")
     assert suffix, f"{tool} overlay must define a non-empty description_suffix."
+
+
+def test_pipecat_data_overlaid_to_object_for_agent_tools():
+    """pipecat_data is typed `string` in the spec but the backend wants an
+    object. The overlay forces it to `object` on the agent create/patch tools
+    so the HTTP client coerces the model's stringified JSON to a dict."""
+    from tool_generator import apply_overlay_to_schema
+
+    for tool in ("aiagents_create", "aiagents_partial_update"):
+        schema = {
+            "type": "object",
+            "properties": {
+                "pipecat_data": {"type": "string", "description": "x"},
+                "name": {"type": "string"},
+            },
+            "required": [],
+        }
+        out = apply_overlay_to_schema(tool, schema)
+        assert out["properties"]["pipecat_data"]["type"] == "object", tool
+        assert out["properties"]["pipecat_data"].get("additionalProperties") is True, tool
+        # unrelated fields are untouched
+        assert out["properties"]["name"]["type"] == "string", tool

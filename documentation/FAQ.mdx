@@ -661,7 +661,9 @@ To pause your subscription:
 4. You will be redirected to our secure Stripe billing portal.
 5. Select the option to pause your subscription.
 
-You can return to this same section at any time to reactivate your plan and resume your AI agent testing and monitoring. This ensures that all your existing agent configurations, evaluators, and historical data remain intact for when you are ready to scale.
+To reactivate your plan, return to the same **Billing → Manage Plan** section and follow the prompts in the Stripe portal. All your existing agent configurations, evaluators, and historical data will remain intact.
+
+If the reactivation option is not available in the Stripe portal, or if your plan does not reactivate automatically, contact support and the team can activate it for you directly.
 
 
 ## How do I cancel my subscription?
@@ -704,6 +706,13 @@ Adding team members to your Cekura workspace allows for collaborative testing an
 4. **Send Invitation**: Enter the email address of the team member you wish to add and send the invite.
 
 **Note:** Please ensure you have the necessary administrative privileges, as workspace management typically requires admin access. If you are unable to see the 'Members' tab or the 'Invite' button, you may need to ask an existing administrator to update your permissions or send the invitation for you.
+
+
+## Why might a user lose access to a Cekura workspace?
+
+Users can lose access to a Cekura workspace when an organisation Admin removes their membership. This most commonly occurs when the organisation has reached its plan's member limit — an Admin may clean up the member list to free up capacity for other users.
+
+If a team member unexpectedly loses access, an Admin can re-invite them at any time: go to **Settings → Members → Invite** and enter their email address. If you need to check your plan's member limit or request an increase, reach out to [support@cekura.ai](mailto:support@cekura.ai).
 
 
 ## How can I interface a custom-hosted voice agent using the OpenAI Realtime API with Cekura to run evaluations?
@@ -968,6 +977,18 @@ Cekura's data storage policy depends on the specific feature you are using withi
 ### Security and Encryption
 Security is a top priority at Cekura. All data stored within our platform, including conversation audio and transcripts, is **encrypted at rest**. 
 
+### Data Retention
+
+Cekura retains monitoring data for **one year** by default, after which it is automatically removed. This applies to:
+- **Call recordings and audio files** sent via the observability endpoint
+- **Transcripts and conversation data** from monitored calls
+
+Your account configuration data is not subject to this automatic deletion and remains available indefinitely:
+- **Metrics** (your metric definitions and evaluation settings)
+- **Voices / agent personalities** (the personality configurations you have set up)
+
+If you need to delete monitoring data before the one-year period — for compliance or privacy reasons — you can do so at any time using Cekura's delete endpoint. If your organisation requires a custom retention window (shorter or longer than one year), contact our support team.
+
 ### Relevant Resources
 If you are integrating your conversation data for monitoring, you can find more details on how to manage and retrieve call data in our documentation:
 - [Observability API Reference - Get Call Data](https://docs.cekura.ai/api-reference/observability/get-call)
@@ -1076,11 +1097,50 @@ If you have an existing integration that posts call data to `observability/v1/ob
 3. Remove the `observability/v1/observe/` call from your post-processing step.
 
 
+## If I already capture and store audio in my own Pipecat pipeline, will the Cekura SDK record it again?
+
+Yes — when you use `observe_pipeline()` (or `observe_and_create_task()`), the SDK registers its own audio frame processor and performs a parallel recording alongside any existing audio capture you have in your pipeline. This is intentional: the SDK needs its own recording to power Cekura's observability and evaluation features.
+
+The parallel recording is designed to have minimal impact on your pipeline:
+
+- **Asynchronous:** All SDK recording tasks run asynchronously and do not block your main pipeline or add latency to conversations.
+- **Chunked multipart upload:** Audio is uploaded to Cekura in small chunks, keeping memory consumption low even during long sessions.
+
+Your existing audio artifacts are unaffected — the SDK records independently and does not interfere with how you store or process audio elsewhere in your pipeline.
+
+## What can I do on the sandbox plan — does it allow real pre-production testing?
+
+The sandbox plan gives access to the full Cekura platform. You can run real pre-production tests against your agents, use all testing, evaluation, and observability features, and validate your integration before going live.
+
+If you run out of credits during your sandbox phase, reach out via your support channel to request a top-up.
+
 ## Can I assign the same contact number to multiple agents?
 
 Yes — `contact_number` does not need to be unique per agent. The same phone number can be assigned to multiple agents without causing conflicts. When you run a scenario, the agent attached to that scenario is what Cekura evaluates, so there is no ambiguity about which agent is under test regardless of shared numbers. Make sure each evaluator (scenario) has the correct agent selected before triggering a run.
 
 For more details on setting up and managing your testing environment, please visit the [Cekura Documentation](https://docs.cekura.ai/).
+
+## Is there a way to recover call logs that were missed due to insufficient credits?
+
+If your account runs out of credits, Cekura stops ingesting and processing new calls. The **auto-fetch** feature does not backfill calls that were missed during a credit gap — only calls that arrive after credits are restored are picked up going forward.
+
+To analyze calls from the missed window, you must manually resend them using the [Send Calls API](https://docs.cekura.ai/api-reference/observability/send-calls):
+
+1. Identify the timeframe of the gap (start and end timestamps).
+2. Export the call recordings or transcripts from your voice provider or internal systems for that window.
+3. POST them to the Send Calls endpoint to ingest them into Cekura for evaluation.
+
+To prevent future gaps, set up a low-credit alert in your dashboard so you can top up before service is interrupted.
+
+
+## Does Cekura provide phone numbers for all countries, and what should I do if my region is not covered?
+
+Cekura does not provide phone numbers for all regions. If you need a testing number in a region Cekura doesn't cover natively, you can bring your own number from a third-party telephony provider such as [Plivo](/documentation/key-concepts/phone-numbers/plivo) or [Twilio](/documentation/key-concepts/phone-numbers/twilio) and import it into Cekura.
+
+Once imported, the number works as a normal Cekura testing number — your system calls it and Cekura's testing agent answers. No additional integration with the telephony provider is required beyond the import step.
+
+See the [Plivo import guide](/documentation/key-concepts/phone-numbers/plivo) for step-by-step instructions.
+
 
 ## How do I submit a bug report or feature request?
 

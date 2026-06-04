@@ -3562,7 +3562,7 @@
         "/observability/v1/call-logs-external/filters_call_id/": {
             "get": {
                 "operationId": "call-logs-external-filters-call-id-retrieve",
-                "description": "Autocomplete-search the production CallLog `call_id` field (the provider's call identifier string, e.g. `\"patronus_xyz\"`). This is distinct from simulation `run_id` (integer; see `runs_list`) and from CallLog ID (integer DB ID).",
+                "description": "Autocomplete-search the production CallLog `call_id` field (the provider's call identifier string). This is distinct from simulation `run_id` (integer; see `runs_list`) and from CallLog ID (integer DB ID).",
                 "tags": [
                     "observability"
                 ],
@@ -5015,7 +5015,7 @@
         "/observability/v1/call-logs/filters_call_id/": {
             "get": {
                 "operationId": "call-logs-filters-call-id-retrieve",
-                "description": "Autocomplete-search the production CallLog `call_id` field (the provider's call identifier string, e.g. `\"patronus_xyz\"`). This is distinct from simulation `run_id` (integer; see `runs_list`) and from CallLog ID (integer DB ID).",
+                "description": "Autocomplete-search the production CallLog `call_id` field (the provider's call identifier string). This is distinct from simulation `run_id` (integer; see `runs_list`) and from CallLog ID (integer DB ID).",
                 "tags": [
                     "observability"
                 ],
@@ -5754,55 +5754,6 @@
                 }
             }
         },
-        "/observability/v1/livekit/egress-credentials/": {
-            "get": {
-                "operationId": "livekit-egress-credentials-retrieve",
-                "description": "Generate scoped S3 credentials for LiveKit egress with a random UUID prefix.",
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "agent_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "ID of the agent to validate LiveKit configuration",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "observability"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/LiveKitEgressCredentialsResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "description": "Missing agent_id or invalid agent configuration"
-                    },
-                    "403": {
-                        "description": "Permission denied"
-                    },
-                    "404": {
-                        "description": "Agent not found"
-                    },
-                    "500": {
-                        "description": "Failed to generate credentials"
-                    }
-                }
-            }
-        },
         "/observability/v1/livekit/observe/": {
             "post": {
                 "operationId": "livekit-observe-create",
@@ -5912,6 +5863,52 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/observability/v1/metric-failure-mode-insights/bulk_generate/": {
+            "post": {
+                "operationId": "metric-failure-mode-insights-bulk-generate-create",
+                "description": "Fan out audits to every eligible metric in the project.\n\nTriggered by the Insights page's \"Generate\" button. Uses the\nsliding ``T-24h`` to ``T`` window (where ``T`` is now), so the\nresult is fresh even between the daily cron firings. Returns\nthe new insight rows so the FE can poll their status.\n\nMetrics with no failing calls in the window get a\n``skipped_no_failures`` marker row (no Celery task queued);\nmetrics already mid-run from a recent cron are returned as-is\ninstead of being re-queued (dedupe inside the kickoff helper).",
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeInsightBulkGenerate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeInsightBulkGenerate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeInsightBulkGenerate"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricFailureModeInsightBulkGenerate"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -6383,25 +6380,6 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            }
-        },
-        "/observability/v1/pipecat/egress-credentials/": {
-            "get": {
-                "operationId": "pipecat-egress-credentials-retrieve",
-                "description": "Generate scoped S3 credentials for Pipecat audio uploads with a random UUID prefix.",
-                "tags": [
-                    "observability"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "No response body"
                     }
                 }
             }
@@ -9924,7 +9902,7 @@
         "/test_framework/process-patronus-message-response/": {
             "post": {
                 "operationId": "test-framework-process-patronus-message-response-create",
-                "description": "API view to process incoming message responses from Patronus.\nThis view handles the storage of incoming webhook data and updates\nthe status of runs based on the call status received in the payload.",
+                "description": "API view to process incoming message responses from the voice service.\nThis view handles the storage of incoming webhook data and updates\nthe status of runs based on the call status received in the payload.",
                 "tags": [
                     "test_framework"
                 ],
@@ -19918,7 +19896,7 @@
         "/test_framework/v1/personalities-external/{id}/call/": {
             "post": {
                 "operationId": "personalities-external-call-create",
-                "description": "Initiate a WebRTC call to talk to a personality directly from the browser.\nOnly callable via Bearer token (Supabase) authentication - not API keys.\nProxies to Patronus /calls/initiate/webrtc and returns Daily.co credentials.",
+                "description": "Initiate a WebRTC call to talk to a personality directly from the browser.\nOnly callable via Bearer token (Supabase) authentication - not API keys.\nInitiates a WebRTC call via Cekura's voice service and returns Daily.co credentials.",
                 "parameters": [
                     {
                         "in": "path",
@@ -20341,7 +20319,7 @@
         "/test_framework/v1/personalities/{id}/call/": {
             "post": {
                 "operationId": "personalities-call-create",
-                "description": "Initiate a WebRTC call to talk to a personality directly from the browser.\nOnly callable via Bearer token (Supabase) authentication - not API keys.\nProxies to Patronus /calls/initiate/webrtc and returns Daily.co credentials.",
+                "description": "Initiate a WebRTC call to talk to a personality directly from the browser.\nOnly callable via Bearer token (Supabase) authentication - not API keys.\nInitiates a WebRTC call via Cekura's voice service and returns Daily.co credentials.",
                 "parameters": [
                     {
                         "in": "path",
@@ -20953,7 +20931,7 @@
         "/test_framework/v1/phone-numbers/providers/metadata/": {
             "get": {
                 "operationId": "phone-numbers-providers-metadata-retrieve",
-                "description": "Fetches decrypted metadata for a phone number by phone_number or id. Called by Patronus and Pipecat services.",
+                "description": "Fetches decrypted metadata for a phone number by phone_number or id. Called by Cekura's internal voice services.",
                 "tags": [
                     "test_framework"
                 ],
@@ -26546,35 +26524,6 @@
                 }
             }
         },
-        "/test_framework/v1/runs/{run_id}/datadog-logs/": {
-            "get": {
-                "operationId": "runs-datadog-logs-retrieve",
-                "description": "Fetch Datadog logs for a given simulation run ID.\n\nRestricted to OAuth tokens minted by the `cekura-support-bot` client via\nthe client_credentials grant. Even though the support-bot client can\nimpersonate any user, the token's subject user must have access to the\nrun's project — either as an org-admin or via a direct project membership.\nOrg-level membership alone is not enough: a user added to project A\nshould not see logs for runs in project B in the same org.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "run_id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "No response body"
-                    }
-                }
-            }
-        },
         "/test_framework/v1/runs/bulk/": {
             "get": {
                 "operationId": "runs-bulk-retrieve",
@@ -31540,7 +31489,7 @@
         "/test_framework/v1/scenarios-external/run_scenarios_sip/": {
             "post": {
                 "operationId": "scenarios-run-sip",
-                "description": "SIP VOICE RUN (direct SIP via Patronus): Execute evaluators against an agent over a direct SIP connection (orchestrated by the Patronus service). The agent must have `sip_endpoint` configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others:**\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "SIP VOICE RUN (direct SIP): Execute evaluators against an agent over a direct SIP connection (orchestrated by Cekura's SIP voice service). The agent must have `sip_endpoint` configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others:**\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators over a direct SIP connection",
                 "tags": [
                     "Evaluators"
@@ -36550,7 +36499,7 @@
         "/test_framework/v1/scenarios/run_scenarios_sip/": {
             "post": {
                 "operationId": "scenarios-run-sip_2",
-                "description": "SIP VOICE RUN (direct SIP via Patronus): Execute evaluators against an agent over a direct SIP connection (orchestrated by the Patronus service). The agent must have `sip_endpoint` configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others:**\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "SIP VOICE RUN (direct SIP): Execute evaluators against an agent over a direct SIP connection (orchestrated by Cekura's SIP voice service). The agent must have `sip_endpoint` configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others:**\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators over a direct SIP connection",
                 "tags": [
                     "Evaluators"
@@ -36726,7 +36675,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-run-sip",
-                        "description": "SIP VOICE RUN (direct SIP via Patronus): Execute evaluators against an agent over a direct SIP connection (orchestrated by the Patronus service). The agent must have `sip_endpoint` configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others:**\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
+                        "description": "SIP VOICE RUN (direct SIP): Execute evaluators against an agent over a direct SIP connection (orchestrated by Cekura's SIP voice service). The agent must have `sip_endpoint` configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others:**\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
                     }
                 }
             }
@@ -44066,7 +44015,7 @@
         "/test_framework/v2/scenarios/run_scenarios_sip/": {
             "post": {
                 "operationId": "scenarios-run-sip_3",
-                "description": "SIP VOICE RUN (direct SIP via Patronus): Execute evaluators against an agent over a direct SIP connection (orchestrated by the Patronus service). The agent must have `sip_endpoint` configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others:**\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "SIP VOICE RUN (direct SIP): Execute evaluators against an agent over a direct SIP connection (orchestrated by Cekura's SIP voice service). The agent must have `sip_endpoint` configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others:**\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators over a direct SIP connection",
                 "tags": [
                     "Evaluators"
@@ -49297,25 +49246,6 @@
                 "description": "Projects members"
             }
         },
-        "/user/webhook/supabase/": {
-            "post": {
-                "operationId": "user-webhook-supabase-create",
-                "tags": [
-                    "user"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "No response body"
-                    }
-                },
-                "description": "User webhook supabase"
-            }
-        },
         "/webpage/domain/": {
             "get": {
                 "operationId": "webpage-domain-list",
@@ -51352,11 +51282,7 @@
                         "maxLength": 255
                     },
                     "information": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
-                        "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
+                        "description": "\nVariables for the test profile, split by which agent receives them.\n```json\n{\n    \"main_agent_variables\": {\"user_id\": \"U-123\"},\n    \"testing_agent_variables\": {\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\"}\n}\n```\n`main_agent_variables` are sent to the agent under test as dynamic variables. `testing_agent_variables` shape the simulated caller's persona. A legacy flat dict (no section keys) is accepted for backward compatibility and is sent to both agents.\n"
                     },
                     "created_by": {
                         "type": "integer",
@@ -51415,11 +51341,7 @@
                         "maxLength": 255
                     },
                     "information": {
-                        "type": "object",
-                        "additionalProperties": {
-                            "type": "string"
-                        },
-                        "description": "\nInformation fields for the test profile\nExample:\n```json\n{\n    \"user_name\": \"John Doe\",\n    \"user_email\": \"john.doe@example.com\",\n}\n```\n"
+                        "description": "\nVariables for the test profile, split by which agent receives them.\n```json\n{\n    \"main_agent_variables\": {\"user_id\": \"U-123\"},\n    \"testing_agent_variables\": {\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\"}\n}\n```\n`main_agent_variables` are sent to the agent under test as dynamic variables. `testing_agent_variables` shape the simulated caller's persona. A legacy flat dict (no section keys) is accepted for backward compatibility and is sent to both agents.\n"
                     },
                     "created_by": {
                         "type": "integer",
@@ -55586,54 +55508,6 @@
                 ],
                 "title": "LiveKit"
             },
-            "LiveKitEgressCredentialsResponse": {
-                "type": "object",
-                "properties": {
-                    "access_key": {
-                        "type": "string"
-                    },
-                    "secret_key": {
-                        "type": "string"
-                    },
-                    "session_token": {
-                        "type": "string"
-                    },
-                    "expires_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "bucket": {
-                        "type": "string"
-                    },
-                    "key": {
-                        "type": "string"
-                    },
-                    "region": {
-                        "type": "string"
-                    },
-                    "livekit_url": {
-                        "type": "string"
-                    },
-                    "livekit_api_key": {
-                        "type": "string"
-                    },
-                    "livekit_api_secret": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "access_key",
-                    "bucket",
-                    "expires_at",
-                    "key",
-                    "livekit_api_key",
-                    "livekit_api_secret",
-                    "livekit_url",
-                    "region",
-                    "secret_key",
-                    "session_token"
-                ]
-            },
             "LivekitScenario": {
                 "type": "object",
                 "description": "",
@@ -56184,6 +56058,10 @@
                         "type": "integer",
                         "readOnly": true
                     },
+                    "total_failures_in_window": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
                     "status": {
                         "enum": [
                             "pending",
@@ -56232,6 +56110,30 @@
                     }
                 }
             },
+            "MetricFailureModeInsightBulkGenerate": {
+                "type": "object",
+                "description": "Request body for ``POST /metric-failure-mode-insights/bulk_generate/``.\n\nTriggers an insight audit for every eligible metric in the project\nusing a sliding T-24h to T window. Returns the new insight rows so\nthe FE can poll them.",
+                "properties": {
+                    "project": {
+                        "type": "integer",
+                        "description": "Project ID — fan out audits to every eligible metric in it."
+                    },
+                    "metric_names": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string",
+                            "maxLength": 255
+                        },
+                        "description": "Optional metric-name allowlist. If provided, only those metrics are audited (used by the FE to keep the toast count aligned with the cards on screen when a view filter is applied)."
+                    }
+                },
+                "required": [
+                    "project"
+                ]
+            },
             "MetricFailureModeInsightGenerate": {
                 "type": "object",
                 "description": "Request body for ``POST /metric-failure-mode-insights/generate/``.",
@@ -56263,13 +56165,15 @@
                         "type": "integer",
                         "maximum": 90,
                         "minimum": 1,
-                        "default": 7
+                        "default": 1,
+                        "description": "Deprecated — audits now always use the last 24 hours."
                     },
                     "max_calls": {
                         "type": "integer",
-                        "maximum": 2000,
-                        "minimum": 10,
-                        "default": 500
+                        "maximum": 50,
+                        "minimum": 1,
+                        "default": 20,
+                        "description": "Upper bound on failing calls fed to the agent. If the 24h window has more than this, a random sample is taken."
                     }
                 },
                 "required": [

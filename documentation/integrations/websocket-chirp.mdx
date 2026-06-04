@@ -1,6 +1,6 @@
 ---
-title: 'Websocket Simulations'
-sidebarTitle: "Websocket Simulations"
+title: 'Websocket Voice'
+sidebarTitle: "Websocket Voice"
 icon: "waveform-lines"
 iconType: "regular"
 description: 'Test agents with raw-PCM WebSocket voice using the CHIRP protocol'
@@ -15,7 +15,7 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 Cekura can simulate calls against any voice agent that exposes a raw-PCM WebSocket endpoint. Instead of going through a vendor SDK, Cekura dials your `wss://` URL directly and exchanges 16 kHz mono PCM audio as binary WebSocket frames using the **CHIRP** protocol.
 
-Use Websocket Simulations when:
+Use WebSocket voice when:
 - Your agent has no phone number and you don't want to use a vendor SDK.
 - You already operate a real-time audio pipeline and want lower-latency bidirectional streaming.
 - You're building a custom voice stack or research prototype that handles raw PCM natively.
@@ -31,13 +31,15 @@ The page below has two parts:
 <Tabs>
 <Tab title="Dashboard">
 
-Run tests directly from the dashboard against your CHIRP WebSocket endpoint.
+Run tests directly from the dashboard against your WebSocket voice endpoint.
 
 <Steps>
-<Step title="Configure Chirp credentials">
-Open your agent settings, pick **Chirp** in the provider grid, and fill in the WebSocket URL (and optional Basic Auth):
+<Step title="Select Custom provider">
+Open your agent settings and select **Custom** in the provider grid. This is the provider type for raw-PCM WebSocket voice agents.
+</Step>
 
-<img src="/images/chirp/websocket-config.png" alt="Chirp WebSocket Configuration" />
+<Step title="Configure WebSocket voice connection">
+In the **Connection** section, enable the **WebSocket (CHIRP)** toggle and fill in your endpoint details:
 
 **Required:**
 - **WebSocket URL** — The `wss://` (or `ws://`) endpoint your agent listens on. Cekura connects directly to this URL.
@@ -56,10 +58,8 @@ Your endpoint must speak raw `pcm_s16le` audio at **16 kHz mono**, framed as Web
 
 <Step title="Run tests from the dashboard">
   1. Select scenarios for your agent and click **Run**.
-  2. With Chirp configured, you will see **Websocket** option under **VOICE** options in **Configure Run** dialog.
+  2. With WebSocket voice configured, you will see the **Websocket** option under **VOICE** options in the **Configure Run** dialog.
   3. Select **Websocket** and click **Run**.
-
-<img src="/images/chirp/run-chirp-tests.png" alt="Run Chirp Tests" />
 
 Cekura will:
 - Open a WebSocket to your configured URL with the Basic Auth header (if set)
@@ -83,19 +83,38 @@ Results appear in your dashboard like any other run — status, metrics, transcr
 
 <Tab title="Code">
 
-Use the API to trigger Chirp runs from your own code or CI.
+Use the API to trigger WebSocket voice runs from your own code or CI.
 
 ## Prerequisites
 
-Configure Chirp credentials on your agent first (same as the **Dashboard** tab):
-
-<img src="/images/chirp/websocket-config.png" alt="Chirp WebSocket Configuration" />
+Configure WebSocket voice on your agent first (same as the **Dashboard** tab):
 
 **Required:**
 - **WebSocket URL** — `wss://` endpoint that speaks the CHIRP protocol (see **Protocol details**).
 
 **Optional:**
 - **Basic Auth Username** / **Password** for the WebSocket upgrade.
+
+### API Configuration
+
+When creating or updating an agent via the API, configure WebSocket voice in the `telephony` block:
+
+```json
+{
+  "provider": {
+    "type": "custom"
+  },
+  "telephony": {
+    "websocket_url": "wss://your-host/voice",
+    "websocket_auth": {
+      "username": "user",
+      "password": "secret"
+    }
+  }
+}
+```
+
+For the V1 API, use the flat fields `websocket_voice_url` and `websocket_auth` instead.
 
 ## API Endpoint
 
@@ -267,19 +286,11 @@ print(result)
 
 ## Error Responses
 
-### Missing Chirp Credentials
+### Missing WebSocket Endpoint
 
 ```json
 {
-  "detail": "Agent must have CHIRP credentials configured (chirp_data with chirp_websocket_url)."
-}
-```
-
-### Missing WebSocket URL
-
-```json
-{
-  "chirp_data": ["chirp_websocket_url is required"]
+  "websocket_url": "Agent does not have a websocket endpoint configured. Please configure telephony.websocket_url in the agent settings."
 }
 ```
 

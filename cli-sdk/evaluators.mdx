@@ -1,0 +1,305 @@
+---
+title: "Evaluators"
+description: "Scenarios, test profiles, personalities, and dynamic variables"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+<Note>
+Setup steps and authentication are in the [Overview](/cli-sdk/overview). This page covers the inputs your evaluations consume.
+</Note>
+
+An **evaluator** is the input to a run. The most important is a **scenario** — a structured test case describing what the simulated caller does and what the agent should achieve. Scenarios are paired with optional **test profiles** (transport / mode config), **personalities** (caller behavior), and **dynamic variables** (per-run overrides).
+
+## Scenarios
+
+### List, get, create, update, delete
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    # List scenarios for an agent
+    cekura scenarios list --agent-id 123
+
+    # Get one
+    cekura scenarios get 9876
+
+    # Create from a JSON file
+    cekura scenarios create --from-file my_scenario.json
+
+    # Update one
+    cekura scenarios update 9876 --from-file patch.json
+
+    # Delete
+    cekura scenarios delete 9876
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    from cekura import Cekura
+
+    client = Cekura()
+
+    # List
+    scenarios = client.scenarios.list(agent_id=123)
+
+    # Get one
+    scenario = client.scenarios.get(scenario_id=9876)
+
+    # Create
+    sc = client.scenarios.create(
+        agent=123,
+        name="Reschedule appointment",
+        description="Caller wants to move their booking to next week",
+        scenario_type="conversation",
+        tags=["smoke"],
+    )
+
+    # Update
+    client.scenarios.update(scenario_id=sc["id"], description="Updated wording")
+
+    # Delete
+    client.scenarios.delete(scenario_id=9876)
+    ```
+  </Tab>
+</Tabs>
+
+### Bulk update
+
+The bulk-update payload is a single JSON object with a top-level `scenarios` list, plus any of `metric_ids_to_add`, `metric_ids_to_remove`, `tool_ids_to_add`, etc.
+
+<Tabs>
+  <Tab title="CLI">
+    Prepare `bulk.json`:
+
+    ```json
+    {
+      "scenarios": [
+        { "id": 101, "tags": ["regression"] },
+        { "id": 102, "tags": ["smoke"] }
+      ],
+      "metric_ids_to_add": [55],
+      "tool_ids_to_remove": [12]
+    }
+    ```
+
+    Apply:
+
+    ```bash
+    cekura scenarios bulk-update --from-file bulk.json
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.scenarios.bulk_update(
+        scenarios=[
+            {"id": 101, "tags": ["regression"]},
+            {"id": 102, "tags": ["smoke"]},
+        ],
+        metric_ids_to_add=[55],
+        tool_ids_to_remove=[12],
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Generate scenarios
+
+Cekura can generate scenario coverage from a description or an existing call.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura scenarios generate --agent-id 123 --description "Bookings flow — happy path and reschedules" --count 10
+    cekura scenarios generate-progress --progress-id <id>
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    job = client.scenarios.generate_bg(
+        agent_id=123,
+        description="Bookings flow — happy path and reschedules",
+        count=10,
+    )
+    client.scenarios.generate_progress(progress_id=job["progress_id"])
+    ```
+  </Tab>
+</Tabs>
+
+### Generate or improve scenario instructions
+
+When you have a scenario shell and need Cekura to author (or rewrite) its instructions — for example, after you've added an `expected_outcome` and want the simulated caller's script regenerated to match — use the instructions pipeline. It runs in the background and exposes a single progress endpoint.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    # AI-author instructions from an outline
+    job = client.scenarios.generate_instructions(
+        agent_id=123,
+        extra_instructions="Caller wants to escalate after two failed retries",
+    )
+
+    # Improve the instructions on an existing scenario
+    client.scenarios.improve_instructions(
+        scenario_id=9876,
+        feedback="Make the caller more impatient",
+    )
+
+    # Poll either job
+    client.scenarios.instructions_progress(progress_id=job["progress_id"])
+    ```
+  </Tab>
+</Tabs>
+
+### Build a scenario from a transcript
+
+Two flavors. `create_from_transcript` makes a brand-new scenario; `update_with_transcript` revises an existing one (useful when a production call exposes a scenario's gap).
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    # New scenario from a transcript
+    client.scenarios.create_from_transcript(
+        agent=123,
+        transcript=[
+            {"role": "agent", "text": "How can I help?"},
+            {"role": "user",  "text": "I'd like to reschedule."},
+        ],
+        name="Reschedule — from call 7788",
+    )
+
+    # Refresh an existing scenario from a newer transcript
+    client.scenarios.update_with_transcript(
+        scenario_id=9876,
+        transcript=[...],
+    )
+    ```
+  </Tab>
+</Tabs>
+
+### Scenario agent (interactive AI builder)
+
+The scenario agent is an LLM-driven authoring loop — you describe an intent and it iterates on a scenario for you. Kicks off in the background.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    job = client.scenarios.scenario_agent(
+        agent_id=123,
+        prompt="Build a scenario where the caller cancels then immediately re-books",
+    )
+    client.scenarios.scenario_agent_progress(progress_id=job["progress_id"])
+    ```
+  </Tab>
+</Tabs>
+
+## Test profiles
+
+A **test profile** bundles transport + mode settings (voice, text, SIP, livekit_v2, pipecat_v2, etc.) so you can reuse them across runs.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura test-profiles list --agent-id 123
+    cekura test-profiles create --from-file profile.json
+    cekura test-profiles update 7 --from-file patch.json
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.test_profiles.list(agent_id=123)
+    client.test_profiles.create(
+        agent=123,
+        name="Voice + Twilio",
+        mode="voice",
+        config={"transport": "twilio"},
+    )
+    client.test_profiles.update(profile_id=7, name="Voice + Plivo")
+    ```
+  </Tab>
+</Tabs>
+
+## Personalities
+
+Personalities define how the simulated caller behaves (interruptive, accented, polite, etc.). The catalog is platform-managed — you enable or disable items per project.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    # Browse the catalog
+    cekura personalities list
+
+    # Enable / disable on a project
+    cekura personalities enable-for-project 742 --personalities 3,29
+    cekura personalities disable-for-project 742 --personalities 3
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.personalities.list()
+    client.personalities.enable_for_project(project_id=742, personalities=[3, 29])
+    client.personalities.disable_for_project(project_id=742, personalities=[3])
+    ```
+  </Tab>
+</Tabs>
+
+## Dynamic variables
+
+Dynamic variables let you parameterize a scenario at run time (e.g. customer name, account ID).
+
+<Tabs>
+  <Tab title="CLI">
+    Manage variables on an agent:
+
+    ```bash
+    cekura agents dynamic-variables list 123
+    cekura agents dynamic-variable-create 123 --from-file vars.json
+    ```
+
+    Pass values inline when triggering a run:
+
+    ```bash
+    cekura scenarios run-text \
+      --agent-id 123 \
+      --scenario-ids 101 \
+      --dynamic-variables '{"customer_name":"Alex","account_id":"A-552"}'
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.scenarios.run_text(
+        agent_id=123,
+        scenario_ids=[101],
+        dynamic_variables={"customer_name": "Alex", "account_id": "A-552"},
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Agents" icon="robot" href="/cli-sdk/agents">
+    The agent under test that scenarios run against.
+  </Card>
+
+  <Card title="Runs & Results" icon="play" href="/cli-sdk/runs">
+    Trigger evaluations using these scenarios.
+  </Card>
+
+  <Card title="Evaluator concepts" icon="vial" href="/documentation/key-concepts/evaluators/overview">
+    Conditional actions, mock tools, and design best practices.
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Full field reference for scenarios, test profiles, and personalities.
+  </Card>
+</CardGroup>

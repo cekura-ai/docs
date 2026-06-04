@@ -6,6 +6,11 @@ iconType: "regular"
 description: "This guide walks you through the process of testing outbound calls using evaluators. You'll learn how to retrieve evaluators with phone numbers and execute outbound call tests."
 ---
 
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
 <iframe
  width="100%"
  
@@ -22,6 +27,20 @@ Testing outbound calls involves two main steps:
 
 1. Getting the list of evaluators with phone numbers
 2. Running the selected evaluators for outbound testing
+
+<Note>
+  **Phone number regional coverage:** Cekura provides testing phone numbers in a limited set of regions. If you need a receiving number in a region Cekura doesn't cover (for example, an Indian +91 number), you can import your own number from [Plivo](/documentation/key-concepts/phone-numbers/plivo) or [Twilio](/documentation/key-concepts/phone-numbers/twilio). Imported numbers work identically to Cekura-provisioned numbers for inbound and outbound testing — your system calls the imported number and Cekura's testing agent answers.
+</Note>
+
+## Prerequisites
+
+- **Outbound mode enabled**: Agent's `inbound` must be set to `false`
+- **Agent `contact_number` set to your outbound caller ID**: Cekura validates the caller ID (ANI) of every incoming outbound-test call against the agent's `contact_number` field. If your agent dials from `+15551234567`, the agent's `contact_number` must be exactly `+15551234567` in E.164 format. Set this in Agent settings or via the [Update Agent API](/api-reference/test_framework/update-agent-partial).
+- **Evaluators ready**: Created evaluators with valid phone numbers
+
+<Warning>
+  **Caller ID mismatch causes silent rejects.** If the `contact_number` on your agent is empty or doesn't match the number your agent dials from, Cekura drops the incoming call without returning a SIP error your telephony provider can surface. The symptom on the provider side (Twilio, Telnyx, etc.) is `Busy`, `NoAnswer`, or a generic failed dial — no audio, no answer, no descriptive error. Confirm `contact_number` matches your actual outbound caller ID before debugging anything further downstream.
+</Warning>
 
 ## Getting Evaluators and Phone Numbers
 
@@ -172,4 +191,19 @@ Once you have your list of evaluators and phone numbers:
 <Card title="API Reference" icon="link">
 Learn more about the [Running Evaluators API](/api-reference/test_framework/post-test_frameworkv1scenarios-externalrun_scenarios)
 </Card>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Calls show Busy / NoAnswer on your telephony provider but never reach Cekura">
+    Cekura rejects incoming outbound-test calls whose caller ID doesn't match a configured `contact_number` on any agent in your project. Open the agent under test and confirm its `contact_number` is set to the exact E.164 number your agent dials from. An empty or mismatched `contact_number` causes every outbound attempt to be silently dropped — the symptom on your provider side is `Busy` / `NoAnswer` / no-pickup, with no audio and no SIP error explaining why. After setting the correct `contact_number`, trigger a new run; existing runs that hit this state will remain in `timeout` and cannot be recovered.
+  </Accordion>
+
+  <Accordion title="Run status stays `timeout` with no transcript">
+    A `timeout` with `duration: 0` and an empty transcript means the call never connected to Cekura. Work through these in order:
+    1. **Caller-ID match** — see the entry above; this is the most common cause.
+    2. **Dial actually happened** — check your telephony provider's logs to confirm the outbound call was placed.
+    3. **Destination number** — confirm the number your agent dialed matches the `outbound_number` returned for that run in the bulk runs API response.
+  </Accordion>
+</AccordionGroup>
 

@@ -15,6 +15,11 @@ class Operation:
     responses: Dict[str, Any]
     tags: List[str]
     deprecated: bool = False
+    extensions: Dict[str, Any] = None
+
+    def __post_init__(self):
+        if self.extensions is None:
+            self.extensions = {}
 
 
 class OpenAPIParser:
@@ -36,6 +41,7 @@ class OpenAPIParser:
             for method in ["get", "post", "put", "patch", "delete"]:
                 if method in path_item:
                     operation_data = path_item[method]
+                    extensions = {k: v for k, v in operation_data.items() if k.startswith("x-")}
                     operation = Operation(
                         path=path,
                         method=method.upper(),
@@ -47,6 +53,7 @@ class OpenAPIParser:
                         responses=operation_data.get("responses", {}),
                         tags=operation_data.get("tags", []),
                         deprecated=operation_data.get("deprecated", False),
+                        extensions=extensions,
                     )
                     operations.append(operation)
 
@@ -142,11 +149,10 @@ class OpenAPIParser:
                     elif "required" in resolved:
                         required.extend(resolved["required"])
 
-            # drf-spectacular puts @extend_schema(examples=[OpenApiExample(...)])
-            # under requestBody.content.application/json.examples as a dict keyed by
-            # a CamelCased version of the example name. Each entry has:
-            #   { value, summary, description }
-            # We flatten into a list so downstream precedence (filter / cap) is simple.
+            # OpenAPI 3.0 stores per-example payloads under
+            # requestBody.content.application/json.examples as a dict keyed by
+            # name, each with { value, summary, description }. Flatten into a
+            # list so downstream precedence (filter / cap) is simple.
             examples_dict = json_content.get("examples", {})
             if isinstance(examples_dict, dict):
                 for key, entry in examples_dict.items():
@@ -222,9 +228,30 @@ class OpenAPIParser:
                 properties[prop_name]["default"] = prop_schema["default"]
 
             if prop_type == "array" and "items" in prop_schema:
-                properties[prop_name]["items"] = {
-                    "type": self._convert_openapi_type(prop_schema["items"].get("type", "string"))
-                }
+                items_schema = prop_schema["items"]
+                if isinstance(items_schema, dict) and "$ref" in items_schema:
+                    try:
+                        items_schema = self.resolve_schema_ref(items_schema["$ref"])
+                    except (ValueError, KeyError):
+                        items_schema = {}
+                # Preserve nested object-item shape (name/required/properties) so
+                # callers know per-item structure for array-of-object fields.
+                if (
+                    isinstance(items_schema, dict)
+                    and items_schema.get("type") == "object"
+                    and items_schema.get("properties")
+                ):
+                    nested = self._extract_schema_properties(items_schema)
+                    item_entry: Dict[str, Any] = {"type": "object", "properties": nested}
+                    if items_schema.get("required"):
+                        item_entry["required"] = list(items_schema["required"])
+                    properties[prop_name]["items"] = item_entry
+                else:
+                    properties[prop_name]["items"] = {
+                        "type": self._convert_openapi_type(items_schema.get("type", "string"))
+                        if isinstance(items_schema, dict)
+                        else "string"
+                    }
 
         return properties
 

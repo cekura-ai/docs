@@ -1,0 +1,294 @@
+---
+title: "Runs & Results"
+description: "Trigger evaluations and inspect outcomes"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+<Note>
+Setup steps and authentication are in the [Overview](/cli-sdk/overview). This page covers triggering runs and reading their output.
+</Note>
+
+A **run** is one execution of a scenario against an agent. A **result** is the parent batch (one trigger → many runs, one per scenario × personality combination). The CLI and SDK expose both.
+
+## Pick a mode
+
+The right command depends on the transport:
+
+| Mode | When to use |
+|---|---|
+| `text` | Fast functional check — no audio, scenarios run as text exchanges |
+| `voice` | Outbound voice call via your provider (Vapi/Retell/etc.) |
+| `chirp` | Cekura's hosted voice runner |
+| `livekit_v2` / `pipecat_v2` | Self-hosted LiveKit or Pipecat agents |
+| `sip` | SIP-based provider (e.g. Plivo, Twilio SIP) |
+| `websocket` | Custom WebSocket protocol |
+| `vapi_webrtc`, `retell_webrtc`, `elevenlabs` | Provider WebRTC paths |
+
+## Trigger a run
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    # Text mode (fastest for iteration)
+    cekura scenarios run-text \
+      --agent-id 123 \
+      --scenario-ids 1,2,3
+
+    # Voice via Cekura's hosted runner
+    cekura scenarios run-chirp \
+      --agent-id 123 \
+      --scenario-ids 1,2,3
+
+    # Self-hosted LiveKit
+    cekura scenarios run-livekit-v2 --from-file run.json
+    ```
+
+    Each command returns a JSON envelope with a top-level `result_id`.
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    from cekura import Cekura
+
+    client = Cekura()
+
+    # Text mode
+    result = client.scenarios.run_text(
+        agent_id=123,
+        scenario_ids=[1, 2, 3],
+    )
+    result_id = result["result_id"]
+    ```
+
+    Other modes follow the same shape:
+
+    ```python
+    client.scenarios.run_chirp(agent_id=123, scenario_ids=[1, 2, 3])
+    client.scenarios.run_livekit_v2(agent_id=123, scenario_ids=[1, 2, 3], ...)
+    client.scenarios.run_pipecat_v2(agent_id=123, scenario_ids=[1, 2, 3], ...)
+    client.scenarios.run_voice(agent_id=123, scenario_ids=[1, 2, 3], ...)
+    client.scenarios.run_sip(agent_id=123, scenario_ids=[1, 2, 3], ...)
+    ```
+  </Tab>
+</Tabs>
+
+## Poll status
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura runs list --result-id <result-id> --format json
+    ```
+
+    Loop in a shell script:
+
+    ```bash
+    while true; do
+      STATUSES=$(cekura runs list --result-id "$RESULT_ID" --format json | jq -r '.[].status' | sort -u)
+      [[ "$STATUSES" =~ pending|running ]] || break
+      sleep 5
+    done
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    import time
+
+    while True:
+        runs = client.runs.list(result_id=result_id)
+        statuses = [r["status"] for r in runs.get("results", runs)]
+        if all(s in ("passed", "failed", "errored", "cancelled") for s in statuses):
+            break
+        time.sleep(5)
+
+    print("done:", statuses)
+    ```
+  </Tab>
+</Tabs>
+
+## Inspect a run
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura runs get 5544
+    cekura runs list --agent-id 123
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    run = client.runs.get(run_id=5544)
+    print(run["status"])
+    print(run["transcript"])
+    for m in run["metric_results"]:
+        print(m["metric_name"], m["value"])
+    ```
+  </Tab>
+</Tabs>
+
+## Live operations on in-progress runs
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    # Get a live listen URL while a voice run is in progress
+    cekura runs listen-url 5544
+
+    # End an in-progress call
+    cekura runs end-call 5544
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.runs.get_listen_url(run_id=5544)
+    client.runs.end_call(run_id=5544)
+    ```
+  </Tab>
+</Tabs>
+
+## Vote on a metric result
+
+Capture thumbs up/down feedback on a specific metric evaluation for a run, optionally attach the expected value and free-text feedback. The run is marked as reviewed; the metric evaluation is updated. Feeds the labs / metric-review workflow.
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura runs mark-metric-vote 5544 \
+      --metric-id 55 \
+      --thumbs-down \
+      --expected-value 2 \
+      --feedback "Agent missed the reschedule step"
+    ```
+
+    `--expected-value` is parsed as JSON when possible (`5`, `true`, `"foo"`), so numeric / boolean metrics get the right type.
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.runs.mark_metric_vote(
+        run_id=5544,
+        metric_id=55,
+        thumbs_up=False,
+        expected_value=2,
+        feedback="Agent missed the reschedule step",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Expected outcome
+
+If a scenario has an `expected_outcome`, you can (re)evaluate whether the run met it, then thumbs-vote on the outcome verdict the same way you vote on metric results.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    # Re-score expected outcome for this run
+    client.runs.run_expected_outcome(run_id=5544)
+
+    # Thumbs vote on the outcome verdict
+    client.runs.mark_expected_outcome_vote(
+        run_id=5544,
+        thumbs_up=True,
+        feedback="Agent did escalate to a human",
+    )
+    ```
+  </Tab>
+</Tabs>
+
+## Flag a critical-scenario verdict as wrong
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    client.runs.mark_critical_scenario_wrong(run_id=5544, scenario_id=42)
+    client.runs.unmark_critical_scenario_wrong(run_id=5544, scenario_id=42)
+    ```
+  </Tab>
+</Tabs>
+
+## Improve the agent's prompt from run failures
+
+Iterate on the agent's prompt using the failure pattern across recent runs.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    # Background job — returns a progress_id you can poll
+    job = client.runs.improve_prompt_bg(
+        run_ids=[5544, 5545, 5546],
+        agent=123,
+        prompt="<current agent system prompt>",
+    )
+    client.runs.improve_prompt_progress(progress_id=job["progress_id"])
+
+    # One-shot synchronous variant (smaller batches)
+    client.runs.improve_prompt(run_ids=[5544], agent=123, prompt="<current>")
+
+    # Just the categorized failure issues, without rewriting the prompt
+    client.runs.improve_prompt_issues(run_ids=[5544, 5545], agent=123)
+    ```
+  </Tab>
+</Tabs>
+
+## Re-evaluate without re-running
+
+If you change a metric prompt and want to score existing runs against the new definition:
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura run rerun 987 --metric-ids 55,56
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.results.rerun(result_id=987, metric_ids=[55, 56])
+    ```
+  </Tab>
+</Tabs>
+
+## Promote a run into a test set
+
+Take a passing run and freeze it as a regression dataset:
+
+<Tabs>
+  <Tab title="CLI">
+    ```bash
+    cekura test-sets create-from-run --run-id 5544 --name "regression-2024-04"
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    ```python
+    client.test_sets.create_from_run(run_id=5544, name="regression-2024-04")
+    ```
+  </Tab>
+</Tabs>
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="Evaluators" icon="vial" href="/cli-sdk/evaluators">
+    The scenarios that runs execute.
+  </Card>
+
+  <Card title="Metrics" icon="database" href="/cli-sdk/metrics">
+    Define how runs are scored.
+  </Card>
+
+  <Card title="Calls" icon="phone" href="/cli-sdk/calls">
+    Production calls — same scoring engine, different input.
+  </Card>
+
+  <Card title="API Reference" icon="book" href="/api-reference">
+    Full field reference for runs, results, and run-mode payloads.
+  </Card>
+</CardGroup>

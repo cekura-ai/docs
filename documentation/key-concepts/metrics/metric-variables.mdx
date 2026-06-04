@@ -6,6 +6,10 @@ iconType: "solid"
 description: "Canonical reference for variables available in metric prompts and Python metric scripts"
 ---
 
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
 ## Overview
 
 When writing metric prompts (LLM Judge) or metric scripts (Python Metric), you can reference call data using `{{variable_name}}` placeholders (LLM Judge) or `data["variable_name"]` accessors (Python). The same set of variables is available across both metric types — what varies is which variables exist in **Simulation** vs. **Observability** contexts.
@@ -28,6 +32,7 @@ This page is the authoritative reference for that set. If you're looking at one 
 | `{{test_profile.*}}` | ✅ | ❌ |
 | `{{provider_call_data.*}}` | ✅ | ❌ |
 | `{{agent.*}}` | ✅ | ✅ |
+| `{{evaluator.*}}` | ✅ | ❌ |
 
 ## Available Variables
 
@@ -115,14 +120,35 @@ Access agent configuration details using the `agent.` prefix.
 #### `{{metadata.*}}`
 **Availability:** ✅ Simulation | ❌ Observability
 
-Access metadata fields using the `metadata.` prefix.
+Access metadata fields using the `metadata.` prefix. This namespace includes two system-generated fields **plus any custom key-value pairs** you include in the `metadata` object when submitting a call via the [Custom Integration](/documentation/integrations/custom-integration) webhook or the observability API.
 
-**Available fields:**
+**System-generated fields:**
 
 | Field | Description | Example Value |
 |-------|-------------|---------------|
 | `{{metadata.ringing_duration}}` | Time before call answered (seconds) | `1.2`, `3.5` |
 | `{{metadata.call_end_reason}}` | Same as `{{call_end_reason}}` | `"customer-ended-call"`, `"agent-ended-call"` |
+
+**Custom fields (any key-value pair you send):**
+
+Any field you include in the `metadata` object of your webhook payload is accessible in metric prompts and Python metric scripts using the same dot notation. For example, if your payload includes `"metadata": {"client_uuid": "abc123", "prompt_code": "hr_intro"}`, you can reference `{{metadata.client_uuid}}` and `{{metadata.prompt_code}}` directly in your LLM Judge or Python metric.
+
+```json
+"metadata": {
+  "client_uuid": "abc123",
+  "candidate_uuid": "xyz789",
+  "prompt_code": "hr_intro"
+}
+```
+
+References in an LLM Judge metric prompt:
+- `{{metadata.client_uuid}}` → `"abc123"`
+- `{{metadata.candidate_uuid}}` → `"xyz789"`
+- `{{metadata.prompt_code}}` → `"hr_intro"`
+
+<Note>
+Custom metadata fields are passed at call-submission time. For simulation runs, they arrive via the Custom Integration webhook sent after the run ends. For structured test data you want to vary per run, see [`{{test_profile.*}}`](#test_profile) instead.
+</Note>
 
 #### `{{test_profile.*}}`
 **Availability:** ✅ Simulation | ❌ Observability
@@ -144,6 +170,18 @@ Structured test scenario data configured for simulation runs. Supports nested ob
 This is based on the provider you have integrated on the platform. This variable gives you complete access to call details from your provider platform.
 
 **Example providers:** VAPI, Retell, Elevenlabs, etc.
+
+#### `{{evaluator.*}}`
+**Availability:** ✅ Simulation | ❌ Observability
+
+Access the evaluator (scenario) being run, including its instructions. Useful when a metric or expected outcome prompt needs to reference what the evaluator was supposed to do.
+
+**Available fields:**
+
+| Field | Description | Example Value |
+|-------|-------------|---------------|
+| `{{evaluator.instructions}}` | Evaluator's instructions text. For Conditional Actions evaluators, this is the JSON-serialized conditional actions structure. | `"Call to cancel an appointment scheduled for next Tuesday"` |
+| `{{evaluator.conditional_action_instructions}}` | Conditional action instructions (only populated when the evaluator's type is **Conditional Actions**, otherwise an empty string). JSON string with `conditions` and `role` keys. | `'{"conditions": [{"id": 0, "condition": "...", "action": "...", "type": "standard", "fixed_message": true}], "role": "..."}'` |
 
 #### `{{dynamic_variables.*}}`
 **Availability:** ❌ Simulation | ✅ Observability (via API)

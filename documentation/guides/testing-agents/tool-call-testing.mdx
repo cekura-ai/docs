@@ -6,6 +6,11 @@ iconType: "regular"
 description: "Validate that your agent calls the right tools, with the right arguments, at the right time."
 ---
 
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
 ## Overview
 
 Most real voice agents don't just talk — they call tools: look up a customer, schedule an appointment, transfer to a human, end the call. If your agent says "I've booked your appointment" but never actually invoked the booking tool, the call is a failure no matter how good the transcript sounds.
@@ -96,6 +101,25 @@ For reliable tool call testing, we strongly recommend configuring [Mock Tools](/
 - **Edge-case coverage** — you can force a tool to return an error, a timeout, or an unusual payload to test how the agent handles it
 
 Without mock tools, tool call testing still works, but every failure becomes ambiguous — was it the agent, or was it the backend? Mocking removes that ambiguity.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Tool calls work in text simulation but not in voice testing">
+    This is a known behavior difference between Retell's native text simulation and Cekura's voice tester. Two common causes:
+
+    **1. Voice Activity Detection (VAD) triggering early.** In voice mode, VAD may detect a brief silence or noise and interrupt the agent mid-flow, before the tool call is dispatched. The agent announces the intent ("Let me check those appointments") but the actual tool invocation is cut off. This doesn't happen in text/chat mode because there's no VAD.
+
+    **2. Different model checkpoints in voice vs. text.** Some providers use slightly different model configurations for voice calls versus native text simulations, which can affect how reliably tool calls are issued.
+
+    **Recommended steps:**
+    - Run the same evaluator in **Chat Mode** within Cekura. If the tool call executes in chat but not in voice, the issue is voice-specific (VAD or model checkpoint).
+    - Check your provider's logs for the reproduced run. If you've configured the Retell integration in Cekura, you can inspect the logs directly from the run view.
+    - Tighten your agent prompt to be explicit about tool calls — for example, instruct the agent to only continue speaking after a tool call has returned a result.
+    - Add a **Tool Call Hallucination** metric to your evaluator to automatically detect cases where the agent claims to invoke a tool but doesn't.
+    - OpenAI models (GPT-4o, GPT-4.1) have generally shown more reliable tool call execution in voice contexts than Gemini.
+  </Accordion>
+</AccordionGroup>
 
 ## Related Resources
 

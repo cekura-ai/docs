@@ -1029,6 +1029,30 @@ Latency can occasionally be affected by intermittent performance issues with tra
 
 If you continue to see latency that significantly exceeds your configured settings, please provide specific **Run IDs** or **Call IDs** to the support team for a detailed trace analysis.
 
+## What are best practices for achieving low end-to-end latency in a cascading voice AI pipeline (STT → LLM → TTS)?
+
+A cascading pipeline routes audio through three sequential services — Speech-to-Text (STT), a Large Language Model (LLM), and Text-to-Speech (TTS) — so each stage adds to the overall response time. With the right model choices and architecture, end-to-end latency of around 2 seconds is achievable.
+
+### Model selection
+
+Choose providers optimised for inference speed at each stage:
+
+- **STT:** Deepgram offers consistently low transcription latency and is a common choice for real-time voice applications.
+- **LLM:** Smaller, faster models such as GPT-4o mini balance response quality with reduced generation time compared to larger variants.
+- **TTS:** ElevenLabs provides high-quality synthesis with low time-to-first-audio.
+
+### Pipeline orchestration
+
+Frameworks like [Pipecat](https://docs.cekura.ai/documentation/integrations/pipecat/automated) are well-suited to cascading voice pipelines. Pipecat handles the streaming handoff between STT, LLM, and TTS stages and keeps end-to-end latency predictable.
+
+### Regional considerations
+
+If your users are geographically distant from your model providers' primary data centres (common for EU deployments when using US-hosted APIs), check whether each provider offers regional endpoints. Routing to a closer endpoint can meaningfully reduce round-trip time at each stage.
+
+### Monitoring with Cekura
+
+Once your pipeline is running, use Cekura's [latency metric](https://docs.cekura.ai/documentation/key-concepts/metrics/pre-defined-metrics) to track per-turn response times across test runs, and the [metadata field](https://docs.cekura.ai/documentation/key-concepts/metrics/basic-advanced-metrics#2-metadata) to tag calls by region or configuration variant so you can compare latency across deployment contexts.
+
 ## How can I bulk reassign evaluators to another agent and prevent associated test cases from being deleted when an agent is removed?
 
 When managing agents and their associated evaluators (test cases) in Cekura, you have full control over how data is preserved during deletions and how it is reassigned to new agents.
@@ -1075,6 +1099,12 @@ Currently, the **Improve Scenarios** tool is optimized for updating scenario con
 **Agents and metrics do not have a built-in UI duplication tool.** To replicate agent or metric configuration across projects, use the [REST API](https://docs.cekura.ai/api-reference/test_framework/create-agent) or the [MCP server](https://docs.cekura.ai/mcp/overview) to create them programmatically with the same settings.
 
 For environment separation (e.g., staging vs. production), another option is to keep all agents in a single shared project and use separate API keys or agent IDs to route webhook payloads to different backend environments. This avoids the need to keep multiple copies of metrics and evaluators in sync. See [Organizing Projects](/documentation/guides/organizing-projects) for recommended patterns.
+
+## How do I assign an evaluator to a specific folder when creating it via the API?
+
+Include the `folder_path` field in your request body when calling the [Create Evaluator](https://docs.cekura.ai/api-reference/test_framework/create-evaluator) endpoint. The value is a dot-separated path string matching the folder hierarchy in your project — for example, `"Booking.Happy path"` or `"Sales.Inbound"`.
+
+**The folder must exist before you reference it.** Use the [Create Folder](https://docs.cekura.ai/api-reference/test_framework/create-folder) endpoint (`POST /test_framework/v1/scenarios/create_folder/`) to create the folder first. If you omit `folder_path`, the evaluator is placed in the project root. Opening a root-level evaluator in the UI will prompt you to assign it to a folder before you can save changes.
 
 ## How do I find or create my Cekura API key?
 
@@ -1145,3 +1175,67 @@ See the [Plivo import guide](/documentation/key-concepts/phone-numbers/plivo) fo
 ## How do I submit a bug report or feature request?
 
 Email [support@cekura.ai](mailto:support@cekura.ai) — this routes directly to the engineering team. For bugs, include a brief description of the issue, any relevant run IDs, evaluator URLs, or dashboard links, and your expected vs. actual behavior. For feature requests, a short description of the use case is sufficient. The team will triage and follow up in your support channel.
+
+
+## Does Cekura support threshold-based alerts, and how should I configure alerts for a specific metric?
+
+Cekura does not currently support standard fixed-threshold alerts (for example, "alert me if this score falls below 80%"). The only supported alert type for monitoring is **Significant Change Alerts**.
+
+### Why Significant Change Alerts instead of fixed thresholds?
+
+LLM judge metrics are non-deterministic — the same agent interaction can receive slightly different scores across evaluations. A fixed threshold would generate excessive noise in this environment. Significant Change Alerts work by establishing a statistical baseline and triggering only when the metric deviates meaningfully from that baseline:
+
+1. Cekura computes a rolling baseline (e.g., 90% success rate on your adherence metric).
+2. You configure a sensitivity margin based on standard deviation.
+3. The alert fires only when the metric falls outside that margin — for example, dropping to 84% when the baseline is 90% and the margin is 5%.
+
+This approach surfaces real regressions while ignoring normal LLM variance.
+
+### How to set up an alert
+
+1. Navigate to the **Alerts** section in the Cekura dashboard.
+2. Click **Add New Alert** in the top right corner.
+3. Select the agent and metric you want to monitor.
+4. Configure the Significant Change Alert sensitivity to match your needs.
+
+For more on how metrics are structured, see the [Metrics documentation](https://docs.cekura.ai/documentation/key-concepts/metrics/basic-advanced-metrics).
+
+
+## Is there a way to pull observability call data across multiple projects in a single API call?
+
+No — the [List Calls API](https://docs.cekura.ai/api-reference/observability/list-calls) requires you to scope results to a single project or agent. Cross-project querying in a single call is not supported; the database is indexed at the project level, and cross-project joins are prohibitively expensive.
+
+When using an organization-level API key, providing either `project_id` or `agent_id` is mandatory to scope the query to the correct project.
+
+### Workarounds if your data is split across projects
+
+- **Multiple API calls:** Make one request per `project_id` and merge the results in your own code.
+- **Consolidate into one project:** If you recently migrated an agent to a new project and data is now split, the Cekura team can help move historical data into a single project. Reach out via your support channel to request this.
+
+
+## How can I view my total credit usage or expenses from a previous month?
+
+The Cekura dashboard does not currently provide a single consolidated "last month" credit summary or billing history export. What is available:
+
+- **Settings → Billing:** Use the date filter to view credit usage over a selected window. The maximum filter window is **30 days**, so you can manually set a range that covers the month you want to review. This gives you an indication of usage for that period rather than a pre-built monthly report.
+- **Subscription invoices:** For subscription fees and payment history, go to **Settings → Billing → Manage Plan** to access the Stripe billing portal.
+- **Detailed usage on request:** If you need a precise breakdown (credits consumed by type, overages vs. subscription, etc.), the Cekura team can pull this for you. Reach out via your support channel.
+
+A full billing history view is on the roadmap.
+
+
+## How does Cekura handle decision-level reasoning and explainability, and what data do I need to provide for audit purposes?
+
+Cekura takes model reasoning into account when explaining why specific outcomes occurred and why evaluations passed or failed. Every LLM Judge and Python metric evaluation produces an `explanation` field that describes why the rubric was or wasn't met.
+
+For workflows where you need a complete audit trail — including the internal logic behind each decision, not just whether the outcome was correct — you need to provide the reasoning data yourself, because Cekura cannot reconstruct internal agent decision logic that isn't present in the transcript or the data you send.
+
+### What to send and how
+
+Your LLM generates reasoning tokens as part of its output. Forward the full reasoning to Cekura via the **`metadata` field** of your observability ingest payload alongside the standard model output. Key points:
+
+- **Send the complete reasoning trace.** There is no cost or performance overhead within Cekura for including reasoning in metadata — only metric evaluations consume credits (0.2 credits per evaluation). Metadata content has no additional charge.
+- **Metadata is immutable after the initial POST.** Collect and include the reasoning before sending; it cannot be added or modified after the call record is created.
+- **Alternative — OpenTelemetry tracing.** If your agent's decisions are expressed as tool calls, you can instead emit reasoning via [OTel tracing](https://docs.cekura.ai/documentation/guides/observability/tracing). `tool_call` spans can carry `function.input` / `function.output` attributes, so decision rationale attached to tool calls flows into Cekura and appears linked to the call record.
+
+Once the reasoning is present in the metadata or OTel spans, Cekura surfaces it in the evaluation report alongside the pass/fail outcome, giving you a per-decision audit trail.

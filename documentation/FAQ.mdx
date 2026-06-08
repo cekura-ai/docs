@@ -1172,6 +1172,20 @@ The parallel recording is designed to have minimal impact on your pipeline:
 
 Your existing audio artifacts are unaffected — the SDK records independently and does not interfere with how you store or process audio elsewhere in your pipeline.
 
+If you want to avoid the parallel recording entirely, use `track_pipeline()` instead — see [Can I disable or selectively control audio recording in the Pipecat SDK?](#can-i-disable-or-selectively-control-audio-recording-in-the-pipecat-sdk) for the full set of recording control options.
+
+## Can I disable or selectively control audio recording in the Pipecat SDK?
+
+The Pipecat SDK offers several recording control options depending on your requirements:
+
+**No recording — use `track_pipeline()` (or `track_and_create_task()`)**: These methods capture transcripts, tool calls, logs, and OTel traces but perform no audio recording. Use this for simulation testing environments or any case where audio recording is not permitted.
+
+**Stop recording mid-call — use `abort()`**: Calling `await tracer.abort()` halts all capture immediately and prevents any data from being sent to the Cekura backend. This is useful if consent is withdrawn partway through a call and you want to ensure nothing is stored.
+
+**Disable the tracer entirely**: Set the environment variable `CEKURA_TRACER_ENABLED="false"`. When set, the tracer is a no-op — no data is captured and nothing is sent to Cekura.
+
+**Per-call selective recording (starting without recording and enabling it mid-call)**: This is not currently supported. There is no built-in mechanism to start a call without recording and then begin recording once consent is confirmed mid-conversation. If your workflow requires starting audio capture at a specific point in the conversation, the recommended approach is to use `track_pipeline()` for calls where consent has not yet been obtained, and `observe_pipeline()` for sessions where consent is established upfront. If you need a more fine-grained per-call recording toggle, reach out via your support channel.
+
 ## What can I do on the sandbox plan — does it allow real pre-production testing?
 
 The sandbox plan gives access to the full Cekura platform. You can run real pre-production tests against your agents, use all testing, evaluation, and observability features, and validate your integration before going live.
@@ -1256,6 +1270,24 @@ The Cekura dashboard does not currently provide a single consolidated "last mont
 - **Detailed usage on request:** If you need a precise breakdown (credits consumed by type, overages vs. subscription, etc.), the Cekura team can pull this for you. Reach out via your support channel.
 
 A full billing history view is on the roadmap.
+
+
+## Does Cekura require access to my codebase during onboarding?
+
+Codebase access is preferred but not mandatory. The reasons Cekura requests it:
+
+- **Automated improvement PRs**: With repository access, Cekura can push pull requests directly that improve your agent based on evaluation results — for example, updating prompts, adjusting tool configurations, or refining mock data.
+- **Faster initial integration**: Setting up mock data, tool call schemas, and traces is significantly quicker when Cekura can inspect your existing code structure rather than receiving it piecemeal.
+
+**If you prefer not to grant codebase access**, the integration can still proceed by coordinating directly with a member of your technical team. In that case, Cekura would typically need the following provided manually:
+
+- Event and data schemas relevant to the metrics being built
+- How your system emits traces, logs, or instrumentation data
+- Tool call definitions and metadata fields used in conversations
+
+The trade-off is a slower initial setup and more back-and-forth to get mock data and traces configured correctly. You can also grant access for the initial integration period and revoke it afterward.
+
+If you have questions about the specific access scope required for your engagement, ask in your support channel and a team member will clarify what applies to your setup.
 
 
 ## How does Cekura handle decision-level reasoning and explainability, and what data do I need to provide for audit purposes?

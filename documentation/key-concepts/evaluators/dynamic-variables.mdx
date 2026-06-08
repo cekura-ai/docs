@@ -86,12 +86,18 @@ How can I help you today?
 **At evaluator generation, Cekura produces consistent values across all three outputs:**
 
 ```
-Test profile:    { "firstName": "Sarah", "accountId": "ACC-4521", ... }
-Dynamic vars:    [ { "name": "firstName", "value": "Sarah" },
-                   { "name": "accountId",  "value": "ACC-4521" } ]
-Mock tool entry: { "input": { "account_id": "ACC-4521" },
-                   "output": { "name": "Sarah Johnson", "balance": 1240.00 } }
+Test profile (sectioned):
+  {
+    "main_agent_variables":     { "firstName": "Sarah", "accountId": "ACC-4521" },
+    "testing_agent_variables":  { "customer_name": "Sarah Johnson",
+                                  "story": "Calling about her latest statement." }
+  }
+Mock tool entry:
+  { "input":  { "account_id": "ACC-4521" },
+    "output": { "name": "Sarah Johnson", "balance": 1240.00 } }
 ```
+
+The values in `main_agent_variables` are what the agent under test actually receives as dynamic variables at call time (via `assistantOverrides.variableValues` on VAPI, `retell_llm_dynamic_variables` on Retell, etc.). The values in `testing_agent_variables` are persona context for Cekura's simulated caller — they never reach the agent under test. See [Test Profile → Profile Sections](/documentation/key-concepts/evaluators/test-profile#profile-sections-main-agent-vs-testing-agent) for details.
 
 ## Relationship to Test Profiles and Mock Tools
 
@@ -99,11 +105,15 @@ Dynamic variables, test profiles, and mock tools are generated together as a coo
 
 | Concept | Purpose |
 |---------|---------|
-| **Test Profile** | Static persona facts the evaluator can reference in its instructions |
-| **Dynamic Variables** | Per-call values injected into the agent's system prompt via `{{...}}` placeholders |
-| **Mock Tools** | Predefined tool responses that return data consistent with the persona |
+| **Test Profile** | Sectioned identity blob — `main_agent_variables` (sent to your agent) plus `testing_agent_variables` (persona for the simulator). |
+| **Dynamic Variables** | Per-call values injected into the agent's system prompt via `{{...}}` placeholders. Live in `test_profile.information.main_agent_variables` and are the single source of truth at call time. |
+| **Mock Tools** | Predefined tool responses that return data consistent with the persona. |
 
 All three are kept in sync so that the agent's system prompt, tool responses, and evaluator behavior all reflect the same fictional caller identity.
+
+<Note>
+**API contract — `dynamic_variable_values` (deprecated).** The scenario endpoint historically also returned a top-level `dynamic_variable_values` field with the same flat dict as `main_agent_variables`. It is now **deprecated** and kept read-only for legacy rows. New scenarios leave it `null`. When supplied on `POST`/`PATCH`, the values are bridged into the attached (or auto-created) test profile's `main_agent_variables` section. Migrate callers to read/write `test_profile.information.main_agent_variables` directly.
+</Note>
 
 <Tip>
 Write detailed descriptions for your dynamic variables. The generation system uses these descriptions to produce realistic, contextually correct values. For example, instead of "Account ID", write "The 8-digit numeric account ID in the format ACCT-XXXXXXXX used to look up the caller's record."

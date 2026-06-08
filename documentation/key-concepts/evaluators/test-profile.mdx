@@ -102,6 +102,49 @@ A test profile can include:
 **Keep Test Profiles Organized**: Use clear naming conventions like "Customer-Banking-Premium" or "Patient-Dental-Regular" to easily identify which test profile to use for different scenarios.
 </Tip>
 
+## Profile Sections — Main Agent vs Testing Agent
+
+A test profile's `information` is split into two sections so each value reaches only the right consumer:
+
+| Section | Sent to | What goes here |
+|---|---|---|
+| `main_agent_variables` | The **agent under test** (over the wire as dynamic variables — `assistantOverrides.variableValues` on VAPI, `retell_llm_dynamic_variables` on Retell, `request_data` on Bland, etc.) | Values your production agent already expects to receive at call start: `user_id`, `account_id`, `order_id`, signed customer-id tokens — anything your agent is configured to read as a registered dynamic variable. |
+| `testing_agent_variables` | The **testing agent** (Cekura's simulated caller) | Persona / context the simulator uses to play the caller: `customer_name`, `date_of_birth`, story details, situational facts. These never reach the agent under test. |
+
+Sectioned example:
+
+```json
+{
+  "main_agent_variables": {
+    "user_id": "U-42",
+    "account_id": "ACCT-99",
+    "order_id": "ORD-2024-98765"
+  },
+  "testing_agent_variables": {
+    "customer_name": "Sarah Johnson",
+    "date_of_birth": "1986-04-12",
+    "story": "Wants to return a blue sweater that didn't fit."
+  }
+}
+```
+
+<Tip>
+**Why split?** Persona PII like `customer_name` shouldn't be sent to the agent under test as a dynamic variable unless your agent registered it. Conversely, dynamic-variable values your production code expects shouldn't leak into the testing agent's persona prompt. The split keeps each side honest.
+</Tip>
+
+### Legacy flat profiles
+
+Older test profiles store `information` as a single flat dict (no section keys):
+
+```json
+{
+  "user_name": "Sarah Johnson",
+  "order_id": "ORD-2024-98765"
+}
+```
+
+These keep working — at call time the same flat dict is delivered to **both** the agent under test and the testing agent (preserving pre-split behavior). The sectioned shape is the new default for newly created profiles; legacy profiles can be edited to migrate.
+
 ## Using Test Profile Variables in Instructions
 
 You can reference test profile fields directly in your evaluator instructions using template variables. This gives you precise control over which values appear in your instructions.

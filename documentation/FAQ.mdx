@@ -1148,6 +1148,86 @@ POST /v2/aiagents/
 }
 ```
 
+### Nested collections
+
+The v2 API includes three nested collections that can be managed inline with agent create/update requests:
+
+| Collection | Description |
+|---|---|
+| `mock_tools` | Mock tool definitions with input/output mappings for testing |
+| `dynamic_variables` | Variable definitions injected into agent context at runtime |
+| `knowledge_base_files` | Files uploaded to the agent's knowledge base |
+
+**Full-replace semantics:** When you include a nested collection array in a PATCH or POST request, it becomes the complete desired state for that collection:
+
+- Items with an `id` (or matching `name` for mock tools) update existing records
+- Items without an `id` create new records
+- **Existing items omitted from the list are deleted**
+- Omitting the field entirely leaves the collection unchanged
+
+<Warning>
+Including a collection array replaces the entire collection. Any existing items not listed in the array are permanently deleted.
+</Warning>
+
+**Example: updating mock tools**
+
+```json
+PATCH /v2/aiagents/{id}/
+{
+  "mock_tools": [
+    {"id": 123, "description": "Updated description", "mock_data": [{"input": {"q": 1}, "output": {"a": 2}}]},
+    {"name": "new_tool", "description": "Brand new tool", "mock_data": [{"input": {}, "output": {"ok": true}}]}
+  ]
+}
+```
+
+This request updates tool ID 123, creates `new_tool`, and deletes any other mock tools previously on the agent.
+
+**Example: adding a knowledge base file**
+
+```json
+PATCH /v2/aiagents/{id}/
+{
+  "knowledge_base_files": [
+    {"id": 456},
+    {"file_name": "notes.txt", "content_base64": "aGVsbG8gd29ybGQ="}
+  ]
+}
+```
+
+This keeps file ID 456, adds `notes.txt`, and deletes any other files.
+
+### Response fields
+
+The v2 agent response includes additional fields for mock tool state:
+
+| Field | Type | Description |
+|---|---|---|
+| `mock_tools_enabled` | boolean | Whether mock-tool mode is currently active on the provider |
+| `mock_tools_provider` | string or null | Provider the mock tools were fetched from (`vapi`, `retell`, `elevenlabs`, `custom`). Null until auto-fetch has been run. |
+
+### Mock lifecycle endpoints
+
+The v2 API provides endpoints for managing the mock tool lifecycle directly on the agent resource:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/v2/aiagents/{id}/auto-fetch-tools/` | POST | Discover tools from the provider and generate mock data |
+| `/v2/aiagents/{id}/auto-fetch-tools-progress/` | GET | Poll auto-fetch task status |
+| `/v2/aiagents/{id}/enable-mock-tools/` | POST | Activate mock mode on the provider |
+| `/v2/aiagents/{id}/enable-mock-tools-progress/` | GET | Poll enable task status |
+| `/v2/aiagents/{id}/disable-mock-tools/` | POST | Restore original (non-mock) tool configuration |
+| `/v2/aiagents/{id}/disable-mock-tools-progress/` | GET | Poll disable task status |
+
+**Typical workflow:**
+
+1. **Auto-fetch:** Call `auto-fetch-tools` with the provider type and assistant ID. This discovers the agent's tools and generates mock input/output data.
+2. **Enable:** Once auto-fetch completes, call `enable-mock-tools` to activate mock mode on the provider.
+3. **Test:** Run your scenarios. The agent returns mock tool responses instead of calling live integrations.
+4. **Disable:** Call `disable-mock-tools` to restore the original tool configuration.
+
+All lifecycle endpoints return a `progress_id`. Poll the corresponding progress endpoint until `status` is `completed` or `failed`.
+
 ### Which API should I use?
 
 Use v2 for new integrations. The nested structure makes provider configuration easier to understand and maintain. Existing v1 integrations continue to work without changes.

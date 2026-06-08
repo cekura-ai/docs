@@ -54,19 +54,23 @@ These headers allow you to:
 You can add additional custom headers through test profiles. When a test profile is attached to a scenario or run, your custom headers are sent alongside the default headers in the SIP INVITE request.
 
 **Requirements:**
-- Add key-value pairs to your test profile
+- Put custom headers in the test profile's `information.main_agent_variables` section (these reach the agent under test; values in `testing_agent_variables` stay on the simulator and are not sent over the wire).
 - Header keys must start with `"X-"` (e.g., `"X-Auth-Token"`, `"X-Customer-Type"`)
-- Only keys with the `"X-"` prefix are included as SIP headers
+- Only keys with the `"X-"` prefix from `main_agent_variables` are included as SIP headers
 
 **Example test profile:**
 ```json
 {
   "name": "Premium Customer Profile",
   "information": {
-    "customer_name": "Jane Smith",
-    "X-Auth-Token": "abc123xyz",
-    "X-Customer-Tier": "premium",
-    "X-Account-Type": "business"
+    "main_agent_variables": {
+      "X-Auth-Token": "abc123xyz",
+      "X-Customer-Tier": "premium",
+      "X-Account-Type": "business"
+    },
+    "testing_agent_variables": {
+      "customer_name": "Jane Smith"
+    }
   }
 }
 ```
@@ -74,7 +78,11 @@ You can add additional custom headers through test profiles. When a test profile
 In this example, the SIP INVITE will include:
 - Default headers: `X-Run-Id`, `X-Scenario-Id`, `X-Result-Id`
 - Custom headers: `X-Auth-Token`, `X-Customer-Tier`, `X-Account-Type`
-- Note: `customer_name` is NOT included as a header (doesn't start with "X-")
+- Note: `customer_name` is in `testing_agent_variables` so it is NOT sent as a SIP header. Keys in `testing_agent_variables` stay on Cekura's simulator only.
+
+<Note>
+**Legacy flat profiles** still work — any `X-`-prefixed key in a flat `information` dict will be sent as a SIP header (preserving pre-sectioning behavior). New profiles should use the sectioned shape so persona keys (`customer_name`, `date_of_birth`, etc.) don't accidentally end up on the wire.
+</Note>
 
 <Tip>
 Use custom headers to pass authentication tokens, routing information, or metadata to your SIP infrastructure.

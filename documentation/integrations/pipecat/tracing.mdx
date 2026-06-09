@@ -35,7 +35,7 @@ export const pipecatPrompt = [
   "- Use cekura.track_pipeline() or cekura.track_and_create_task() — these capture transcripts only, no audio. This is what Cekura simulation calls use.",
   "",
   "Common setup for both:",
-  "1. Install the SDK: pip install cekura[pipecat]==1.4.0",
+  "1. Install the SDK: pip install cekura[pipecat]==1.4.1",
   "2. Import PipecatTracer: from cekura.pipecat import PipecatTracer",
   "3. Initialize the tracer:",
   "   cekura = PipecatTracer(",
@@ -164,7 +164,7 @@ Use this setup in your test agents while running simulation calls from the Cekur
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install cekura[pipecat]==1.4.0
+pip install cekura[pipecat]==1.4.1
 ```
 
 </Step>
@@ -292,7 +292,7 @@ Use this setup in your production agents for monitoring live calls with audio re
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install cekura[pipecat]==1.4.0
+pip install cekura[pipecat]==1.4.1
 ```
 
 </Step>
@@ -501,6 +501,31 @@ cekura.set_custom_metadata({"bot_version": "1.0", "environment": "staging"})
 
 `set_custom_metadata()` can be called at any point before the pipeline session finalizes — including in cleanup or post-processing handlers that execute before the session tears down. Once the session has ended and data has been submitted to Cekura, the record is immutable and metadata cannot be updated.
 
+## Deferred Upload (Compliance)
+
+For compliance scenarios where you need user consent before sending any data to the backend, use `defer_upload=True`. All audio is buffered locally and no data (audio, transcript, logs) is sent until you explicitly grant consent.
+
+```python
+pipeline = cekura.observe_pipeline(pipeline, context, runner_args=runner_args, defer_upload=True)
+
+# Grant consent — flushes buffered audio and enables upload:
+await cekura.start_audio_upload()
+
+# Or abort mid-call to discard everything immediately:
+await cekura.abort()
+```
+
+If neither method is called before the session ends, all data is automatically discarded. Nothing is sent to the backend.
+
+Also works with the single-step API:
+
+```python
+task = cekura.observe_and_create_task(
+    pipeline, context, runner_args=runner_args, transport=transport,
+    defer_upload=True,
+)
+```
+
 <Note>
   If you currently send call data to `observability/v1/observe/` and want to adopt the SDK — or are wondering whether both can run simultaneously — see [Can I also add the Pipecat SDK if I already post to the observability endpoint?](/documentation/FAQ#i-already-post-call-data-to-the-observability-endpoint-from-my-pipecat-agent-can-i-also-add-the-pipecat-sdk) in the FAQ.
 
@@ -547,7 +572,8 @@ pipeline = tracer.observe_pipeline(
     context,               # Required: LLMContext instance
     runner_args=None,      # Optional: RunnerArguments (session_id extracted if present)
     session_id=None,       # Optional: Takes precedence over runner_args.session_id
-    custom_metadata=None   # Optional: Dict of custom metadata
+    custom_metadata=None,  # Optional: Dict of custom metadata
+    defer_upload=False     # Optional: Hold all data until start_audio_upload() is called
 )
 ```
 
@@ -579,6 +605,7 @@ task = tracer.observe_and_create_task(
     transport=None,        # Optional: Transport for cleanup on disconnect
     session_id=None,       # Optional: Custom session identifier
     custom_metadata=None,  # Optional: Dict of custom metadata
+    defer_upload=False,    # Optional: Hold all data until start_audio_upload() is called
     **pipeline_task_kwargs # Optional: Additional args forwarded to PipelineTask
 )
 ```
@@ -610,9 +637,17 @@ task = tracer.register_task_handlers(
 )
 ```
 
+### start_audio_upload()
+
+Grants consent and begins uploading session data when `defer_upload=True`. Flushes any buffered audio to S3 and enables normal upload for the rest of the session. No-op if `defer_upload` was not set.
+
+```python
+await tracer.start_audio_upload()
+```
+
 ### abort()
 
-Stops all capture mid-call and prevents data from being sent to the Cekura backend.
+Stops all capture mid-call and prevents data from being sent to the Cekura backend. Clears any deferred audio buffer and aborts in-progress S3 uploads.
 
 ```python
 await tracer.abort()

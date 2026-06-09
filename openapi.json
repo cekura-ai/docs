@@ -6082,7 +6082,7 @@
         "/observability/v1/metric-failure-mode-insights/bulk_generate/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-bulk-generate-create",
-                "description": "Fan out audits to every eligible metric in the project.\n\nTriggered by the Insights page's \"Generate\" button. Uses the\nsliding ``T-24h`` to ``T`` window (where ``T`` is now), so the\nresult is fresh even between the daily cron firings. Returns\nthe new insight rows so the FE can poll their status.\n\nMetrics with no failing calls in the window get a\n``skipped_no_failures`` marker row (no Celery task queued);\nmetrics already mid-run from a recent cron are returned as-is\ninstead of being re-queued (dedupe inside the kickoff helper).",
+                "description": "Fan out audits to every eligible metric in the project.\n\nTriggered by the Insights page's \"Generate\" button. Uses the\nsliding ``T-24h`` to ``T`` window (where ``T`` is now), so the\nresult is fresh even between the daily cron firings. Returns\nthe new insight rows so the FE can poll their status.\n\nMetrics with no failing calls in the window get a\n``skipped_no_failures`` marker row (no Celery task queued);\nmetrics already mid-run from a recent cron are returned as-is\ninstead of being re-queued (dedupe inside the kickoff helper).\n\nCost: ``get_insight_generation_cost()`` credits per metric that\nactually produces an insight (i.e. had ≥1 failing call in the 24h\nwindow). Eligible metrics with no failing calls generate nothing\nand are not charged — you pay only for the insight cards you get.\nThe per-metric price is admin-configurable via the\n``INSIGHT_GENERATION_COST`` SettingValue. Insufficient balance →\nHTTP 402 from the global exception handler before any work is\nqueued.",
                 "tags": [
                     "observability"
                 ],
@@ -6163,6 +6163,32 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/MetricFailureModeInsightGenerate"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/metric-failure-mode-insights/pricing/": {
+            "get": {
+                "operationId": "metric-failure-mode-insights-pricing-retrieve",
+                "description": "Per-metric credit cost of a manual Insights ``Generate`` press.\n\nLets the FE label the button with the live price (e.g. \"Generate\n(10 credits/metric)\") instead of hardcoding a number that would\ndrift from the admin-set ``INSIGHT_GENERATION_COST``. Scoped by\n``?project=<id>`` so the standard project-access permission check\napplies; the price itself is global.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricFailureModeInsight"
                                 }
                             }
                         },
@@ -23099,6 +23125,40 @@
                 }
             }
         },
+        "/test_framework/v1/results-external/{id}/regenerate_ai_summary/": {
+            "post": {
+                "operationId": "results-external-regenerate-ai-summary-create",
+                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix) and recommended next steps for this result, based on its current failure clusters. The new summary appears on the next `results_retrieve` call once the job finishes.",
+                "summary": "Regenerate the AI summary for a result",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this result.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Results"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Regeneration queued; poll results_retrieve to see the new ai_summary / next_steps."
+                    },
+                    "404": {
+                        "description": "Result not found"
+                    }
+                }
+            }
+        },
         "/test_framework/v1/results-external/{id}/rerun/": {
             "post": {
                 "operationId": "results-external-rerun-create",
@@ -24199,6 +24259,40 @@
                         "enabled": true,
                         "name": "results-evaluate-metrics-create",
                         "description": "Evaluate metrics against result transcripts"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/results/{id}/regenerate_ai_summary/": {
+            "post": {
+                "operationId": "results-regenerate-ai-summary-create",
+                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix) and recommended next steps for this result, based on its current failure clusters. The new summary appears on the next `results_retrieve` call once the job finishes.",
+                "summary": "Regenerate the AI summary for a result",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this result.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Results"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Regeneration queued; poll results_retrieve to see the new ai_summary / next_steps."
+                    },
+                    "404": {
+                        "description": "Result not found"
                     }
                 }
             }
@@ -53418,6 +53512,7 @@
             },
             "CallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -53609,6 +53704,7 @@
             },
             "CallLogList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -54802,6 +54898,7 @@
             },
             "Dashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -54933,6 +55030,7 @@
             },
             "DashboardList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -57205,6 +57303,7 @@
             },
             "MetricList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -59906,6 +60005,7 @@
             },
             "PatchedCallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -60363,6 +60463,7 @@
             },
             "PatchedDashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -61984,6 +62085,31 @@
                         "readOnly": true,
                         "description": "\nFailed reasons of the test runs\nExample:\n```json\n{\n    \"issues\": [\n      {\n        \"rank\": 1,\n        \"run_ids\": [\n          34588\n        ],\n        \"description\": \"The agent did not provide the standard greeting, emergency disclaimer, or ask how they could help.\",\n        \"affected_count\": 1\n      },\n      {\n        \"rank\": 2,\n        \"run_ids\": [\n          34588\n        ],\n        \"description\": \"The agent did not explain the distinction between the primary care and express clinics.\",\n        \"affected_count\": 1\n      }\n    ],\n    \"total_failed_runs\": 1\n  }\n```\n"
                     },
+                    "ai_summary": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nLLM-generated narrative summary of the result, structured for the Results-page UI.\nExample:\n```json\n{\n    \"what_happened\": \"8 of 10 runs failed, 2 passed. All 8 failures cluster into 3 distinct causes.\",\n    \"why_it_happened\": \"The default test profile isn't seeded in the production backend, so every auth-required workflow exits before PIN/address steps run.\",\n    \"how_to_fix\": \"Seed the test profile in production, tighten the competitor-mention guardrail, and add CA-only store phrasing to the FAQ flow.\",\n    \"generated_from_runs_count\": 10,\n    \"generated_at\": \"2026-05-25T12:00:00Z\"\n}\n```\n"
+                    },
+                    "next_steps": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nLLM-suggested next steps to fix the issues found in this result, ordered by impact.\nExample:\n```json\n[\n    {\"title\": \"Seed test profile in production\", \"description\": \"Unblocks 6 runs; ~5 min.\"},\n    {\"title\": \"Tighten competitor guardrail\", \"description\": \"1 prompt edit; review drift run.\"}\n]\n```\n"
+                    },
+                    "performance_metrics": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Per-rubric-rule performance breakdown. One entry per rule in the project's rubric_config: metric name, aggregated value across the result's runs, and whether that aggregate meets the rule's conditions."
+                    },
                     "run_type": {
                         "type": [
                             "string",
@@ -62640,6 +62766,7 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -63373,7 +63500,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, and hyphens",
+                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, hyphens, and spaces between words (no leading or trailing spaces)",
                         "maxLength": 255
                     },
                     "description": {
@@ -65461,6 +65588,31 @@
                         "readOnly": true,
                         "description": "\nFailed reasons of the test runs\nExample:\n```json\n{\n    \"issues\": [\n      {\n        \"rank\": 1,\n        \"run_ids\": [\n          34588\n        ],\n        \"description\": \"The agent did not provide the standard greeting, emergency disclaimer, or ask how they could help.\",\n        \"affected_count\": 1\n      },\n      {\n        \"rank\": 2,\n        \"run_ids\": [\n          34588\n        ],\n        \"description\": \"The agent did not explain the distinction between the primary care and express clinics.\",\n        \"affected_count\": 1\n      }\n    ],\n    \"total_failed_runs\": 1\n  }\n```\n"
                     },
+                    "ai_summary": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nLLM-generated narrative summary of the result, structured for the Results-page UI.\nExample:\n```json\n{\n    \"what_happened\": \"8 of 10 runs failed, 2 passed. All 8 failures cluster into 3 distinct causes.\",\n    \"why_it_happened\": \"The default test profile isn't seeded in the production backend, so every auth-required workflow exits before PIN/address steps run.\",\n    \"how_to_fix\": \"Seed the test profile in production, tighten the competitor-mention guardrail, and add CA-only store phrasing to the FAQ flow.\",\n    \"generated_from_runs_count\": 10,\n    \"generated_at\": \"2026-05-25T12:00:00Z\"\n}\n```\n"
+                    },
+                    "next_steps": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nLLM-suggested next steps to fix the issues found in this result, ordered by impact.\nExample:\n```json\n[\n    {\"title\": \"Seed test profile in production\", \"description\": \"Unblocks 6 runs; ~5 min.\"},\n    {\"title\": \"Tighten competitor guardrail\", \"description\": \"1 prompt edit; review drift run.\"}\n]\n```\n"
+                    },
+                    "performance_metrics": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Per-rubric-rule performance breakdown. One entry per rule in the project's rubric_config: metric name, aggregated value across the result's runs, and whether that aggregate meets the rule's conditions."
+                    },
                     "run_type": {
                         "type": [
                             "string",
@@ -65807,6 +65959,7 @@
             },
             "RunList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -66231,6 +66384,7 @@
             },
             "Scenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -66430,10 +66584,6 @@
                     "dynamic_variable_values": {
                         "readOnly": true,
                         "description": "REMOVED FROM API. Reads return the historical value for legacy rows (`null` for new rows). Writes are no longer accepted — supplying a non-null value yields a 400 error. Put dynamic-variable values in `test_profile_data.information.main_agent_variables` instead: create the test profile via POST /test-profiles/ and attach it via the `test_profile` field on the scenario."
-                    },
-                    "generated_mock_tool_entries": {
-                        "readOnly": true,
-                        "description": "Expected mock tool calls generated for this evaluator during scenario auto-generation when the agent has mock tools attached. Each entry has shape {tool_id, tool_name, new_entry: {input, output}}."
                     },
                     "generated_mock_tool_entries": {
                         "readOnly": true,
@@ -67103,6 +67253,7 @@
             },
             "ScenarioList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67322,6 +67473,7 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67524,10 +67676,6 @@
                     "dynamic_variable_values": {
                         "readOnly": true,
                         "description": "REMOVED FROM API. Reads return the historical value for legacy rows (`null` for new rows). Writes are no longer accepted — supplying a non-null value yields a 400 error. Put dynamic-variable values in `test_profile_data.information.main_agent_variables` instead: create the test profile via POST /test-profiles/ and attach it via the `test_profile` field on the scenario."
-                    },
-                    "generated_mock_tool_entries": {
-                        "readOnly": true,
-                        "description": "Expected mock tool calls generated for this evaluator during scenario auto-generation when the agent has mock tools attached. Each entry has shape {tool_id, tool_name, new_entry: {input, output}}."
                     },
                     "generated_mock_tool_entries": {
                         "readOnly": true,
@@ -68770,6 +68918,7 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -69018,6 +69167,7 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -69177,6 +69327,7 @@
             },
             "SchemaScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69376,10 +69527,6 @@
                     "dynamic_variable_values": {
                         "readOnly": true,
                         "description": "REMOVED FROM API. Reads return the historical value for legacy rows (`null` for new rows). Writes are no longer accepted — supplying a non-null value yields a 400 error. Put dynamic-variable values in `test_profile_data.information.main_agent_variables` instead: create the test profile via POST /test-profiles/ and attach it via the `test_profile` field on the scenario."
-                    },
-                    "generated_mock_tool_entries": {
-                        "readOnly": true,
-                        "description": "Expected mock tool calls generated for this evaluator during scenario auto-generation when the agent has mock tools attached. Each entry has shape {tool_id, tool_name, new_entry: {input, output}}."
                     },
                     "generated_mock_tool_entries": {
                         "readOnly": true,
@@ -70555,7 +70702,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, and hyphens",
+                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, hyphens, and spaces between words (no leading or trailing spaces)",
                         "maxLength": 255
                     },
                     "description": {

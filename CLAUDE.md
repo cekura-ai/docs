@@ -60,3 +60,4 @@ mintlify dev      # run from this directory
 ## Rule — keep this repo public-safe
 
 This repo is public. Do not add references to internal implementation details, upstream service names, internal file paths, decorator names, or migration history in any file here (`.mdx`, `.py`, `.md`, workflow YAML). Describe behavior in terms of what is visible in `openapi.json` and the files in this repo.
+

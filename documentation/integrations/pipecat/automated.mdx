@@ -253,38 +253,52 @@ Poll for results using the [List Runs with IDs API](/api-reference/test_framewor
 
 ## Accessing Test Profile Data in Your Agent
 
-In the automated flow, Cekura creates the Pipecat session on your behalf. When a [test profile](/documentation/key-concepts/evaluators/test-profile) is assigned to the scenario, Cekura **flattens** the test profile fields directly into the **Agent Configuration JSON** (`SessionParams.data`). This means your agent can access test profile values as top-level keys — no custom extraction needed.
+In the automated flow, Cekura creates the Pipecat session on your behalf. When a [test profile](/documentation/key-concepts/evaluators/test-profile) is assigned to the scenario, Cekura merges the profile's **`main_agent_variables`** section directly into the **Agent Configuration JSON** (`SessionParams.data`). Values in `testing_agent_variables` stay on Cekura's simulated caller and are **not** sent to your agent.
 
 ### Session Data Structure
 
-Your agent receives the Agent Configuration JSON via `SessionParams.data`. When a test profile is attached, its fields are merged directly into the config:
+Given a test profile with this sectioned `information`:
+
+```json
+{
+  "main_agent_variables": {
+    "user_id": "U-42",
+    "account_id": "ACC-12345"
+  },
+  "testing_agent_variables": {
+    "customer_name": "John Doe",
+    "story": "Calling about her latest statement"
+  }
+}
+```
+
+your agent's `SessionParams.data` becomes:
 
 ```json
 {
   "your_existing_config_key": "value",
-  "user_name": "John Doe",
-  "user_email": "john@example.com",
+  "user_id": "U-42",
   "account_id": "ACC-12345"
 }
 ```
 
-If a test profile key matches an existing key in the Agent Configuration, the test profile value takes precedence.
+Only `main_agent_variables` keys are flattened. `customer_name` / `story` are kept on the simulator. If a `main_agent_variables` key matches an existing key in the Agent Configuration, the test profile value takes precedence.
 
 ### Accessing Test Profile Fields in Your Agent
 
-Since test profile fields are top-level keys, access them directly from the session data:
+Since `main_agent_variables` are top-level keys in `session_data`, access them directly:
 
 ```python
 async def main(session_data: dict):
-    # Test profile fields are merged directly into session_data
-    user_name = session_data.get("user_name", "")
+    # main_agent_variables are merged directly into session_data
+    user_id = session_data.get("user_id", "")
     account_id = session_data.get("account_id", "")
 
     # Use the variables to customize your agent behavior
 ```
 
 <Note>
-Test profile fields are flattened into the same Agent Configuration JSON you configure in your agent settings. If a test profile key has the same name as an existing config key, the test profile value will override it. This lets you use your Agent Configuration as defaults that get overridden per-scenario via test profiles.
+Only `main_agent_variables` are flattened into your Agent Configuration JSON — never `testing_agent_variables`. Put any value your agent needs to read at call start (e.g., `user_id`, `account_id`) into `main_agent_variables`. Persona facts the simulated caller should use (e.g., `customer_name`, `date_of_birth`) belong in `testing_agent_variables` so they don't leak into your agent's config.
 </Note>
 
 ## Key Terminology

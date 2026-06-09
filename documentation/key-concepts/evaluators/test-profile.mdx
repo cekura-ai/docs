@@ -106,9 +106,14 @@ A test profile can include:
 
 Test profiles organize variables into two sections based on where they are used:
 
+| Section | Sent to | What goes here |
+|---|---|---|
+| `main_agent_variables` | The **agent under test** (over the wire as dynamic variables — `assistantOverrides.variableValues` on VAPI, `retell_llm_dynamic_variables` on Retell, `request_data` on Bland, etc.) | Values your production agent already expects to receive at call start: `user_id`, `account_id`, `order_id`, signed customer-id tokens — anything your agent is configured to read as a registered dynamic variable. |
+| `testing_agent_variables` | The **testing agent** (Cekura's simulated caller) | Persona / context the simulator uses to play the caller: `customer_name`, `date_of_birth`, story details, situational facts. These never reach the agent under test. |
+
 ### Main Agent Variables
 
-Variables in this section are sent to your agent under test as dynamic variables. They populate `{{...}}` placeholders in your agent's system prompt and appear in provider-specific fields (VAPI `variableValues`, Retell `dynamic_variables`, ElevenLabs `dynamic_variables`, Pipecat `session_config`, LiveKit dispatch metadata, or custom HTTP headers).
+Variables in `main_agent_variables` are sent to your agent under test as dynamic variables. They populate `{{...}}` placeholders in your agent's system prompt and appear in provider-specific fields (VAPI `variableValues`, Retell `dynamic_variables`, ElevenLabs `dynamic_variables`, Pipecat `session_config`, LiveKit dispatch metadata, or custom HTTP headers).
 
 Use this section for values your agent needs at runtime:
 - Customer IDs or account numbers
@@ -117,7 +122,7 @@ Use this section for values your agent needs at runtime:
 
 ### Testing Agent Variables
 
-Variables in this section are used by the evaluator to play a convincing caller. They shape the evaluator's instructions and context but are never sent to your agent.
+Variables in `testing_agent_variables` are used by the evaluator to play a convincing caller. They shape the evaluator's instructions and context but are never sent to your agent.
 
 Use this section for persona details the evaluator needs:
 - The caller's name and personal information
@@ -125,6 +130,27 @@ Use this section for persona details the evaluator needs:
 - Security question answers
 
 This separation ensures your agent receives only the values it needs, while the evaluator has the full persona context to respond naturally.
+
+<Tip>
+**Why split?** Persona PII like `customer_name` shouldn't be sent to the agent under test as a dynamic variable unless your agent registered it. Conversely, dynamic-variable values your production code expects shouldn't leak into the testing agent's persona prompt. The split keeps each side honest.
+</Tip>
+
+### Sectioned Example
+
+```json
+{
+  "main_agent_variables": {
+    "user_id": "U-42",
+    "account_id": "ACCT-99",
+    "order_id": "ORD-2024-98765"
+  },
+  "testing_agent_variables": {
+    "customer_name": "Sarah Johnson",
+    "date_of_birth": "1986-04-12",
+    "story": "Wants to return a blue sweater that didn't fit."
+  }
+}
+```
 
 ### Creating a Test Profile
 
@@ -134,6 +160,13 @@ When you create or edit a test profile, the dialog displays both sections with l
 2. **Testing agent variables** — Persona and context used by the simulated caller
 
 Add key-value pairs to each section based on where the variable should be used.
+
+<Note>
+**Both sections are optional.** Set only the ones you need:
+- If your agent has no registered [dynamic variables](/documentation/key-concepts/evaluators/dynamic-variables), omit `main_agent_variables` (or leave it `{}`) — there's nothing for it to deliver. Put persona/context for the simulated caller in `testing_agent_variables` only.
+- If you only need to send dynamic-variable values and don't need to brief the simulated caller separately, populate `main_agent_variables` and leave `testing_agent_variables` empty (or omit it).
+- Both empty / both missing is also valid — the profile then has no information payload but can still be attached to a scenario for naming purposes.
+</Note>
 
 <Note>
 Existing test profiles created before this feature will show all variables in the **Testing agent variables** section when opened. Move any variables that should reach your agent into **Main agent variables** before saving.

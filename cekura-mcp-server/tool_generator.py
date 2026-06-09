@@ -98,10 +98,10 @@ def apply_overlay_to_schema(tool_name: str, schema: Dict[str, Any]) -> Dict[str,
         schema['required'] = sorted(existing)
 
     # Force specific body fields to a given JSON-schema type. For fields the
-    # backend stores as JSON objects but the OpenAPI spec types as `string`
-    # (e.g. AIAgent.pipecat_data), declaring `object` makes the HTTP client
-    # coerce the model's stringified value to a dict before sending — the
-    # backend rejects a raw string. Scoped per-tool via mcp_tools.json.
+    # backend stores as JSON objects but the OpenAPI spec types as `string`,
+    # declaring `object` makes the HTTP client coerce the model's stringified
+    # value to a dict before sending — the backend rejects a raw string.
+    # Scoped per-tool via mcp_tools.json.
     for field_name, ptype in (overlay.get('property_types') or {}).items():
         prop = (schema.get('properties') or {}).get(field_name)
         if isinstance(prop, dict):

@@ -518,6 +518,28 @@ If you continue to face difficulties, please contact our support team so we can 
 Cekura is fully GDPR compliant, ensuring that all data processing activities meet the rigorous standards set by the European Union for data protection and privacy. We provide a Data Processing Agreement (DPA) to our customers upon request to help satisfy legal and regulatory requirements. Please note that the DPA is provided upon request for a fee. To initiate this process or to receive further documentation regarding our compliance standards, please contact our support team.
 
 
+## What are Cekura's EU data residency options and standard contract terms?
+
+### EU Data Residency
+
+Cekura provides data residency options that depend on the type of data being processed:
+
+- **Production monitoring data:** EU data residency is currently live. If you are using Cekura to monitor live agent conversations (including recordings and transcripts), this data can be hosted within the EU region to meet local compliance requirements.
+- **Synthetic testing data:** Currently hosted in the US. A version supporting EU residency for synthetic testing data is in development.
+
+For GDPR compliance documentation and Data Processing Agreements, see the section above.
+
+### Contract Terms
+
+The standard minimum contract term is **12 months**. A **one-month break clause** is available — if the product or support does not meet your needs within the first month, you have the option to exit the agreement.
+
+### Data Portability
+
+To avoid vendor lock-in, Cekura provides full API access to retrieve your data at any time. See our [API Reference for Getting Call Data](https://docs.cekura.ai/api-reference/observability/get-call) for details on programmatically exporting call data and metadata.
+
+For custom contract arrangements or enterprise pricing, contact [support@cekura.ai](mailto:support@cekura.ai).
+
+
 ## How can I schedule runs of evaluators in the platform?
 
 Yes, you can schedule automated runs of your evaluators using the **Cronjobs** feature in Cekura. This allows you to perform regular testing and monitoring of your AI agents without manual intervention. To set up a schedule, follow these steps: 1. **Select Evaluators**: Go to your evaluators list and check the boxes next to the ones you want to schedule. 2. **Open Actions**: Click the **Actions** button found in the top right corner of the dashboard. 3. **Configure Cron Job**: Select **Cron jobs** from the menu. 4. **Set Schedule**: Choose your desired frequency and timing for the runs. Once configured, Cekura will automatically execute these test cases based on your defined schedule and evaluate them against your metrics.
@@ -994,6 +1016,18 @@ If you are integrating your conversation data for monitoring, you can find more 
 - [Observability API Reference - Get Call Data](https://docs.cekura.ai/api-reference/observability/get-call)
 - [Metadata and Metrics Guide](https://docs.cekura.ai/documentation/key-concepts/metrics/basic-advanced-metrics#2-metadata)
 
+## How is the pay-as-you-go (developer) plan priced, and do I get more credits when I add team members?
+
+Cekura's **pay-as-you-go plan** is designed for individual developers and small teams. The pricing structure is per seat:
+
+- **First user:** free
+- **Each additional user:** $30 per user per month
+
+Credits are purchased separately from the seat price. Adding a team member does not automatically increase your credit allocation — credits are bought independently as needed.
+
+For higher credit volumes, concurrent call limits above 10, or multi-project access, contact [support@cekura.ai](mailto:support@cekura.ai) to discuss available plans.
+
+
 ## What is the maximum number of projects I can create on my plan?
 
 The number of projects you can create depends on your subscription plan. The **Developer plan** includes a limit of **1 project**. If you receive a `400: Max projects limit reached` error when trying to create a new project, you have reached your plan's project quota.
@@ -1028,6 +1062,30 @@ By default, the Testing Agent often uses an LLM to generate responses based on t
 Latency can occasionally be affected by intermittent performance issues with transcribers or LLM providers. While Cekura works to accommodate these spikes within your configured wait times, using deterministic evaluators (Fixed Messages) is the most effective way to ensure the agent stays within the timing requirements of your silence detection system.
 
 If you continue to see latency that significantly exceeds your configured settings, please provide specific **Run IDs** or **Call IDs** to the support team for a detailed trace analysis.
+
+## What are best practices for achieving low end-to-end latency in a cascading voice AI pipeline (STT → LLM → TTS)?
+
+A cascading pipeline routes audio through three sequential services — Speech-to-Text (STT), a Large Language Model (LLM), and Text-to-Speech (TTS) — so each stage adds to the overall response time. With the right model choices and architecture, end-to-end latency of around 2 seconds is achievable.
+
+### Model selection
+
+Choose providers optimised for inference speed at each stage:
+
+- **STT:** Deepgram offers consistently low transcription latency and is a common choice for real-time voice applications.
+- **LLM:** Smaller, faster models such as GPT-4o mini balance response quality with reduced generation time compared to larger variants.
+- **TTS:** ElevenLabs provides high-quality synthesis with low time-to-first-audio.
+
+### Pipeline orchestration
+
+Frameworks like [Pipecat](https://docs.cekura.ai/documentation/integrations/pipecat/automated) are well-suited to cascading voice pipelines. Pipecat handles the streaming handoff between STT, LLM, and TTS stages and keeps end-to-end latency predictable.
+
+### Regional considerations
+
+If your users are geographically distant from your model providers' primary data centres (common for EU deployments when using US-hosted APIs), check whether each provider offers regional endpoints. Routing to a closer endpoint can meaningfully reduce round-trip time at each stage.
+
+### Monitoring with Cekura
+
+Once your pipeline is running, use Cekura's [latency metric](https://docs.cekura.ai/documentation/key-concepts/metrics/pre-defined-metrics) to track per-turn response times across test runs, and the [metadata field](https://docs.cekura.ai/documentation/key-concepts/metrics/basic-advanced-metrics#2-metadata) to tag calls by region or configuration variant so you can compare latency across deployment contexts.
 
 ## How can I bulk reassign evaluators to another agent and prevent associated test cases from being deleted when an agent is removed?
 
@@ -1076,6 +1134,12 @@ Currently, the **Improve Scenarios** tool is optimized for updating scenario con
 
 For environment separation (e.g., staging vs. production), another option is to keep all agents in a single shared project and use separate API keys or agent IDs to route webhook payloads to different backend environments. This avoids the need to keep multiple copies of metrics and evaluators in sync. See [Organizing Projects](/documentation/guides/organizing-projects) for recommended patterns.
 
+## How do I assign an evaluator to a specific folder when creating it via the API?
+
+Include the `folder_path` field in your request body when calling the [Create Evaluator](https://docs.cekura.ai/api-reference/test_framework/create-evaluator) endpoint. The value is a dot-separated path string matching the folder hierarchy in your project — for example, `"Booking.Happy path"` or `"Sales.Inbound"`.
+
+**The folder must exist before you reference it.** Use the [Create Folder](https://docs.cekura.ai/api-reference/test_framework/create-folder) endpoint (`POST /test_framework/v1/scenarios/create_folder/`) to create the folder first. If you omit `folder_path`, the evaluator is placed in the project root. Opening a root-level evaluator in the UI will prompt you to assign it to a folder before you can save changes.
+
 ## How do I find or create my Cekura API key?
 
 Navigate to **Settings** → **Organization** → **API Key** in the Cekura dashboard (direct link: [dashboard.cekura.ai/dashboard/settings/org/api-key](https://dashboard.cekura.ai/dashboard/settings/org/api-key)). From there you can copy an existing key or create a new one.
@@ -1107,6 +1171,20 @@ The parallel recording is designed to have minimal impact on your pipeline:
 - **Chunked multipart upload:** Audio is uploaded to Cekura in small chunks, keeping memory consumption low even during long sessions.
 
 Your existing audio artifacts are unaffected — the SDK records independently and does not interfere with how you store or process audio elsewhere in your pipeline.
+
+If you want to avoid the parallel recording entirely, use `track_pipeline()` instead — see [Can I disable or selectively control audio recording in the Pipecat SDK?](#can-i-disable-or-selectively-control-audio-recording-in-the-pipecat-sdk) for the full set of recording control options.
+
+## Can I disable or selectively control audio recording in the Pipecat SDK?
+
+The Pipecat SDK offers several recording control options depending on your requirements:
+
+**No recording — use `track_pipeline()` (or `track_and_create_task()`)**: These methods capture transcripts, tool calls, logs, and OTel traces but perform no audio recording. Use this for simulation testing environments or any case where audio recording is not permitted.
+
+**Stop recording mid-call — use `abort()`**: Calling `await tracer.abort()` halts all capture immediately and prevents any data from being sent to the Cekura backend. This is useful if consent is withdrawn partway through a call and you want to ensure nothing is stored.
+
+**Disable the tracer entirely**: Set the environment variable `CEKURA_TRACER_ENABLED="false"`. When set, the tracer is a no-op — no data is captured and nothing is sent to Cekura.
+
+**Per-call selective recording (starting without recording and enabling it mid-call)**: This is not currently supported. There is no built-in mechanism to start a call without recording and then begin recording once consent is confirmed mid-conversation. If your workflow requires starting audio capture at a specific point in the conversation, the recommended approach is to use `track_pipeline()` for calls where consent has not yet been obtained, and `observe_pipeline()` for sessions where consent is established upfront. If you need a more fine-grained per-call recording toggle, reach out via your support channel.
 
 ## What can I do on the sandbox plan — does it allow real pre-production testing?
 
@@ -1145,3 +1223,101 @@ See the [Plivo import guide](/documentation/key-concepts/phone-numbers/plivo) fo
 ## How do I submit a bug report or feature request?
 
 Email [support@cekura.ai](mailto:support@cekura.ai) — this routes directly to the engineering team. For bugs, include a brief description of the issue, any relevant run IDs, evaluator URLs, or dashboard links, and your expected vs. actual behavior. For feature requests, a short description of the use case is sufficient. The team will triage and follow up in your support channel.
+
+
+## Does Cekura support threshold-based alerts, and how should I configure alerts for a specific metric?
+
+Cekura does not currently support standard fixed-threshold alerts (for example, "alert me if this score falls below 80%"). The only supported alert type for monitoring is **Significant Change Alerts**.
+
+### Why Significant Change Alerts instead of fixed thresholds?
+
+LLM judge metrics are non-deterministic — the same agent interaction can receive slightly different scores across evaluations. A fixed threshold would generate excessive noise in this environment. Significant Change Alerts work by establishing a statistical baseline and triggering only when the metric deviates meaningfully from that baseline:
+
+1. Cekura computes a rolling baseline (e.g., 90% success rate on your adherence metric).
+2. You configure a sensitivity margin based on standard deviation.
+3. The alert fires only when the metric falls outside that margin — for example, dropping to 84% when the baseline is 90% and the margin is 5%.
+
+This approach surfaces real regressions while ignoring normal LLM variance.
+
+### How to set up an alert
+
+1. Navigate to the **Alerts** section in the Cekura dashboard.
+2. Click **Add New Alert** in the top right corner.
+3. Select the agent and metric you want to monitor.
+4. Configure the Significant Change Alert sensitivity to match your needs.
+
+For more on how metrics are structured, see the [Metrics documentation](https://docs.cekura.ai/documentation/key-concepts/metrics/basic-advanced-metrics).
+
+
+## Is there a way to pull observability call data across multiple projects in a single API call?
+
+No — the [List Calls API](https://docs.cekura.ai/api-reference/observability/list-calls) requires you to scope results to a single project or agent. Cross-project querying in a single call is not supported; the database is indexed at the project level, and cross-project joins are prohibitively expensive.
+
+When using an organization-level API key, providing either `project_id` or `agent_id` is mandatory to scope the query to the correct project.
+
+### Workarounds if your data is split across projects
+
+- **Multiple API calls:** Make one request per `project_id` and merge the results in your own code.
+- **Consolidate into one project:** If you recently migrated an agent to a new project and data is now split, the Cekura team can help move historical data into a single project. Reach out via your support channel to request this.
+
+
+## How can I view my total credit usage or expenses from a previous month?
+
+The Cekura dashboard does not currently provide a single consolidated "last month" credit summary or billing history export. What is available:
+
+- **Settings → Billing:** Use the date filter to view credit usage over a selected window. The maximum filter window is **30 days**, so you can manually set a range that covers the month you want to review. This gives you an indication of usage for that period rather than a pre-built monthly report.
+- **Subscription invoices:** For subscription fees and payment history, go to **Settings → Billing → Manage Plan** to access the Stripe billing portal.
+- **Detailed usage on request:** If you need a precise breakdown (credits consumed by type, overages vs. subscription, etc.), the Cekura team can pull this for you. Reach out via your support channel.
+
+A full billing history view is on the roadmap.
+
+
+## Does Cekura require access to my codebase during onboarding?
+
+Codebase access is preferred but not mandatory. The reasons Cekura requests it:
+
+- **Automated improvement PRs**: With repository access, Cekura can push pull requests directly that improve your agent based on evaluation results — for example, updating prompts, adjusting tool configurations, or refining mock data.
+- **Faster initial integration**: Setting up mock data, tool call schemas, and traces is significantly quicker when Cekura can inspect your existing code structure rather than receiving it piecemeal.
+
+**If you prefer not to grant codebase access**, the integration can still proceed by coordinating directly with a member of your technical team. In that case, Cekura would typically need the following provided manually:
+
+- Event and data schemas relevant to the metrics being built
+- How your system emits traces, logs, or instrumentation data
+- Tool call definitions and metadata fields used in conversations
+
+The trade-off is a slower initial setup and more back-and-forth to get mock data and traces configured correctly. You can also grant access for the initial integration period and revoke it afterward.
+
+If you have questions about the specific access scope required for your engagement, ask in your support channel and a team member will clarify what applies to your setup.
+
+
+## Why is a count metric failing even when the measured value is zero?
+
+This happens when the **Rubric** threshold for that metric is configured with the wrong comparison direction. In Cekura, a metric measures a value — for example, the number of unnecessary repetitions — and the Rubric determines whether that value is a pass or fail based on an operator and threshold you configure.
+
+For **"lower is better" count metrics** (such as Unnecessary Repetition Count), a measured value of 0 is the best possible result. However, if the rubric rule uses "greater than or equal to" with a threshold like 3, the evaluation fails whenever the count is *below* 3 — including 0 — because the rule requires a minimum count to pass, which is the reverse of what you want.
+
+### How to fix it
+
+Open the evaluator's Rubric settings (click **View Rubric** on the metric) and update the operator to **"less than or equal to"** with a threshold that sets the maximum acceptable count. For example:
+
+- To fail only when repetitions are detected at all: *Unnecessary Repetition Count ≤ 0*
+- To allow up to 2 repetitions before failing: *Unnecessary Repetition Count ≤ 2*
+
+The same principle applies to any metric whose interpretation says "Lower is better" (see the *Interpretation* note on each entry in [Pre-defined Metrics](/documentation/key-concepts/metrics/pre-defined-metrics)): use **≤** for those, and **≥** only for metrics where higher values indicate better performance (such as boolean pass/fail metrics, which use ≥ 5).
+
+
+## How does Cekura handle decision-level reasoning and explainability, and what data do I need to provide for audit purposes?
+
+Cekura takes model reasoning into account when explaining why specific outcomes occurred and why evaluations passed or failed. Every LLM Judge and Python metric evaluation produces an `explanation` field that describes why the rubric was or wasn't met.
+
+For workflows where you need a complete audit trail — including the internal logic behind each decision, not just whether the outcome was correct — you need to provide the reasoning data yourself, because Cekura cannot reconstruct internal agent decision logic that isn't present in the transcript or the data you send.
+
+### What to send and how
+
+Your LLM generates reasoning tokens as part of its output. Forward the full reasoning to Cekura via the **`metadata` field** of your observability ingest payload alongside the standard model output. Key points:
+
+- **Send the complete reasoning trace.** There is no cost or performance overhead within Cekura for including reasoning in metadata — only metric evaluations consume credits (0.2 credits per evaluation). Metadata content has no additional charge.
+- **Metadata is immutable after the initial POST.** Collect and include the reasoning before sending; it cannot be added or modified after the call record is created.
+- **Alternative — OpenTelemetry tracing.** If your agent's decisions are expressed as tool calls, you can instead emit reasoning via [OTel tracing](https://docs.cekura.ai/documentation/guides/observability/tracing). `tool_call` spans can carry `function.input` / `function.output` attributes, so decision rationale attached to tool calls flows into Cekura and appears linked to the call record.
+
+Once the reasoning is present in the metadata or OTel spans, Cekura surfaces it in the evaluation report alongside the pass/fail outcome, giving you a per-decision audit trail.

@@ -1099,6 +1099,41 @@ Yes — `contact_number` does not need to be unique per agent. The same phone nu
 
 For more details on setting up and managing your testing environment, please visit the [Cekura Documentation](https://docs.cekura.ai/).
 
+## Why am I getting a 400 error when setting dynamic_variable_values on a scenario?
+
+The `dynamic_variable_values` field has been removed from the Scenario API. Submitting a non-null value for this field in a POST or PATCH request returns a 400 error directing you to the new approach.
+
+### Migration path
+
+Store dynamic-variable values in a test profile instead:
+
+1. **Create a test profile** via `POST /test-profiles/` with an `information` object that uses the sectioned shape:
+   ```json
+   {
+     "name": "My Test Profile",
+     "agent": 123,
+     "information": {
+       "main_agent_variables": {
+         "user_id": "U-42",
+         "account_id": "ACC-4521"
+       },
+       "testing_agent_variables": {
+         "customer_name": "John Doe"
+       }
+     }
+   }
+   ```
+2. **Attach the test profile** to your scenario using the `test_profile` field on the scenario create or update request.
+
+### Why the change?
+
+The sectioned test profile structure separates values that reach your agent under test (`main_agent_variables`) from persona context used by the evaluator (`testing_agent_variables`). This gives you precise control over which data flows where. See [Test Profile — Variable Sections](/documentation/key-concepts/evaluators/test-profile#variable-sections) for details.
+
+### Legacy scenarios
+
+Existing scenarios with `dynamic_variable_values` already stored continue to work at runtime — the values are still delivered to your agent. Only new writes via the API are rejected.
+
+
 ## How do I submit a bug report or feature request?
 
 Email [support@cekura.ai](mailto:support@cekura.ai) — this routes directly to the engineering team. For bugs, include a brief description of the issue, any relevant run IDs, evaluator URLs, or dashboard links, and your expected vs. actual behavior. For feature requests, a short description of the use case is sufficient. The team will triage and follow up in your support channel.

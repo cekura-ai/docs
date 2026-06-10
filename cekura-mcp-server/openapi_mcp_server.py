@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
+import jwt
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
@@ -69,6 +70,9 @@ _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower()
 
 MCP_ISSUER_URL = os.environ.get("MCP_ISSUER_URL", "https://api.cekura.ai")
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "https://api.cekura.ai/mcp")
+
+# Clock-skew grace (seconds) for the local oauth_access JWT expiry check.
+OAUTH_EXP_SKEW_SECONDS = 10
 
 # Derive allowed hosts from MCP_ISSUER_URL and MCP_SERVER_URL (covers prod, ngrok, local).
 from urllib.parse import urlparse as _urlparse
@@ -906,7 +910,7 @@ def main():
 
     import uvicorn
     from starlette.middleware.base import BaseHTTPMiddleware
-    from starlette.responses import JSONResponse
+    from starlette.responses import JSONResponse, Response
     from starlette.routing import Route
 
     parser = argparse.ArgumentParser(description="Cekura OpenAPI MCP Server")
@@ -949,9 +953,27 @@ def main():
             has_bearer = False
             auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
             if auth_header and auth_header.lower().startswith('bearer '):
-                request_bearer_token.set(auth_header[7:])
+                token = auth_header[7:]
+                request_bearer_token.set(token)
                 has_bearer = True
                 logger.debug("Bearer token credential set for request")
+
+                # Short-circuit expired oauth_access JWTs with 401 +
+                # WWW-Authenticate so the MCP client refreshes the token.
+                # Signature validation stays the backend's job.
+                try:
+                    claims = jwt.decode(token, options={"verify_signature": False})
+                except jwt.PyJWTError:
+                    claims = None
+                if claims and claims.get("type") == "oauth_access":
+                    exp = claims.get("exp")
+                    if isinstance(exp, (int, float)) and exp < time.time() - OAUTH_EXP_SKEW_SECONDS:
+                        return JSONResponse(
+                            {"error": "invalid_token",
+                             "error_description": "OAuth access token expired"},
+                            status_code=401,
+                            headers={"WWW-Authenticate": WWW_AUTH_HEADER},
+                        )
 
             # API key header — legacy mcp-remote / Claude Desktop
             has_api_key = False
@@ -1088,15 +1110,23 @@ def main():
         logger.info(f"observe: forwarded session {session_id} as call_id={call_id} (skill={skill}, turns={len(transcript)})")
         return JSONResponse({"status": "ok", "call_id": call_id, "upstream_status": resp.status_code})
 
+    def _has_api_key(request) -> bool:
+        return bool(
+            request.headers.get('X-CEKURA-API-KEY')
+            or request.headers.get('x-cekura-api-key')
+        )
+
     async def oauth_protected_resource(request):
-        # RFC 9728 — resource server advertises its authorization server
+        if _has_api_key(request):
+            return Response(status_code=404)
         return JSONResponse({
             "resource": MCP_SERVER_URL,
             "authorization_servers": [MCP_ISSUER_URL],
         })
 
     async def oauth_as_metadata(request):
-        # Convenience fallback for clients that check AS metadata directly on resource server
+        if _has_api_key(request):
+            return Response(status_code=404)
         return JSONResponse({
             "issuer": MCP_ISSUER_URL,
             "authorization_endpoint": f"{MCP_ISSUER_URL}/user/oauth/authorize",

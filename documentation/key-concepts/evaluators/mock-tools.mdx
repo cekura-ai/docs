@@ -106,6 +106,21 @@ If you run a self-hosted agent with your own MCP server, you can auto-fetch tool
 </Tab>
 </Tabs>
 
+#### Viewing Generated Mock Tool Data
+
+When Auto-Fetch generates mock data for scenarios whose agent has mock tools attached, the expected mock tool calls are stored on each scenario as `generated_mock_tool_entries`. This data includes:
+
+- **Tool ID**: The identifier for the mock tool
+- **Tool Name**: The name of the tool being mocked
+- **Expected Input**: The input parameters the tool expects
+- **Expected Output**: The response the tool will return
+
+You can view this data in two ways:
+
+1. **Via the Evaluator UI**: When viewing a scenario in the Cekura dashboard, the generated mock tool entries are displayed so you can see what tool calls the evaluator will make during testing
+2. **Via the API**: Retrieve a scenario using the scenarios retrieve endpoint to access the `generated_mock_tool_entries` field programmatically
+
+This visibility helps you understand exactly what mock tool interactions will occur during each test run, making it easier to debug and validate your agent's tool-calling behavior.
 #### Enabling and Disabling Mock Mode
 
 After running Auto-Fetch, use the **Mock** toggle to control whether your provider's tools are redirected to Cekura's mock endpoints.
@@ -269,6 +284,16 @@ Execute your evaluators to test the agent with mock tools:
    - Select the evaluators you created
    - Click **"Run Evaluator"** to start testing
    - Choose the number of test iterations if needed
+
+## Handling Dynamic Input Parameters
+
+Mock tools match on **exact input values**. If your tool receives inputs that vary per call (for example, a date parameter or a user-generated string), a mock entry whose `input` doesn't exactly match what the agent sends will not fire — and the tool call will silently fail.
+
+To handle variable inputs reliably:
+
+- **Provide multiple input-output entries.** Add one entry per realistic input variant your evaluators exercise. Use [Auto-Fetch](#option-1-auto-fetch-tools-recommended) — Cekura generates mock data from your agent's real call history, giving you coverage of the input variations that actually occur.
+- **Pin dynamic values in your evaluator instructions.** If a parameter like a date or appointment slot is completely open-ended, use [Test Profiles](/documentation/key-concepts/evaluators/test-profile) to fix the value: set `{{test_profile.appointment_date}}` in your evaluator scenario, and mock only for that pinned value. This makes both the mock matching and the evaluator assertion deterministic.
+- **Check the tool name matches exactly.** Any casing or underscore mismatch between the tool name in your mock config and the name in your provider (Retell LLM/Flow, VAPI, ElevenLabs) will silently prevent the mock from firing, regardless of the input.
 
 ## API Reference
 

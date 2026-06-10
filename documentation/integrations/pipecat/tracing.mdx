@@ -7,9 +7,123 @@ description: "Enhanced observability and simulation testing for Pipecat agents u
 ---
 
 import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+import { CopyLlmPromptButton } from "/snippets/copy-llm-prompt-button.mdx";
+
+export const pipecatPrompt = [
+  "You are integrating Cekura observability and testing into an existing Pipecat voice agent codebase.",
+  "",
+  "OBJECTIVE",
+  "Add the Cekura PipecatTracer SDK so that:",
+  "- Production calls are monitored with transcripts, tool calls, audio recording, logs, and OpenTelemetry traces (observability mode).",
+  "- UAT/dev/staging calls support simulation testing from the Cekura platform with transcripts, logs, and OTel traces but no audio recording (testing mode).",
+  "",
+  "The user's codebase likely has separate entrypoints or environment-based configuration for prod vs UAT. Ask the user how they distinguish between these environments before writing code.",
+  "",
+  "BEFORE YOU START",
+  '1. Ask the user: "Do you have separate entrypoints or an environment variable that distinguishes your production agent from your UAT/dev/staging agent? (e.g., ENV=production vs ENV=staging, or separate files like bot_prod.py vs bot_dev.py)"',
+  '2. Ask the user: "What is your Cekura agent ID? You can find it in the Cekura dashboard under your agent settings. If you don\'t know it, I can look it up for you."',
+  "3. Find the function that builds and runs the Pipecat pipeline (look for PipelineRunner, PipelineTask, Pipeline).",
+  "4. Find the LLMContext and LLMContextAggregatorPair usage — the SDK requires both user and assistant aggregators in the pipeline.",
+  "5. Find existing error handling and service patterns in the codebase. Follow them.",
+  "",
+  "IMPLEMENTATION REQUIREMENTS",
+  "",
+  "For the production / observability entrypoint:",
+  "- Use cekura.observe_pipeline() or cekura.observe_and_create_task() — these capture transcripts AND record dual-channel audio.",
+  "",
+  "For the UAT / testing entrypoint:",
+  "- Use cekura.track_pipeline() or cekura.track_and_create_task() — these capture transcripts only, no audio. This is what Cekura simulation calls use.",
+  "",
+  "Common setup for both:",
+  "1. Install the SDK: pip install cekura[pipecat]==1.4.1",
+  "2. Import PipecatTracer: from cekura.pipecat import PipecatTracer",
+  "3. Initialize the tracer:",
+  "   cekura = PipecatTracer(",
+  '       api_key=os.getenv("CEKURA_API_KEY"),',
+  "       agent_id=<AGENT_ID>,",
+  "   )",
+  "4. The pipeline MUST contain LLMUserAggregator and LLMAssistantAggregator (created via LLMContextAggregatorPair). If they are missing, add them.",
+  "5. After wrapping the pipeline, create the PipelineTask with enable_tracing=True and enable_turn_tracking=True for OTel traces.",
+  "6. Register task handlers: cekura.register_task_handlers(task, transport=transport)",
+  "7. Store the API key in an environment variable CEKURA_API_KEY — never hardcode it.",
+  "",
+  "Single-step API (recommended for simpler setups):",
+  "- Production: task = cekura.observe_and_create_task(pipeline, context, runner_args=runner_args, transport=transport)",
+  "- UAT: task = cekura.track_and_create_task(pipeline, context, runner_args=runner_args, transport=transport)",
+  "These combine pipeline wrapping, task creation (with OTel tracing), and handler registration in one call.",
+  "",
+  "Multi-step API (when you need more control over PipelineTask):",
+  "- Production: pipeline = cekura.observe_pipeline(pipeline, context, runner_args=runner_args)",
+  "- UAT: pipeline = cekura.track_pipeline(pipeline, context, runner_args=runner_args)",
+  "Then manually create PipelineTask with enable_tracing=True, enable_turn_tracking=True, and call cekura.register_task_handlers(task, transport=transport).",
+  "",
+  "INTEGRATION POINTS",
+  "- The tracer wraps the existing Pipeline — insert it between Pipeline construction and PipelineTask creation.",
+  "- register_task_handlers hooks into the task lifecycle for cleanup — call it after PipelineTask creation.",
+  "- If runner_args is available, pass it so the SDK can extract the session ID automatically.",
+  "- The transport parameter enables automatic cleanup on participant disconnect.",
+  "",
+  "SUCCESS CRITERIA",
+  "- Production calls appear in the Cekura dashboard Calls section with transcripts, audio, tool calls, logs, and OTel traces.",
+  "- UAT/simulation calls from the Cekura platform appear in the Runs section with transcripts, tool calls, logs, and OTel traces.",
+  "- No audio recording in UAT mode.",
+  "- The pipeline runs identically to before — the tracer is non-intrusive.",
+  "- CEKURA_API_KEY is read from environment, not hardcoded.",
+  "- Existing pipeline structure, error handling, and patterns in the codebase are preserved.",
+  "",
+  "CONSTRAINTS",
+  "- DO NOT restructure the existing pipeline or change its processor order.",
+  "- DO NOT create new files unless the codebase clearly separates concerns into modules.",
+  "- DO NOT add Cekura-specific error handling that diverges from existing patterns.",
+  "- DO NOT remove or modify any existing processors, transports, or LLM configuration.",
+  "- The only new dependency is cekura[pipecat].",
+  "- If aggregators are missing from the pipeline, add them in the standard Pipecat pattern (user_aggregator after STT, assistant_aggregator after transport output).",
+  "",
+  "REFERENCE IMPLEMENTATION",
+  "",
+  "Production (observability):",
+  "```python",
+  "from cekura.pipecat import PipecatTracer",
+  "",
+  "cekura = PipecatTracer(",
+  '    api_key=os.getenv("CEKURA_API_KEY"),',
+  "    agent_id=<AGENT_ID>,",
+  ")",
+  "pipeline = cekura.observe_pipeline(pipeline, context, runner_args=runner_args)",
+  "task = PipelineTask(pipeline, enable_tracing=True, enable_turn_tracking=True)",
+  "task = cekura.register_task_handlers(task, transport=transport)",
+  "```",
+  "",
+  "UAT/Testing (simulation):",
+  "```python",
+  "from cekura.pipecat import PipecatTracer",
+  "",
+  "cekura = PipecatTracer(",
+  '    api_key=os.getenv("CEKURA_API_KEY"),',
+  "    agent_id=<AGENT_ID>,",
+  ")",
+  "pipeline = cekura.track_pipeline(pipeline, context, runner_args=runner_args)",
+  "task = PipelineTask(pipeline, enable_tracing=True, enable_turn_tracking=True)",
+  "task = cekura.register_task_handlers(task, transport=transport)",
+  "```",
+  "",
+  "NEXT STEPS",
+  "Once the SDK is integrated, use the Cekura MCP tools to:",
+  "- Create test scenarios and run simulations against your agent (use the cekura MCP skills for scenarios, runs, and metrics).",
+  "- Monitor production calls and evaluate agent performance from the Cekura dashboard.",
+  "If the Cekura MCP server is available in your environment, use its tools/skills to create scenarios, trigger test runs, review results, and set up metrics — all without leaving your coding agent.",
+  "",
+  "ADDITIONAL REFERENCE",
+  "For full SDK reference, OTel tracing details, troubleshooting, and advanced options see: https://docs.cekura.ai/documentation/integrations/pipecat/tracing",
+].join("\n");
 
 <CopyPageButton />
 
+<Info>
+**Using a coding agent?** Paste this prompt directly in your Pipecat agent codebase to jumpstart your Cekura integration.
+
+<CopyLlmPromptButton prompt={pipecatPrompt} />
+</Info>
 
 ## Overview
 
@@ -20,7 +134,13 @@ Pipecat Tracing provides deep observability into your Pipecat agent's performanc
 - Complete agent-side conversation transcripts with UTC timestamps
 - Tool/function calls with inputs and outputs
 - Dual-channel audio recording (agent + user) for production monitoring
+- OpenTelemetry traces with conversation, turn, and service spans (STT, LLM, TTS)
+- Session logs capture from agent
 - Session metadata for correlation and debugging
+
+<Note>
+**Replacing an existing direct API integration?** If you currently post call data to the `POST /observability/v1/observe/` endpoint directly, the Pipecat SDK is a **replacement**, not an add-on — these two approaches are mutually exclusive for the same session. Running both creates duplicate records with no merging. Migrate by moving your metadata to `set_custom_metadata()` and removing the direct API call. See [Migrating from the direct API to the SDK](/documentation/FAQ#i-already-post-call-data-to-the-observability-endpoint-from-my-pipecat-agent-can-i-also-add-the-pipecat-sdk) for step-by-step instructions.
+</Note>
 
 ## Video Tutorial
 
@@ -38,13 +158,13 @@ Watch this video to see the Pipecat tracing integration in action:
 <Tabs>
 <Tab title="Testing">
 
-Use this setup in your test agents while running simulation calls from the Cekura platform. This mode captures transcripts only — no audio recording.
+Use this setup in your test agents while running simulation calls from the Cekura platform. This mode captures transcripts, logs, and OTel traces — no audio recording.
 
 <Steps>
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install cekura[pipecat]==1.2.0
+pip install cekura[pipecat]==1.4.1
 ```
 
 </Step>
@@ -54,7 +174,7 @@ pip install cekura[pipecat]==1.2.0
 Add the Cekura tracer to your Pipecat agent:
 
 1. Initialize the tracer with your API key and agent ID
-2. Track your pipeline to capture transcripts and tool calls
+2. Track your pipeline to capture transcripts, tool calls, logs, and OTel traces
 3. Register task handlers for automatic cleanup
 
 ```python
@@ -91,18 +211,19 @@ async def run_bot(transport, runner_args):
         assistant_aggregator,
     ])
 
-    # (1) Initialize Cekura tracer
+    # Initialize Cekura tracer
     cekura = PipecatTracer(
         api_key=os.getenv("CEKURA_API_KEY"),
         agent_id=123,  # Your agent ID from Cekura dashboard
     )
 
-    # (2) Track pipeline (transcript only, no audio)
+    # Track pipeline (transcript only, no audio)
     pipeline = cekura.track_pipeline(pipeline, context, runner_args=runner_args)
 
-    task = PipelineTask(pipeline)
+    # Create task with OTel tracing enabled
+    task = PipelineTask(pipeline, enable_tracing=True, enable_turn_tracking=True)
 
-    # (3) Register task handlers for automatic cleanup
+    # Register task handlers for automatic cleanup
     task = cekura.register_task_handlers(task, transport=transport)
 
     # Run pipeline as usual
@@ -112,6 +233,8 @@ async def run_bot(transport, runner_args):
 
 **What this does:**
 - Captures transcripts and tool calls
+- Captures session logs (INFO+)
+- Exports OpenTelemetry traces (conversation, turn, STT/LLM/TTS spans)
 - Sends data to Cekura's simulation webhook for test analysis
 - No audio recording — lightweight for testing
 
@@ -119,7 +242,9 @@ For simpler setups, you can combine all steps into one call:
 
 ```python
 task = cekura.track_and_create_task(
-    pipeline, context, runner_args=runner_args, transport=transport
+    pipeline, context, runner_args=runner_args, transport=transport,
+    custom_metadata={"bot_version": "1.0"},  # optional
+    **pipeline_task_kwargs  # additional args forwarded to PipelineTask
 )
 ```
 
@@ -152,7 +277,7 @@ Run tests using your preferred connection type:
 - **WebRTC**: Select WebRTC under Voice connections in the Configure Run dialog for WebRTC-based testing
 - **Telephony**: Select Telephony under Voice connections for phone-based testing
 
-Test results will appear in the Runs section with enhanced data including transcripts and tool calls.
+Test results will appear in the Runs section with enhanced data including transcripts, tool calls, logs, and OTel traces.
 
 </Step>
 </Steps>
@@ -161,13 +286,13 @@ Test results will appear in the Runs section with enhanced data including transc
 
 <Tab title="Observability">
 
-Use this setup in your production agents for monitoring live calls with audio recording.
+Use this setup in your production agents for monitoring live calls with audio recording, logs, and OTel traces.
 
 <Steps>
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install cekura[pipecat]==1.2.0
+pip install cekura[pipecat]==1.4.1
 ```
 
 </Step>
@@ -177,7 +302,7 @@ pip install cekura[pipecat]==1.2.0
 Add the Cekura tracer to your Pipecat agent:
 
 1. Initialize the tracer with your API key and agent ID
-2. Observe your pipeline to capture transcripts, tool calls, and audio
+2. Observe your pipeline to capture transcripts, tool calls, audio, logs, and OTel traces
 3. Register task handlers for audio recording and automatic cleanup
 
 ```python
@@ -214,18 +339,19 @@ async def run_bot(transport, runner_args):
         assistant_aggregator,
     ])
 
-    # (1) Initialize Cekura tracer
+    # Initialize Cekura tracer
     cekura = PipecatTracer(
         api_key=os.getenv("CEKURA_API_KEY"),
         agent_id=123,  # Your agent ID from Cekura dashboard
     )
 
-    # (2) Observe pipeline (transcript + audio recording)
+    # Observe pipeline (transcript + audio recording)
     pipeline = cekura.observe_pipeline(pipeline, context, runner_args=runner_args)
 
-    task = PipelineTask(pipeline)
+    # Create task with OTel tracing enabled
+    task = PipelineTask(pipeline, enable_tracing=True, enable_turn_tracking=True)
 
-    # (3) Register task handlers for audio recording
+    # Register task handlers for audio recording
     task = cekura.register_task_handlers(task, transport=transport)
 
     # Run pipeline as usual
@@ -236,13 +362,21 @@ async def run_bot(transport, runner_args):
 **What this does:**
 - Captures transcripts, tool calls, and session metadata
 - Records dual-channel audio (agent + user) for analysis
+- Captures session logs (INFO+)
+- Exports OpenTelemetry traces (conversation, turn, STT/LLM/TTS spans)
 - Exports data to Cekura observability endpoint
+
+<Note>
+  `observe_pipeline()` registers its own audio frame processor and performs a parallel recording independently of any audio capture you already have in your pipeline. The two recordings are completely separate — the SDK's recording is asynchronous and does not add latency. If you already record audio and want to understand the impact, see [Will the Cekura SDK record audio again if I already capture it?](/documentation/FAQ#if-i-already-capture-and-store-audio-in-my-own-pipecat-pipeline-will-the-cekura-sdk-record-it-again) in the FAQ. To avoid recording entirely or control it per call, see [Can I disable or selectively control audio recording?](/documentation/FAQ#can-i-disable-or-selectively-control-audio-recording-in-the-pipecat-sdk).
+</Note>
 
 For simpler setups, you can combine all steps into one call:
 
 ```python
 task = cekura.observe_and_create_task(
-    pipeline, context, runner_args=runner_args, transport=transport
+    pipeline, context, runner_args=runner_args, transport=transport,
+    custom_metadata={"bot_version": "1.0"},  # optional
+    **pipeline_task_kwargs  # additional args forwarded to PipelineTask
 )
 ```
 
@@ -264,11 +398,90 @@ With tracing enabled, you'll see enriched information in the Cekura platform:
 
 - **Complete Transcript**: Full conversation history with UTC timestamps
 - **Tool Calls**: Function call requests and responses with inputs and outputs
+- **OpenTelemetry Traces**: Conversation, turn, and service-level spans (STT, LLM, TTS) with latency and usage metrics
+- **Session Logs**: INFO+ logs captured during the session for debugging
 - **Session Metadata**: Session IDs for correlating Cekura calls with your logs
 - **Audio Recording**: Dual-channel recordings (agent + user) for quality monitoring (observability mode only)
 - **Custom Metadata**: Additional metadata passed via `custom_metadata` parameter
 
 <img src="/images/pipecat/pipecat_enhanced_data.png" alt="Pipecat Enhanced Data in Cekura UI" />
+
+## OpenTelemetry Tracing
+
+The SDK automatically exports OpenTelemetry traces for every call, giving you detailed visibility into your agent's execution pipeline. Traces are exported to the Cekura platform by default and correlated with call logs automatically.
+
+### Trace Structure
+
+Each call produces a hierarchical trace:
+
+```
+Conversation
+├── Turn 1
+│   ├── stt (Deepgram, Google, etc.)
+│   ├── llm (OpenAI, Gemini, etc.) — includes token usage, model, tools
+│   └── tts (Cartesia, ElevenLabs, etc.) — includes character count
+├── Turn 2
+│   ├── stt
+│   ├── llm → tool_call
+│   ├── llm → tool_result
+│   └── tts
+└── Turn N
+    └── ...
+```
+
+Each span includes service-specific attributes like model name, token usage, latency, and TTFB metrics.
+
+### How It Works
+
+When using the **single-step API** (`observe_and_create_task` / `track_and_create_task`), OTel tracing is configured automatically — no additional code needed.
+
+When using the **multi-step API** (`observe_pipeline` / `track_pipeline`), you need to enable tracing on the `PipelineTask` yourself:
+
+```python
+task = PipelineTask(pipeline, enable_tracing=True, enable_turn_tracking=True)
+```
+
+The SDK sets up the OTel provider in both cases. In the multi-step API, it's ready for Pipecat to use once you enable tracing on the task.
+
+### Additional Span Attributes
+
+You can attach custom attributes to the conversation-level span via `additional_span_attributes` on the `PipelineTask`. This is useful for adding your own correlation IDs or metadata to traces.
+
+```python
+# Single-step: pass as pipeline_task_kwargs
+task = cekura.observe_and_create_task(
+    pipeline, context, runner_args=runner_args, transport=transport,
+    additional_span_attributes={
+        "user.id": "user_123",
+        "session.type": "support_call",
+    }
+)
+
+# Multi-step: pass directly to PipelineTask
+task = PipelineTask(
+    pipeline,
+    enable_tracing=True,
+    enable_turn_tracking=True,
+    additional_span_attributes={
+        "user.id": "user_123",
+        "session.type": "support_call",
+    }
+)
+```
+
+### Disabling OTel Traces
+
+To disable OTel trace export entirely:
+
+```python
+cekura = PipecatTracer(
+    api_key="...",
+    agent_id=123,
+    enable_otel_traces=False,
+)
+```
+
+When disabled, no OTel provider is set up and no traces are exported. All other SDK features (transcripts, audio, logs) continue to work normally.
 
 ## Custom Metadata
 
@@ -287,6 +500,31 @@ cekura.set_custom_metadata({"bot_version": "1.0", "environment": "staging"})
 ```
 
 `set_custom_metadata()` can be called at any point before the pipeline session finalizes — including in cleanup or post-processing handlers that execute before the session tears down. Once the session has ended and data has been submitted to Cekura, the record is immutable and metadata cannot be updated.
+
+## Deferred Upload (Compliance)
+
+For compliance scenarios where you need user consent before sending any data to the backend, use `defer_upload=True`. All audio is buffered locally and no data (audio, transcript, logs) is sent until you explicitly grant consent.
+
+```python
+pipeline = cekura.observe_pipeline(pipeline, context, runner_args=runner_args, defer_upload=True)
+
+# Grant consent — flushes buffered audio and enables upload:
+await cekura.start_audio_upload()
+
+# Or abort mid-call to discard everything immediately:
+await cekura.abort()
+```
+
+If neither method is called before the session ends, all data is automatically discarded. Nothing is sent to the backend.
+
+Also works with the single-step API:
+
+```python
+task = cekura.observe_and_create_task(
+    pipeline, context, runner_args=runner_args, transport=transport,
+    defer_upload=True,
+)
+```
 
 <Note>
   If you currently send call data to `observability/v1/observe/` and want to adopt the SDK — or are wondering whether both can run simultaneously — see [Can I also add the Pipecat SDK if I already post to the observability endpoint?](/documentation/FAQ#i-already-post-call-data-to-the-observability-endpoint-from-my-pipecat-agent-can-i-also-add-the-pipecat-sdk) in the FAQ.
@@ -314,10 +552,13 @@ cekura.set_custom_metadata({"bot_version": "1.0", "environment": "staging"})
 from cekura.pipecat import PipecatTracer
 
 tracer = PipecatTracer(
-    api_key="your_api_key",         # Required: Your Cekura API key
-    agent_id=123,                   # Required: Agent ID from dashboard
-    host="https://api.cekura.ai",   # Optional: Custom API host
-    enabled=True                    # Optional: Enable/disable tracer
+    api_key="your_api_key",                     # Required: Your Cekura API key
+    agent_id=123,                               # Required: Agent ID from dashboard
+    host="https://api.cekura.ai",               # Optional: Custom API host
+    enabled=True,                               # Optional: Enable/disable tracer
+    otel_endpoint="https://otel.cekura.ai",     # Optional: OTel Collector gRPC endpoint
+    enable_otel_traces=True,                    # Optional: Enable OpenTelemetry trace export
+    capture_logs=True,                          # Optional: Capture session logs (INFO+)
 )
 ```
 
@@ -331,7 +572,8 @@ pipeline = tracer.observe_pipeline(
     context,               # Required: LLMContext instance
     runner_args=None,      # Optional: RunnerArguments (session_id extracted if present)
     session_id=None,       # Optional: Takes precedence over runner_args.session_id
-    custom_metadata=None   # Optional: Dict of custom metadata
+    custom_metadata=None,  # Optional: Dict of custom metadata
+    defer_upload=False     # Optional: Hold all data until start_audio_upload() is called
 )
 ```
 
@@ -353,7 +595,7 @@ pipeline = tracer.track_pipeline(
 
 ### observe_and_create_task()
 
-Single-step observability setup. Combines `observe_pipeline()`, `PipelineTask` creation, and `register_task_handlers()`.
+Single-step observability setup. Combines `observe_pipeline()`, `PipelineTask` creation, and `register_task_handlers()`. Automatically configures OTel tracing when enabled.
 
 ```python
 task = tracer.observe_and_create_task(
@@ -362,13 +604,15 @@ task = tracer.observe_and_create_task(
     runner_args=None,      # Optional: RunnerArguments for session_id
     transport=None,        # Optional: Transport for cleanup on disconnect
     session_id=None,       # Optional: Custom session identifier
-    custom_metadata=None   # Optional: Dict of custom metadata
+    custom_metadata=None,  # Optional: Dict of custom metadata
+    defer_upload=False,    # Optional: Hold all data until start_audio_upload() is called
+    **pipeline_task_kwargs # Optional: Additional args forwarded to PipelineTask
 )
 ```
 
 ### track_and_create_task()
 
-Single-step simulation setup. Combines `track_pipeline()`, `PipelineTask` creation, and `register_task_handlers()`.
+Single-step simulation setup. Combines `track_pipeline()`, `PipelineTask` creation, and `register_task_handlers()`. Automatically configures OTel tracing when enabled.
 
 ```python
 task = tracer.track_and_create_task(
@@ -377,19 +621,36 @@ task = tracer.track_and_create_task(
     runner_args=None,      # Optional: RunnerArguments for session_id
     transport=None,        # Optional: Transport for cleanup on disconnect
     session_id=None,       # Optional: Custom session identifier
-    custom_metadata=None   # Optional: Dict of custom metadata
+    custom_metadata=None,  # Optional: Dict of custom metadata
+    **pipeline_task_kwargs # Optional: Additional args forwarded to PipelineTask
 )
 ```
 
 ### register_task_handlers()
 
-Registers cleanup handlers for automatic resource management when the session ends. Only needed when using the multi-step approach.
+Registers cleanup handlers for automatic resource management when the session ends. Only needed when using the two-step approach.
 
 ```python
 task = tracer.register_task_handlers(
     task,              # Required: PipelineTask instance
     transport=None     # Optional: Transport for cleanup on disconnect
 )
+```
+
+### start_audio_upload()
+
+Grants consent and begins uploading session data when `defer_upload=True`. Flushes any buffered audio to S3 and enables normal upload for the rest of the session. No-op if `defer_upload` was not set.
+
+```python
+await tracer.start_audio_upload()
+```
+
+### abort()
+
+Stops all capture mid-call and prevents data from being sent to the Cekura backend. Clears any deferred audio buffer and aborts in-progress S3 uploads.
+
+```python
+await tracer.abort()
 ```
 
 ### set_custom_metadata()

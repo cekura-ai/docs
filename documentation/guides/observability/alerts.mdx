@@ -1,0 +1,283 @@
+---
+title: "Alerts"
+sidebarTitle: "Alerts"
+icon: "bell"
+iconType: "regular"
+description: "Get notified when a metric fails, drifts, or crosses a threshold. Configure alerts on any metric, route them to Slack, and review what fired and why."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## Overview
+
+Alerts watch your metrics as calls come in and notify you the moment something
+goes wrong — a metric starts failing, its average drifts away from its baseline,
+or a numeric value crosses a limit you set. Each alert is attached to one metric,
+can be scoped with filters, and routes notifications to Slack.
+
+Three things make up every alert:
+
+- **The metric it watches** — any metric on your project.
+- **The alert type** — *Failure*, *Trend*, or *Threshold* (explained below).
+- **Where it notifies** — a Slack workspace and (optionally) a specific channel.
+
+You manage alerts from the **Alerts** page in the sidebar, where you can create
+them, toggle them on and off, and review every time they fired.
+
+<Frame caption="The Alerts page — KPI strip, activity chart, and the alerts that fired.">
+  <img src="/images/alerts/alerts-overview.png" alt="Alerts overview page" />
+</Frame>
+
+## Alert types
+
+Cekura supports three alert types. Which ones are available for a given alert
+depend on the metric you're watching.
+
+### Failure alert
+
+Fires **immediately** every time the metric fails on a call — for example, a
+binary pass/fail metric scores below passing, or a critical workflow check is
+violated. There's nothing to tune: as soon as a failing evaluation lands, the
+alert fires once for that call.
+
+Best for hard failures you always want to know about right away — critical
+deviations, infrastructure issues, or a workflow step the agent must never skip.
+
+### Trend alert
+
+Fires when the metric **drifts significantly from its recent history**. Instead
+of reacting to a single call, a trend alert maintains a rolling window of recent
+values and compares new calls against that baseline using an exponentially
+weighted moving average (EWMA). When the metric moves further than expected, the
+alert fires.
+
+This is the right choice when no single call is "wrong," but the metric is
+slowly getting worse (or better) — a satisfaction score sliding down over a few
+hundred calls, for instance.
+
+Trend alerts are tuned with three knobs, but you don't have to set them by hand.
+Pick one of the three **sensitivity presets**:
+
+| Preset | Sensitivity | What it's good for |
+|--------|-------------|--------------------|
+| **Conservative** | Low — catches only large shifts | Quiet or low-traffic metrics where you only want to hear about big moves |
+| **Balanced** *(recommended)* | Sensible defaults — start here | Most metrics |
+| **Aggressive** | High — fires quickly on small shifts | High-traffic metrics where you want early warning |
+
+Under the hood each preset sets three parameters — window size (how many recent
+calls form the baseline), a standard-deviation multiplier (how far a value must
+move to count as drift), and an EWMA smoothing factor (how quickly the baseline
+reacts to recent calls):
+
+| Preset | Window size | Std. multiplier | EWMA α |
+|--------|-------------|-----------------|--------|
+| Conservative | 100 | 3.0 | 0.10 |
+| Balanced | 50 | 2.0 | 0.30 |
+| Aggressive | 25 | 1.5 | 0.50 |
+
+<Note>
+A trend alert needs enough history before it can fire — roughly a few full
+windows of calls. A freshly created trend alert on a low-traffic metric may stay
+quiet for a while as it builds its baseline.
+</Note>
+
+For binary (pass/fail) metrics you can also set a **direction** so the alert only
+fires when the metric moves the way you care about:
+
+- **Both** *(default)* — fire on any significant change.
+- **Increase only** — fire only when the pass rate climbs.
+- **Decrease only** — fire only when the pass rate drops.
+
+### Threshold alert
+
+Fires when a **numeric metric crosses a value you set**. Available for numeric
+metrics only (e.g. latency, words-per-minute, a 0–100 score).
+
+You configure:
+
+- **Condition** — one of:
+  - **Value &gt; threshold** — fire when the value goes above a number.
+  - **Value &lt; threshold** — fire when the value drops below a number.
+  - **Outside [low, high]** — fire when the value falls outside a band.
+- **Threshold value** — the number (or the low/high pair for *Outside*).
+- **Min breaches** — how many of the recent calls must cross the threshold
+  before the alert fires. `1` means "fire on any single breach."
+- **Window size** — how many recent evaluations to look at (default `50`).
+
+For example, *Value &gt; 500, min breaches 3, window 50* fires when **3 of the
+last 50 calls** had a value above 500 — useful for ignoring one-off spikes while
+still catching a real, sustained problem.
+
+## Creating an alert
+
+1. Open **Alerts** from the sidebar.
+2. Click **New alert**.
+3. **Select a metric.** The alert name auto-fills from the metric and type — you
+   can edit it freely.
+4. **Pick the alert type.** The available types depend on the metric:
+   - *Failure* — no extra configuration.
+   - *Trend* — pick a sensitivity preset (and a direction for binary metrics).
+   - *Threshold* — set the condition, value, min breaches, and window size.
+5. **(Optional) Choose Slack delivery.** Select a connected workspace, and
+   optionally a channel ID. Leave the channel blank to use the workspace's
+   default channel. Choose **No Slack delivery** to create the alert without
+   notifications.
+6. Click **Create alert**.
+
+<Frame caption="Creating a Trend alert — choose the metric, type, sensitivity preset, and Slack delivery.">
+  <img src="/images/alerts/new-alert-drawer.png" alt="New alert drawer" />
+</Frame>
+
+<Tip>
+You can also start this flow from a dashboard: on any metric widget, open the
+**⋮** menu and choose **Create alert on this metric** — the drawer opens with the
+metric pre-filled. See
+[Creating an alert from a widget](/documentation/guides/dashboards#creating-an-alert-from-a-widget).
+</Tip>
+
+### Filters (optional)
+
+Every alert type can be scoped with **filters** so it only considers a subset of
+calls — for example, only calls for a specific agent, region, or customer
+segment. Filters use the same JSON query structure as
+[dashboard widgets](/documentation/guides/dashboards#filters). Set them from the
+**Filter** column in the configured-alerts table.
+
+## Managing alerts
+
+The **All configured alerts** table lists every alert on the project. Most
+columns are editable inline, so you can adjust an alert without leaving the page:
+
+| Column | What it does |
+|--------|--------------|
+| **Enabled** | Toggle the alert on or off without deleting it. |
+| **Last 24h** | How many times the alert fired in the last day. |
+| **Type** | The metric's evaluation type (binary, numeric, etc.). |
+| **Alert Type** | Switch between Failure, Trend, and Threshold. |
+| **Filter** | Open the filter editor to scope which calls count. |
+| **Slack Channel** | Choose the workspace/channel that receives notifications. |
+| **Alert Direction** | For trend alerts: Both, Increase only, or Decrease only. |
+| **Actions** | Edit the alert's parameters, or delete it. |
+
+Use the search box and the **Agent** and **Metric Type** filters at the top of
+the table to narrow a long list.
+
+<Frame caption="The configured-alerts table — toggle, retype, filter, and route alerts inline.">
+  <img src="/images/alerts/configured-alerts-table.png" alt="Configured alerts table" />
+</Frame>
+
+## Slack notifications
+
+When an alert fires, Cekura posts a message to the Slack channel you configured.
+The message is intentionally compact:
+
+- The **agent** the call belongs to.
+- A **headline** — the metric name, plus the failure or the drift delta
+  (e.g. *"Failures went from 12% → 31%"*).
+- For trend alerts, a **trend chart** is attached as a follow-up image so you can
+  see the shift at a glance.
+- **Go to call** — jumps straight to the call log that triggered the fire.
+- **Open in Cekura** — opens the [Alert Review](#reviewing-alerts) page for the
+  full picture.
+
+<Frame caption="A fired alert in Slack — headline, delta, trend chart, and quick-jump buttons.">
+  <img src="/images/alerts/slack-notification.png" alt="Slack alert notification" />
+</Frame>
+
+### Connecting Slack and routing
+
+- Connect a Slack workspace from your workspace settings before you can route
+  alerts to it.
+- An alert with a **workspace and channel** posts to that channel.
+- An alert with a **workspace only** posts to the workspace's default channel.
+- An alert with **no Slack config** is silent — it still records fires you can
+  see on the review page, but sends no notification.
+
+Alerts are **scoped to their project**, so an alert on one project never spills
+into another project's channels.
+
+<Note>
+Calls that fail because of an internal Cekura platform error (rather than a real
+agent failure) do **not** fire alerts — this keeps your channels free of noise
+that isn't about your agent's behavior.
+</Note>
+
+## Reviewing alerts
+
+The **Alert Review** experience answers "what fired, when, and why" — both
+across the whole project and for a single alert.
+
+### Project overview
+
+The main **Alerts** page summarizes recent activity over a window you choose
+(**24h**, **3d**, or **7d**):
+
+- **Total fires**, **unique alerts fired**, and the **top firing alert** as KPI
+  cards, each with a comparison against the prior period.
+- An **activity chart** — a stacked bar chart of fires over time, broken down by
+  the noisiest alerts. Click a bar to filter the list to that time bucket.
+- **Alerts that fired** — a ranked list with each alert's fire count and a
+  sparkline; click through to its detail page.
+
+### Single-alert detail
+
+Open any alert to see its dedicated review page (`/alerts/review/{alert_id}`):
+
+- **KPI cards** — fires in the window, when it first and last fired, and current
+  status.
+- **AI Summary** — click **Summarize with AI** to have Cekura read the recent
+  fires and surface the common theme behind them (headline + themes). Generated
+  on demand and cached.
+- **Activity chart** — fires over time for this alert; click a bar to filter.
+- **Fire events** — a paginated list of every fire, each linking to the call that
+  triggered it. Click a fire to open the call detail inline and step through the
+  fires one by one.
+
+<Frame caption="The single-alert review page — KPIs, AI summary, activity chart, and the full fire list.">
+  <img src="/images/alerts/alert-detail.png" alt="Alert detail review page" />
+</Frame>
+
+## Managing alerts via the API
+
+Alerts can be created, listed, updated, and deleted through the API (and are
+available as MCP tools). The key fields on an alert are:
+
+- `project` — the project the alert belongs to.
+- `name` — display name.
+- `source_type` — `"metric"`.
+- `source_id` — the metric ID being watched.
+- `source` — keyed on `sub_type`:
+  - Failure: `{ "sub_type": "normal" }`
+  - Trend: `{ "sub_type": "significant_change", "window_size": 50 }`
+  - Threshold: `{ "sub_type": "threshold", "window_size": 50 }`
+  - Add an optional `"filters"` object to scope the alert.
+- `threshold` — config matching the `sub_type`:
+  - Failure: `{}`
+  - Trend: `{ "std_multiplier": 2.0, "ewma_alpha": 0.3, "direction": "" }`
+  - Threshold: `{ "operator": "gt", "value": 500, "min_breaches": 1 }`
+    (use `"value": { "low": 20, "high": 80 }` with `"operator": "outside"`)
+- `notifications` — `{ "slack": { "workspace_id": 123, "channel_id": "C0123" } }`.
+  Omit `channel_id` for the workspace default, or omit `notifications` entirely
+  for a silent alert.
+
+**Example — create a threshold alert on a latency metric:**
+
+```bash
+curl -X POST https://api.cekura.ai/api/observability/v1/alerts/ \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "project": 123,
+    "name": "High latency",
+    "source_type": "metric",
+    "source_id": 456,
+    "source": { "sub_type": "threshold", "window_size": 50 },
+    "threshold": { "operator": "gt", "value": 500, "min_breaches": 3 },
+    "notifications": { "slack": { "workspace_id": 789 } }
+  }'
+```
+
+Deleting an alert is a soft delete: it stops firing but its history stays
+available for review.

@@ -5878,7 +5878,7 @@
         "/observability/v1/deep-research-insights/generate/": {
             "post": {
                 "operationId": "deep-research-insights-generate-create",
-                "description": "Queue a Deep Research audit; returns the new row in ``pending``.",
+                "description": "Queue a Deep Research audit; returns the new row in ``pending``.\n\nCost: ``get_deep_research_cost()`` credits per press that actually\nqueues a fresh audit — spam protection for an expensive\nModal-sandboxed agent run. The price is admin-configurable via the\n``DEEP_RESEARCH_GENERATION_COST`` SettingValue. Insufficient\nbalance → HTTP 402 from the global exception handler before any\nwork is queued. A press that only gets an already-in-flight row\nback (double-click while one is still running) is not charged.",
                 "tags": [
                     "observability"
                 ],
@@ -5913,6 +5913,32 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/DeepResearchInsightGenerate"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/deep-research-insights/pricing/": {
+            "get": {
+                "operationId": "deep-research-insights-pricing-retrieve",
+                "description": "Flat credit cost of a Deep Research ``Generate`` press.\n\nLets the FE label the button with the live price (e.g. \"Generate\n(20 credits)\") instead of hardcoding a number that would drift\nfrom the admin-set ``DEEP_RESEARCH_GENERATION_COST``. Scoped by\n``?project=<id>`` so the standard project-access permission check\napplies; the price itself is global.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeepResearchInsight"
                                 }
                             }
                         },
@@ -6082,7 +6108,7 @@
         "/observability/v1/metric-failure-mode-insights/bulk_generate/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-bulk-generate-create",
-                "description": "Fan out audits to every eligible metric in the project.\n\nTriggered by the Insights page's \"Generate\" button. Uses the\nsliding ``T-24h`` to ``T`` window (where ``T`` is now), so the\nresult is fresh even between the daily cron firings. Returns\nthe new insight rows so the FE can poll their status.\n\nMetrics with no failing calls in the window get a\n``skipped_no_failures`` marker row (no Celery task queued);\nmetrics already mid-run from a recent cron are returned as-is\ninstead of being re-queued (dedupe inside the kickoff helper).",
+                "description": "Fan out audits to every eligible metric in the project.\n\nTriggered by the Insights page's \"Generate\" button. Uses the\nsliding ``T-24h`` to ``T`` window (where ``T`` is now), so the\nresult is fresh even between the daily cron firings. Returns\nthe new insight rows so the FE can poll their status.\n\nMetrics with no failing calls in the window get a\n``skipped_no_failures`` marker row (no Celery task queued);\nmetrics already mid-run from a recent cron are returned as-is\ninstead of being re-queued (dedupe inside the kickoff helper).\n\nCost: ``get_insight_generation_cost()`` credits per metric that\nactually produces an insight (i.e. had ≥1 failing call in the 24h\nwindow). Eligible metrics with no failing calls generate nothing\nand are not charged — you pay only for the insight cards you get.\nThe per-metric price is admin-configurable via the\n``INSIGHT_GENERATION_COST`` SettingValue. Insufficient balance →\nHTTP 402 from the global exception handler before any work is\nqueued.",
                 "tags": [
                     "observability"
                 ],
@@ -6163,6 +6189,32 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/MetricFailureModeInsightGenerate"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/metric-failure-mode-insights/pricing/": {
+            "get": {
+                "operationId": "metric-failure-mode-insights-pricing-retrieve",
+                "description": "Per-metric credit cost of a manual Insights ``Generate`` press.\n\nLets the FE label the button with the live price (e.g. \"Generate\n(10 credits/metric)\") instead of hardcoding a number that would\ndrift from the admin-set ``INSIGHT_GENERATION_COST``. Scoped by\n``?project=<id>`` so the standard project-access permission check\napplies; the price itself is global.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricFailureModeInsight"
                                 }
                             }
                         },
@@ -11076,7 +11128,7 @@
         },
         "/test_framework/v1/aiagents/": {
             "get": {
-                "operationId": "aiagents-list",
+                "operationId": "aiagents-v1-list",
                 "description": "aiagents_list: List AI voice agents in your account. Filter by `project_id` to scope to one project, or omit to list every agent the caller can access. Returns a paginated list of agent summaries (id, name, provider, contact number, created/updated timestamps).\n\nPerformance tip: passing `project_id` from your workspace context narrows the result. Try `page_size=20` first — you can paginate or raise the page size if you actually need more.",
                 "summary": "List AI voice agents",
                 "parameters": [
@@ -11144,7 +11196,7 @@
                 }
             },
             "post": {
-                "operationId": "aiagents-create",
+                "operationId": "aiagents-v1-create",
                 "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (yes — Retell uses this field even for voice).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the serializer exposes fields for some providers (`pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*`) that are NOT currently in the `assistant_provider` enum. Those fields exist for response/config purposes but the matching provider value cannot be selected today.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell only).\n- `auto_sync_prompt_enabled` — auto-sync prompts from the provider every 30s.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
                 "summary": "Create an AI voice agent",
                 "tags": [
@@ -13692,7 +13744,7 @@
         },
         "/test_framework/v1/aiagents/{id}/": {
             "get": {
-                "operationId": "aiagents-retrieve",
+                "operationId": "aiagents-v1-retrieve",
                 "description": "Retrieve an AI voice agent by ID",
                 "parameters": [
                     {
@@ -13742,7 +13794,7 @@
                 }
             },
             "put": {
-                "operationId": "aiagents-update",
+                "operationId": "aiagents-v1-update",
                 "description": "Fully replace an AI agent's fields. Prefer `PATCH` (partial_update) unless you need full-replacement semantics. See `aiagents_create` for the field shape and per-provider examples.",
                 "summary": "Replace an AI voice agent (full update)",
                 "parameters": [
@@ -13830,7 +13882,7 @@
                 }
             },
             "patch": {
-                "operationId": "aiagents-partial-update",
+                "operationId": "aiagents-v1-partial-update",
                 "description": "Partially update an AI agent. Same field shape as create — see `aiagents_create` for details and per-provider examples.",
                 "summary": "Update an AI voice agent (partial)",
                 "parameters": [
@@ -13912,7 +13964,7 @@
                 }
             },
             "delete": {
-                "operationId": "aiagents-destroy",
+                "operationId": "aiagents-v1-destroy",
                 "description": "⚠ Irreversible. Deletes the agent.\n\n**Cascade behaviour (controlled by `delete_related` query param):**\n- `delete_related=true` (default) — also deletes the agent's evaluators, results, and runs.\n- `delete_related=false` — detaches evaluators (sets agent=null) and leaves results untouched.",
                 "summary": "Delete an AI voice agent",
                 "parameters": [
@@ -13969,8 +14021,8 @@
         },
         "/test_framework/v1/aiagents/{id}/delete_knowledge_base/": {
             "delete": {
-                "operationId": "aiagents-delete-knowledge-base-destroy",
-                "description": "Aiagents delete knowledge base",
+                "operationId": "aiagents-v1-delete-knowledge-base-destroy",
+                "description": "Aiagents v1 delete knowledge base",
                 "parameters": [
                     {
                         "in": "path",
@@ -14029,8 +14081,8 @@
         },
         "/test_framework/v1/aiagents/{id}/disable_personalities/": {
             "post": {
-                "operationId": "aiagents-disable-personalities-create",
-                "description": "Aiagents disable personalities",
+                "operationId": "aiagents-v1-disable-personalities-create",
+                "description": "Aiagents v1 disable personalities",
                 "parameters": [
                     {
                         "in": "path",
@@ -14086,8 +14138,8 @@
         },
         "/test_framework/v1/aiagents/{id}/duplicate/": {
             "post": {
-                "operationId": "aiagents-duplicate-create",
-                "description": "Duplicate an AI voice agent with all its configuration",
+                "operationId": "aiagents-v1-duplicate-create",
+                "description": "Aiagents v1 duplicate",
                 "parameters": [
                     {
                         "in": "path",
@@ -14160,8 +14212,8 @@
         },
         "/test_framework/v1/aiagents/{id}/enable_personalities/": {
             "post": {
-                "operationId": "aiagents-enable-personalities-create",
-                "description": "Aiagents enable personalities",
+                "operationId": "aiagents-v1-enable-personalities-create",
+                "description": "Aiagents v1 enable personalities",
                 "parameters": [
                     {
                         "in": "path",
@@ -14217,8 +14269,8 @@
         },
         "/test_framework/v1/aiagents/{id}/knowledge_base/": {
             "get": {
-                "operationId": "aiagents-knowledge-base-list",
-                "description": "Aiagents knowledge base",
+                "operationId": "aiagents-v1-knowledge-base-list",
+                "description": "Aiagents v1 knowledge base",
                 "parameters": [
                     {
                         "in": "path",
@@ -14287,8 +14339,8 @@
         },
         "/test_framework/v1/aiagents/{id}/personalities/": {
             "get": {
-                "operationId": "aiagents-personalities-retrieve",
-                "description": "Aiagents personalities",
+                "operationId": "aiagents-v1-personalities-retrieve",
+                "description": "Aiagents v1 personalities",
                 "parameters": [
                     {
                         "in": "path",
@@ -14324,8 +14376,8 @@
         },
         "/test_framework/v1/aiagents/{id}/runs_overview/": {
             "get": {
-                "operationId": "aiagents-runs-overview-retrieve",
-                "description": "Aiagents runs overview",
+                "operationId": "aiagents-v1-runs-overview-retrieve",
+                "description": "Aiagents v1 runs overview",
                 "parameters": [
                     {
                         "in": "path",
@@ -14488,8 +14540,8 @@
         },
         "/test_framework/v1/aiagents/runs_overview_project/": {
             "get": {
-                "operationId": "aiagents-runs-overview-project-retrieve",
-                "description": "Aiagents runs overview project",
+                "operationId": "aiagents-v1-runs-overview-project-retrieve",
+                "description": "Aiagents v1 runs overview project",
                 "tags": [
                     "test_framework"
                 ],
@@ -14514,8 +14566,8 @@
         },
         "/test_framework/v1/aiagents/short_list/": {
             "get": {
-                "operationId": "aiagents-short-list-list",
-                "description": "Aiagents short list",
+                "operationId": "aiagents-v1-short-list-list",
+                "description": "Aiagents v1 short list",
                 "parameters": [
                     {
                         "name": "page",
@@ -23099,6 +23151,40 @@
                 }
             }
         },
+        "/test_framework/v1/results-external/{id}/regenerate_ai_summary/": {
+            "post": {
+                "operationId": "results-external-regenerate-ai-summary-create",
+                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix) and recommended next steps for this result, based on its current failure clusters. The new summary appears on the next `results_retrieve` call once the job finishes.",
+                "summary": "Regenerate the AI summary for a result",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this result.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Results"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Regeneration queued; poll results_retrieve to see the new ai_summary / next_steps."
+                    },
+                    "404": {
+                        "description": "Result not found"
+                    }
+                }
+            }
+        },
         "/test_framework/v1/results-external/{id}/rerun/": {
             "post": {
                 "operationId": "results-external-rerun-create",
@@ -24199,6 +24285,40 @@
                         "enabled": true,
                         "name": "results-evaluate-metrics-create",
                         "description": "Evaluate metrics against result transcripts"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/results/{id}/regenerate_ai_summary/": {
+            "post": {
+                "operationId": "results-regenerate-ai-summary-create",
+                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix) and recommended next steps for this result, based on its current failure clusters. The new summary appears on the next `results_retrieve` call once the job finishes.",
+                "summary": "Regenerate the AI summary for a result",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this result.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Results"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Regeneration queued; poll results_retrieve to see the new ai_summary / next_steps."
+                    },
+                    "404": {
+                        "description": "Result not found"
                     }
                 }
             }
@@ -29457,7 +29577,7 @@
         "/test_framework/v1/scenarios-external/generate-bg/": {
             "post": {
                 "operationId": "scenarios-generate-bg",
-                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A default test profile is created for the agent if none exists. Each generated scenario will have `test_profile_data` populated with synthetic caller information (name, address, phone, email).\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
+                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
                 "tags": [
                     "test_framework"
                 ],
@@ -34348,7 +34468,7 @@
         "/test_framework/v1/scenarios/generate-bg/": {
             "post": {
                 "operationId": "scenarios-generate-bg_2",
-                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A default test profile is created for the agent if none exists. Each generated scenario will have `test_profile_data` populated with synthetic caller information (name, address, phone, email).\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
+                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
                 "tags": [
                     "test_framework"
                 ],
@@ -34417,7 +34537,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-generate-bg",
-                        "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A default test profile is created for the agent if none exists. Each generated scenario will have `test_profile_data` populated with synthetic caller information (name, address, phone, email).\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null."
+                        "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null."
                     }
                 }
             }
@@ -37837,8 +37957,14 @@
                                                 "agent": 123,
                                                 "name": "<string>",
                                                 "information": {
-                                                    "user_name": "<string>",
-                                                    "user_email": "<string>"
+                                                    "main_agent_variables": {
+                                                        "user_id": "<string>",
+                                                        "account_id": "<string>"
+                                                    },
+                                                    "testing_agent_variables": {
+                                                        "user_name": "<string>",
+                                                        "user_email": "<string>"
+                                                    }
                                                 }
                                             }
                                         ],
@@ -37877,8 +38003,14 @@
                                         "agent": 123,
                                         "name": "<string>",
                                         "information": {
-                                            "user_name": "<string>",
-                                            "user_email": "<string>"
+                                            "main_agent_variables": {
+                                                "user_id": "<string>",
+                                                "account_id": "<string>"
+                                            },
+                                            "testing_agent_variables": {
+                                                "user_name": "<string>",
+                                                "user_email": "<string>"
+                                            }
                                         }
                                     },
                                     "summary": "Create Test Profile with Agent"
@@ -37888,8 +38020,14 @@
                                         "project": 456,
                                         "name": "<string>",
                                         "information": {
-                                            "user_name": "<string>",
-                                            "user_email": "<string>"
+                                            "main_agent_variables": {
+                                                "user_id": "<string>",
+                                                "account_id": "<string>"
+                                            },
+                                            "testing_agent_variables": {
+                                                "user_name": "<string>",
+                                                "user_email": "<string>"
+                                            }
                                         }
                                     },
                                     "summary": "Create Test Profile with Project"
@@ -37929,8 +38067,14 @@
                                             "agent": null,
                                             "name": "<string>",
                                             "information": {
-                                                "user_name": "John Doe",
-                                                "user_email": "john.doe@example.com"
+                                                "main_agent_variables": {
+                                                    "user_id": "U-42",
+                                                    "account_id": "ACC-4521"
+                                                },
+                                                "testing_agent_variables": {
+                                                    "user_name": "John Doe",
+                                                    "user_email": "john.doe@example.com"
+                                                }
                                             }
                                         },
                                         "summary": "Create Test Profile Response"
@@ -38016,8 +38160,14 @@
                                                 "agent": 123,
                                                 "name": "<string>",
                                                 "information": {
-                                                    "user_name": "<string>",
-                                                    "user_email": "<string>"
+                                                    "main_agent_variables": {
+                                                        "user_id": "<string>",
+                                                        "account_id": "<string>"
+                                                    },
+                                                    "testing_agent_variables": {
+                                                        "user_name": "<string>",
+                                                        "user_email": "<string>"
+                                                    }
                                                 }
                                             }
                                         ],
@@ -38048,8 +38198,14 @@
                                         "agent": 123,
                                         "name": "<string>",
                                         "information": {
-                                            "user_name": "<string>",
-                                            "user_email": "<string>"
+                                            "main_agent_variables": {
+                                                "user_id": "<string>",
+                                                "account_id": "<string>"
+                                            },
+                                            "testing_agent_variables": {
+                                                "user_name": "<string>",
+                                                "user_email": "<string>"
+                                            }
                                         }
                                     },
                                     "summary": "Create Test Profile with Agent"
@@ -38059,8 +38215,14 @@
                                         "project": 456,
                                         "name": "<string>",
                                         "information": {
-                                            "user_name": "<string>",
-                                            "user_email": "<string>"
+                                            "main_agent_variables": {
+                                                "user_id": "<string>",
+                                                "account_id": "<string>"
+                                            },
+                                            "testing_agent_variables": {
+                                                "user_name": "<string>",
+                                                "user_email": "<string>"
+                                            }
                                         }
                                     },
                                     "summary": "Create Test Profile with Project"
@@ -38100,8 +38262,14 @@
                                             "agent": null,
                                             "name": "<string>",
                                             "information": {
-                                                "user_name": "John Doe",
-                                                "user_email": "john.doe@example.com"
+                                                "main_agent_variables": {
+                                                    "user_id": "U-42",
+                                                    "account_id": "ACC-4521"
+                                                },
+                                                "testing_agent_variables": {
+                                                    "user_name": "John Doe",
+                                                    "user_email": "john.doe@example.com"
+                                                }
                                             }
                                         },
                                         "summary": "Create Test Profile Response"
@@ -38169,8 +38337,14 @@
                                             "agent": 123,
                                             "name": "<string>",
                                             "information": {
-                                                "user_name": "<string>",
-                                                "user_email": "<string>"
+                                                "main_agent_variables": {
+                                                    "user_id": "<string>",
+                                                    "account_id": "<string>"
+                                                },
+                                                "testing_agent_variables": {
+                                                    "user_name": "<string>",
+                                                    "user_email": "<string>"
+                                                }
                                             }
                                         },
                                         "summary": "Get Test Profile"
@@ -38265,8 +38439,14 @@
                                     "value": {
                                         "name": "<string>",
                                         "information": {
-                                            "user_name": "<string>",
-                                            "user_email": "<string>"
+                                            "main_agent_variables": {
+                                                "user_id": "<string>",
+                                                "account_id": "<string>"
+                                            },
+                                            "testing_agent_variables": {
+                                                "user_name": "<string>",
+                                                "user_email": "<string>"
+                                            }
                                         }
                                     },
                                     "summary": "Partial Update Test Profile"
@@ -38304,8 +38484,14 @@
                                             "agent": 123,
                                             "name": "<string>",
                                             "information": {
-                                                "user_name": "<string>",
-                                                "user_email": "<string>"
+                                                "main_agent_variables": {
+                                                    "user_id": "<string>",
+                                                    "account_id": "<string>"
+                                                },
+                                                "testing_agent_variables": {
+                                                    "user_name": "<string>",
+                                                    "user_email": "<string>"
+                                                }
                                             }
                                         },
                                         "summary": "Partial Update Test Profile Response"
@@ -38399,8 +38585,14 @@
                                             "agent": 123,
                                             "name": "<string>",
                                             "information": {
-                                                "user_name": "<string>",
-                                                "user_email": "<string>"
+                                                "main_agent_variables": {
+                                                    "user_id": "<string>",
+                                                    "account_id": "<string>"
+                                                },
+                                                "testing_agent_variables": {
+                                                    "user_name": "<string>",
+                                                    "user_email": "<string>"
+                                                }
                                             }
                                         },
                                         "summary": "Get Test Profile"
@@ -38503,8 +38695,14 @@
                                     "value": {
                                         "name": "<string>",
                                         "information": {
-                                            "user_name": "<string>",
-                                            "user_email": "<string>"
+                                            "main_agent_variables": {
+                                                "user_id": "<string>",
+                                                "account_id": "<string>"
+                                            },
+                                            "testing_agent_variables": {
+                                                "user_name": "<string>",
+                                                "user_email": "<string>"
+                                            }
                                         }
                                     },
                                     "summary": "Partial Update Test Profile"
@@ -38542,8 +38740,14 @@
                                             "agent": 123,
                                             "name": "<string>",
                                             "information": {
-                                                "user_name": "<string>",
-                                                "user_email": "<string>"
+                                                "main_agent_variables": {
+                                                    "user_id": "<string>",
+                                                    "account_id": "<string>"
+                                                },
+                                                "testing_agent_variables": {
+                                                    "user_name": "<string>",
+                                                    "user_email": "<string>"
+                                                }
                                             }
                                         },
                                         "summary": "Partial Update Test Profile Response"
@@ -38882,7 +39086,7 @@
         },
         "/test_framework/v2/aiagents/": {
             "get": {
-                "operationId": "test-framework-v2-aiagents-list",
+                "operationId": "aiagents-list",
                 "description": "List AI voice agents. Filter by project_id to scope to one project. Returns agents in the v2 format with a nested provider block.",
                 "summary": "List AI voice agents",
                 "parameters": [
@@ -38937,14 +39141,14 @@
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "test-framework-v2-aiagents-list",
+                        "name": "aiagents-list",
                         "description": "List AI voice agents. Filter by project_id to scope to one project. Returns agents in the v2 format with a nested provider block."
                     }
                 }
             },
             "post": {
-                "operationId": "test-framework-v2-aiagents-create",
-                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `import-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
+                "operationId": "aiagents-create",
+                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "test_framework"
@@ -39171,15 +39375,15 @@
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "test-framework-v2-aiagents-create",
-                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `import-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
+                        "name": "aiagents-create",
+                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
                     }
                 }
             }
         },
         "/test_framework/v2/aiagents/{id}/": {
             "get": {
-                "operationId": "test-framework-v2-aiagents-retrieve",
+                "operationId": "aiagents-retrieve",
                 "description": "Retrieve an AI voice agent",
                 "summary": "Retrieve an AI voice agent",
                 "parameters": [
@@ -39232,13 +39436,13 @@
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "test-framework-v2-aiagents-retrieve",
+                        "name": "aiagents-retrieve",
                         "description": "Retrieve an AI voice agent"
                     }
                 }
             },
             "put": {
-                "operationId": "test-framework-v2-aiagents-update",
+                "operationId": "aiagents-update",
                 "description": "Fully replace an agent's fields. Prefer PATCH unless you need full-replacement semantics.",
                 "summary": "Replace an AI voice agent (full update)",
                 "parameters": [
@@ -39328,13 +39532,13 @@
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "test-framework-v2-aiagents-update",
+                        "name": "aiagents-update",
                         "description": "Fully replace an agent's fields. Prefer PATCH unless you need full-replacement semantics."
                     }
                 }
             },
             "patch": {
-                "operationId": "test-framework-v2-aiagents-partial-update",
+                "operationId": "aiagents-partial-update",
                 "description": "Partially update an agent. Only fields included in the request body are modified.",
                 "summary": "Update an AI voice agent (partial)",
                 "parameters": [
@@ -39418,13 +39622,13 @@
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "test-framework-v2-aiagents-partial-update",
+                        "name": "aiagents-partial-update",
                         "description": "Partially update an agent. Only fields included in the request body are modified."
                     }
                 }
             },
             "delete": {
-                "operationId": "test-framework-v2-aiagents-destroy",
+                "operationId": "aiagents-destroy",
                 "description": "⚠ Irreversible. Deletes the agent. Pass delete_related=false to detach evaluators instead of deleting them.",
                 "summary": "Delete an AI voice agent",
                 "parameters": [
@@ -39481,17 +39685,17 @@
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "test-framework-v2-aiagents-destroy",
+                        "name": "aiagents-destroy",
                         "description": "⚠ Irreversible. Deletes the agent. Pass delete_related=false to detach evaluators instead of deleting them."
                     }
                 }
             }
         },
-        "/test_framework/v2/aiagents/{id}/auto-fetch-tools/": {
+        "/test_framework/v2/aiagents/{id}/auto-fetch/": {
             "post": {
-                "operationId": "test-framework-v2-aiagents-auto-fetch-tools-create",
-                "description": "Discover the agent's tools from a managed provider (Retell, VAPI, ElevenLabs) or a customer-hosted MCP server, and generate mock input/output data for each. Existing tools that already have mock data are kept. For provider=\"custom\", supply `mcp_server_url`. Returns a `progress_id`; poll the progress endpoint for completion. This does not enable mock mode.",
-                "summary": "Auto-fetch mock tools for an agent",
+                "operationId": "aiagents-auto-fetch-create",
+                "description": "Re-fetch the full agent configuration from its connected provider (Retell, VAPI, ElevenLabs, Synthflow): system prompt, call settings, phone number, tools with mock data, dynamic variables and knowledge base files. Returns a `progress_id`; poll `auto-fetch-progress/` for staged status.",
+                "summary": "Auto-fetch the agent configuration from its provider",
                 "parameters": [
                     {
                         "in": "path",
@@ -39506,37 +39710,17 @@
                 "tags": [
                     "test_framework"
                 ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentAutoFetchToolsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentAutoFetchToolsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentAutoFetchToolsRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
                 "security": [
                     {
                         "api_key": []
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AgentAutoFetchToolsResponse"
+                                    "$ref": "#/components/schemas/AgentAutoFetchResponse"
                                 }
                             }
                         },
@@ -39546,7 +39730,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AgentAutoFetchToolsErrorResponse"
+                                    "$ref": "#/components/schemas/AgentAutoFetchErrorResponse"
                                 }
                             }
                         },
@@ -39555,11 +39739,11 @@
                 }
             }
         },
-        "/test_framework/v2/aiagents/{id}/auto-fetch-tools-progress/": {
+        "/test_framework/v2/aiagents/{id}/auto-fetch-progress/": {
             "get": {
-                "operationId": "test-framework-v2-aiagents-auto-fetch-tools-progress-retrieve",
-                "description": "Poll the status of a background auto-fetch-tools task.",
-                "summary": "Poll status of an auto-fetch-tools task",
+                "operationId": "aiagents-auto-fetch-progress-retrieve",
+                "description": "Poll the staged status of a background auto-fetch (whole-agent import).",
+                "summary": "Poll status of an auto-fetch task",
                 "parameters": [
                     {
                         "in": "path",
@@ -39592,7 +39776,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AgentAutoFetchToolsProgressResponse"
+                                    "$ref": "#/components/schemas/AgentAutoFetchProgressResponse"
                                 }
                             }
                         },
@@ -39602,7 +39786,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AgentAutoFetchToolsProgressErrorResponse"
+                                    "$ref": "#/components/schemas/AgentAutoFetchProgressErrorResponse"
                                 }
                             }
                         },
@@ -39613,7 +39797,7 @@
         },
         "/test_framework/v2/aiagents/{id}/delete_knowledge_base/": {
             "delete": {
-                "operationId": "test-framework-v2-aiagents-delete-knowledge-base-destroy",
+                "operationId": "aiagents-delete-knowledge-base-destroy",
                 "description": "Aiagents delete knowledge base",
                 "parameters": [
                     {
@@ -39671,133 +39855,11 @@
                 }
             }
         },
-        "/test_framework/v2/aiagents/{id}/disable-mock-tools/": {
-            "post": {
-                "operationId": "test-framework-v2-aiagents-disable-mock-tools-create",
-                "description": "Restore the agent's original (non-mock) tool configuration on the provider. Mock data is preserved so mock mode can be re-enabled later. Returns a `progress_id`; poll the progress endpoint for completion.",
-                "summary": "Disable mock tools for an agent",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this ai agent.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentDisableMockToolsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentDisableMockToolsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentDisableMockToolsRequest"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentDisableMockToolsResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentDisableMockToolsErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v2/aiagents/{id}/disable-mock-tools-progress/": {
-            "get": {
-                "operationId": "test-framework-v2-aiagents-disable-mock-tools-progress-retrieve",
-                "description": "Poll the status of a background disable-mock-tools task.",
-                "summary": "Poll status of a disable-mock-tools task",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this ai agent.",
-                        "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentDisableMockToolsProgressResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentDisableMockToolsProgressErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/test_framework/v2/aiagents/{id}/disable_personalities/": {
             "post": {
-                "operationId": "test-framework-v2-aiagents-disable-personalities-create",
-                "description": "Aiagents disable personalities",
+                "operationId": "aiagents-disable-personalities-create",
+                "description": "Disable personalities for the agent's project. Pass `personalities` as a list of personality IDs, or the string \"all\". Returns the project's personalities.",
+                "summary": "Disable personalities for an agent's project",
                 "parameters": [
                     {
                         "in": "path",
@@ -39807,6 +39869,24 @@
                         },
                         "description": "A unique integer value identifying this ai agent.",
                         "required": true
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
                     }
                 ],
                 "tags": [
@@ -39842,18 +39922,44 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AIAgentV2"
+                                    "$ref": "#/components/schemas/PaginatedPersonalityList"
                                 }
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-disable-personalities-create",
+                        "description": "Disable personalities for the agent's project. Pass `personalities` as a list of personality IDs, or the string \"all\". Returns the project's personalities."
                     }
                 }
             }
         },
         "/test_framework/v2/aiagents/{id}/duplicate/": {
             "post": {
-                "operationId": "test-framework-v2-aiagents-duplicate-create",
+                "operationId": "aiagents-duplicate-create",
                 "description": "Create a copy of the agent with all its configuration. Returns the new agent in v2 format.",
                 "summary": "Duplicate an AI voice agent",
                 "parameters": [
@@ -39928,139 +40034,17 @@
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "test-framework-v2-aiagents-duplicate-create",
+                        "name": "aiagents-duplicate-create",
                         "description": "Create a copy of the agent with all its configuration. Returns the new agent in v2 format."
-                    }
-                }
-            }
-        },
-        "/test_framework/v2/aiagents/{id}/enable-mock-tools/": {
-            "post": {
-                "operationId": "test-framework-v2-aiagents-enable-mock-tools-create",
-                "description": "Activate mock-tool mode on the agent's provider (Retell, VAPI, ElevenLabs) using the mock data created by auto-fetch. Disabled by default. Returns a `progress_id`; poll the progress endpoint for the resulting mock endpoints.",
-                "summary": "Enable mock tools for an agent",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this ai agent.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentEnableMockToolsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentEnableMockToolsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentEnableMockToolsRequest"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentEnableMockToolsResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentEnableMockToolsErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v2/aiagents/{id}/enable-mock-tools-progress/": {
-            "get": {
-                "operationId": "test-framework-v2-aiagents-enable-mock-tools-progress-retrieve",
-                "description": "Poll the status of a background enable-mock-tools task.",
-                "summary": "Poll status of an enable-mock-tools task",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this ai agent.",
-                        "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentEnableMockToolsProgressResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentEnableMockToolsProgressErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
                     }
                 }
             }
         },
         "/test_framework/v2/aiagents/{id}/enable_personalities/": {
             "post": {
-                "operationId": "test-framework-v2-aiagents-enable-personalities-create",
-                "description": "Aiagents enable personalities",
+                "operationId": "aiagents-enable-personalities-create",
+                "description": "Enable personalities for the agent's project. Pass `personalities` as a list of personality IDs, or the string \"all\". Returns the project's personalities.",
+                "summary": "Enable personalities for an agent's project",
                 "parameters": [
                     {
                         "in": "path",
@@ -40070,6 +40054,24 @@
                         },
                         "description": "A unique integer value identifying this ai agent.",
                         "required": true
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
                     }
                 ],
                 "tags": [
@@ -40105,18 +40107,44 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AIAgentV2"
+                                    "$ref": "#/components/schemas/PaginatedPersonalityList"
                                 }
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-enable-personalities-create",
+                        "description": "Enable personalities for the agent's project. Pass `personalities` as a list of personality IDs, or the string \"all\". Returns the project's personalities."
                     }
                 }
             }
         },
         "/test_framework/v2/aiagents/{id}/knowledge_base/": {
             "get": {
-                "operationId": "test-framework-v2-aiagents-knowledge-base-list",
+                "operationId": "aiagents-knowledge-base-list",
                 "description": "Aiagents knowledge base",
                 "parameters": [
                     {
@@ -40186,8 +40214,72 @@
         },
         "/test_framework/v2/aiagents/{id}/personalities/": {
             "get": {
-                "operationId": "test-framework-v2-aiagents-personalities-retrieve",
-                "description": "Aiagents personalities",
+                "operationId": "aiagents-personalities-list",
+                "description": "List the caller/tester personalities available to this agent's project. Filter with query params: type, language, enabled_only=true (only the personalities currently enabled for the project).",
+                "summary": "List personalities available to an agent",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this ai agent.",
+                        "required": true
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedPersonalityList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "aiagents-personalities-list",
+                        "description": "List the caller/tester personalities available to this agent's project. Filter with query params: type, language, enabled_only=true (only the personalities currently enabled for the project)."
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/aiagents/{id}/runs_overview/": {
+            "get": {
+                "operationId": "aiagents-runs-overview-retrieve",
+                "description": "Aiagents runs overview",
                 "parameters": [
                     {
                         "in": "path",
@@ -40221,10 +40313,11 @@
                 }
             }
         },
-        "/test_framework/v2/aiagents/{id}/runs_overview/": {
-            "get": {
-                "operationId": "test-framework-v2-aiagents-runs-overview-retrieve",
-                "description": "Aiagents runs overview",
+        "/test_framework/v2/aiagents/{id}/toggle-mock-tools/": {
+            "post": {
+                "operationId": "aiagents-toggle-mock-tools-create",
+                "description": "Toggle mock-tool mode on the agent's provider. `enabled=true` replaces the provider tools with Cekura-hosted mocks; `enabled=false` restores the originals (mock data is preserved). Returns a `progress_id`; poll `toggle-mock-tools-progress/`.",
+                "summary": "Enable or disable mock tools on the provider",
                 "parameters": [
                     {
                         "in": "path",
@@ -40233,6 +40326,82 @@
                             "type": "integer"
                         },
                         "description": "A unique integer value identifying this ai agent.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentToggleMockToolsRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentToggleMockToolsRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentToggleMockToolsRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentToggleMockToolsResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentToggleMockToolsErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/aiagents/{id}/toggle-mock-tools-progress/": {
+            "get": {
+                "operationId": "aiagents-toggle-mock-tools-progress-retrieve",
+                "description": "Poll the enable/disable task. The progress_id is unique, so we resolve it\nagainst both task namespaces and return whichever holds it.",
+                "summary": "Poll status of a toggle-mock-tools task",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this ai agent.",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
                         "required": true
                     }
                 ],
@@ -40249,7 +40418,17 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/AIAgentV2"
+                                    "$ref": "#/components/schemas/AgentToggleMockToolsProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentToggleMockToolsProgressErrorResponse"
                                 }
                             }
                         },
@@ -40393,64 +40572,9 @@
                 }
             }
         },
-        "/test_framework/v2/aiagents/import-progress/": {
-            "get": {
-                "operationId": "test-framework-v2-aiagents-import-progress-retrieve",
-                "description": "Returns the staged status of a background agent import started via `configure_from_provider`. Each stage reports pending / in_progress / completed / skipped / failed so a step-by-step loader can be rendered.",
-                "summary": "Poll cloud-provider import progress",
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ImportProgressResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "field_name": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/test_framework/v2/aiagents/runs_overview_project/": {
             "get": {
-                "operationId": "test-framework-v2-aiagents-runs-overview-project-retrieve",
+                "operationId": "aiagents-runs-overview-project-retrieve",
                 "description": "Aiagents runs overview project",
                 "tags": [
                     "test_framework"
@@ -40476,7 +40600,7 @@
         },
         "/test_framework/v2/aiagents/short_list/": {
             "get": {
-                "operationId": "test-framework-v2-aiagents-short-list-list",
+                "operationId": "aiagents-short-list-list",
                 "description": "Aiagents short list",
                 "parameters": [
                     {
@@ -42337,7 +42461,7 @@
         "/test_framework/v2/scenarios/generate-bg/": {
             "post": {
                 "operationId": "scenarios-generate-bg_3",
-                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A default test profile is created for the agent if none exists. Each generated scenario will have `test_profile_data` populated with synthetic caller information (name, address, phone, email).\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
+                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
                 "tags": [
                     "test_framework"
                 ],
@@ -51818,7 +51942,7 @@
                     },
                     "progress_id": {
                         "type": "string",
-                        "description": "Poll import-progress/ with this to follow the staged import."
+                        "description": "Poll auto-fetch-progress/ with this to follow the staged import."
                     }
                 },
                 "required": [
@@ -52260,7 +52384,7 @@
                     "description"
                 ]
             },
-            "AgentAutoFetchToolsErrorResponse": {
+            "AgentAutoFetchErrorResponse": {
                 "type": "object",
                 "properties": {
                     "detail": {
@@ -52271,7 +52395,7 @@
                     "detail"
                 ]
             },
-            "AgentAutoFetchToolsProgressErrorResponse": {
+            "AgentAutoFetchProgressErrorResponse": {
                 "type": "object",
                 "properties": {
                     "detail": {
@@ -52282,9 +52406,12 @@
                     "detail"
                 ]
             },
-            "AgentAutoFetchToolsProgressResponse": {
+            "AgentAutoFetchProgressResponse": {
                 "type": "object",
                 "properties": {
+                    "agent_id": {
+                        "type": "integer"
+                    },
                     "status": {
                         "enum": [
                             "in_progress",
@@ -52295,23 +52422,15 @@
                         "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
                         "x-spec-enum-id": "6e9575e5767aaee0"
                     },
-                    "tools_created": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
+                    "current_stage": {
+                        "type": "string"
                     },
-                    "tools_updated": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
-                    },
-                    "message": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
+                    "stages": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        }
                     },
                     "error": {
                         "type": [
@@ -52321,55 +52440,18 @@
                     }
                 },
                 "required": [
+                    "agent_id",
+                    "current_stage",
                     "error",
-                    "message",
-                    "status",
-                    "tools_created",
-                    "tools_updated"
+                    "stages",
+                    "status"
                 ]
             },
-            "AgentAutoFetchToolsRequest": {
-                "type": "object",
-                "properties": {
-                    "provider": {
-                        "enum": [
-                            "vapi",
-                            "retell",
-                            "elevenlabs",
-                            "custom"
-                        ],
-                        "type": "string",
-                        "x-spec-enum-id": "e3f60d118bb06f46",
-                        "description": "Provider to fetch tools from. Use \"custom\" for self-hosted agents that expose an MCP server directly.\n\n* `vapi` - vapi\n* `retell` - retell\n* `elevenlabs` - elevenlabs\n* `custom` - custom"
-                    },
-                    "assistant_id": {
-                        "type": "string",
-                        "description": "Provider assistant/agent ID. Required for vapi/retell/elevenlabs; ignored for custom."
-                    },
-                    "api_key": {
-                        "type": "string",
-                        "description": "Optional API key for the managed provider. Ignored for custom. If not provided, stored credentials are used."
-                    },
-                    "mcp_server_url": {
-                        "type": "string",
-                        "description": "Required when provider=\"custom\". URL of the customer-hosted MCP server."
-                    },
-                    "mcp_server_headers": {
-                        "type": "object",
-                        "additionalProperties": {},
-                        "description": "Optional auth/custom headers forwarded to the MCP server during tool discovery (provider=\"custom\" only)."
-                    }
-                },
-                "required": [
-                    "provider"
-                ]
-            },
-            "AgentAutoFetchToolsResponse": {
+            "AgentAutoFetchResponse": {
                 "type": "object",
                 "properties": {
                     "progress_id": {
-                        "type": "string",
-                        "description": "Poll auto-fetch-tools-progress/?progress_id=<value> to track completion"
+                        "type": "string"
                     }
                 },
                 "required": [
@@ -52397,87 +52479,6 @@
                     }
                 }
             },
-            "AgentDisableMockToolsErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "AgentDisableMockToolsProgressErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "AgentDisableMockToolsProgressResponse": {
-                "type": "object",
-                "properties": {
-                    "status": {
-                        "enum": [
-                            "in_progress",
-                            "completed",
-                            "failed"
-                        ],
-                        "type": "string",
-                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
-                        "x-spec-enum-id": "6e9575e5767aaee0"
-                    },
-                    "mock_enabled": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ]
-                    },
-                    "message": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "error": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    }
-                },
-                "required": [
-                    "error",
-                    "message",
-                    "mock_enabled",
-                    "status"
-                ]
-            },
-            "AgentDisableMockToolsRequest": {
-                "type": "object",
-                "properties": {
-                    "api_key": {
-                        "type": "string",
-                        "description": "Optional API key for the provider. If not provided, will use stored credentials."
-                    }
-                }
-            },
-            "AgentDisableMockToolsResponse": {
-                "type": "object",
-                "properties": {
-                    "progress_id": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "progress_id"
-                ]
-            },
             "AgentDynamicVariableWrite": {
                 "type": "object",
                 "description": "One dynamic variable entry in the v2 agent write payload (request side of `dynamic_variables`).",
@@ -52501,94 +52502,6 @@
                     "name"
                 ]
             },
-            "AgentEnableMockToolsErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "AgentEnableMockToolsProgressErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "AgentEnableMockToolsProgressResponse": {
-                "type": "object",
-                "properties": {
-                    "status": {
-                        "enum": [
-                            "in_progress",
-                            "completed",
-                            "failed"
-                        ],
-                        "type": "string",
-                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
-                        "x-spec-enum-id": "6e9575e5767aaee0"
-                    },
-                    "mock_enabled": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ]
-                    },
-                    "mcp_endpoints": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/AgentMockMCPEndpoint"
-                        },
-                        "description": "MCP mock endpoints registered for this agent (one per MCP-typed tool). Empty for agents without MCP tools."
-                    },
-                    "message": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "error": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    }
-                },
-                "required": [
-                    "error",
-                    "message",
-                    "mock_enabled",
-                    "status"
-                ]
-            },
-            "AgentEnableMockToolsRequest": {
-                "type": "object",
-                "properties": {
-                    "api_key": {
-                        "type": "string",
-                        "description": "Optional API key. If not provided, uses stored credentials."
-                    }
-                }
-            },
-            "AgentEnableMockToolsResponse": {
-                "type": "object",
-                "properties": {
-                    "progress_id": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "progress_id"
-                ]
-            },
             "AgentKnowledgeBaseFileWrite": {
                 "type": "object",
                 "description": "One knowledge base file entry in the v2 agent write payload (request side of `knowledge_base_files`).",
@@ -52610,28 +52523,6 @@
                         "description": "Base64-encoded content for a new file. A data-URI prefix is accepted."
                     }
                 }
-            },
-            "AgentMockMCPEndpoint": {
-                "type": "object",
-                "properties": {
-                    "mock_index": {
-                        "type": "integer"
-                    },
-                    "url": {
-                        "type": "string"
-                    },
-                    "tool_names": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "required": [
-                    "mock_index",
-                    "tool_names",
-                    "url"
-                ]
             },
             "AgentMockToolWrite": {
                 "type": "object",
@@ -52798,6 +52689,101 @@
                         "description": "Phone numbers authorized for outbound calls (E.164 format). Example: `[\"+14155551234\", \"+14155550000\"]`"
                     }
                 }
+            },
+            "AgentToggleMockToolsErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "AgentToggleMockToolsProgressErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "AgentToggleMockToolsProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "in_progress",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
+                        "x-spec-enum-id": "6e9575e5767aaee0"
+                    },
+                    "mock_enabled": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "mcp_endpoints": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ToggleMockToolsMCPEndpoint"
+                        },
+                        "description": "MCP mock endpoints registered after enabling. Empty for agents without MCP tools or when disabling."
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "error",
+                    "message",
+                    "mock_enabled",
+                    "status"
+                ]
+            },
+            "AgentToggleMockToolsRequest": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "True to enable mock mode, false to disable."
+                    },
+                    "api_key": {
+                        "type": "string",
+                        "description": "Optional API key. If not provided, stored credentials are used."
+                    }
+                },
+                "required": [
+                    "enabled"
+                ]
+            },
+            "AgentToggleMockToolsResponse": {
+                "type": "object",
+                "properties": {
+                    "progress_id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "progress_id"
+                ]
             },
             "AgentforceChatConfig": {
                 "type": "object",
@@ -56320,47 +56306,6 @@
                     "plivo_auth_id",
                     "plivo_auth_token",
                     "plivo_phone_number"
-                ]
-            },
-            "ImportProgressResponse": {
-                "type": "object",
-                "properties": {
-                    "agent_id": {
-                        "type": "integer"
-                    },
-                    "status": {
-                        "enum": [
-                            "in_progress",
-                            "completed",
-                            "failed"
-                        ],
-                        "type": "string",
-                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
-                        "x-spec-enum-id": "6e9575e5767aaee0"
-                    },
-                    "current_stage": {
-                        "type": "string"
-                    },
-                    "stages": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": {}
-                        }
-                    },
-                    "error": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    }
-                },
-                "required": [
-                    "agent_id",
-                    "current_stage",
-                    "error",
-                    "stages",
-                    "status"
                 ]
             },
             "ImportTelnyxNumber": {
@@ -59976,6 +59921,37 @@
                     }
                 }
             },
+            "PaginatedPersonalityList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Personality"
+                        }
+                    }
+                }
+            },
             "PaginatedResultList": {
                 "type": "object",
                 "required": [
@@ -62567,6 +62543,31 @@
                         "readOnly": true,
                         "description": "\nFailed reasons of the test runs\nExample:\n```json\n{\n    \"issues\": [\n      {\n        \"rank\": 1,\n        \"run_ids\": [\n          34588\n        ],\n        \"description\": \"The agent did not provide the standard greeting, emergency disclaimer, or ask how they could help.\",\n        \"affected_count\": 1\n      },\n      {\n        \"rank\": 2,\n        \"run_ids\": [\n          34588\n        ],\n        \"description\": \"The agent did not explain the distinction between the primary care and express clinics.\",\n        \"affected_count\": 1\n      }\n    ],\n    \"total_failed_runs\": 1\n  }\n```\n"
                     },
+                    "ai_summary": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nLLM-generated narrative summary of the result, structured for the Results-page UI.\nExample:\n```json\n{\n    \"what_happened\": \"8 of 10 runs failed, 2 passed. All 8 failures cluster into 3 distinct causes.\",\n    \"why_it_happened\": \"The default test profile isn't seeded in the production backend, so every auth-required workflow exits before PIN/address steps run.\",\n    \"how_to_fix\": \"Seed the test profile in production, tighten the competitor-mention guardrail, and add CA-only store phrasing to the FAQ flow.\",\n    \"generated_from_runs_count\": 10,\n    \"generated_at\": \"2026-05-25T12:00:00Z\"\n}\n```\n"
+                    },
+                    "next_steps": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nLLM-suggested next steps to fix the issues found in this result, ordered by impact.\nExample:\n```json\n[\n    {\"title\": \"Seed test profile in production\", \"description\": \"Unblocks 6 runs; ~5 min.\"},\n    {\"title\": \"Tighten competitor guardrail\", \"description\": \"1 prompt edit; review drift run.\"}\n]\n```\n"
+                    },
+                    "performance_metrics": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Per-rubric-rule performance breakdown. One entry per rule in the project's rubric_config: metric name, aggregated value across the result's runs, and whether that aggregate meets the rule's conditions."
+                    },
                     "run_type": {
                         "type": [
                             "string",
@@ -62931,7 +62932,7 @@
                     "information": {
                         "type": "object",
                         "additionalProperties": {},
-                        "description": "Information fields of the test profile"
+                        "description": "Test profile information. Use the sectioned shape — `main_agent_variables` (sent to the agent under test as dynamic variables at call time) and `testing_agent_variables` (persona/context used by the simulated caller, not sent to the agent). Legacy flat dicts (no section keys) are still accepted and delivered to both sides for backward compatibility. Example: {\"main_agent_variables\": {\"user_id\": \"U-42\"}, \"testing_agent_variables\": {\"customer_name\": \"John Doe\"}}."
                     }
                 }
             },
@@ -63956,7 +63957,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, and hyphens",
+                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, hyphens, and spaces between words (no leading or trailing spaces)",
                         "maxLength": 255
                     },
                     "description": {
@@ -64540,6 +64541,177 @@
                         "readOnly": true
                     }
                 }
+            },
+            "Personality": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "forked_from": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "organization": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "\nName of the personality\nExample: `\"Customer Service\"`\n",
+                        "maxLength": 255
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "\nPrompt of the personality\nExample: `\"You are a friendly and helpful customer service agent who is always willing to help\"`\n"
+                    },
+                    "language": {
+                        "enum": [
+                            "af",
+                            "ar",
+                            "bn",
+                            "bg",
+                            "zh",
+                            "cs",
+                            "da",
+                            "nl",
+                            "en",
+                            "et",
+                            "fi",
+                            "fr",
+                            "de",
+                            "el",
+                            "gu",
+                            "hi",
+                            "he",
+                            "hu",
+                            "id",
+                            "it",
+                            "ja",
+                            "kn",
+                            "ko",
+                            "ms",
+                            "ml",
+                            "mr",
+                            "multi",
+                            "no",
+                            "pl",
+                            "pa",
+                            "pt",
+                            "ro",
+                            "ru",
+                            "sk",
+                            "es",
+                            "sv",
+                            "th",
+                            "tr",
+                            "tl",
+                            "ta",
+                            "te",
+                            "uk",
+                            "vi"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                    },
+                    "accent": {
+                        "type": "string",
+                        "description": "\nAccent of the personality\nExample: `\"American\"`\n",
+                        "maxLength": 255
+                    },
+                    "gender": {
+                        "enum": [
+                            "male",
+                            "female",
+                            "neutral"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "427cb1f56db21620",
+                        "description": "\nGender of the personality\n\n\n* `male` - Male\n* `female` - Female\n* `neutral` - Neutral"
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "default": false
+                    },
+                    "call_service_provider": {
+                        "enum": [
+                            "vapi",
+                            "patronus"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "f442d6949d5b96ff",
+                        "description": "\nCall service provider\n\n\n* `vapi` - VAPI\n* `patronus` - Patronus"
+                    },
+                    "background_noise": {
+                        "type": "string"
+                    },
+                    "voice_model": {
+                        "type": "string"
+                    },
+                    "voice_id": {
+                        "type": "string"
+                    },
+                    "interruption_level": {
+                        "type": "string"
+                    },
+                    "speed": {
+                        "type": "string"
+                    },
+                    "generation_config": {
+                        "type": "string"
+                    },
+                    "network_simulation": {
+                        "type": "string"
+                    },
+                    "message_plan": {
+                        "type": "string"
+                    },
+                    "start_speaking_plan": {
+                        "type": "string"
+                    },
+                    "stop_speaking_plan": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "background_sound_volume": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "patronus_settings": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    },
+                    "provider_agent_id": {
+                        "type": "string",
+                        "description": "\nProvider agent ID\nExample: `\"assistant_123\"`\n",
+                        "maxLength": 255
+                    },
+                    "is_starred": {
+                        "type": "boolean",
+                        "description": "\nWhether the personality is starred\n"
+                    }
+                },
+                "required": [
+                    "background_noise",
+                    "name",
+                    "prompt",
+                    "voice_model"
+                ]
             },
             "PhoneNumber": {
                 "type": "object",
@@ -65873,6 +66045,31 @@
                         "readOnly": true,
                         "description": "\nFailed reasons of the test runs\nExample:\n```json\n{\n    \"issues\": [\n      {\n        \"rank\": 1,\n        \"run_ids\": [\n          34588\n        ],\n        \"description\": \"The agent did not provide the standard greeting, emergency disclaimer, or ask how they could help.\",\n        \"affected_count\": 1\n      },\n      {\n        \"rank\": 2,\n        \"run_ids\": [\n          34588\n        ],\n        \"description\": \"The agent did not explain the distinction between the primary care and express clinics.\",\n        \"affected_count\": 1\n      }\n    ],\n    \"total_failed_runs\": 1\n  }\n```\n"
                     },
+                    "ai_summary": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nLLM-generated narrative summary of the result, structured for the Results-page UI.\nExample:\n```json\n{\n    \"what_happened\": \"8 of 10 runs failed, 2 passed. All 8 failures cluster into 3 distinct causes.\",\n    \"why_it_happened\": \"The default test profile isn't seeded in the production backend, so every auth-required workflow exits before PIN/address steps run.\",\n    \"how_to_fix\": \"Seed the test profile in production, tighten the competitor-mention guardrail, and add CA-only store phrasing to the FAQ flow.\",\n    \"generated_from_runs_count\": 10,\n    \"generated_at\": \"2026-05-25T12:00:00Z\"\n}\n```\n"
+                    },
+                    "next_steps": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nLLM-suggested next steps to fix the issues found in this result, ordered by impact.\nExample:\n```json\n[\n    {\"title\": \"Seed test profile in production\", \"description\": \"Unblocks 6 runs; ~5 min.\"},\n    {\"title\": \"Tighten competitor guardrail\", \"description\": \"1 prompt edit; review drift run.\"}\n]\n```\n"
+                    },
+                    "performance_metrics": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Per-rubric-rule performance breakdown. One entry per rule in the project's rubric_config: metric name, aggregated value across the result's runs, and whether that aggregate meets the rule's conditions."
+                    },
                     "run_type": {
                         "type": [
                             "string",
@@ -66837,16 +67034,11 @@
                             }
                         ],
                         "readOnly": true,
-                        "description": "\nDetails of the test profile associated with this scenario\nExample:\n```json\n{\n    \"id\": \"<integer>\",\n    \"agent_id\": \"<integer>\",\n    \"name\": \"<string>\",\n    \"information\": {\n        \"user_name\": \"<string>\",\n        \"user_email\": \"<string>\",\n        \"order_id\": \"<string>\",\n    },\n}\n```\n"
+                        "description": "\nDetails of the test profile associated with this scenario. `information` uses the\nsectioned shape: `main_agent_variables` are sent to the agent under test as\ndynamic variables at call time; `testing_agent_variables` are persona/context\nused by Cekura's simulated caller. Legacy flat dicts (no section keys) still\nwork — at call time they are delivered to both sides for backward compatibility.\nExample:\n```json\n{\n    \"id\": \"<integer>\",\n    \"agent_id\": \"<integer>\",\n    \"name\": \"<string>\",\n    \"information\": {\n        \"main_agent_variables\": {\n            \"user_id\": \"<string>\",\n            \"account_id\": \"<string>\"\n        },\n        \"testing_agent_variables\": {\n            \"user_name\": \"<string>\",\n            \"user_email\": \"<string>\",\n            \"order_id\": \"<string>\"\n        }\n    }\n}\n```\n"
                     },
                     "dynamic_variable_values": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "description": "Generated values for the agent's dynamic variables for this scenario. Keys are variable names; values are the generated values."
+                        "readOnly": true,
+                        "description": "REMOVED FROM API. Reads return the historical value for legacy rows (`null` for new rows). Writes are no longer accepted — supplying a non-null value yields a 400 error. Put dynamic-variable values in `test_profile_data.information.main_agent_variables` instead: create the test profile via POST /test-profiles/ and attach it via the `test_profile` field on the scenario."
                     },
                     "generated_mock_tool_entries": {
                         "readOnly": true,
@@ -67300,7 +67492,7 @@
                                 "type": "null"
                             }
                         ],
-                        "description": "Generated values for the agent's dynamic variables for this scenario. Keys are variable names; values are the generated values."
+                        "description": "REMOVED FROM API. Historically stored a flat copy of the agent's dynamic-variable values for the scenario. The column is retained read-only for legacy rows; reads still return its historical value, but writes via the API are rejected with a 400. At call time the Run-level helper consults this column ONLY when the attached test_profile is legacy-flat (or absent) — sectioned test profiles are the canonical source and ignore this column. Put dynamic-variable values in `test_profile.information.main_agent_variables` for new scenarios."
                     },
                     "phone_number": {
                         "type": [
@@ -67683,7 +67875,7 @@
                                 "type": "null"
                             }
                         ],
-                        "description": "Generated values for the agent's dynamic variables for this scenario. Keys are variable names; values are the generated values."
+                        "description": "REMOVED FROM API. Historically stored a flat copy of the agent's dynamic-variable values for the scenario. The column is retained read-only for legacy rows; reads still return its historical value, but writes via the API are rejected with a 400. At call time the Run-level helper consults this column ONLY when the attached test_profile is legacy-flat (or absent) — sectioned test profiles are the canonical source and ignore this column. Put dynamic-variable values in `test_profile.information.main_agent_variables` for new scenarios."
                     },
                     "created_at": {
                         "type": "string",
@@ -67932,16 +68124,11 @@
                             }
                         ],
                         "readOnly": true,
-                        "description": "\nDetails of the test profile associated with this scenario\nExample:\n```json\n{\n    \"id\": \"<integer>\",\n    \"agent_id\": \"<integer>\",\n    \"name\": \"<string>\",\n    \"information\": {\n        \"user_name\": \"<string>\",\n        \"user_email\": \"<string>\",\n        \"order_id\": \"<string>\",\n    },\n}\n```\n"
+                        "description": "\nDetails of the test profile associated with this scenario. `information` uses the\nsectioned shape: `main_agent_variables` are sent to the agent under test as\ndynamic variables at call time; `testing_agent_variables` are persona/context\nused by Cekura's simulated caller. Legacy flat dicts (no section keys) still\nwork — at call time they are delivered to both sides for backward compatibility.\nExample:\n```json\n{\n    \"id\": \"<integer>\",\n    \"agent_id\": \"<integer>\",\n    \"name\": \"<string>\",\n    \"information\": {\n        \"main_agent_variables\": {\n            \"user_id\": \"<string>\",\n            \"account_id\": \"<string>\"\n        },\n        \"testing_agent_variables\": {\n            \"user_name\": \"<string>\",\n            \"user_email\": \"<string>\",\n            \"order_id\": \"<string>\"\n        }\n    }\n}\n```\n"
                     },
                     "dynamic_variable_values": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "description": "Generated values for the agent's dynamic variables for this scenario. Keys are variable names; values are the generated values."
+                        "readOnly": true,
+                        "description": "REMOVED FROM API. Reads return the historical value for legacy rows (`null` for new rows). Writes are no longer accepted — supplying a non-null value yields a 400 error. Put dynamic-variable values in `test_profile_data.information.main_agent_variables` instead: create the test profile via POST /test-profiles/ and attach it via the `test_profile` field on the scenario."
                     },
                     "generated_mock_tool_entries": {
                         "readOnly": true,
@@ -68475,7 +68662,7 @@
                     "information": {
                         "type": "object",
                         "additionalProperties": {},
-                        "description": "Information fields of the test profile"
+                        "description": "Test profile information. Use the sectioned shape — `main_agent_variables` (sent to the agent under test as dynamic variables at call time) and `testing_agent_variables` (persona/context used by the simulated caller, not sent to the agent). Legacy flat dicts (no section keys) are still accepted and delivered to both sides for backward compatibility. Example: {\"main_agent_variables\": {\"user_id\": \"U-42\"}, \"testing_agent_variables\": {\"customer_name\": \"John Doe\"}}."
                     }
                 },
                 "required": [
@@ -69817,16 +70004,11 @@
                             }
                         ],
                         "readOnly": true,
-                        "description": "\nDetails of the test profile associated with this scenario\nExample:\n```json\n{\n    \"id\": \"<integer>\",\n    \"agent_id\": \"<integer>\",\n    \"name\": \"<string>\",\n    \"information\": {\n        \"user_name\": \"<string>\",\n        \"user_email\": \"<string>\",\n        \"order_id\": \"<string>\",\n    },\n}\n```\n"
+                        "description": "\nDetails of the test profile associated with this scenario. `information` uses the\nsectioned shape: `main_agent_variables` are sent to the agent under test as\ndynamic variables at call time; `testing_agent_variables` are persona/context\nused by Cekura's simulated caller. Legacy flat dicts (no section keys) still\nwork — at call time they are delivered to both sides for backward compatibility.\nExample:\n```json\n{\n    \"id\": \"<integer>\",\n    \"agent_id\": \"<integer>\",\n    \"name\": \"<string>\",\n    \"information\": {\n        \"main_agent_variables\": {\n            \"user_id\": \"<string>\",\n            \"account_id\": \"<string>\"\n        },\n        \"testing_agent_variables\": {\n            \"user_name\": \"<string>\",\n            \"user_email\": \"<string>\",\n            \"order_id\": \"<string>\"\n        }\n    }\n}\n```\n"
                     },
                     "dynamic_variable_values": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "description": "Generated values for the agent's dynamic variables for this scenario. Keys are variable names; values are the generated values."
+                        "readOnly": true,
+                        "description": "REMOVED FROM API. Reads return the historical value for legacy rows (`null` for new rows). Writes are no longer accepted — supplying a non-null value yields a 400 error. Put dynamic-variable values in `test_profile_data.information.main_agent_variables` instead: create the test profile via POST /test-profiles/ and attach it via the `test_profile` field on the scenario."
                     },
                     "generated_mock_tool_entries": {
                         "readOnly": true,
@@ -70977,6 +71159,28 @@
                     "agent"
                 ]
             },
+            "ToggleMockToolsMCPEndpoint": {
+                "type": "object",
+                "properties": {
+                    "mock_index": {
+                        "type": "integer"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "mock_index",
+                    "tool_names",
+                    "url"
+                ]
+            },
             "TokenRefresh": {
                 "type": "object",
                 "properties": {
@@ -71002,7 +71206,7 @@
                     },
                     "name": {
                         "type": "string",
-                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, and hyphens",
+                        "description": "Name of the tool - must be less than 64 characters and contain only alphanumerics, underscores, hyphens, and spaces between words (no leading or trailing spaces)",
                         "maxLength": 255
                     },
                     "description": {

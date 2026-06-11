@@ -60,11 +60,6 @@ request_base_url: ContextVar[str] = ContextVar('request_base_url', default=None)
 # wires its conversation_id here). Per-call `_meta["com.cekura/conversation_id"]`
 # wins when both are present.
 request_conversation_id: ContextVar[str] = ContextVar('request_conversation_id', default=None)
-# MCP streamable-http session id (``Mcp-Session-Id``). Captured so external
-# analytics can group an external client's tool calls into a chat session
-# without relying on a per-call conversation id.
-request_mcp_session_id: ContextVar[str] = ContextVar('request_mcp_session_id', default=None)
-
 # X-CEKURA-BASE-URL override is only allowed when explicitly enabled (dev/staging only)
 _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower() in ("1", "true", "yes")
 
@@ -101,7 +96,10 @@ transport_security = TransportSecuritySettings(
     allowed_hosts=_allowed_hosts,
 )
 
-mcp = FastMCP("Cekura API", transport_security=transport_security)
+# Stateless: every request is self-contained, so restarts/redeploys and
+# horizontal scaling don't invalidate client sessions, and per-request
+# credentials always apply (no session-task contextvar snapshots).
+mcp = FastMCP("Cekura API", transport_security=transport_security, stateless_http=True)
 
 server_config = None
 openapi_parser = None
@@ -695,7 +693,27 @@ def _claude_jsonl_to_cekura_transcript(jsonl_text: str) -> List[Dict[str, object
 
 
 def get_request_credential() -> tuple[str, str]:
-    """Return (credential, type) from request context. Type is 'bearer' or 'api_key'."""
+    """Return (credential, type) from request context. Type is 'bearer' or 'api_key'.
+
+    Reads the headers of the HTTP request that delivered the current MCP
+    message. The session task's contextvars are snapshotted at session
+    creation, so a token refreshed mid-session would never reach handlers
+    through them; the contextvars remain only as a fallback for contexts
+    without an MCP request (e.g. unit tests).
+    """
+    headers = None
+    try:
+        req = mcp._mcp_server.request_context.request
+        headers = getattr(req, "headers", None)
+    except LookupError:
+        pass
+    if headers is not None:
+        auth = headers.get('Authorization') or headers.get('authorization')
+        if auth and auth.lower().startswith('bearer '):
+            return auth[7:], "bearer"
+        api_key = headers.get('X-CEKURA-API-KEY') or headers.get('x-cekura-api-key')
+        if api_key:
+            return api_key, "api_key"
     bearer = request_bearer_token.get()
     if bearer:
         return bearer, "bearer"
@@ -709,7 +727,10 @@ def get_request_credential() -> tuple[str, str]:
 def _resolve_client_identifier() -> str:
     """Best-effort client identifier from the active request context.
 
-    Falls back to ``unknown`` when the context isn't available (e.g. unit tests).
+    Prefers ``clientInfo`` from the MCP ``initialize`` params; in stateless
+    mode tool calls run in sessions that never saw ``initialize``, so fall
+    back to the HTTP ``User-Agent`` header. ``unknown`` when neither is
+    available (e.g. unit tests).
     """
     try:
         # `request_context` is a property that returns the current RequestContext
@@ -718,11 +739,16 @@ def _resolve_client_identifier() -> str:
         session = getattr(req_ctx, "session", None)
         params = getattr(session, "client_params", None) if session else None
         ci = getattr(params, "clientInfo", None) if params else None
-        if ci is None:
-            return "unknown"
-        name = getattr(ci, "name", None) or "unknown"
-        version = getattr(ci, "version", None) or "unknown"
-        return f"{name}/{version}"
+        if ci is not None:
+            name = getattr(ci, "name", None) or "unknown"
+            version = getattr(ci, "version", None) or "unknown"
+            return f"{name}/{version}"
+        headers = getattr(getattr(req_ctx, "request", None), "headers", None)
+        if headers is not None:
+            user_agent = headers.get("User-Agent") or headers.get("user-agent")
+            if user_agent:
+                return user_agent[:80]
+        return "unknown"
     except (LookupError, AttributeError):
         return "unknown"
 
@@ -764,13 +790,11 @@ def _resolve_telemetry() -> Dict[str, Optional[str]]:
     meta = _read_request_meta()
     skill = meta.get("com.cekura/skill")
     conversation_id = meta.get("com.cekura/conversation_id") or request_conversation_id.get()
-    mcp_session_id = request_mcp_session_id.get()
     return {
         "call_id": f"call_{uuid.uuid4().hex[:16]}",
         "client_id": _resolve_client_identifier(),
         "skill": skill if isinstance(skill, str) and skill else None,
         "conversation_id": conversation_id if isinstance(conversation_id, str) and conversation_id else None,
-        "mcp_session_id": mcp_session_id if isinstance(mcp_session_id, str) and mcp_session_id else None,
     }
 
 
@@ -870,7 +894,6 @@ def setup_dynamic_tool_handlers():
                 mcp_tool=name,
                 mcp_skill=telemetry["skill"],
                 conversation_id=telemetry["conversation_id"],
-                mcp_session_id=telemetry["mcp_session_id"],
             )
 
             # Forward the resolved per-property types so the HTTP client can respect
@@ -999,14 +1022,6 @@ def main():
                 )
                 if conversation_header:
                     reset_tokens.append((request_conversation_id, request_conversation_id.set(conversation_header)))
-
-                # MCP protocol session identifier (issued on `initialize`).
-                mcp_session_header = (
-                    request.headers.get('Mcp-Session-Id')
-                    or request.headers.get('mcp-session-id')
-                )
-                if mcp_session_header:
-                    reset_tokens.append((request_mcp_session_id, request_mcp_session_id.set(mcp_session_header)))
 
                 # Enforce auth at the transport layer for MCP traffic. Without this,
                 # FastMCP's `initialize` and `tools/list` succeed unauthenticated,

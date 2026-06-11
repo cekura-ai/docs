@@ -271,6 +271,59 @@ If your webhook integration isn't working as expected:
 - Check that phone numbers follow the correct format (+ followed by digits, max 15 chars)
 - Ensure `messages` is an array with dictionaries containing role and content fields
 
+## Mock Tools (optional)
+
+If your agent calls tools and you want to test it without hitting live third-party services, use [Mock Tools](/documentation/key-concepts/evaluators/mock-tools). With a custom integration there are two independent pieces — both are required for tool-based evaluation to work.
+
+### 1. Call the Cekura mock endpoint during the call
+
+Point the tool at its Cekura mock endpoint instead of the real service. During the call, your agent makes a normal HTTP request and gets back the mock output you configured.
+
+- **Method:** `POST`
+- **Body:** the tool's arguments as a flat JSON object — the same shape as the `input` in your mock configuration. For example, a tool whose mock entry is `{"input": {"user_id": 1}, ...}` is called with body `{"user_id": 1}`.
+- **Authentication:** include your `X-CEKURA-API-KEY` header. A missing or wrong key is the most common cause of a mock call failing.
+- The endpoint matches your request against the configured input/output mappings and returns the matching `output`.
+
+See the [Mock Tool API reference](/api-reference/test_framework/post-mock-tool) for the exact endpoint and request/response schema.
+
+### 2. Report the tool call in your transcript
+
+Calling the mock endpoint makes the tool *respond* correctly during the call, but it does **not** by itself tell Cekura's metrics that a tool was used. The [Mock Tool Call Accuracy](/documentation/key-concepts/evaluators/mock-tools#verifying-tool-calls-the-mock-tool-call-accuracy-metric) metric (and any tool-based metric) reads the **transcript** to determine what was called.
+
+So your webhook `messages` array must include a `function_call` message for each tool call, carrying the tool `name` and `arguments` in its `data` object:
+
+```json
+{
+  "role": "function_call",
+  "content": "",
+  "data": {
+    "id": "call_abc",
+    "name": "pre_call_lookup",
+    "arguments": {}
+  }
+}
+```
+
+Include the paired result as well (recommended):
+
+```json
+{
+  "role": "function_call_result",
+  "content": "",
+  "data": {
+    "id": "call_abc",
+    "name": "pre_call_lookup",
+    "result": { "account_id": "TEST-90210", "account_tier": "Premium" }
+  }
+}
+```
+
+<Warning>
+If you omit these `function_call` messages, the Mock Tool Call Accuracy metric will report the tool as **not called** and the result will fail — even when the tool was actually called and used correctly during the call. The mock endpoint being hit is not visible to the metric; only the transcript is.
+</Warning>
+
+A tool that takes no input must still send `"arguments": {}`. See [Transcript Format](/documentation/advanced/transcript-format) for a complete transcript example with function calls.
+
 ## Next Steps
 
 - Learn about [custom metrics](/documentation/key-concepts/metrics/custom-metrics)

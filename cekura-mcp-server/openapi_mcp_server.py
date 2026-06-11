@@ -693,7 +693,27 @@ def _claude_jsonl_to_cekura_transcript(jsonl_text: str) -> List[Dict[str, object
 
 
 def get_request_credential() -> tuple[str, str]:
-    """Return (credential, type) from request context. Type is 'bearer' or 'api_key'."""
+    """Return (credential, type) from request context. Type is 'bearer' or 'api_key'.
+
+    Reads the headers of the HTTP request that delivered the current MCP
+    message. The session task's contextvars are snapshotted at session
+    creation, so a token refreshed mid-session would never reach handlers
+    through them; the contextvars remain only as a fallback for contexts
+    without an MCP request (e.g. unit tests).
+    """
+    headers = None
+    try:
+        req = mcp._mcp_server.request_context.request
+        headers = getattr(req, "headers", None)
+    except LookupError:
+        pass
+    if headers is not None:
+        auth = headers.get('Authorization') or headers.get('authorization')
+        if auth and auth.lower().startswith('bearer '):
+            return auth[7:], "bearer"
+        api_key = headers.get('X-CEKURA-API-KEY') or headers.get('x-cekura-api-key')
+        if api_key:
+            return api_key, "api_key"
     bearer = request_bearer_token.get()
     if bearer:
         return bearer, "bearer"

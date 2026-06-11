@@ -75,7 +75,7 @@ MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "https://api.cekura.ai/mcp")
 OAUTH_EXP_SKEW_SECONDS = 10
 
 # Derive allowed hosts from MCP_ISSUER_URL and MCP_SERVER_URL (covers prod, ngrok, local).
-from urllib.parse import urlparse as _urlparse
+from urllib.parse import quote as _quote, urlparse as _urlparse
 
 _issuer_host = _urlparse(MCP_ISSUER_URL).netloc
 _server_host = _urlparse(MCP_SERVER_URL).netloc
@@ -395,6 +395,8 @@ _escalation_history: Dict[Tuple[str, str], List[float]] = {}
 
 _PII_PATTERNS: Tuple[Tuple[re.Pattern, str], ...] = (
     (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "[email]"),
+    (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "[ssn]"),
+    (re.compile(r"\b(?:\d[ -]?){13,16}\b"), "[card]"),
     (re.compile(r"\+?\d[\d\s().-]{7,}\d"), "[phone]"),
     (re.compile(r"\b(?:sk|pk|api)[-_][A-Za-z0-9]{8,}\b"), "[token]"),
     (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._\-]+"), "[bearer]"),
@@ -801,7 +803,7 @@ def _dispatch_args(op, arguments: Dict[str, Any]) -> Tuple[str, Dict[str, Any], 
         if value is None:
             continue
         if key in path_param_names:
-            resolved_path = resolved_path.replace(f"{{{key}}}", str(value))
+            resolved_path = resolved_path.replace(f"{{{key}}}", _quote(str(value), safe=""))
         elif key in query_param_names:
             query_args[key] = value
         elif has_body:
@@ -949,78 +951,84 @@ def main():
             if path in NO_AUTH_PATHS:
                 return await call_next(request)
 
-            # Bearer token — OAuth web users or agent/CLI JWT passthrough
-            has_bearer = False
-            auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
-            if auth_header and auth_header.lower().startswith('bearer '):
-                token = auth_header[7:]
-                request_bearer_token.set(token)
-                has_bearer = True
-                logger.debug("Bearer token credential set for request")
+            reset_tokens: List[Tuple[ContextVar, Any]] = []
+            try:
+                # Bearer token — OAuth web users or agent/CLI JWT passthrough
+                has_bearer = False
+                auth_header = request.headers.get('Authorization') or request.headers.get('authorization')
+                if auth_header and auth_header.lower().startswith('bearer '):
+                    token = auth_header[7:]
+                    reset_tokens.append((request_bearer_token, request_bearer_token.set(token)))
+                    has_bearer = True
 
-                # Short-circuit expired oauth_access JWTs with 401 +
-                # WWW-Authenticate so the MCP client refreshes the token.
-                # Signature validation stays the backend's job.
-                try:
-                    claims = jwt.decode(token, options={"verify_signature": False})
-                except jwt.PyJWTError:
-                    claims = None
-                if claims and claims.get("type") == "oauth_access":
-                    exp = claims.get("exp")
-                    if isinstance(exp, (int, float)) and exp < time.time() - OAUTH_EXP_SKEW_SECONDS:
-                        return JSONResponse(
-                            {"error": "invalid_token",
-                             "error_description": "OAuth access token expired"},
-                            status_code=401,
-                            headers={"WWW-Authenticate": WWW_AUTH_HEADER},
-                        )
+                    # Short-circuit expired oauth_access JWTs with 401 +
+                    # WWW-Authenticate so the MCP client refreshes the token.
+                    # Signature validation stays the backend's job.
+                    try:
+                        claims = jwt.decode(token, options={"verify_signature": False})
+                    except jwt.PyJWTError:
+                        claims = None
+                    if claims and claims.get("type") == "oauth_access":
+                        exp = claims.get("exp")
+                        if isinstance(exp, (int, float)) and exp < time.time() - OAUTH_EXP_SKEW_SECONDS:
+                            return JSONResponse(
+                                {"error": "invalid_token",
+                                 "error_description": "OAuth access token expired"},
+                                status_code=401,
+                                headers={"WWW-Authenticate": WWW_AUTH_HEADER},
+                            )
 
-            # API key header — legacy mcp-remote / Claude Desktop
-            has_api_key = False
-            api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
-            if api_key:
-                request_api_key.set(api_key)
-                has_api_key = True
-                logger.debug("API key credential set for request")
+                # API key header — legacy mcp-remote / Claude Desktop
+                has_api_key = False
+                api_key = request.headers.get('X-CEKURA-API-KEY') or request.headers.get('x-cekura-api-key')
+                if api_key:
+                    reset_tokens.append((request_api_key, request_api_key.set(api_key)))
+                    has_api_key = True
 
-            # Base URL override — only honoured when ALLOW_BASE_URL_OVERRIDE=true (dev/staging)
-            if _ALLOW_BASE_URL_OVERRIDE:
-                base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
-                if base_url_override:
-                    request_base_url.set(base_url_override.rstrip("/"))
+                # Base URL override — only honoured when ALLOW_BASE_URL_OVERRIDE=true (dev/staging)
+                if _ALLOW_BASE_URL_OVERRIDE:
+                    base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
+                    if base_url_override:
+                        request_base_url.set(base_url_override.rstrip("/"))
 
-            # Connection-level conversation identifier (e.g. set by the Cekura
-            # sandbox at sandbox start). Per-call ``_meta`` overrides this.
-            conversation_header = (
-                request.headers.get('X-Cekura-Conversation-Id')
-                or request.headers.get('x-cekura-conversation-id')
-            )
-            if conversation_header:
-                request_conversation_id.set(conversation_header)
-
-            # MCP protocol session identifier (issued on `initialize`).
-            mcp_session_header = (
-                request.headers.get('Mcp-Session-Id')
-                or request.headers.get('mcp-session-id')
-            )
-            if mcp_session_header:
-                request_mcp_session_id.set(mcp_session_header)
-
-            # Enforce auth at the transport layer for MCP traffic. Without this,
-            # FastMCP's `initialize` and `tools/list` succeed unauthenticated,
-            # which makes Claude Desktop's connector flow conclude "no auth
-            # required" and skip the OAuth handshake entirely.
-            if path.startswith("/mcp") and not has_bearer and not has_api_key:
-                return JSONResponse(
-                    {
-                        "error": "unauthorized",
-                        "error_description": "Authenticate via OAuth (Bearer) or X-CEKURA-API-KEY",
-                    },
-                    status_code=401,
-                    headers={"WWW-Authenticate": WWW_AUTH_HEADER},
+                # Connection-level conversation identifier (e.g. set by the Cekura
+                # sandbox at sandbox start). Per-call ``_meta`` overrides this.
+                conversation_header = (
+                    request.headers.get('X-Cekura-Conversation-Id')
+                    or request.headers.get('x-cekura-conversation-id')
                 )
+                if conversation_header:
+                    reset_tokens.append((request_conversation_id, request_conversation_id.set(conversation_header)))
 
-            return await call_next(request)
+                # MCP protocol session identifier (issued on `initialize`).
+                mcp_session_header = (
+                    request.headers.get('Mcp-Session-Id')
+                    or request.headers.get('mcp-session-id')
+                )
+                if mcp_session_header:
+                    reset_tokens.append((request_mcp_session_id, request_mcp_session_id.set(mcp_session_header)))
+
+                # Enforce auth at the transport layer for MCP traffic. Without this,
+                # FastMCP's `initialize` and `tools/list` succeed unauthenticated,
+                # which makes Claude Desktop's connector flow conclude "no auth
+                # required" and skip the OAuth handshake entirely.
+                if path.startswith("/mcp") and not has_bearer and not has_api_key:
+                    return JSONResponse(
+                        {
+                            "error": "unauthorized",
+                            "error_description": "Authenticate via OAuth (Bearer) or X-CEKURA-API-KEY",
+                        },
+                        status_code=401,
+                        headers={"WWW-Authenticate": WWW_AUTH_HEADER},
+                    )
+
+                return await call_next(request)
+            finally:
+                for var, tok in reversed(reset_tokens):
+                    try:
+                        var.reset(tok)
+                    except (ValueError, LookupError):
+                        pass
 
     async def health_check(request):
         return JSONResponse({

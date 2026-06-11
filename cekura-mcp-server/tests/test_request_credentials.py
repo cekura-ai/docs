@@ -86,3 +86,16 @@ class TestGetRequestCredential:
 
         with pytest.raises(ValueError):
             srv.get_request_credential()
+
+
+class TestResolveClientIdentifier:
+    def test_falls_back_to_user_agent_without_initialize_session(self, mcp_request):
+        # Stateless mode: tool calls run in sessions that never saw
+        # `initialize`, so clientInfo is unavailable and the HTTP
+        # User-Agent header is the best client signal.
+        mcp_request({"user-agent": "claude-code/2.1.139"})
+
+        assert srv._resolve_client_identifier() == "claude-code/2.1.139"
+
+    def test_unknown_without_request_context(self):
+        assert srv._resolve_client_identifier() == "unknown"

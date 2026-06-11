@@ -174,7 +174,7 @@ class CekuraAPIClient:
             raise Exception(f"Rate limit exceeded (429). Retry after: {retry_after}")
 
         if response.status_code >= 500:
-            raise Exception(f"Server error ({response.status_code}): {response.text[:200]}")
+            raise Exception(f"Server error ({response.status_code}). The service failed to process the request; please retry.")
 
         try:
             error_detail = response.json()

@@ -1328,6 +1328,31 @@ The trade-off is a slower initial setup and more back-and-forth to get mock data
 If you have questions about the specific access scope required for your engagement, ask in your support channel and a team member will clarify what applies to your setup.
 
 
+## What does "Create Evaluator from Call" actually do, and can I use it to test a different STT provider with my original audio?
+
+When you use the "Create Evaluator from Call" (or "Create Scenarios from Call") feature on a production call log, Cekura reads the transcript of that call and generates a new structured evaluator that recreates the same conversation flow, intent, and expected outcomes. The resulting evaluator can then be run repeatedly as a regression test.
+
+**Important limitation for STT testing:** When the evaluator is run, the Testing Agent replays the transcript text using synthetic TTS audio (ElevenLabs), *not* the original production audio recording. This means the evaluator cannot be used to test a different STT provider against the original audio — the STT input will be re-synthesised speech, not the real recording.
+
+If your goal is to benchmark STT providers against real production audio, the correct approach is:
+
+1. Pull the call log for each target call via the Cekura API to get the per-turn `start_time` and `end_time` values from the transcript JSON (see [Transcript Format](https://docs.cekura.ai/documentation/advanced/transcript-format)).
+2. Use those timestamps to slice the original audio recording into per-turn segments (e.g. with `ffmpeg`).
+3. Send those audio segments to each STT provider you want to compare and compute WER against a ground-truth transcription.
+
+The Cekura transcript provides the timing data needed for step 1; the STT comparison pipeline itself runs outside Cekura.
+
+
+## How can I view all historical transcripts for a specific evaluator?
+
+You can access all past runs for a specific evaluator using the filtering and grouping features on the Results page:
+
+1. On the **Results** page, use the **Filter by evaluator name** option to scope the view to the evaluator you care about.
+2. Select the filtered runs you want to review, then use the **Create Result** action (sometimes labelled "Group into Result" or "Club Runs") to merge them into a single combined result. This brings all selected runs into one result view where you can navigate between individual conversation transcripts.
+
+This workflow lets you review transcripts across runs to spot when a regression was introduced, compare responses across LLM versions, or audit how the agent has behaved over time on that specific test case. For more on organising and filtering results, see [Organising Projects](https://docs.cekura.ai/documentation/guides/organizing-projects).
+
+
 ## Why is a count metric failing even when the measured value is zero?
 
 This happens when the **Rubric** threshold for that metric is configured with the wrong comparison direction. In Cekura, a metric measures a value — for example, the number of unnecessary repetitions — and the Rubric determines whether that value is a pass or fail based on an operator and threshold you configure.

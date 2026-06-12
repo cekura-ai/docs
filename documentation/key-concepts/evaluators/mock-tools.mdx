@@ -244,11 +244,34 @@ To handle variable inputs reliably:
 - **Pin dynamic values in your evaluator instructions.** If a parameter like a date or appointment slot is completely open-ended, use [Test Profiles](/documentation/key-concepts/evaluators/test-profile) to fix the value: set `{{test_profile.appointment_date}}` in your evaluator scenario, and mock only for that pinned value. This makes both the mock matching and the evaluator assertion deterministic.
 - **Check the tool name matches exactly.** Any casing or underscore mismatch between the tool name in your mock config and the name in your provider (Retell LLM/Flow, VAPI, ElevenLabs) will silently prevent the mock from firing, regardless of the input.
 
+## Mock Tool Response Fields
+
+When you retrieve an agent, the response includes these mock tool fields:
+
+- **`mock_tools_enabled`**: Boolean indicating whether mock mode is currently enabled on the provider
+- **`mock_tools_provider`**: The provider where mock mode is configured (e.g., `vapi`, `retell`, `elevenlabs`)
+- **`mock_tools[]`**: Array of mock tool configurations, each including:
+  - **`mock_data`**: The input-output mappings for this tool
+  - **`served_via`**: Runtime routing information — how the mock tool is accessed:
+    - **`type: "direct"`**: Tool has its own dedicated URL at `served_via.url`
+    - **`type: "mcp"`**: Tool is grouped under a shared MCP endpoint at `served_via.url`, identified by `mock_index`
+
+### MCP Routing
+
+Mock tools can be served two ways:
+
+1. **Direct routing** (`served_via.type='direct'`): Each tool gets a unique URL. This is the default for providers that expect per-tool webhook URLs (VAPI, Retell, ElevenLabs). Use `served_via.url` directly when configuring your provider.
+
+2. **MCP routing** (`served_via.type='mcp'`): Multiple tools share a single endpoint, with each tool identified by its `mock_index`. This groups related tools under one URL to simplify configuration and reduce webhook sprawl. The MCP endpoint dispatches to the correct tool based on the `mock_index` path parameter.
+
+MCP routing is useful when you have many mock tools and want to minimize the number of webhook URLs you configure on your provider. Direct routing gives you per-tool URLs for maximum flexibility.
+
 ## API Reference
 
 For programmatic access to mock tools — they are managed directly on the agent:
 
-- [Get Agent](/api-reference/test_framework/get-agent) — read the agent's `mock_tools` (each entry includes its mock data and runtime access URL)
+- [Get Agent](/api-reference/test_framework/get-agent) — read the agent's `mock_tools`, `mock_tools_enabled`, and `mock_tools_provider` fields (each tool includes its mock data and `served_via` routing info)
 - [Update Agent](/api-reference/test_framework/update-agent-partial) — create, update, or delete mock tools via the `mock_tools` field
-- [Auto-Fetch Agent from Provider](/api-reference/test_framework/auto-fetch-agent) — re-fetch the agent's full configuration (including tools + mock data) from its provider
-- [Toggle Mock Tools](/api-reference/test_framework/toggle-mock-tools) — enable or disable mock mode on the provider
+- [Auto-Fetch Agent from Provider](/api-reference/test_framework/auto-fetch-agent) — re-fetch the agent's full configuration (including tools + mock data) from its provider; monitor progress with the auto-fetch progress endpoint
+- [Auto-Fetch Progress](/api-reference/test_framework/auto-fetch-progress) — poll this per-agent endpoint to track the status of an auto-fetch operation
+- [Toggle Mock Tools](/api-reference/test_framework/toggle-mock-tools) — enable or disable mock mode on the provider (updates `mock_tools_enabled` and applies changes to the provider's configuration)

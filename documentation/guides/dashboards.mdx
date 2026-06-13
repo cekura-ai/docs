@@ -86,20 +86,29 @@ fields like `success` or `duration` don't show it.
 ## Time range
 
 A dashboard's **date range** controls the window every widget plots, and it is
-capped at **30 days**:
+capped at **30 days**. This limit applies both to the dashboard UI and to the
+widget data API endpoints (`GET /dashboards/widgets/{id}/data/` and
+`POST /dashboards/widgets/preview_data/`):
 
 - You can select any window from **the last 5 minutes up to the last 30 days**,
   using the quick ranges (Last 1 hour, Last 24 hours, Last 7 days, Last 30 days,
   …) or a custom from/to range.
 - A custom range **cannot span more than 30 days**, and its **start cannot be
-  earlier than 30 days ago**. Picking a range outside these bounds shows a
-  validation error ("Date range cannot exceed 30 days" / "Start date must be
-  within the last 30 days").
+  earlier than 30 days ago**. Any request whose start timestamp (`timestamp_gte`)
+  is older than 30 days returns `400 {"detail": "Timestamp filter value is too
+  far in the past. Maximum allowed range is 30 days."}` — regardless of the
+  window width. Splitting a longer period into ≤30-day sub-ranges does **not**
+  bypass the limit if any sub-range's start is older than 30 days.
 
 <Note>
-The 30-day cap applies to the dashboard view. To analyze a longer history,
-query the call logs directly via the API, where you can set arbitrary
-`timestamp` filters.
+This limit is by design: long-range aggregation queries impose significant
+server load. It applies to **both the UI and the widget data API endpoints** —
+not just the interactive dashboard view. There is currently no API endpoint
+that returns server-side aggregated call metrics (call volume per day, enum
+breakdowns, metric counts) for date ranges older than 30 days. For historical
+analysis beyond 30 days, use the call logs API
+(`GET /observability/v1/call-logs/`) with arbitrary `timestamp` filters and
+aggregate client-side.
 </Note>
 
 This range is part of the dashboard's saved [filters](#filters) — it persists

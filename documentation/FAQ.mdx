@@ -114,25 +114,21 @@ To perform effective A/B testing between two conversational agents (such as a pr
 By running identicaltest cases against both agents, you can directly measure improvements or regressions in performance, accuracy, and flow adherence. For more information on setting up your agents for testing, refer to the [Agent Setup Guide](https://docs.cekura.ai/documentation/key-concepts/agents/Agent_Setup_Guide). To learn more about how to interpret the results, see our documentation on [Basic and Advanced Metrics](https://docs.cekura.ai/documentation/key-concepts/metrics/basic-advanced-metrics).
 
 
-## Is there a way to export or download call totals and topic breakdowns from the dashboard instead of manually copying and pasting?
+## Is there a way to export call data or share reports from the Calls page or dashboards?
 
-Yes, Cekura provides several ways to access and export your call data, totals, and topic breakdowns without the need for manual copying and pasting.
+Yes, Cekura supports several options for exporting call data and sharing reports.
 
-### 1. Using the Cekura API
-The most efficient way to export data for external reporting—such as emailing a daily breakdown of calls by topic—is through our API. The API allows you to programmatically fetch call data and metadata, which can then be formatted into your own reports or integrated into internal tools.
+### 1. CSV Export of Selected Calls
+On the **Calls** (Observability) page, you can select individual call records and export them as CSV. This is useful for sharing specific calls with stakeholders or running offline analysis on a targeted subset.
 
-*   **Granular Metrics:** The API often provides access to more detailed metrics than what is currently visible on the standard dashboard.
-*   **Integration:** You can leverage these results in your own web applications, allowing your team to focus specifically on calls that have been flagged for review.
-*   **API Documentation:** You can find the reference for fetching call data here: [https://docs.cekura.ai/api-reference/observability/get-call](https://docs.cekura.ai/api-reference/observability/get-call).
+### 2. Dashboards with Daily Reports
+Create a [dashboard](/documentation/guides/dashboards) using the metrics and breakdowns you need — call volumes, outcome distributions, metric scores, and more. Use the **⋮** menu on any dashboard to include it in a daily report email sent to project members. Daily reports can be routed to a specific address by configuring project membership. See [Configuring daily report recipients](#how-can-i-configure-daily-reports-to-be-sent-to-a-specific-email-address-instead-of-all-project-members).
 
-### 2. Dashboard Reporting
-While we are constantly improving the dashboard's export features, you can currently view detailed breakdowns by navigating to your agent's reporting page. 
+### 3. Using the Cekura API
+For custom or automated reporting, use the [Get Call API](https://docs.cekura.ai/api-reference/observability/get-call) to programmatically fetch call data and metric evaluations and format them to match your reporting requirements.
 
-*   **Timeframe Selection:** Ensure you use the timeframe selector (located atthe top right of the dashboard) to filter for specific dates, such as "Today" or a custom range.
-*   **Direct Links:** If you encounter any issues with page loading or stalling, you can often access the specific data view by ensuring your URL includes the correct organization and agent IDs along with the `from` and `to` ISO timestamps.
-
-### 3. Custom Support for Reporting
-If you need a specific breakdown that is not currently documented in the public API reference, please reach out to the Cekura support team. We can provide specific endpoints tailored to your organization's reporting requirements to help you automate yourcustomer communications.
+### 4. Custom Reporting Support
+If you need a specific breakdown not covered by the options above, reach out to the Cekura support team. We can provide specific endpoints tailored to your organisation's reporting requirements.
 
 
 ## Is there a way to update or add metadata to data after it has been posted to the observability endpoint?
@@ -780,20 +776,27 @@ Once the connection is established, you can follow the standard Cekura workflow 
 4. **Evaluate Results:** The platform analyzes the conversation based on defined metrics and expected outcomes to provide a performance report.
 
 
-## How can I prevent a testing agent or evaluator from automatically ending a call when it is instructed not to disconnect?
+## How can I prevent the testing agent from ending the call?
 
-If your testing agent (evaluator) is ending calls prematurely despite having specific instructions in the scenario prompt to wait for the main agent to disconnect, you may need to disable the `End Call` tool in the evaluator's configuration. This ensures the evaluator does not have the technical capability to hang up, regardless of the conversation flow.
+The testing agent ends a call when its evaluator condition contains the `<endcall />` tag in the action text. To prevent the testing agent from ending the call, **remove the `<endcall />` tag from the evaluator's condition instructions**.
 
-### Steps to Disable End Call
+For example, change:
 
-1. **Navigate to Evaluators**: Log in to your Cekura dashboard and go to the **Evaluators** section.
-2. **Edit Evaluator**: Find the evaluator you are using for the test and click on **Edit**.
-3. **Access Configuration**: Within the evaluator settings, navigate to the **Configuration** tab.
-4. **Modify Tool Calls**: Look for the **Tool Calls** section.
-5. **Disable end_call**: Locate the `end_call` tool and switch it to **Disabled**.
+```
+"Thank you, goodbye. <endcall />"
+```
 
-By disabling this tool, the testing agent will be forced to stay on the line until the main agent terminates the session. 
-Note - It is not recommended to disable this tool. Instead provide better instructions on when to end the call. 
+to:
+
+```
+"Thank you, goodbye."
+```
+
+Without the `<endcall />` tag in any condition, the testing agent will stay on the line and let the main agent terminate the session. See the [Conditional Actions guide](/documentation/key-concepts/evaluators/conditional-actions) for full tag reference.
+
+<Note>
+A UI option to disable the end-call capability at the evaluator level was previously available but has been removed — it was redundant with simply omitting the tag from the evaluator instructions.
+</Note>
 
 
 ## How do I set up outbound tests?
@@ -1081,6 +1084,16 @@ Latency can occasionally be affected by intermittent performance issues with tra
 
 If you continue to see latency that significantly exceeds your configured settings, please provide specific **Run IDs** or **Call IDs** to the support team for a detailed trace analysis.
 
+## Which LLM and TTS providers are commonly used in production voice agents?
+
+Based on current usage across production voice AI deployments, the most common choices at each stage are:
+
+- **STT:** Deepgram — consistently low transcription latency for real-time applications.
+- **LLM:** GPT-4o, GPT-4.1, and Gemini 2.5/3 Flash — widely used for their balance of quality and response speed. Very recent frontier models tend to carry higher latency than these established mid-tier options, making them less suitable for real-time conversation.
+- **TTS:** ElevenLabs and Cartesia — both offer high-quality synthesis with low time-to-first-audio and are the most common choices for production voice agents.
+
+For architecture guidance and latency targets at each stage, see [Best practices for achieving low end-to-end latency](/documentation/FAQ#what-are-best-practices-for-achieving-low-end-to-end-latency-in-a-cascading-voice-ai-pipeline-stt--llm--tts).
+
 ## What are best practices for achieving low end-to-end latency in a cascading voice AI pipeline (STT → LLM → TTS)?
 
 A cascading pipeline routes audio through three sequential services — Speech-to-Text (STT), a Large Language Model (LLM), and Text-to-Speech (TTS) — so each stage adds to the overall response time. With the right model choices and architecture, end-to-end latency of around 2 seconds is achievable.
@@ -1090,8 +1103,8 @@ A cascading pipeline routes audio through three sequential services — Speech-t
 Choose providers optimised for inference speed at each stage:
 
 - **STT:** Deepgram offers consistently low transcription latency and is a common choice for real-time voice applications.
-- **LLM:** Smaller, faster models such as GPT-4o mini balance response quality with reduced generation time compared to larger variants.
-- **TTS:** ElevenLabs provides high-quality synthesis with low time-to-first-audio.
+- **LLM:** GPT-4o, GPT-4.1, and Gemini 2.5/3 Flash are widely used in production for their balance of quality and response speed. Smaller variants (e.g. GPT-4o mini) can reduce latency further but may trade off response quality. Very recent frontier models often carry higher latency than the established mid-tier options noted above.
+- **TTS:** ElevenLabs and Cartesia both provide high-quality synthesis with low time-to-first-audio and are the most common choices for production voice agents.
 
 ### Pipeline orchestration
 
@@ -1328,9 +1341,9 @@ The trade-off is a slower initial setup and more back-and-forth to get mock data
 If you have questions about the specific access scope required for your engagement, ask in your support channel and a team member will clarify what applies to your setup.
 
 
-## What does "Create Evaluator from Call" actually do, and can I use it to test a different STT provider with my original audio?
+## What does "Create Evaluator from Call" actually do, and can I use it to replicate a production failure as a test case?
 
-When you use the "Create Evaluator from Call" (or "Create Scenarios from Call") feature on a production call log, Cekura reads the transcript of that call and generates a new structured evaluator that recreates the same conversation flow, intent, and expected outcomes. The resulting evaluator can then be run repeatedly as a regression test.
+When you use the "Create Evaluator from Call" (or "Create Scenarios from Call") feature on a production call log, Cekura reads the transcript of that call and generates a new structured evaluator that recreates the same conversation flow, intent, and expected outcomes. The resulting evaluator can then be run repeatedly as a regression test — this is the recommended approach for turning a specific production failure into a repeatable test scenario. For finer control over branching conditions, turn sequences, or IVR flows, build the evaluator directly using [Conditional Actions](/documentation/key-concepts/evaluators/conditional-actions).
 
 **Important limitation for STT testing:** When the evaluator is run, the Testing Agent replays the transcript text using synthetic TTS audio (ElevenLabs), *not* the original production audio recording. This means the evaluator cannot be used to test a different STT provider against the original audio — the STT input will be re-synthesised speech, not the real recording.
 
@@ -1341,6 +1354,15 @@ If your goal is to benchmark STT providers against real production audio, the co
 3. Send those audio segments to each STT provider you want to compare and compute WER against a ground-truth transcription.
 
 The Cekura transcript provides the timing data needed for step 1; the STT comparison pipeline itself runs outside Cekura.
+
+
+## Can I test my agent using audio recordings or audio files I provide?
+
+The Testing Agent generates its own synthetic speech for every run — it does not accept externally provided audio files as test inputs. To replicate a specific failure scenario or conversation flow, use [Structured Tests](/documentation/key-concepts/evaluators/conditional-actions): write a rule-based evaluator whose conditions follow the conversation path you want to reproduce, and the Testing Agent will simulate that sequence with its own synthesised voice.
+
+If the failure you want to reproduce came from a production call already captured in Cekura, the *Create Evaluator from Call* feature converts that call's transcript into an evaluator, preserving the turn-by-turn dialogue as conditions. The Testing Agent replays the conversation using synthetic audio rather than the original recording.
+
+For STT benchmarking against original audio recordings, see [What does "Create Evaluator from Call" actually do?](#what-does-create-evaluator-from-call-actually-do-and-can-i-use-it-to-replicate-a-production-failure-as-a-test-case).
 
 
 ## How can I view all historical transcripts for a specific evaluator?
@@ -1384,3 +1406,44 @@ Your LLM generates reasoning tokens as part of its output. Forward the full reas
 - **Alternative — OpenTelemetry tracing.** If your agent's decisions are expressed as tool calls, you can instead emit reasoning via [OTel tracing](https://docs.cekura.ai/documentation/guides/observability/tracing). `tool_call` spans can carry `function.input` / `function.output` attributes, so decision rationale attached to tool calls flows into Cekura and appears linked to the call record.
 
 Once the reasoning is present in the metadata or OTel spans, Cekura surfaces it in the evaluation report alongside the pass/fail outcome, giving you a per-decision audit trail.
+
+
+## How do I keep my Cekura skills up to date when new skills are released?
+
+How you update depends on how you installed the skills.
+
+**Claude Code marketplace**: Run `/upgrade-skills` in any Claude Code session. To get updates automatically at every session startup, open the plugin manager (`/plugin`), go to the **Marketplaces** tab, select **cekura-skills**, and enable auto-update.
+
+**Other agents (Cursor, Codex, Windsurf, etc.)**: Auto-update is not available — unlike the Claude Code marketplace, there is no background refresh option for these agents. Run the update command manually whenever you want the latest skills:
+
+```bash
+# Refresh existing skills
+npx skills update
+
+# Or refresh existing AND pick up any newly-added skills
+npx skills add cekura-ai/cekura-skills --all
+```
+
+Cekura pushes skill updates whenever the underlying API or MCP server changes, so running the update command is all that is needed on your side. For full installation and update instructions, see [Skills](/mcp/skills#update-refresh).
+
+
+## Can I compare Cekura metric results against my own manual or ground-truth scores?
+
+Yes. Write a [Python metric](/documentation/key-concepts/metrics/python-metric) that reads the results of other Cekura metrics already evaluated on the same call, then applies your own comparison logic.
+
+Inside any Python metric, every other metric that ran on that call is available by name in the `data` dictionary:
+
+```python
+# Read a Cekura metric result
+cekura_score = data["Quality Score"]
+
+# Read a manually supplied value from a Test Profile
+manual_score = data["test_profile"]["ManualScore"]
+
+# Compare and produce a result
+within_tolerance = abs(cekura_score - manual_score) <= 5
+_result = within_tolerance
+_explanation = f"Cekura score {cekura_score} vs manual {manual_score} — {'within' if within_tolerance else 'outside'} tolerance"
+```
+
+You can supply the manual score via a [Test Profile](/documentation/key-concepts/evaluators/test-profiles) so it varies per test case without editing the metric code. For the full `data` dictionary reference, see [Metric Results Access](/documentation/key-concepts/metrics/python-metric#metric-results-access).

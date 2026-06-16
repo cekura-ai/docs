@@ -1,0 +1,71 @@
+---
+title: 'Amazon Connect Chat Testing'
+sidebarTitle: "Amazon Connect"
+description: 'Test agents hosted behind an Amazon Connect chat widget'
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
+## Overview
+
+Cekura can simulate chat conversations against agents deployed behind an **Amazon Connect chat widget**. Cekura connects to the widget as a test user, exchanges messages through Amazon Connect's standard chat protocol, and evaluates the conversation against your configured evaluators.
+
+Use Amazon Connect Chat Testing when:
+- Your agent receives conversations via an Amazon Connect chat widget.
+- You want to run structured or instruction-based evaluators against your Connect-hosted agent.
+
+<Note>
+Before your first simulation, add `https://api.cekura.ai` to the **Allowed Domains** list in your Amazon Connect widget settings. Without this, Cekura's backend will be blocked from initiating chat sessions.
+</Note>
+
+## Configuration
+
+In your agent settings, select **Amazon Connect** as the provider and fill in the required fields:
+
+| Field | Description |
+|---|---|
+| **Widget ID** | The unique identifier for your Amazon Connect chat widget. Found in the JavaScript embed snippet as the fourth argument to the `amazon_connect(...)` initializer call (a UUID, e.g. `0f61aff1-cf8c-41b5-9726-ee1278f5c679`). |
+| **Snippet ID** | The base64-encoded credentials blob from your Amazon Connect instance. Found in the embed code as `amazon_connect('snippetId', '...')`. |
+| **Connect Host** | The hostname of your Amazon Connect instance, e.g. `myinstance.my.connect.aws`. |
+| **Security Token** | The JWT issued by Amazon Connect for widget authentication. |
+| **Contact Flow ID** | The ID of the contact flow your chat widget routes conversations to. |
+| **Region** | The AWS region your Amazon Connect instance is hosted in (e.g. `us-east-1`). **This field is required** — omitting it causes an "Internal error" when running evaluations. |
+
+### Locating your embed credentials
+
+Your Widget ID, Snippet ID, and Connect Host are all present in the JavaScript embed snippet provided by Amazon Connect when you publish your chat widget:
+
+```html
+<script type="text/javascript">
+  (function(w, d, x, id){
+    s=d.createElement('script');
+    s.src='https://<connect-host>/connectwidget/static/amazon-connect-chat-interface-client.js';
+    s.async=1; s.id=id;
+    d.getElementsByTagName('head')[0].appendChild(s);
+    w[x] = w[x] || function() { (w[x].ac = w[x].ac || []).push(arguments) };
+  })(window, document, 'amazon_connect', '<widget-id>');   /* ← Widget ID is the 4th arg */
+  amazon_connect('snippetId', '<snippet-id>');             /* ← Snippet ID */
+</script>
+```
+
+The Contact Flow ID is the second UUID segment in the ARN of your contact flow:
+```
+arn:aws:connect:<region>:<account>:instance/<instance-id>/contact-flow/<contact-flow-id>
+```
+
+## Troubleshooting
+
+**"Internal error" when running evaluations**
+
+The most common cause is a missing or incorrect **Region** field. Confirm the value matches the AWS region of your Connect instance (visible in your Amazon Connect console URL or the instance ARN).
+
+**403 / "session expired" errors**
+
+One or more of the following fields is incorrect or stale: Widget ID, Snippet ID, or Security Token. Re-copy the embed snippet from your Amazon Connect console and update the corresponding fields in Cekura. Security tokens are typically short-lived; if your token has expired, generate a new one.
+
+**Widget connection refused / CORS errors**
+
+Confirm that `https://api.cekura.ai` appears in your Amazon Connect widget's **Allowed Domains** list. Changes to the allowlist can take a few minutes to propagate.

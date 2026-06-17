@@ -84,9 +84,35 @@ These metrics evaluate whether your agent provides correct and consistent inform
 
     **For Call Logs**: Uses two separate state-of-the-art transcription models to generate ground truth transcriptions. Compares these against the candidate transcript to find inconsistencies, with the score based on the number of errors found. No text normalisation is applied before scoring — the raw transcript is sent directly to the LLM judge so it can assess exactly what was transcribed.
 
-    **For Runs/Simulations**: Compares the provider transcript (what the Main Agent's TTS actually said) against the Cekura ground truth transcript (what the Main Agent should have said). This makes it the recommended metric for detecting **TTS content fidelity errors** — for example, if the agent's TTS renders "2:30pm" as "two thirteen", or drops a digit from a number, the WER metric will catch it. Normalisation is applied using POS-weighted Word Error Rate (WER): errors in names, nouns, and numbers count as 1.0; verb errors count as 0.5; other words are ignored. This normalisation approach works across common languages including Spanish. Scoring: 5 = 0 errors, 4 = 1-3 errors, 3 = 4-6 errors, 2 = 7-12 errors, 1 = 13+ errors.
+    **For Runs/Simulations**: Compares the provider transcript (what the Main Agent's TTS actually said) against the Cekura ground truth transcript (what the Main Agent should have said). This makes it the recommended metric for detecting **TTS content fidelity errors** — for example, if the agent's TTS renders "2:30pm" as "two thirteen", or drops a digit from a number, the WER metric will catch it.
 
-    The explanation also includes the standard Word Error Rate (WER) percentage.
+    **What is Word Error Rate (WER)?** WER is the standard speech-recognition accuracy measure — the fraction of spoken words the speech-to-text got wrong:
+
+    ```
+    WER = (substitutions + deletions + insertions) / words in reference
+    ```
+
+    A WER of 0% means a perfect transcription; lower is better. The explanation always reports the WER percentage for the run.
+
+    **How the score is calculated.** The score is *not* the raw WER. Each transcription error is weighted by how much the mistranscribed word matters, and the score comes from the total **weighted error count**:
+
+    | Word type | Weight per error |
+    | --- | --- |
+    | Names, common nouns, numbers | **1.0** |
+    | Verbs | **0.5** |
+    | Everything else (articles, pronouns, fillers, prepositions…) | **0** (ignored) |
+
+    The same distinct word mistranscribed multiple times is only counted once. This POS-weighted approach works across common languages including Spanish. The weighted error count then maps to the score:
+
+    | Score | Weighted errors |
+    | --- | --- |
+    | 100% | 0 |
+    | 80% | 1–3 |
+    | 60% | 4–6 |
+    | 40% | 7–12 |
+    | 20% | 13+ |
+
+    **Reading the explanation.** Errors are grouped into **Major Variations** (affect the metric score) and **Minor Variations** (do not affect the score), so you can see exactly which mistranscriptions drove the score. Both sections always appear — `None` means there were no errors of that kind. A summary at the bottom shows the **Metric Score** and the **WER** percentage.
 
     **Interpretation**: Higher scores indicate better transcription accuracy. Use this metric when you need to verify that the agent's TTS is rendering content correctly (correct words, correct numbers), not just that speech is audible.
   </Accordion>

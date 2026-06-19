@@ -315,12 +315,13 @@ When writing your custom code, you have access to different variables depending 
     cekura_transcript = data.get("cekura_transcript_json", [])
     # Structure:
     # [
-    #   {"role": "Main Agent", "content": "Hello", "timestamp": 1.0},
-    #   {"role": "Testing Agent", "content": "Hi there", "timestamp": 5.5}
+    #   {"role": "assistant", "content": "Hello", "timestamp": 1.0},
+    #   {"role": "user", "content": "Hi there", "timestamp": 5.5}
     # ]
 
-    # Provides alternative transcript format with simplified structure
-    # Each entry contains role (assistant/user), content, and timestamp in seconds
+    # Provides alternative transcript format with simplified structure.
+    # Note: this format uses "assistant"/"user" roles, unlike transcript_json
+    # which uses "Main Agent"/"Testing Agent".
     ```
   </Accordion>
   <Accordion title="test_profile" href="#test-profile">
@@ -461,6 +462,35 @@ if "premium plan" in transcript:
 else:
     _result = False
     _explanation = "Agent did not mention the Premium Plan in the conversation"
+```
+
+### Evaluation Trigger (Custom Code)
+
+A metric's **Evaluation Trigger** decides *whether* the metric runs on a given call (distinct from the metric body, which decides the score). When the trigger is set to **Custom** with **Custom Code**, you write a short Python snippet that runs in the same secure Python environment as a Python metric: it receives the same [`data`](#available-data-variables) dictionary and must set `_result` and `_explanation`.
+
+- `_result` — a **boolean**: `True` to run the metric on this call, `False` to skip it.
+- `_explanation` — a string explaining the decision.
+
+<Warning>
+A trigger is **not** a function — there is no `return`. Set `_result` and `_explanation` as variables, exactly like a Python metric. The transcript is in `data["transcript_json"]` (there is no `messages` variable), and each turn's `role` is `"Main Agent"` or `"Testing Agent"` — not `"agent"`, `"assistant"`, or `"user"`.
+</Warning>
+
+**Example** — only run the metric when the Main Agent spoke more than 5 times:
+
+```python
+main_messages = [m for m in data["transcript_json"] if m["role"] == "Main Agent"]
+_result = len(main_messages) > 5
+_explanation = f"Main Agent spoke {len(main_messages)} times"
+```
+
+**Example** — skip the metric when the customer hung up:
+
+```python
+_result = True
+_explanation = "Metric is relevant"
+if data.get("call_end_reason") == "customer-hung-up":
+    _result = False
+    _explanation = "Customer hung up, metric not applicable"
 ```
 
 ### Latency Threshold Example

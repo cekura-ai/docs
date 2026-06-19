@@ -1,0 +1,96 @@
+---
+title: "Generating Scenarios"
+sidebarTitle: "Generating Scenarios"
+icon: "wand-magic-sparkles"
+iconType: "regular"
+description: "Auto-generate test scenarios for your agent, answer clarifying questions when asked, and let Cekura build the matching test profile."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+Cekura can generate realistic test scenarios for your agent automatically — grounded in your
+agent's description, its workflow, and any knowledge-base files you've attached. Generation runs
+in the background: you start it, poll for progress, answer a clarifying question if one is asked,
+and collect the finished scenarios.
+
+## How it works
+
+<Steps>
+  <Step title="Start a generation">
+    Call the generate endpoint with your `agent_id` and how many scenarios you want
+    (`num_scenarios`). You can optionally pass `extra_instructions` to steer the generation toward a
+    specific situation (for example, a caller disputing a charge). The response returns a
+    `progress_id`.
+  </Step>
+  <Step title="Poll for progress">
+    Use the `progress_id` to poll the progress endpoint. The response includes a `status`, a
+    human-readable `current_step`, `completed_scenarios` / `total_scenarios` counts, and a
+    `scenarios_list` that fills in as scenarios are produced.
+  </Step>
+  <Step title="Answer a clarifying question (only if asked)">
+    If the generator needs more information to produce good scenarios, `status` becomes
+    `pending_clarification` and the response carries `questions` plus an `agent_message`. Submit a
+    reply to the clarify-answer endpoint with the same `progress_id` and your `answer`, and
+    generation resumes automatically. See [The clarification flow](#the-clarification-flow) below.
+  </Step>
+  <Step title="Collect the results">
+    When `status` is `completed`, `scenarios_list` contains the generated scenarios (each with a
+    name and instructions) and they are saved to your project, ready to run.
+  </Step>
+</Steps>
+
+## The clarification flow
+
+Sometimes the generator can't tell what you want from the agent and instructions alone — for
+example, when the agent's stated purpose doesn't match the attached knowledge base, or the request
+is ambiguous. Rather than guess, it pauses and asks.
+
+When this happens:
+
+- The progress response has `status: "pending_clarification"`, a list of `questions`, and an
+  `agent_message` describing what's unclear. The `current_step` repeats the question so it shows
+  directly in the progress UI.
+- Reply by calling the clarify-answer endpoint with the `progress_id` and your `answer`. Generation
+  then continues from where it paused — your answer is carried into the rest of the run.
+- You can answer more than once if the generator asks follow-ups; each answer resumes the flow.
+
+<Note>
+Only the user who started the generation can answer its clarification questions. A clarification
+also expires if it goes unanswered for a while — if that happens, simply start a new generation.
+</Note>
+
+## Automatic test profiles
+
+Generated scenarios never hard-code personal data. Wherever a caller needs to provide a value — a
+name, a date of birth, an ID, a chosen option — the scenario references a `{{test_profile.<field>}}`
+placeholder instead of a literal. Cekura creates a matching [test profile](/documentation/key-concepts/evaluators/test-profile)
+that supplies consistent values for those fields, so every run uses the same realistic identity.
+
+This keeps scenarios reusable and privacy-safe: you can edit the test profile to change the identity
+without touching the scenario steps.
+
+## Knowledge-base grounding
+
+If your agent has attached knowledge-base files, the generator reads them so scenarios reflect real
+facts from your content. See [Knowledge Base Testing](/documentation/guides/testing-agents/knowledge-base-testing)
+for how to attach files.
+
+If a file can't be processed during generation, the progress response includes a `warnings` entry
+naming the file. Generation still completes — the affected scenarios are simply grounded less in
+that file — so it's worth re-checking the file's format if you see a warning.
+
+## Status reference
+
+| `status` | Meaning |
+| --- | --- |
+| `pending_clarification` | The generator asked a question; reply via the clarify-answer endpoint to resume. |
+| `completed` | Generation finished; `scenarios_list` holds the saved scenarios. |
+| `failed` | Generation could not complete; `current_step` explains why. Start a new generation to retry. |
+
+## Related
+
+- [Test Profile](/documentation/key-concepts/evaluators/test-profile) — how generated identity values are stored and edited.
+- [Knowledge Base Testing](/documentation/guides/testing-agents/knowledge-base-testing) — attach files to ground scenarios.
+- [API Reference: start a background generation](/api-reference/test_framework/generate-evaluator-bg) and [poll progress](/api-reference/test_framework/generate-evaluator-poll-progress).

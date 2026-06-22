@@ -129,14 +129,20 @@ export const pipecatPrompt = [
 
 Pipecat Tracing provides deep observability into your Pipecat agent's performance by integrating the Cekura Python SDK directly into your agent code. This integration significantly enhances the information available in the Cekura platform for end-to-end visibility over agent execution.
 
-**What you get:**
+**What the SDK captures by default** (no OTel instrumentation required):
 
-- Complete agent-side conversation transcripts with UTC timestamps
+- Complete agent-side conversation transcripts with per-turn UTC timestamps
 - Tool/function calls with inputs and outputs
-- Dual-channel audio recording (agent + user) for production monitoring
-- OpenTelemetry traces with conversation, turn, and service spans (STT, LLM, TTS)
-- Session logs capture from agent
-- Session metadata for correlation and debugging
+- Custom metadata (via `set_custom_metadata()`)
+- Dual-channel audio recording (agent + user) — observability mode only; not recorded in testing mode
+- Session logs
+
+**What OpenTelemetry adds** (optional — the SDK configures OTel automatically when `enable_tracing=True` is set on the PipelineTask; no manual span-wrapping required):
+
+- Per-component latency breakdown: STT, LLM, and TTS latency spans
+- Full conversation and turn spans for detailed trace waterfall views
+
+Tool calls, custom metadata, and transcripts are captured automatically by the SDK in both observability and testing modes — OTel is optional and adds the per-component latency breakdown when enabled.
 
 <Note>
 **Replacing an existing direct API integration?** If you currently post call data to the `POST /observability/v1/observe/` endpoint directly, the Pipecat SDK is a **replacement**, not an add-on — these two approaches are mutually exclusive for the same session. Running both creates duplicate records with no merging. Migrate by moving your metadata to `set_custom_metadata()` and removing the direct API call. See [Migrating from the direct API to the SDK](/documentation/FAQ#i-already-post-call-data-to-the-observability-endpoint-from-my-pipecat-agent-can-i-also-add-the-pipecat-sdk) for step-by-step instructions.

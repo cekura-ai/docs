@@ -625,6 +625,10 @@ To monitor your calls, you can send conversation details—such as call recordin
 - **Using Metadata:** To understand how to leverage metadata (like latency) in your evaluations, see our [Metadata Documentation](https://docs.cekura.ai/documentation/key-concepts/metrics/basic-advanced-metrics#2-metadata).
 
 
+## Can a monitoring call be marked as failed even when all my metrics pass?
+
+Yes. Beyond metric scores, a monitoring call can be marked as failed by the platform for operational reasons — for example, when the call has zero duration because no audio recording was submitted. In such cases the Rubric Breakdown may show all conditions as skipped or passed, yet the overall call status is still marked failed. If you observe this pattern, contact the support team and share the call ID so they can identify the specific platform-level cause.
+
 ## What are the implementation requirements and costs for the 'voice tone + clarity' metric, and will an audio recording always be required for it to work?
 
 The 'voice tone + clarity' metric is an audio-based evaluation tool designed to monitor the quality of AI voice agents. To use this metric, an audio recording is always required as the analysis is performed directly on the sound file. Implementation involves sending your call recordings along with anyrelevant metadata to Cekura for evaluation. The cost for using this metric is 0.2 credits per minute of audio recording processed. For more information on how to send call data via API, visit: https://docs.cekura.ai/api-reference/observability/get-call.
@@ -1126,7 +1130,17 @@ Based on empirical data across voice AI deployments, the mean p95 latency (exclu
 - **3s:** A reasonable target — competitive and noticeably better than the market mean.
 - **4–5s:** Typical market mean p95 for production voice agents.
 
+For Cekura's E2E Latency metric (which captures the full pipeline including TTS delivery and network overhead), a per-turn mean of **1,500–2,000ms** is a good target for a responsive production agent — see [Why does Cekura's Latency metric show a higher value than my voice provider's dashboard?](/documentation/FAQ#why-does-cekuras-latency-metric-show-a-higher-value-than-my-voice-providers-dashboard) for context on what Cekura's E2E measurement captures.
+
 Use Cekura's [latency metric](https://docs.cekura.ai/documentation/key-concepts/metrics/pre-defined-metrics) to track your agent's per-turn p95 across test runs and production calls, and use [metadata tagging](https://docs.cekura.ai/documentation/key-concepts/metrics/basic-advanced-metrics#2-metadata) to segment by provider, region, or configuration to identify where latency accumulates.
+
+## Why does Cekura's Latency metric show a higher value than my voice provider's dashboard?
+
+The difference comes from the scope of what each side measures. Cekura's Latency metric captures the full end-to-end (E2E) gap — from when the caller finishes speaking to when the agent's audio begins to play — using VAD-based boundary detection on the stereo recording. This includes LLM processing, TTS rendering, audio streaming overhead, and network round-trip latency.
+
+Most voice provider dashboards report a narrower internal measurement: typically from speech-recognition completion to when the LLM response is ready, which excludes TTS delivery time and last-mile network overhead. A gap of 500–1,000ms between the two figures is normal and expected.
+
+For production-ready agents, an E2E latency of **1,500–2,000ms** is a good target for a responsive experience. At the p95 level, well-optimised agents typically reach around 2 seconds; the market mean p95 is 4–5 seconds. See [typical p95 latency benchmarks](/documentation/FAQ#what-is-the-typical-p95-latency-seen-in-the-market-for-voice-ai-agents) and [best practices for low latency](/documentation/FAQ#what-are-best-practices-for-achieving-low-end-to-end-latency-in-a-cascading-voice-ai-pipeline-stt--llm--tts) for model and architecture guidance.
 
 ## Which Speech-to-Text (STT) provider works best for real-time multilingual conversations?
 
@@ -1163,18 +1177,24 @@ For more details on configuring your testing environment, please visit the [Agen
 
 ## Is there a way to mass update expected outcomes or tags for a particular set of scenarios using the 'improve scenarios' feature?
 
-Yes, Cekura provides a powerful **Improve Scenarios** feature that allows you to perform bulk updates on your test cases using a natural language chat interface. This feature is designed to eliminate manual editing by allowing you to describe the changes you want to make to a group of scenarios at once.
+Yes, Cekura provides a powerful **Improve Scenarios** feature that allows you to perform bulk updates on your test cases using a natural language chat interface. This feature is designed to eliminate manual editing by allowing you to describe the changes you want to make to any evaluator property — including expected outcomes, personality, instructions, and more — across a group of scenarios at once.
 
-### How to Mass Update Expected Outcomes
-To update the expected outcomes for a specific group of scenarios, follow these steps:
+### How to Mass Update Evaluator Properties
+To update properties for a specific group of scenarios, follow these steps:
 1. **Filter Scenarios:** Use the filter options in your scenario list (e.g., filter by a specific tag) to isolate the scenarios you wish to update.
 2. **Select Scenarios:** Select the checkboxes for the scenarios you want to modify.
 3. **Open Improve Scenarios:** Click the **Improve Scenarios** button. This will open a chat agent interface.
-4. **Provide Instructions:** Simply tell the agent what you want to change. For example: *"Update the expected outcome for all selected scenarios to ensure the agent asks for a zip code."*
+4. **Provide Instructions:** Simply tell the agent what you want to change. For example: *"Update the expected outcome for all selected scenarios to ensure the agent asks for a zip code."* or *"Change the personality to English – Casual for all selected scenarios."*
 5. **Execute:** The AI will process the request and update the selected scenarios automatically.
 
+### Bulk Changing Personality
+To change the personality of multiple evaluators at once, select them and open **Improve Scenarios**, then describe the change in natural language — for example: *"Set the personality to Spanish – Neutral for all selected evaluators."* The feature supports any personality option available in the evaluator settings.
+
 ### Mass Updating Tags
-Currently, the **Improve Scenarios** tool is optimized for updating scenario content and expected outcomes. While you can filter by tags to select your scenarios, the ability to mass update or remove tags directly via the chat agent is a feature that is currently being added and will be available in the coming days.
+Currently, the **Improve Scenarios** tool is optimized for updating scenario content and properties such as expected outcomes and personality. While you can filter by tags to select your scenarios, the ability to mass update or remove tags directly via the chat agent is a feature that is currently being added and will be available in the coming days.
+
+### Structural Changes (Tools, End Call)
+For structural changes such as adding or removing tools (e.g., the End Call tool), use **Actions → Modify Evaluators** from the evaluator list instead. Select the affected evaluators, click **Actions → Modify Evaluators → Add Tools**, and choose the tool to add. This is separate from the Improve Scenarios interface, which handles content and property edits.
 
 
 ## Can I duplicate evaluators, agents, or metrics across projects?
@@ -1236,6 +1256,30 @@ The Pipecat SDK offers several recording control options depending on your requi
 **Disable the tracer entirely**: Set the environment variable `CEKURA_TRACER_ENABLED="false"`. When set, the tracer is a no-op — no data is captured and nothing is sent to Cekura.
 
 **Per-call selective recording (starting without recording and enabling it mid-call)**: This is not currently supported. There is no built-in mechanism to start a call without recording and then begin recording once consent is confirmed mid-conversation. If your workflow requires starting audio capture at a specific point in the conversation, the recommended approach is to use `track_pipeline()` for calls where consent has not yet been obtained, and `observe_pipeline()` for sessions where consent is established upfront. If you need a more fine-grained per-call recording toggle, reach out via your support channel.
+
+## What data does the Pipecat SDK capture for each call?
+
+The SDK has two integration modes with different capture scopes:
+
+**`observe_pipeline()` / `observe_and_create_task()` (observability mode)** captures:
+- Conversation transcript with per-turn UTC timestamps
+- Tool/function calls with inputs and outputs
+- Custom metadata (via `set_custom_metadata()`)
+- Dual-channel audio recording (agent + user)
+- OpenTelemetry traces (STT, LLM, TTS latency spans)
+- Session logs
+
+**`track_pipeline()` / `track_and_create_task()` (testing mode)** captures:
+- Conversation transcript with per-turn UTC timestamps
+- Tool/function calls with inputs and outputs
+- Custom metadata
+- OpenTelemetry traces
+- Session logs
+- No audio recording
+
+In both modes, tool calls and custom metadata are captured alongside the transcript — not just transcript and audio. The key distinction between modes is audio recording: `observe_pipeline()` records audio; `track_pipeline()` does not.
+
+For full details and setup instructions, see the [Pipecat Tracing guide](/documentation/integrations/pipecat/tracing).
 
 ## What can I do on the sandbox plan — does it allow real pre-production testing?
 

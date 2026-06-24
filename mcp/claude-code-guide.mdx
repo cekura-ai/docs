@@ -1,7 +1,7 @@
 ---
 title: "Using Cekura with Claude Code"
-sidebarTitle: "Claude Code Guide"
-description: "End-to-end walkthrough: evaluate complex voice agents using Claude Code, the Cekura MCP, and Cekura Skills"
+sidebarTitle: "Claude Code"
+description: "Recommended setup: install the Cekura Claude Code plugin, connect MCP, and use Skills plus slash commands."
 icon: "code"
 ---
 
@@ -9,8 +9,96 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 <CopyPageButton />
 
+Claude Code is the best Cekura assistant experience. The Cekura plugin bundles Skills, slash commands, MCP configuration, update support, and MCP failure help.
 
-Watch an end-to-end walkthrough of evaluating complex voice agents—running multiple tools across coordinating agents—using Claude Code, the Cekura MCP, and Cekura Skills.
+## What you get
+
+| Capability | Included? | Why it matters |
+|---|---:|---|
+| Cekura Skills | Yes | Your assistant knows Cekura workflows and best practices |
+| Slash commands | Yes | Fast entry points like `/setup-mcp`, `/autogen-eval`, `/run-evals`, and `/cekura-report` |
+| MCP config | Yes | The plugin includes the Cekura MCP server config |
+| OAuth setup | Yes | `/setup-mcp` walks you through browser sign-in |
+| Update support | Yes | `/upgrade-skills` refreshes skills and commands |
+| Failure help | Yes | MCP failures are detected and surfaced with next steps |
+
+## Install the plugin
+
+<Tabs>
+  <Tab title="Claude Code CLI">
+    1. Start a Claude Code session.
+    2. Run `/plugin`.
+    3. Open **Marketplaces > Add Marketplace**.
+    4. Paste `https://github.com/cekura-ai/cekura-skills.git` and confirm.
+    5. Open **Discover**, search `cekura`, and install the `cekura` plugin.
+    6. Restart the Claude Code session if prompted.
+  </Tab>
+
+  <Tab title="Claude Code in VS Code">
+    1. Open the Claude Code chat panel.
+    2. Open **Manage Plugins > Marketplaces**.
+    3. Add `https://github.com/cekura-ai/cekura-skills.git`.
+    4. Open **Plugins**, search `cekura`, and install the plugin.
+    5. Restart VS Code if prompted.
+  </Tab>
+</Tabs>
+
+## Connect MCP
+
+Run this in Claude Code:
+
+```plaintext
+/setup-mcp
+```
+
+Choose OAuth unless you specifically need an API key. OAuth opens a browser, lets you sign into Cekura, and avoids storing keys in config files.
+
+<Tip>
+The plugin already includes the Cekura MCP server URL. `/setup-mcp` verifies whether MCP is working, registers the server if needed, and confirms connectivity.
+</Tip>
+
+## Verify setup
+
+Ask Claude Code:
+
+```plaintext
+Use the Cekura skills and MCP. List my Cekura agents, pick one, and propose 3 evaluators I should create first. Do not create anything until I approve.
+```
+
+If setup is working, Claude Code should list real agents from your workspace and use Cekura evaluator-design guidance before proposing next steps.
+
+## Start with onboarding
+
+For a guided first run, use:
+
+```plaintext
+/cekura-onboarding
+```
+
+You can also ask in plain English:
+
+```plaintext
+I'm new to Cekura. Walk me through setting up my first useful agent evaluation workflow.
+```
+
+## Common workflows
+
+| Goal | Use |
+|---|---|
+| Configure MCP | `/setup-mcp` |
+| Get started | `/cekura-onboarding` |
+| Create a metric | `/create-metric` |
+| Improve a metric | `/improve-metric` |
+| Generate evaluators | `/autogen-eval` |
+| Create one evaluator carefully | `/manual-create-update-eval` |
+| Run evaluators | `/run-evals` |
+| Review results | `/eval-results` |
+| Produce a quality report | `/cekura-report` |
+| Update the plugin | `/upgrade-skills` |
+
+## Example advanced workflow
+
+Watch an end-to-end walkthrough of evaluating complex voice agents, running multiple tools across coordinating agents, using Claude Code, the Cekura MCP, and Cekura Skills.
 
 <iframe
   style={{
@@ -27,34 +115,18 @@ Watch an end-to-end walkthrough of evaluating complex voice agents—running mul
   title="Using Cekura with Claude Code"
 />
 
-## Quick Guide
+## Troubleshooting
 
-<Steps>
-  <Step title="Connect Claude Code to Cekura">
-    Install the Cekura MCP server (see the [Claude Code tab in the MCP overview](/mcp/overview#2-configure-mcp-server)) and install the [Cekura Skills repository](https://github.com/cekura-ai/cekura-skills). Skills give Claude Code the playbook for creating evaluators, running tests, and analyzing results through Cekura.
-  </Step>
+<AccordionGroup>
+  <Accordion title="MCP is not connected">
+    Run `/setup-mcp` again and choose OAuth. Then ask Claude Code to list available Cekura tools or list your agents.
+  </Accordion>
 
-  <Step title="Set up mock data and cleanup hooks">
-    Complex agents depend on database state—ships, credits, sectors, user metadata. Stand up a lightweight webhook server that seeds mock data before a run and listens for Cekura's post-run webhook to reset the database. This keeps concurrent tests isolated and repeatable.
-  </Step>
+  <Accordion title="Commands do not appear">
+    Restart Claude Code after installing the plugin. If the plugin still does not appear, reinstall from the marketplace and confirm `cekura@cekura-skills` is listed.
+  </Accordion>
 
-  <Step title="Let Claude Code learn the schema">
-    Ask Claude Code to read your database schema and agent tools through the Cekura MCP. Once it has the lay of the land, prompt it to generate scenario coverage—for example: *"Using the Cekura skill, create 10 test cases covering ship movement, corp joins, and credit transfers."*
-  </Step>
-
-  <Step title="Run the full suite">
-    Kick off all evaluators at once through the MCP. Cekura executes them concurrently and surfaces pass/fail with full transcripts and traces.
-  </Step>
-
-  <Step title="Triage with Claude">
-    Ask Claude Code to pull failing runs and classify them: *"Analyze these 4 failures and tell me which are real bugs vs. flakes."* Because runs are non-deterministic, **rerun each failing test 3–4 times** and ask Claude to compute a pass rate. One pass out of four usually points to a prompt or tool-routing bug, not infra.
-  </Step>
-
-  <Step title="Get a root-cause report">
-    Claude Code stitches together Cekura run links, Pipecat session IDs, transcripts, and a per-scenario root cause into a final report—coverage summary, failure breakdown, and recommended prompt or tool fixes.
-  </Step>
-</Steps>
-
-<Tip>
-A good first prompt: *"Use the Cekura MCP to list my agents, then use the Cekura skill to generate 10 workflow evaluators covering the most common user flows."*
-</Tip>
+  <Accordion title="Plugin update looks stale">
+    Run `/upgrade-skills`. If it reports stale plugin entries, follow the reinstall steps in the [Skills Catalog](/mcp/skills#reinstall-claude-code-plugin).
+  </Accordion>
+</AccordionGroup>

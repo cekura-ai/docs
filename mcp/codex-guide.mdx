@@ -1,59 +1,97 @@
 ---
 title: "Using Cekura with Codex"
-sidebarTitle: "Codex Guide"
-description: "End-to-end walkthrough: evaluate complex voice agents using OpenAI Codex CLI and the Cekura MCP"
-icon: "code"
+sidebarTitle: "Codex"
+description: "Set up Codex with Cekura Skills, an AGENTS.md fallback, and the Cekura MCP server."
+icon: "terminal"
 ---
 
 import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 <CopyPageButton />
 
+Use Codex with Cekura Skills for workflow guidance and the Cekura MCP server for live workspace actions.
 
-Use OpenAI's Codex CLI together with the Cekura MCP to design evaluators, run them against your voice agents, and triage the results — all from your terminal.
+## What you get
 
-## Quick Guide
+| Capability | Codex setup |
+|---|---:|
+| Cekura workflow guidance | Yes, via Agent Skills or `AGENTS.md` fallback |
+| MCP tools | Yes |
+| OAuth sign-in | Yes, through MCP |
+| Claude Code slash commands | No |
+| Claude Code plugin hooks | No |
+
+## 1. Install Cekura Skills
+
+Start with the Agent Skills install:
+
+```bash
+npx skills add cekura-ai/cekura-skills --all
+```
+
+If your Codex build does not load Agent Skills yet, use the portable `AGENTS.md` fallback in the repo where you run Codex:
+
+```bash
+curl -L https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/codex/AGENTS.md -o AGENTS.md
+```
+
+The fallback gives Codex Cekura metric, evaluator, API, and anti-pattern guidance in one file.
+
+## 2. Connect MCP
+
+Add this to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.cekura]
+url = "https://api.cekura.ai/mcp"
+```
+
+On first use, Codex opens a browser to authorize against your Cekura dashboard account.
+
+For API-key auth, see [MCP-only setup](/mcp/mcp-only#api-key-setup).
+
+## 3. Verify setup
+
+Start Codex from your agent repo and ask:
+
+```plaintext
+Use the Cekura skills and MCP. List my Cekura agents, pick one, and propose 3 evaluators I should create first. Do not create anything until I approve.
+```
+
+If Codex can list agents but does not use Cekura-specific evaluator or metric guidance, keep the `AGENTS.md` fallback in the repo.
+
+## Recommended workflow
 
 <Steps>
-  <Step title="Connect Codex to Cekura">
-    Add the Cekura MCP server to Codex. Edit `~/.codex/config.toml` and add:
-
-    ```toml
-    [mcp_servers.cekura]
-    url = "https://api.cekura.ai/mcp"
-    ```
-
-    On first use Codex opens a browser to authorize against your Cekura dashboard. For API-key-based auth (project-scoped credentials, shared CI access), use the CLI form instead:
-
-    ```bash
-    codex mcp add cekura --env CEKURA_API_KEY=YOUR_API_KEY_HERE -- \
-      sh -c 'npx -y mcp-remote https://api.cekura.ai/mcp --header "X-CEKURA-API-KEY:$CEKURA_API_KEY"'
-    ```
-
-    Verify by starting Codex and asking: *"List my Cekura agents."*
+  <Step title="Run Codex from the agent repo">
+    Codex should have access to prompts, tool definitions, schemas, and local tests before it creates Cekura evaluators.
   </Step>
 
-  <Step title="Set up mock data and cleanup hooks">
-    Complex agents depend on database state — users, accounts, sessions, entitlements. Stand up a lightweight webhook server that seeds mock data before a run and listens for Cekura's post-run webhook to reset the database. This keeps concurrent tests isolated and repeatable.
+  <Step title="Plan first, then create">
+    Ask Codex for a coverage matrix. Approve the plan before creating evaluators or metrics.
   </Step>
 
-  <Step title="Let Codex learn the schema">
-    Run Codex from your agent's repo so it can read your tool definitions, prompts, and database schema directly. Then prompt it to generate scenario coverage through the Cekura MCP — for example: *"Read the agent's tools and prompts in this repo, then create 10 Cekura evaluators covering the most common user flows."*
+  <Step title="Run a small test batch">
+    Run a small set of evaluators first, inspect transcripts, then scale to broader regression runs.
   </Step>
 
-  <Step title="Run the full suite">
-    Kick off all evaluators at once through the MCP: *"Run every evaluator on agent X and report pass/fail."* Cekura executes them concurrently and surfaces pass/fail with full transcripts and traces.
-  </Step>
-
-  <Step title="Triage with Codex">
-    Ask Codex to pull failing runs and classify them: *"Fetch the failures from the last run and tell me which are real bugs vs. flakes."* Because runs are non-deterministic, **rerun each failing test 3–4 times** and ask Codex to compute a pass rate. One pass out of four usually points to a prompt or tool-routing bug, not infra.
-  </Step>
-
-  <Step title="Fix in-place and re-run">
-    With both your codebase and the Cekura MCP in the same Codex session, you can go from failing transcript → suspected prompt or tool bug → edit → re-run the failing evaluator without leaving the terminal.
+  <Step title="Patch and re-run">
+    When a run fails, ask Codex to compare the transcript against your prompt or code, patch the likely issue, and rerun the targeted evaluator.
   </Step>
 </Steps>
 
-<Tip>
-A good first prompt: *"Use the Cekura MCP to list my agents, then read the prompt for the first one and propose 10 workflow evaluators covering the most common user flows."*
-</Tip>
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Skills do not seem to load">
+    Add `AGENTS.md` to the repo where you run Codex, restart Codex, and ask explicitly: *"Use the Cekura guidance in AGENTS.md to design evaluators."*
+  </Accordion>
+
+  <Accordion title="MCP tools do not appear">
+    Confirm `~/.codex/config.toml` contains the `cekura` MCP server, restart Codex, and verify the URL is `https://api.cekura.ai/mcp`.
+  </Accordion>
+
+  <Accordion title="OAuth does not complete">
+    Re-run the MCP authorization flow and confirm your browser is signed into the correct Cekura account.
+  </Accordion>
+</AccordionGroup>

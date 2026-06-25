@@ -1,7 +1,7 @@
 ---
 title: "Using Cekura with Codex"
 sidebarTitle: "Codex"
-description: "Set up Codex with Cekura Skills, an AGENTS.md fallback, and the Cekura MCP server."
+description: "Install the Cekura plugin in Codex — it bundles Cekura Skills and the MCP server, then authenticate with one command."
 icon: "terminal"
 ---
 
@@ -9,37 +9,34 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 <CopyPageButton />
 
-Use Codex with Cekura Skills for workflow guidance and the Cekura MCP server for live workspace actions.
+Codex has native Cekura plugin support. The plugin gives you Cekura Skills **and** the Cekura MCP server — you just authenticate the MCP once.
 
-## Install Cekura Skills
+## Install the plugin
 
-Start with the Agent Skills install:
-
-```bash
-npx skills add cekura-ai/cekura-skills --all
-```
-
-If your Codex build does not load Agent Skills yet, use the portable `AGENTS.md` fallback in the repo where you run Codex:
+Three commands — add the marketplace, install the plugin, then authenticate MCP:
 
 ```bash
-curl -L https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/codex/AGENTS.md -o AGENTS.md
+codex plugin marketplace add cekura-ai/cekura-skills
+codex plugin add cekura@cekura
+codex mcp login cekura
 ```
 
-The fallback gives Codex Cekura metric, evaluator, API, and anti-pattern guidance in one file.
+`codex mcp login` opens a browser for OAuth sign-in — no API key. Prefer the TUI? Run `codex`, open `/plugins` to install **cekura**, then `/mcp` to authenticate.
 
-## Connect MCP
+<Note>
+Codex plugins don't carry slash commands; the bundled Skills cover those workflows — they activate by context or when you invoke one with `@`.
+</Note>
 
-Add this to `~/.codex/config.toml`. The `mcp-remote` shim handles the OAuth browser sign-in for Codex:
+Verify it worked:
 
-```toml
-[mcp_servers.cekura]
-command = "npx"
-args = ["-y", "mcp-remote", "https://api.cekura.ai/mcp"]
+```bash
+codex plugin list   # cekura listed as installed
+codex mcp list      # cekura shows connected after login
 ```
 
-On first use, Codex opens a browser to authorize against your Cekura dashboard account. This path needs Node.js 20.18.1 or higher.
-
-For API-key auth, see [MCP-only setup](/mcp/mcp-only#api-key-setup).
+<Tip>
+Added the marketplace before a recent release? Refresh it first: `codex plugin marketplace upgrade cekura`. For API-key auth instead of OAuth, see [MCP-only setup](/mcp/mcp-only#api-key-setup).
+</Tip>
 
 ## Verify setup
 
@@ -49,17 +46,31 @@ Start Codex from your agent repo and ask:
 Use the Cekura skills and MCP. List my Cekura agents, pick one, and propose 3 evaluators I should create first. Do not create anything until I approve.
 ```
 
-If Codex can list agents but does not use Cekura-specific evaluator or metric guidance, keep the `AGENTS.md` fallback in the repo.
+Codex should list real agents from your workspace and reason in Cekura terms (evaluators, metrics, test profiles, run results).
 
 ## What you get
 
-| Capability | Codex setup |
+| Capability | Codex plugin |
 |---|---:|
-| Cekura workflow guidance | Yes, via Agent Skills or `AGENTS.md` fallback |
-| MCP tools | Yes |
-| OAuth sign-in | Yes, through MCP |
+| Cekura Skills | Yes |
+| MCP tools | Yes (auto-configured) |
+| OAuth sign-in | Yes (`codex mcp login`) |
 | Claude Code slash commands | No |
 | Claude Code plugin hooks | No |
+
+## No-MCP fallback
+
+If you can't use the plugin, install Skills (guidance only — no live workspace tools):
+
+```bash
+npx skills add cekura-ai/cekura-skills --all
+```
+
+Or drop the portable behavior preset in the repo where you run Codex:
+
+```bash
+curl -L https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/codex/AGENTS.md -o AGENTS.md
+```
 
 ## Recommended workflow
 
@@ -84,15 +95,15 @@ If Codex can list agents but does not use Cekura-specific evaluator or metric gu
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Skills do not seem to load">
-    Add `AGENTS.md` to the repo where you run Codex, restart Codex, and ask explicitly: *"Use the Cekura guidance in AGENTS.md to design evaluators."*
+  <Accordion title="Plugin not found or out of date">
+    Run `codex plugin marketplace upgrade cekura`, then `codex plugin add cekura@cekura` again. Confirm with `codex plugin list`.
   </Accordion>
 
   <Accordion title="MCP tools do not appear">
-    Confirm `~/.codex/config.toml` contains the `cekura` MCP server, restart Codex, and verify the URL is `https://api.cekura.ai/mcp`.
+    Run `codex mcp login cekura` and confirm `codex mcp list` shows `cekura` connected. Restart Codex if needed.
   </Accordion>
 
   <Accordion title="OAuth does not complete">
-    Re-run the MCP authorization flow and confirm your browser is signed into the correct Cekura account.
+    Re-run `codex mcp login cekura` and confirm your browser is signed into the correct Cekura account.
   </Accordion>
 </AccordionGroup>

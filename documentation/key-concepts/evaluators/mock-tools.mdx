@@ -244,6 +244,57 @@ To get reliable, predictable results across a range of input values:
 - **Pin dynamic values in your evaluator instructions.** If a parameter like a date or appointment slot is completely open-ended, use [Test Profiles](/documentation/key-concepts/evaluators/test-profile) to fix the value: set `{{test_profile.appointment_date}}` in your evaluator scenario, and add a corresponding mock entry for that pinned value. This keeps both the mock response and the evaluator assertion deterministic.
 - **Check the tool name matches exactly.** Any casing or underscore mismatch between the tool name in your mock config and the name in your provider (Retell LLM/Flow, VAPI, ElevenLabs) will prevent the mock from firing, regardless of the input.
 
+## Verifying Tool Calls: the Mock Tool Call Accuracy Metric
+
+The **Mock Tool Call Accuracy** metric checks whether your agent called the expected mock tools, with the expected inputs, during a run. Understanding how it detects tool calls is important — especially for custom and self-hosted integrations.
+
+### How the metric detects tool calls
+
+The metric reads the **run transcript** and looks only at entries whose role is `Function Call`:
+
+- **Called** — a `Function Call` entry with a matching tool `name` is present in the transcript.
+- **Correct input** — the `arguments` on that entry match one of the tool's expected inputs. Numeric and format variations are handled, and a tool whose expected input is `{}` matches any input.
+- The metric scores precision/recall across expected vs. actually-called vs. correctly-called tools (an F1-style score, 0–5). The explanation lists each tool as `called with correct input ✓`, `called but wrong input ✗`, or `not called ✗`.
+
+<Warning>
+Detection is **transcript-based**, not endpoint-based. A tool call that genuinely happened at runtime is still reported as **not called** if it is missing from the transcript Cekura evaluates. The mock endpoint returning the right data is not sufficient on its own — the function call must also appear in the transcript.
+</Warning>
+
+### Provider behavior
+
+- **VAPI, Retell, ElevenLabs (managed integrations):** function-call events are reported automatically as part of the call data, so `Function Call` entries appear in the transcript without extra work on your side.
+- **Custom / self-hosted integrations:** Cekura only knows what your webhook sends. You **must** include `function_call` (and ideally `function_call_result`) messages in the transcript you post — otherwise tool-based metrics have nothing to score against. See [Mock Tools with Custom Integration](/documentation/integrations/custom-integration#mock-tools-optional).
+
+### Required transcript shape
+
+Each tool call must be sent as a `function_call` message carrying the tool `name` and `arguments` in its `data` object. A tool that takes no input still needs `"arguments": {}`:
+
+```json
+{
+  "role": "function_call",
+  "data": {
+    "id": "call_abc",
+    "name": "pre_call_lookup",
+    "arguments": {}
+  }
+}
+```
+
+And, recommended, the paired result:
+
+```json
+{
+  "role": "function_call_result",
+  "data": {
+    "id": "call_abc",
+    "name": "pre_call_lookup",
+    "result": { "account_id": "TEST-90210", "account_tier": "Premium" }
+  }
+}
+```
+
+See [Transcript Format](/documentation/advanced/transcript-format) for a full transcript example including function calls.
+
 ## API Reference
 
 For programmatic access to mock tools — they are managed directly on the agent:

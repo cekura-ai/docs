@@ -3,7 +3,7 @@ title: 'Testing Outbound Calls'
 sidebarTitle: "Outbound Calls"
 icon: "phone-arrow-up-right"
 iconType: "regular"
-description: "This guide walks you through the process of testing outbound calls using evaluators. You'll learn how to retrieve evaluators with phone numbers and execute outbound call tests."
+description: "This guide walks you through the process of testing outbound calls using evaluators."
 ---
 
 import { CopyPageButton } from "/snippets/copy-page-button.mdx";
@@ -192,6 +192,10 @@ Once you have your list of evaluators and phone numbers:
 Learn more about the [Running Evaluators API](/api-reference/test_framework/post-test_frameworkv1scenarios-externalrun_scenarios)
 </Card>
 
+<Info>
+  **Dial window timing:** Each outbound run has a dial window that opens when the run reaches `pending` status. Your agent must dial the `outbound_number` before `outbound_dial_window_closes_at` (default 300 seconds after the window opens). Dials received after the deadline are dropped and the run returns `status: timeout`. The three dial-window fields (`outbound_dial_window_opens_at`, `outbound_dial_window_seconds`, `outbound_dial_window_closes_at`) are included in run responses so you can track the deadline.
+</Info>
+
 ## Troubleshooting
 
 <AccordionGroup>
@@ -201,9 +205,10 @@ Learn more about the [Running Evaluators API](/api-reference/test_framework/post
 
   <Accordion title="Run status stays `timeout` with no transcript">
     A `timeout` with `duration: 0` and an empty transcript means the call never connected to Cekura. Work through these in order:
-    1. **Caller-ID match** — see the entry above; this is the most common cause.
-    2. **Dial actually happened** — check your telephony provider's logs to confirm the outbound call was placed.
-    3. **Destination number** — confirm the number your agent dialed matches the `outbound_number` returned for that run in the bulk runs API response.
+    1. **Dialed too late** — if your agent dialed after `outbound_dial_window_closes_at` (check the run response for this field; default is 300 seconds after the run reached `pending`), Cekura dropped the call. Dial promptly when a run reaches `pending` status.
+    2. **Caller-ID match** — see the entry above; this is a common cause.
+    3. **Dial actually happened** — check your telephony provider's logs to confirm the outbound call was placed.
+    4. **Destination number** — confirm the number your agent dialed matches the `outbound_number` returned for that run in the bulk runs API response.
   </Accordion>
 
   <Accordion title="Requested run count exceeds the project's concurrent call limit">
@@ -214,4 +219,3 @@ Learn more about the [Running Evaluators API](/api-reference/test_framework/post
     To configure your project's parallel call limit, see [Managing concurrent evaluator runs](/documentation/FAQ#how-can-i-limit-the-number-of-concurrent-evaluator-runs-to-manage-parallel-call-capacity) in the FAQ.
   </Accordion>
 </AccordionGroup>
-

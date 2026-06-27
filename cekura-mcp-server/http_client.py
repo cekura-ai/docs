@@ -15,6 +15,7 @@ class CekuraAPIClient:
         mcp_tool: Optional[str] = None,
         mcp_skill: Optional[str] = None,
         conversation_id: Optional[str] = None,
+        client_source: str = "mcp",
     ):
         self.base_url = base_url
         self.credential_type = credential_type
@@ -38,7 +39,10 @@ class CekuraAPIClient:
             headers={
                 **auth_header,
                 "Content-Type": "application/json",
-                "X-Client-Source": "mcp",
+                # Defaults to "mcp"; the trusted Cekura sandbox passes
+                # "cekura_ai_agent" so the backend tags agents it creates as the
+                # in-dashboard AI builder rather than a user's own MCP (CEK-7815).
+                "X-Client-Source": client_source,
                 **telemetry_headers,
             },
             timeout=timeout,
@@ -191,6 +195,7 @@ def create_client(
     mcp_tool: Optional[str] = None,
     mcp_skill: Optional[str] = None,
     conversation_id: Optional[str] = None,
+    client_source: str = "mcp",
 ) -> CekuraAPIClient:
     return CekuraAPIClient(
         base_url,
@@ -202,4 +207,5 @@ def create_client(
         mcp_tool=mcp_tool,
         mcp_skill=mcp_skill,
         conversation_id=conversation_id,
+        client_source=client_source,
     )

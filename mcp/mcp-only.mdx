@@ -1,0 +1,224 @@
+---
+title: "Set up Skills + MCP manually"
+sidebarTitle: "Manual setup"
+description: "For clients without a native Cekura plugin: install Cekura Skills, then connect the MCP server separately."
+icon: "wrench"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+<Note>
+Most clients — Claude Code, Cursor, Codex, Gemini CLI — have a [native plugin](/mcp/overview#set-up) that installs Skills **and** MCP in one step. Use this page only if your client has no plugin. You'll set up the two pieces separately: **Skills first, then MCP.**
+</Note>
+
+## What MCP gives you
+
+Cekura's MCP server exposes documentation search and Cekura API operations through one endpoint:
+
+```plaintext
+https://api.cekura.ai/mcp
+```
+
+Your assistant can search docs, list agents, create metrics, generate evaluators, run tests, inspect results, and analyze call logs through typed tools.
+
+## Prerequisites
+
+- Access to the [Cekura Dashboard](https://dashboard.cekura.ai)
+- Node.js 20.18.1 or higher if your client uses the `mcp-remote` shim
+- No Node.js requirement for Claude Code's native HTTP transport, Claude Desktop connectors, or Codex native HTTP config
+
+## Install Skills
+
+Install Cekura Skills first, so your assistant knows Cekura workflows — not just raw tools:
+
+```bash
+npx skills add cekura-ai/cekura-skills --all
+```
+
+If your assistant doesn't load Agent Skills, use the portable [behavior preset](/mcp/other-agents) instead. (Only need raw tools, e.g. for CI? Skip ahead to Connect MCP.)
+
+## Connect MCP
+
+Then connect the MCP server. OAuth is recommended; use an API key only for CI or project-scoped credentials.
+
+### OAuth setup
+
+Your MCP client opens a browser, you sign into Cekura, and the client manages the session token.
+
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add --transport http cekura --scope user https://api.cekura.ai/mcp
+    ```
+
+    Verify:
+
+    ```bash
+    claude mcp list
+    ```
+  </Tab>
+
+  <Tab title="Claude Desktop">
+    1. Open Claude Desktop.
+    2. Go to **Settings > Connectors**.
+    3. Click **Add custom connector**.
+    4. Set **Name** to `Cekura`.
+    5. Set **URL** to `https://api.cekura.ai/mcp`.
+    6. Save, then finish the browser authorization flow.
+
+    This connector gives MCP only. To get Cekura Skills too, install the plugin instead — see the [Claude Desktop guide](/mcp/claude-desktop-guide).
+  </Tab>
+
+  <Tab title="Cursor / VS Code">
+    Add this to your Cursor MCP config or `.vscode/mcp.json`:
+
+    ```json
+    {
+      "mcpServers": {
+        "cekura": {
+          "command": "npx",
+          "args": ["-y", "mcp-remote", "https://api.cekura.ai/mcp"]
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Codex">
+    Add this to `~/.codex/config.toml`. The `mcp-remote` shim handles the OAuth browser sign-in (needs Node.js 20.18.1+):
+
+    ```toml
+    [mcp_servers.cekura]
+    command = "npx"
+    args = ["-y", "mcp-remote", "https://api.cekura.ai/mcp"]
+    ```
+  </Tab>
+</Tabs>
+
+### API-key setup
+
+Use an API key only when you need a project-scoped credential, a shared service credential, or a client that cannot complete OAuth. Create keys in **Settings > API Keys** in the Cekura dashboard.
+
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add --transport http cekura --scope user https://api.cekura.ai/mcp --header "X-CEKURA-API-KEY:YOUR_API_KEY_HERE"
+    ```
+
+    Verify:
+
+    ```bash
+    claude mcp list
+    ```
+  </Tab>
+
+  <Tab title="Claude Desktop">
+    Claude Desktop's connector UI is best with OAuth. Use the OAuth flow above unless your workspace specifically requires an API key.
+
+    If your workspace requires API-key auth, use Claude Code or another MCP client that supports custom headers.
+  </Tab>
+
+  <Tab title="Cursor / VS Code">
+    ```json
+    {
+      "mcpServers": {
+        "cekura": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "mcp-remote",
+            "https://api.cekura.ai/mcp",
+            "--header",
+            "X-CEKURA-API-KEY:${CEKURA_API_KEY}"
+          ],
+          "env": {
+            "CEKURA_API_KEY": "YOUR_API_KEY_HERE"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Codex">
+    Native HTTP config:
+
+    ```toml
+    [mcp_servers.cekura]
+    url = "https://api.cekura.ai/mcp"
+    http_headers = { "X-CEKURA-API-KEY" = "YOUR_API_KEY_HERE" }
+    ```
+
+    CLI form:
+
+    ```bash
+    codex mcp add cekura --env CEKURA_API_KEY=YOUR_API_KEY_HERE -- sh -c 'npx -y mcp-remote https://api.cekura.ai/mcp --header "X-CEKURA-API-KEY:$CEKURA_API_KEY"'
+    ```
+  </Tab>
+</Tabs>
+
+## Verify the connection
+
+Restart your assistant and ask:
+
+```plaintext
+List my Cekura agents.
+```
+
+If configured correctly, your assistant returns agents from your Cekura workspace.
+
+## Request headers
+
+| Header | Used by | Description |
+|---|---|---|
+| `Authorization: Bearer <token>` | OAuth | Set automatically by your MCP client after sign-in |
+| `X-CEKURA-API-KEY` | API-key path | Required when using an API key |
+| `Content-Type: application/json` | Both | Request payload format |
+
+## Available tool areas
+
+<CardGroup cols={2}>
+  <Card title="Documentation Search" icon="magnifying-glass" color="#A6A7EA">
+    Search integration guides, schemas, examples, and workflow docs.
+  </Card>
+
+  <Card title="Testing" icon="flask" color="#A6A7EA">
+    Create agents, create evaluators, define metrics, run tests, and inspect results.
+  </Card>
+
+  <Card title="Observability" icon="eye" color="#A6A7EA">
+    List call logs, evaluate production calls, and analyze call performance.
+  </Card>
+
+  <Card title="Automation" icon="clock" color="#A6A7EA">
+    Create scheduled jobs, recurring tests, and metric-improvement workflows.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Auth failed">
+    A `401 Unauthorized` usually means the OAuth session expired or the API key is invalid.
+
+    For OAuth, reconnect from your client and confirm you are signed into the right Cekura account. For API keys, confirm the header name is exactly `X-CEKURA-API-KEY` and the key is active.
+  </Accordion>
+
+  <Accordion title="Tools are not showing up">
+    Restart your assistant after changing MCP config. Confirm the URL is exactly `https://api.cekura.ai/mcp`, check JSON or TOML syntax, and inspect your assistant's MCP logs.
+  </Accordion>
+
+  <Accordion title="Node.js version errors">
+    If `mcp-remote` fails with an engine or `File is not defined` error, upgrade Node.js to 20.18.1 or higher and make sure your client is using that Node.js version.
+  </Accordion>
+
+  <Accordion title="Rate limits">
+    If you hit `429 Too Many Requests`, reduce concurrency, narrow the request, or check usage in **Settings > API Usage**.
+  </Accordion>
+</AccordionGroup>
+
+## Next step
+
+If your client turns out to have a native plugin, switch to it — it bundles Skills + MCP and keeps both updated. See the [setup overview](/mcp/overview#set-up). Browse the [Skills catalog](/mcp/skills) for what the Skills cover.

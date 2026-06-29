@@ -1,7 +1,7 @@
 ---
 title: "Using Cekura with Claude Desktop"
-sidebarTitle: "Claude Desktop Guide"
-description: "End-to-end setup: install the Cekura plugin in Claude Desktop, connect the MCP, and add your own custom skills"
+sidebarTitle: "Claude Desktop"
+description: "Install the Cekura plugin in Claude Desktop for Skills + MCP, or connect the MCP server directly via the connector UI."
 icon: "desktop"
 ---
 
@@ -9,139 +9,64 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 <CopyPageButton />
 
+Claude Desktop supports Cekura two ways: install the **plugin** (Skills + MCP, recommended) or add the MCP server as a **connector** (MCP only).
 
-This is the single-page setup for Claude Desktop. Everything you need — Cekura skills, the MCP server, and your own custom skills — installs in a few minutes through the Claude Desktop plugin marketplace.
+## Install the plugin
 
-<Note>
-**One-line summary:** install the **`cekura`** plugin from `https://github.com/cekura-ai/cekura-skills.git` via **Settings → Plugins**, finish the MCP OAuth sign-in, and you're done. Custom skills live in the **`~/.claude/skills/`** folder or in your own marketplace fork.
-</Note>
-
-## What you'll set up
-
-1. **Cekura plugin** — bundles the nine Cekura skills and auto-configures the MCP server.
-2. **MCP authorization** — one-click OAuth into your Cekura workspace.
-3. **Custom skills** — your own organization-specific playbooks, installed alongside the Cekura ones.
-
-## Prerequisites
-
-- A [Cekura dashboard](https://dashboard.cekura.ai) account.
-- A current Claude Desktop build (Mac or Windows) with **Plugins** enabled. On Team/Enterprise, a workspace admin must enable Plugins and Connectors at the org level first.
-- No Node.js, no API keys, and no manual config-file editing for the default OAuth path.
-
-## 1. Install the Cekura plugin
-
-The plugin ships all nine Cekura skills plus the MCP server configuration in a single install — same `cekura-ai/cekura-skills` marketplace used by Claude Code.
+The plugin bundles Cekura Skills and the MCP server. Skills are available in both Chat and Cowork.
 
 <Steps>
-  <Step title="Open the plugin manager">
-    Claude Desktop → **Settings** → **Plugins**.
+  <Step title="Open the Plugins tab">
+    In Claude Desktop, open the **Customize** menu → **Plugins**.
   </Step>
 
   <Step title="Add the Cekura marketplace">
-    Click **Marketplaces** → **Add marketplace**. Paste:
-
-    ```
-    https://github.com/cekura-ai/cekura-skills.git
-    ```
-
-    Confirm. Claude Desktop fetches the marketplace manifest.
+    In **Personal plugins**, click **+** → **Add marketplace** → **Add from a repository**, and enter `cekura-ai/cekura-skills`.
   </Step>
 
-  <Step title="Install the `cekura` plugin">
-    Switch to the **Discover** (or **Plugins**) tab, search `cekura`, and install. This registers the nine skills and adds the Cekura MCP server to your connector list.
+  <Step title="Install cekura">
+    Install the **cekura** plugin from the marketplace.
   </Step>
 
-  <Step title="Authorize the MCP">
-    Open a new chat. On the first Cekura tool call, Claude Desktop opens a browser for OAuth — sign into your Cekura dashboard and click **Authorize**. The session token is managed for you.
-  </Step>
-
-  <Step title="Verify">
-    Ask: *"Use the Cekura MCP to list my agents, then use the Cekura skills to propose 10 workflow evaluators covering the most common flows for the first agent."*
-
-    Claude should call `aiagents_list`, load the `cekura-eval-design` skill, and draft evaluators. If you get `401 Unauthorized`, reconnect from **Settings → Connectors → Cekura**.
+  <Step title="Authorize MCP">
+    Complete the OAuth browser sign-in to your Cekura dashboard account when prompted — no API key needed.
   </Step>
 </Steps>
 
-<Tip>
-**Auto-update.** In the plugin manager, select **cekura-skills → Enable auto-update**. New skill versions and tool overlays land in your next session without re-installing. Same mechanism as Claude Code.
-</Tip>
-
-### What you get out of the box
-
-| Capability | What it does |
-|---|---|
-| 9 Cekura skills | Auto-activate on phrases like *"design a metric for…"* or *"fix this failing run…"* — full catalog in [Skills overview](/mcp/skills). |
-| Cekura MCP server | 84+ tools for agents, evaluators, metrics, runs, and call logs. Configuration in [MCP overview](/mcp/overview). |
-| Skill activation logs | Visible in Claude's chain-of-thought when the matching skill loads. |
-
 <Note>
-**Slash commands** (`/create-metric`, `/run-evals`, etc.) are a Claude Code-only feature today. In Claude Desktop, you describe the task in plain English and Claude auto-activates the matching skill. The end result is the same — Claude calls the same MCP tools under the hood.
+Plugin **hooks and sub-agents run only in Cowork** (they appear grayed out in Chat). If MCP tools don't appear in a Chat session, add the Cekura connector (**Settings → Connectors**) — see [manual setup](/mcp/mcp-only).
 </Note>
 
-## 2. Add your own custom skills
+## Verify setup
 
-Custom skills encode organization-specific knowledge — naming conventions, compliance checks, internal runbooks — and activate the same way the Cekura ones do.
+Start a new chat and ask:
 
-### Skill structure
-
-A skill is a folder with one required file, `SKILL.md`, plus any supporting files it references.
-
-```
-my-team-eval-conventions/
-├── SKILL.md            ← required
-├── naming-rules.md     ← optional, referenced from SKILL.md
-└── examples/
-    └── good-eval.yaml
+```plaintext
+Use the Cekura skills and MCP. List my Cekura agents, pick one, and propose 3 evaluators I should create first. Do not create anything until I approve.
 ```
 
-`SKILL.md` starts with YAML frontmatter — `name` and a specific `description` (Claude matches your message against the description to decide whether to load the skill).
+Claude should list real agents from your workspace. With the plugin installed, it also reasons in Cekura terms (evaluators, metrics, test profiles). On a connector-only setup, phrase requests with the workflow you want — metrics, evaluators, runs, call logs, or reports.
 
-### Ways to install
+## Prefer the terminal or full plugin power?
 
-| Path | When to use |
-|---|---|
-| Drop into `~/.claude/skills/<name>/` | Solo iteration. Restart Claude Desktop to pick it up. |
-| Fork the marketplace, install the plugin | Team rollout — same **Settings → Plugins → Add marketplace** flow as Cekura, pointing at your fork. |
-| Workspace upload | Team/Enterprise only — admin adds the marketplace at the org level. |
-
-For format details, the `skill-creator` shortcut, and the full authoring guide, see [Anthropic's skills documentation](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/overview) and the [Agent Skills standard](https://agentskills.io).
-
-## 3. End-to-end example
-
-A typical "set up evals for a new agent" loop in Claude Desktop:
-
-1. *"List my Cekura agents."* — MCP returns agents.
-2. *"For agent `support-bot`, generate 10 workflow evaluators following our naming conventions."* — auto-loads `cekura-eval-design` **and** your custom `my-team-eval-conventions` skill, drafts the evaluators, calls the MCP to create them.
-3. *"Run every evaluator on `support-bot` and stream pass/fail."* — MCP runs them concurrently.
-4. *"For the 3 failures, rerun each 4 times and tell me which are real bugs vs. flakes."* — Claude triages with `cekura-fixing-prod-issues`.
-5. *"Draft a fix plan with the suspected prompt or tool changes for each real bug."* — Claude composes the report inline.
+Use [Claude Code](/mcp/claude-code-guide) — the CLI (or the Desktop app's **Code** tab) gives slash commands like `/cekura-onboarding`, `/autogen-eval`, and `/cekura-report`, plugin update support via `/upgrade-skills`, and the MCP failure hook.
 
 ## Troubleshooting
 
-| Symptom | Fix |
-|---|---|
-| Plugin install fails or marketplace not found | Confirm the URL is exactly `https://github.com/cekura-ai/cekura-skills.git`. Re-run **Marketplace → Refresh**. |
-| `401 Unauthorized` from MCP tools | **Settings → Connectors → Cekura → Reconnect** to re-run OAuth. |
-| Cekura tools don't appear in a chat | Restart Claude Desktop after installing the plugin. Confirm the Cekura connector is **Enabled**. |
-| Skills don't activate | Confirm **Settings → Capabilities → Skills** is on, restart the app, and check that the skill's `description:` matches the phrasing you're using. |
-| Custom skill in `~/.claude/skills/` isn't loading | The folder must contain `SKILL.md` at its root (not nested), and the `name:` frontmatter field must match the folder name. |
-| Team workspace doesn't show Plugins or Connectors | An admin needs to enable them once at the org level. |
+<AccordionGroup>
+  <Accordion title="MCP tools do not appear in Chat">
+    The plugin's MCP may run in Cowork. Add the Cekura connector (**Settings → Connectors**) to get MCP tools in Chat, then restart Claude Desktop.
+  </Accordion>
 
-Deeper MCP-only troubleshooting (rate limits, header issues, Node.js edge cases) lives in [MCP overview → Troubleshooting](/mcp/overview#troubleshooting).
+  <Accordion title="Authorization failed">
+    Re-authorize from the plugin (or **Settings → Connectors**) and confirm your browser is signed into the intended Cekura account.
+  </Accordion>
 
-## References
+  <Accordion title="Plugin or tools do not appear">
+    Restart Claude Desktop, confirm the **cekura** plugin is installed under **Customize → Plugins**, and (for the connector) verify the URL is exactly `https://api.cekura.ai/mcp`.
+  </Accordion>
 
-<CardGroup cols={2}>
-  <Card title="MCP Overview" icon="shield-halved" href="/mcp/overview">
-    Full configuration matrix, auth options, request headers
-  </Card>
-  <Card title="Skills Catalog" icon="sparkles" href="/mcp/skills">
-    All nine Cekura skills and what each one activates on
-  </Card>
-  <Card title="Claude Code Guide" icon="code" href="/mcp/claude-code-guide">
-    The Claude Code equivalent (plugin marketplace + slash commands)
-  </Card>
-  <Card title="Dashboard" icon="gauge" href="https://dashboard.cekura.ai">
-    Manage projects, agents, and API keys
-  </Card>
-</CardGroup>
+  <Accordion title="I need API-key auth">
+    OAuth is the recommended path. If your workspace requires API-key auth or custom headers, use the [API-key setup](/mcp/mcp-only#api-key-setup) or Claude Code.
+  </Accordion>
+</AccordionGroup>

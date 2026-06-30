@@ -28509,6 +28509,155 @@
                 }
             }
         },
+        "/test_framework/v1/scenarios-external/create-from-transcript-bg/": {
+            "post": {
+                "operationId": "scenarios-create-from-transcript-bg",
+                "description": "Create a new evaluator from a call transcript in the background. Returns a `progress_id` immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until `status` is `completed` or `failed`.\n\nAnalyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**Response fields:** `progress_id` (UUID string) for polling.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "progress_id": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios-external/create-from-transcript-progress/": {
+            "get": {
+                "operationId": "scenarios-create-from-transcript-progress",
+                "description": "Scenarios create from transcript progress",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "UUID progress identifier returned from create-from-transcript-bg endpoint",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "in_progress",
+                                                "completed",
+                                                "failed"
+                                            ]
+                                        },
+                                        "scenario_id": {
+                                            "type": "integer",
+                                            "nullable": true
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "scenario": {
+                                            "type": "object",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/scenarios-external/create_folder/": {
             "post": {
                 "operationId": "scenarios-folder-create",
@@ -29890,6 +30039,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -29901,7 +30073,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -29910,7 +30085,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -30118,6 +30296,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -30129,7 +30330,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -30138,7 +30342,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -30294,6 +30501,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -30305,7 +30535,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -30314,7 +30547,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -30471,6 +30707,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -30482,7 +30741,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -30491,7 +30753,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -30836,6 +31101,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -30847,7 +31135,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -30856,7 +31147,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -31016,6 +31310,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -31027,7 +31344,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -31036,7 +31356,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -31197,6 +31520,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -31208,7 +31554,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -31217,7 +31566,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -31375,6 +31727,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -31386,7 +31761,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -31395,7 +31773,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -31551,6 +31932,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -31562,7 +31966,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -31571,7 +31978,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -31750,6 +32160,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -31761,7 +32194,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -31770,7 +32206,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -31929,6 +32368,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -31940,7 +32402,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -31949,7 +32414,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -32113,6 +32581,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -32124,7 +32615,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -32133,7 +32627,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -33218,6 +33715,171 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios/create-from-transcript-bg/": {
+            "post": {
+                "operationId": "scenarios-create-from-transcript-bg_2",
+                "description": "Create a new evaluator from a call transcript in the background. Returns a `progress_id` immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until `status` is `completed` or `failed`.\n\nAnalyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**Response fields:** `progress_id` (UUID string) for polling.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "progress_id": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-create-from-transcript-bg",
+                        "description": "Create a new evaluator from a call transcript in the background. Returns a `progress_id` immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until `status` is `completed` or `failed`.\n\nAnalyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**Response fields:** `progress_id` (UUID string) for polling."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios/create-from-transcript-progress/": {
+            "get": {
+                "operationId": "scenarios-create-from-transcript-progress_2",
+                "description": "Scenarios create from transcript progress",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "UUID progress identifier returned from create-from-transcript-bg endpoint",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "in_progress",
+                                                "completed",
+                                                "failed"
+                                            ]
+                                        },
+                                        "scenario_id": {
+                                            "type": "integer",
+                                            "nullable": true
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "scenario": {
+                                            "type": "object",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-create-from-transcript-progress",
+                        "description": "Scenarios create from transcript progress"
                     }
                 }
             }
@@ -34699,6 +35361,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -34710,7 +35395,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -34719,7 +35407,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -34935,6 +35626,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -34946,7 +35660,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -34955,7 +35672,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -35119,6 +35839,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -35130,7 +35873,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -35139,7 +35885,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -35304,6 +36053,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -35315,7 +36087,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -35324,7 +36099,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -35677,6 +36455,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -35688,7 +36489,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -35697,7 +36501,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -35865,6 +36672,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -35876,7 +36706,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -35885,7 +36718,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -36054,6 +36890,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -36065,7 +36924,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -36074,7 +36936,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -36240,6 +37105,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -36251,7 +37139,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -36260,7 +37151,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -36424,6 +37318,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -36435,7 +37352,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -36444,7 +37364,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -36631,6 +37554,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -36642,7 +37588,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -36651,7 +37600,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -36818,6 +37770,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -36829,7 +37804,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -36838,7 +37816,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -37010,6 +37991,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -37021,7 +38025,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -37030,7 +38037,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -41415,6 +42425,155 @@
                 }
             }
         },
+        "/test_framework/v2/scenarios/create-from-transcript-bg/": {
+            "post": {
+                "operationId": "scenarios-create-from-transcript-bg_3",
+                "description": "Create a new evaluator from a call transcript in the background. Returns a `progress_id` immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until `status` is `completed` or `failed`.\n\nAnalyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**Response fields:** `progress_id` (UUID string) for polling.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "progress_id": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/scenarios/create-from-transcript-progress/": {
+            "get": {
+                "operationId": "scenarios-create-from-transcript-progress_3",
+                "description": "Scenarios create from transcript progress",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "UUID progress identifier returned from create-from-transcript-bg endpoint",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "in_progress",
+                                                "completed",
+                                                "failed"
+                                            ]
+                                        },
+                                        "scenario_id": {
+                                            "type": "integer",
+                                            "nullable": true
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "scenario": {
+                                            "type": "object",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v2/scenarios/create_folder/": {
             "post": {
                 "operationId": "scenarios-folder-create_3",
@@ -42796,6 +43955,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -42807,7 +43989,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -42816,7 +44001,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -43024,6 +44212,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -43035,7 +44246,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -43044,7 +44258,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -43200,6 +44417,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -43211,7 +44451,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -43220,7 +44463,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -43377,6 +44623,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -43388,7 +44657,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -43397,7 +44669,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -43742,6 +45017,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -43753,7 +45051,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -43762,7 +45063,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -43922,6 +45226,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -43933,7 +45260,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -43942,7 +45272,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -44103,6 +45436,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -44114,7 +45470,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -44123,7 +45482,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -44281,6 +45643,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -44292,7 +45677,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -44301,7 +45689,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -44457,6 +45848,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -44468,7 +45882,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -44477,7 +45894,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -44656,6 +46076,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -44667,7 +46110,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -44676,7 +46122,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -44835,6 +46284,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -44846,7 +46318,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -44855,7 +46330,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -45019,6 +46497,29 @@
                                                             "null"
                                                         ],
                                                         "description": "Details of the test profile associated with this run scenario"
+                                                    },
+                                                    "outbound_dial_window_opens_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "When the outbound dial window opened (run transitioned to pending/waiting-for-call). Null until dispatched."
+                                                    },
+                                                    "outbound_dial_window_seconds": {
+                                                        "type": [
+                                                            "integer",
+                                                            "null"
+                                                        ],
+                                                        "description": "Duration of the outbound dial window in seconds."
+                                                    },
+                                                    "outbound_dial_window_closes_at": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ],
+                                                        "format": "date-time",
+                                                        "description": "Deadline by which your agent must dial the outbound number (opens_at + outbound_dial_window_seconds). Dials after this are dropped and the run returns status: timeout."
                                                     }
                                                 }
                                             },
@@ -45030,7 +46531,10 @@
                                                     "number": null,
                                                     "inbound_number": "+11234567890",
                                                     "scenario_name": "Customer Support Call (Agent Inbound = True)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": null,
+                                                    "outbound_dial_window_seconds": null,
+                                                    "outbound_dial_window_closes_at": null
                                                 },
                                                 {
                                                     "id": 275,
@@ -45039,7 +46543,10 @@
                                                     "number": "+11234567890",
                                                     "inbound_number": null,
                                                     "scenario_name": "Outbound Sales Call (Agent Inbound = False)",
-                                                    "test_profile_data": null
+                                                    "test_profile_data": null,
+                                                    "outbound_dial_window_opens_at": "2026-06-24T10:47:30Z",
+                                                    "outbound_dial_window_seconds": 300,
+                                                    "outbound_dial_window_closes_at": "2026-06-24T10:52:30Z"
                                                 }
                                             ]
                                         },
@@ -68051,6 +69558,13 @@
                     "expected_outcome_prompt": {
                         "type": "string",
                         "description": "Prompt describing the expected outcome of the scenario"
+                    },
+                    "folder_path": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Folder path to assign the scenario to (e.g. 'folder_name' or 'parent.child')"
                     }
                 },
                 "required": [

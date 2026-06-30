@@ -60,6 +60,9 @@ request_base_url: ContextVar[str] = ContextVar('request_base_url', default=None)
 # wires its conversation_id here). Per-call `_meta["com.cekura/conversation_id"]`
 # wins when both are present.
 request_conversation_id: ContextVar[str] = ContextVar('request_conversation_id', default=None)
+# Connection-level client source (X-Client-Source). Only the trusted Cekura
+# sandbox sets this (to "cekura_ai_agent"); see _resolve_client_source for the guard.
+request_client_source: ContextVar[str] = ContextVar('request_client_source', default=None)
 # X-CEKURA-BASE-URL override is only allowed when explicitly enabled (dev/staging only)
 _ALLOW_BASE_URL_OVERRIDE = os.environ.get("ALLOW_BASE_URL_OVERRIDE", "").lower() in ("1", "true", "yes")
 
@@ -779,6 +782,22 @@ def _read_request_meta() -> Dict[str, Any]:
         return {}
 
 
+# Client sources a caller may self-declare via X-Client-Source. Everything
+# else — and every API-key caller — is recorded as plain "mcp", so an external
+# MCP client cannot spoof a dashboard/cekura_ai_agent origin. Only the bearer-authed
+# Cekura sandbox declares "cekura_ai_agent" (CEK-7815).
+_SELF_DECLARABLE_CLIENT_SOURCES = {"cekura_ai_agent"}
+
+
+def _resolve_client_source(credential_type: str) -> str:
+    """The X-Client-Source to forward to the backend. Honour an incoming
+    self-declared value only for trusted bearer auth; default to "mcp"."""
+    incoming = (request_client_source.get() or "").lower()
+    if credential_type == "bearer" and incoming in _SELF_DECLARABLE_CLIENT_SOURCES:
+        return incoming
+    return "mcp"
+
+
 def _resolve_telemetry() -> Dict[str, Optional[str]]:
     """Resolve per-call telemetry fields once at the top of the handler.
 
@@ -894,6 +913,7 @@ def setup_dynamic_tool_handlers():
                 mcp_tool=name,
                 mcp_skill=telemetry["skill"],
                 conversation_id=telemetry["conversation_id"],
+                client_source=_resolve_client_source(credential_type),
             )
 
             # Forward the resolved per-property types so the HTTP client can respect
@@ -1022,6 +1042,16 @@ def main():
                 )
                 if conversation_header:
                     reset_tokens.append((request_conversation_id, request_conversation_id.set(conversation_header)))
+
+                # Connection-level client source (e.g. the Cekura sandbox sets
+                # "cekura_ai_agent"). Gated by _resolve_client_source so untrusted
+                # callers can't spoof a non-mcp origin.
+                client_source_header = (
+                    request.headers.get('X-Client-Source')
+                    or request.headers.get('x-client-source')
+                )
+                if client_source_header:
+                    reset_tokens.append((request_client_source, request_client_source.set(client_source_header)))
 
                 # Enforce auth at the transport layer for MCP traffic. Without this,
                 # FastMCP's `initialize` and `tools/list` succeed unauthenticated,

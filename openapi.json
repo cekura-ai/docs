@@ -14889,6 +14889,25 @@
                 }
             }
         },
+        "/test_framework/v1/email-inbound/": {
+            "post": {
+                "operationId": "email-inbound-create",
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "description": "Create a new email inbound"
+            }
+        },
         "/test_framework/v1/knowledge-base-connectors/": {
             "get": {
                 "operationId": "knowledge-base-connectors-list",
@@ -29970,6 +29989,135 @@
                 }
             }
         },
+        "/test_framework/v1/scenarios-external/run_scenarios_email/": {
+            "post": {
+                "operationId": "scenarios-run-email",
+                "description": "EMAIL RUN: Execute evaluators against an agent that communicates over email. Cekura sends an email to the agent's address and simulates the full conversation, receiving replies via inbound webhook.\n\nThe agent must have an `email_id` configured, or you can supply `agent_email` as a one-time override. The `agent_email` field takes precedence if both are set.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Inbound agents** (`agent.inbound=true`): Cekura sends the first email to the agent. **Outbound agents** (`agent.inbound=false`): the response includes `inbound_email` — the address your agent should email first to start the conversation.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'.",
+                "summary": "Run evaluators against an email agent",
+                "tags": [
+                    "Evaluators"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            },
+                            "examples": {
+                                "InboundAgent—AgentConfiguredEmailAddress": {
+                                    "value": {
+                                        "agent_id": 99,
+                                        "scenarios": [
+                                            102
+                                        ],
+                                        "frequency": 1
+                                    },
+                                    "summary": "Inbound agent — agent configured email address",
+                                    "description": "Agent has email_id set. Cekura sends the first email; agent replies."
+                                },
+                                "InboundAgent—One-timeEmailOverride": {
+                                    "value": {
+                                        "agent_id": 99,
+                                        "scenarios": [
+                                            102,
+                                            103
+                                        ],
+                                        "frequency": 2,
+                                        "agent_email": "support@yourcompany.com"
+                                    },
+                                    "summary": "Inbound agent — one-time email override",
+                                    "description": "Override the agent's configured email for this run only."
+                                },
+                                "OutboundAgent—AgentEmailsCekuraFirst": {
+                                    "value": {
+                                        "agent_id": 42,
+                                        "scenarios": [
+                                            201
+                                        ],
+                                        "frequency": 1
+                                    },
+                                    "summary": "Outbound agent — agent emails Cekura first",
+                                    "description": "For outbound agents the response includes `inbound_email` per run. Configure your agent to email that address to start the conversation."
+                                }
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RunScenarioResult"
+                                },
+                                "examples": {
+                                    "Response—InboundAgent(CekuraSendsFirst)": {
+                                        "value": {
+                                            "id": 453,
+                                            "agent": 99,
+                                            "agent_inbound": true,
+                                            "status": "running",
+                                            "run_as_text": true,
+                                            "runs": [
+                                                {
+                                                    "id": 22019,
+                                                    "status": "running",
+                                                    "scenario": 102,
+                                                    "inbound_number": null,
+                                                    "inbound_email": null,
+                                                    "scenario_name": "Customer support scenario"
+                                                }
+                                            ],
+                                            "created_at": "2026-06-22T09:00:00Z"
+                                        },
+                                        "summary": "Response — inbound agent (Cekura sends first)"
+                                    },
+                                    "Response—OutboundAgent(agentEmailsCekuraFirst)": {
+                                        "value": {
+                                            "id": 454,
+                                            "agent": 42,
+                                            "agent_inbound": false,
+                                            "status": "running",
+                                            "run_as_text": true,
+                                            "runs": [
+                                                {
+                                                    "id": 22020,
+                                                    "status": "running",
+                                                    "scenario": 201,
+                                                    "inbound_number": null,
+                                                    "inbound_email": "run-22020@veliitroee.resend.app",
+                                                    "scenario_name": "Outreach scenario"
+                                                }
+                                            ],
+                                            "created_at": "2026-06-22T09:01:00Z"
+                                        },
+                                        "summary": "Response — outbound agent (agent emails Cekura first)",
+                                        "description": "`inbound_email` is the address your agent should send its first email to."
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/scenarios-external/run_scenarios_jotform/": {
             "post": {
                 "operationId": "scenarios-external-run-scenarios-jotform-create",
@@ -34972,6 +35120,143 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios/run_scenarios_email/": {
+            "post": {
+                "operationId": "scenarios-run-email_2",
+                "description": "EMAIL RUN: Execute evaluators against an agent that communicates over email. Cekura sends an email to the agent's address and simulates the full conversation, receiving replies via inbound webhook.\n\nThe agent must have an `email_id` configured, or you can supply `agent_email` as a one-time override. The `agent_email` field takes precedence if both are set.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Inbound agents** (`agent.inbound=true`): Cekura sends the first email to the agent. **Outbound agents** (`agent.inbound=false`): the response includes `inbound_email` — the address your agent should email first to start the conversation.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'.",
+                "summary": "Run evaluators against an email agent",
+                "tags": [
+                    "Evaluators"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            },
+                            "examples": {
+                                "InboundAgent—AgentConfiguredEmailAddress": {
+                                    "value": {
+                                        "agent_id": 99,
+                                        "scenarios": [
+                                            102
+                                        ],
+                                        "frequency": 1
+                                    },
+                                    "summary": "Inbound agent — agent configured email address",
+                                    "description": "Agent has email_id set. Cekura sends the first email; agent replies."
+                                },
+                                "InboundAgent—One-timeEmailOverride": {
+                                    "value": {
+                                        "agent_id": 99,
+                                        "scenarios": [
+                                            102,
+                                            103
+                                        ],
+                                        "frequency": 2,
+                                        "agent_email": "support@yourcompany.com"
+                                    },
+                                    "summary": "Inbound agent — one-time email override",
+                                    "description": "Override the agent's configured email for this run only."
+                                },
+                                "OutboundAgent—AgentEmailsCekuraFirst": {
+                                    "value": {
+                                        "agent_id": 42,
+                                        "scenarios": [
+                                            201
+                                        ],
+                                        "frequency": 1
+                                    },
+                                    "summary": "Outbound agent — agent emails Cekura first",
+                                    "description": "For outbound agents the response includes `inbound_email` per run. Configure your agent to email that address to start the conversation."
+                                }
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RunScenarioResult"
+                                },
+                                "examples": {
+                                    "Response—InboundAgent(CekuraSendsFirst)": {
+                                        "value": {
+                                            "id": 453,
+                                            "agent": 99,
+                                            "agent_inbound": true,
+                                            "status": "running",
+                                            "run_as_text": true,
+                                            "runs": [
+                                                {
+                                                    "id": 22019,
+                                                    "status": "running",
+                                                    "scenario": 102,
+                                                    "inbound_number": null,
+                                                    "inbound_email": null,
+                                                    "scenario_name": "Customer support scenario"
+                                                }
+                                            ],
+                                            "created_at": "2026-06-22T09:00:00Z"
+                                        },
+                                        "summary": "Response — inbound agent (Cekura sends first)"
+                                    },
+                                    "Response—OutboundAgent(agentEmailsCekuraFirst)": {
+                                        "value": {
+                                            "id": 454,
+                                            "agent": 42,
+                                            "agent_inbound": false,
+                                            "status": "running",
+                                            "run_as_text": true,
+                                            "runs": [
+                                                {
+                                                    "id": 22020,
+                                                    "status": "running",
+                                                    "scenario": 201,
+                                                    "inbound_number": null,
+                                                    "inbound_email": "run-22020@veliitroee.resend.app",
+                                                    "scenario_name": "Outreach scenario"
+                                                }
+                                            ],
+                                            "created_at": "2026-06-22T09:01:00Z"
+                                        },
+                                        "summary": "Response — outbound agent (agent emails Cekura first)",
+                                        "description": "`inbound_email` is the address your agent should send its first email to."
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-email",
+                        "description": "EMAIL RUN: Execute evaluators against an agent that communicates over email. Cekura sends an email to the agent's address and simulates the full conversation, receiving replies via inbound webhook.\n\nThe agent must have an `email_id` configured, or you can supply `agent_email` as a one-time override. The `agent_email` field takes precedence if both are set.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Inbound agents** (`agent.inbound=true`): Cekura sends the first email to the agent. **Outbound agents** (`agent.inbound=false`): the response includes `inbound_email` — the address your agent should email first to start the conversation.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'."
                     }
                 }
             }
@@ -43190,6 +43475,135 @@
                 }
             }
         },
+        "/test_framework/v2/scenarios/run_scenarios_email/": {
+            "post": {
+                "operationId": "scenarios-run-email_3",
+                "description": "EMAIL RUN: Execute evaluators against an agent that communicates over email. Cekura sends an email to the agent's address and simulates the full conversation, receiving replies via inbound webhook.\n\nThe agent must have an `email_id` configured, or you can supply `agent_email` as a one-time override. The `agent_email` field takes precedence if both are set.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Inbound agents** (`agent.inbound=true`): Cekura sends the first email to the agent. **Outbound agents** (`agent.inbound=false`): the response includes `inbound_email` — the address your agent should email first to start the conversation.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'.",
+                "summary": "Run evaluators against an email agent",
+                "tags": [
+                    "Evaluators"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            },
+                            "examples": {
+                                "InboundAgent—AgentConfiguredEmailAddress": {
+                                    "value": {
+                                        "agent_id": 99,
+                                        "scenarios": [
+                                            102
+                                        ],
+                                        "frequency": 1
+                                    },
+                                    "summary": "Inbound agent — agent configured email address",
+                                    "description": "Agent has email_id set. Cekura sends the first email; agent replies."
+                                },
+                                "InboundAgent—One-timeEmailOverride": {
+                                    "value": {
+                                        "agent_id": 99,
+                                        "scenarios": [
+                                            102,
+                                            103
+                                        ],
+                                        "frequency": 2,
+                                        "agent_email": "support@yourcompany.com"
+                                    },
+                                    "summary": "Inbound agent — one-time email override",
+                                    "description": "Override the agent's configured email for this run only."
+                                },
+                                "OutboundAgent—AgentEmailsCekuraFirst": {
+                                    "value": {
+                                        "agent_id": 42,
+                                        "scenarios": [
+                                            201
+                                        ],
+                                        "frequency": 1
+                                    },
+                                    "summary": "Outbound agent — agent emails Cekura first",
+                                    "description": "For outbound agents the response includes `inbound_email` per run. Configure your agent to email that address to start the conversation."
+                                }
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunScenariosEmail"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RunScenarioResult"
+                                },
+                                "examples": {
+                                    "Response—InboundAgent(CekuraSendsFirst)": {
+                                        "value": {
+                                            "id": 453,
+                                            "agent": 99,
+                                            "agent_inbound": true,
+                                            "status": "running",
+                                            "run_as_text": true,
+                                            "runs": [
+                                                {
+                                                    "id": 22019,
+                                                    "status": "running",
+                                                    "scenario": 102,
+                                                    "inbound_number": null,
+                                                    "inbound_email": null,
+                                                    "scenario_name": "Customer support scenario"
+                                                }
+                                            ],
+                                            "created_at": "2026-06-22T09:00:00Z"
+                                        },
+                                        "summary": "Response — inbound agent (Cekura sends first)"
+                                    },
+                                    "Response—OutboundAgent(agentEmailsCekuraFirst)": {
+                                        "value": {
+                                            "id": 454,
+                                            "agent": 42,
+                                            "agent_inbound": false,
+                                            "status": "running",
+                                            "run_as_text": true,
+                                            "runs": [
+                                                {
+                                                    "id": 22020,
+                                                    "status": "running",
+                                                    "scenario": 201,
+                                                    "inbound_number": null,
+                                                    "inbound_email": "run-22020@veliitroee.resend.app",
+                                                    "scenario_name": "Outreach scenario"
+                                                }
+                                            ],
+                                            "created_at": "2026-06-22T09:01:00Z"
+                                        },
+                                        "summary": "Response — outbound agent (agent emails Cekura first)",
+                                        "description": "`inbound_email` is the address your agent should send its first email to."
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v2/scenarios/run_scenarios_jotform/": {
             "post": {
                 "operationId": "test-framework-v2-scenarios-run-scenarios-jotform-create",
@@ -49743,6 +50157,15 @@
                     "webhook_secret_configured": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "email_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Email address this agent receives at. When set, enables email-based test runs.",
+                        "maxLength": 254
                     }
                 },
                 "required": [
@@ -50351,6 +50774,15 @@
                         "format": "date-time",
                         "readOnly": true,
                         "description": "\nTimestamp when the agent was last updated\nExample: `\"2021-01-01T00:00:00Z\"`\n"
+                    },
+                    "email_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Email address this agent receives at. When set, enables email-based test runs.",
+                        "maxLength": 254
                     }
                 },
                 "required": [
@@ -60831,6 +61263,15 @@
                         "format": "date-time",
                         "readOnly": true,
                         "description": "\nTimestamp when the agent was last updated\nExample: `\"2021-01-01T00:00:00Z\"`\n"
+                    },
+                    "email_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Email address this agent receives at. When set, enables email-based test runs.",
+                        "maxLength": 254
                     }
                 }
             },
@@ -61728,6 +62169,15 @@
                     "webhook_secret_configured": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "email_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Email address this agent receives at. When set, enables email-based test runs.",
+                        "maxLength": 254
                     }
                 }
             },
@@ -64653,6 +65103,123 @@
                     }
                 }
             },
+            "RunScenarioResult": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "\nUnique identifier for the Result\nExample: `123`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "\nName of the Result\nExample: `\"Test Result 1\"`\n",
+                        "maxLength": 255
+                    },
+                    "agent": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "\nID of the AI agent that was tested\nExample: `123`\n"
+                    },
+                    "agent_inbound": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "\nWhether the agent is configured for inbound calls (true) or outbound calls (false)\nExample: `true` or `false`\n"
+                    },
+                    "status": {
+                        "enum": [
+                            "running",
+                            "completed",
+                            "failed",
+                            "pending",
+                            "in_progress",
+                            "evaluating",
+                            "in_queue",
+                            "timeout",
+                            "cancelled",
+                            "scaling_up"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "623e22fc1eb17833",
+                        "default": "pending",
+                        "description": "\nCurrent status of the result\n\n\n* `running` - Running\n* `completed` - Completed\n* `failed` - Failed\n* `pending` - Pending\n* `in_progress` - In Progress\n* `evaluating` - Evaluating\n* `in_queue` - In Queue\n* `timeout` - Timeout\n* `cancelled` - Cancelled\n* `scaling_up` - Scaling Up"
+                    },
+                    "success_rate": {
+                        "type": "number",
+                        "format": "double",
+                        "default": 0.0,
+                        "description": "Success rate of the test runs as a decimal (0.0 to 1.0)"
+                    },
+                    "run_as_text": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "\nWhether this test was run in text mode instead of voice mode\nExample: `true` or `false`\n"
+                    },
+                    "is_cronjob": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "\nWhether this result was created by a scheduled cronjob\nExample: `true` or `false`\n"
+                    },
+                    "runs": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Run summaries for this result. For full run data including transcripts and metric scores, fetch the result detail endpoint — there `runs` is a dict keyed by run ID.",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "\nTimestamp when this test result was created\nExample: `2021-01-01 00:00:00`\n"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Timestamp when this test result was last updated"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "RunScenariosEmail": {
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "ID of the agent to run against. Required if none of the scenarios have an agent."
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of evaluator IDs to run."
+                    },
+                    "frequency": {
+                        "type": "integer",
+                        "maximum": 100,
+                        "minimum": 1,
+                        "description": "Number of times to run each scenario."
+                    },
+                    "agent_email": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Override the agent's configured email address for this run."
+                    }
+                },
+                "required": [
+                    "frequency",
+                    "scenarios"
+                ]
+            },
             "RunScenariosRetellWebRTCRequest": {
                 "type": "object",
                 "properties": {
@@ -66767,6 +67334,15 @@
                         "format": "date-time",
                         "readOnly": true,
                         "description": "\nTimestamp when the agent was last updated\nExample: `\"2021-01-01T00:00:00Z\"`\n"
+                    },
+                    "email_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Email address this agent receives at. When set, enables email-based test runs.",
+                        "maxLength": 254
                     }
                 },
                 "required": [
@@ -68428,6 +69004,15 @@
                     "webhook_secret_configured": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "email_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Email address this agent receives at. When set, enables email-based test runs.",
+                        "maxLength": 254
                     }
                 },
                 "required": [

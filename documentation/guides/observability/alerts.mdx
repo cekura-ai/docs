@@ -20,7 +20,8 @@ can be scoped with filters, and routes notifications to Slack.
 Three things make up every alert:
 
 - **The metric it watches** — any metric on your project.
-- **The alert type** — *Failure*, *Trend*, or *Threshold* (explained below).
+- **The alert type** — *Failure*, *Trend*, *Threshold*, *New failure mode*, or
+  *Failure mode spike* (explained below).
 - **Where it notifies** — a Slack workspace and (optionally) a specific channel.
 
 You manage alerts from the **Alerts** page in the sidebar, where you can create
@@ -32,8 +33,11 @@ them, toggle them on and off, and review every time they fired.
 
 ## Alert types
 
-Cekura supports three alert types. Which ones are available for a given alert
-depend on the metric you're watching.
+Cekura supports five alert types. The first three watch a metric's raw
+evaluations; the last two watch the **failure-mode insights** Cekura
+accumulates for a metric (the recurring root-cause categories its failing calls
+fall into — see [Insights](/documentation/guides/observability/insights)). Which
+types are available depends on the metric you're watching.
 
 ### Failure alert
 
@@ -110,6 +114,56 @@ For example, *Value &gt; 500, min breaches 3, window 50* fires when **3 of the
 last 50 calls** had a value above 500 — useful for ignoring one-off spikes while
 still catching a real, sustained problem.
 
+### New failure mode alert
+
+Fires when Cekura detects a **brand-new failure mode** for the metric — a
+recurring failure category it hasn't seen before. As failing calls are analyzed,
+each is grouped into a root-cause category; when a genuinely new category
+appears, this alert tells you a new *kind* of problem has started happening,
+before it becomes common.
+
+You configure one option:
+
+- **Minimum calls before firing** — how many calls a new failure mode must
+  accumulate before the alert fires (default `1`, i.e. fire the moment it
+  appears). Raise it to suppress one-off blips and only hear about modes that
+  are actually recurring.
+
+Best for catching emerging problems early — a new way the agent breaks that
+didn't exist last week.
+
+### Failure mode spike alert
+
+Fires when an **existing failure mode's volume suddenly spikes** relative to its
+own recent history. Unlike a new-mode alert, this watches modes you already know
+about and tells you when one of them starts happening far more often than usual.
+
+Like trend alerts, you tune it by picking a **sensitivity preset** rather than
+setting knobs by hand:
+
+| Preset | Sensitivity | What it's good for |
+|--------|-------------|--------------------|
+| **Conservative** | Low — only large, sustained spikes | Low-volume metrics |
+| **Balanced** *(recommended)* | Sensible defaults — start here | Most metrics |
+| **Aggressive** | High — fires quickly on small spikes | High-traffic metrics |
+
+Each preset bundles a recent window, a trailing baseline window, a minimum
+count, and a spike multiplier. A mode fires when, within the recent window, it
+accumulated at least the minimum number of calls **and** that count is at least
+the multiplier times what its trailing baseline rate would predict:
+
+| Preset | Recent window | Baseline window | Min count | Multiplier |
+|--------|---------------|-----------------|-----------|------------|
+| Conservative | 24h | 14 days | 10 | 4× |
+| Balanced | 24h | 7 days | 5 | 3× |
+| Aggressive | 6h | 3 days | 3 | 2× |
+
+<Note>
+A failure mode with **no** prior history is treated as a *new* mode (handled by
+the New failure mode alert), not a spike — so the two alert types don't
+double-notify for the same freshly-appeared mode.
+</Note>
+
 ## Creating an alert
 
 1. Open **Alerts** from the sidebar.
@@ -120,6 +174,8 @@ still catching a real, sustained problem.
    - *Failure* — no extra configuration.
    - *Trend* — pick a sensitivity preset (and a direction for binary metrics).
    - *Threshold* — set the condition, value, min breaches, and window size.
+   - *New failure mode* — optionally set the minimum calls before firing.
+   - *Failure mode spike* — pick a sensitivity preset.
 5. **(Optional) Choose Slack delivery.** Select a connected workspace, and
    optionally a channel ID. Leave the channel blank to use the workspace's
    default channel. Choose **No Slack delivery** to create the alert without
@@ -155,7 +211,7 @@ columns are editable inline, so you can adjust an alert without leaving the page
 | **Enabled** | Toggle the alert on or off without deleting it. |
 | **Last 24h** | How many times the alert fired in the last day. |
 | **Type** | The metric's evaluation type (binary, numeric, etc.). |
-| **Alert Type** | Switch between Failure, Trend, and Threshold. |
+| **Alert Type** | Switch between Failure, Trend, Threshold, New failure mode, and Failure mode spike. |
 | **Filter** | Open the filter editor to scope which calls count. |
 | **Slack Channel** | Choose the workspace/channel that receives notifications. |
 | **Alert Direction** | For trend alerts: Both, Increase only, or Decrease only. |
@@ -178,6 +234,9 @@ The message is intentionally compact:
   (e.g. *"Failures went from 12% → 31%"*).
 - For trend alerts, a **trend chart** is attached as a follow-up image so you can
   see the shift at a glance.
+- For failure-mode alerts (new mode / spike), the **failure mode** and its call
+  count, with a **View insights** button that opens the metric's failure-mode
+  breakdown.
 - **Go to call** — jumps straight to the call log that triggered the fire.
 - **Open in Cekura** — opens the [Alert Review](#reviewing-alerts) page for the
   full picture.

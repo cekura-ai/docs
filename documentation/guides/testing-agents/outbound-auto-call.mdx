@@ -122,6 +122,10 @@ Cekura sends the following JSON payload to your trigger URL:
 Your webhook endpoint must be publicly accessible (HTTPS), return a 200 or 201 status code, and respond within 30 seconds.
 </Note>
 
+<Info>
+  **Dial window timing:** Each outbound run has a dial window that opens when the run reaches `pending` status. The call must be placed before `outbound_dial_window_closes_at` (default 300 seconds after the window opens). Dials received after the deadline are dropped and the run returns `status: timeout`. The three dial-window fields (`outbound_dial_window_opens_at`, `outbound_dial_window_seconds`, `outbound_dial_window_closes_at`) are included in run responses so you can track the deadline.
+</Info>
+
 ### Response Format
 
 Your webhook should return:
@@ -141,7 +145,9 @@ Your webhook should return:
   </Accordion>
 
   <Accordion title="Calls Placed but Run Times Out (Busy / NoAnswer on Provider Side)">
-    The provider dialed but Cekura never picked up. Cekura rejects incoming outbound-test calls whose caller ID doesn't match a configured `contact_number` on any agent in your project. Open the agent under test and confirm its `contact_number` is set to the exact E.164 number the provider dials from (the `from_number` in the trigger webhook payload). An empty or mismatched `contact_number` causes every outbound attempt to be silently dropped — your provider logs will show `Busy` / `NoAnswer` / no-pickup with no audio and no SIP error explaining why. After correcting `contact_number`, trigger a fresh run; the timed-out runs cannot be recovered.
+    The provider dialed but Cekura never picked up. Two possible causes:
+    1. **Dialed too late** — if the provider dialed after `outbound_dial_window_closes_at` (check the run response for this field; default is 300 seconds after the run reached `pending`), Cekura dropped the call. This can happen if the trigger URL webhook is slow to respond or if there's a delay in your call logic.
+    2. **Caller-ID mismatch** — Cekura rejects incoming outbound-test calls whose caller ID doesn't match a configured `contact_number` on any agent in your project. Open the agent under test and confirm its `contact_number` is set to the exact E.164 number the provider dials from (the `from_number` in the trigger webhook payload). An empty or mismatched `contact_number` causes every outbound attempt to be silently dropped — your provider logs will show `Busy` / `NoAnswer` / no-pickup with no audio and no SIP error explaining why. After correcting `contact_number`, trigger a fresh run; the timed-out runs cannot be recovered.
   </Accordion>
 
   <Accordion title="Failed to Initiate Call / Permission Errors">

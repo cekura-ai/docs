@@ -1,7 +1,7 @@
 ---
 title: "Using Cekura with Cursor"
-sidebarTitle: "Cursor Guide"
-description: "End-to-end walkthrough: evaluate complex voice agents using Cursor and the Cekura MCP"
+sidebarTitle: "Cursor"
+description: "Install the Cekura plugin in Cursor — it bundles Cekura Skills and the MCP server, no separate MCP setup."
 icon: "code"
 ---
 
@@ -9,52 +9,97 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 <CopyPageButton />
 
+Cursor has native Cekura plugin support. Installing the plugin gives you Cekura Skills **and** the Cekura MCP server in one step — no separate MCP configuration.
 
-Use Cursor's agent mode together with the Cekura MCP to design evaluators, run them against your voice agents, and triage the results — all without leaving the editor.
-
-## Quick Guide
+## Install the plugin
 
 <Steps>
-  <Step title="Connect Cursor to Cekura">
-    Add the Cekura MCP server to Cursor. Open **Cursor Settings → MCP → Add new MCP server** (or edit `~/.cursor/mcp.json` directly) and paste:
-
-    ```json
-    {
-      "mcpServers": {
-        "cekura": {
-          "command": "npx",
-          "args": ["mcp-remote", "https://api.cekura.ai/mcp"]
-        }
-      }
-    }
-    ```
-
-    On first use Cursor opens a browser to authorize against your Cekura dashboard. For API-key-based auth (project-scoped credentials, shared CI access), see the [MCP overview](/mcp/overview#configure-mcp-server-full-matrix).
-
-    Verify by asking Cursor's agent: *"List my Cekura agents."*
+  <Step title="Open the marketplace importer">
+    In Cursor, go to **Settings > Plugins > Team Marketplaces > Add Marketplace > Import from Repo**.
   </Step>
 
-  <Step title="Set up mock data and cleanup hooks">
-    Complex agents depend on database state — users, accounts, sessions, entitlements. Stand up a lightweight webhook server that seeds mock data before a run and listens for Cekura's post-run webhook to reset the database. This keeps concurrent tests isolated and repeatable.
+  <Step title="Point it at the Cekura repo">
+    Enter `https://github.com/cekura-ai/cekura-skills` and import.
   </Step>
 
-  <Step title="Let Cursor learn the schema">
-    Open your agent's repo in Cursor and ask the agent to read your tool definitions, prompts, and database schema. Then prompt it to generate scenario coverage through the Cekura MCP — for example: *"Read the agent's tools in `src/agent/tools.ts`, then create 10 Cekura evaluators covering the most common user flows."*
+  <Step title="Install the plugin">
+    Install **cekura** from the imported marketplace.
   </Step>
 
-  <Step title="Run the full suite">
-    Kick off all evaluators at once through the MCP: *"Run every evaluator on agent X and stream the results."* Cekura executes them concurrently and surfaces pass/fail with full transcripts and traces.
-  </Step>
-
-  <Step title="Triage with Cursor">
-    Ask Cursor's agent to pull failing runs and classify them: *"Fetch the failures from the last run and tell me which are real bugs vs. flakes."* Because runs are non-deterministic, **rerun each failing test 3–4 times** and ask Cursor to compute a pass rate. One pass out of four usually points to a prompt or tool-routing bug, not infra.
-  </Step>
-
-  <Step title="Fix in-place and re-run">
-    Because Cursor has both your codebase and the Cekura MCP in the same context, you can go from failing transcript → suspected prompt or tool bug → edit → re-run the failing evaluator in a single thread.
+  <Step title="Authorize MCP">
+    When prompted, complete the OAuth browser sign-in to your Cekura dashboard account. No API key needed — the plugin already includes the MCP server config.
   </Step>
 </Steps>
 
-<Tip>
-A good first prompt: *"Use the Cekura MCP to list my agents, then read the prompt for the first one and propose 10 workflow evaluators covering the most common user flows."*
-</Tip>
+<Note>
+Cursor plugins don't carry Claude-style slash commands; the bundled Skills cover those workflows and activate automatically when your request matches.
+</Note>
+
+## Verify setup
+
+Ask Cursor:
+
+```plaintext
+Use the Cekura skills and MCP. List my Cekura agents, pick one, and propose 3 evaluators I should create first. Do not create anything until I approve.
+```
+
+Cursor should list real agents from your workspace and reason in Cekura terms (evaluators, metrics, test profiles, run results).
+
+## Keep it updated
+
+Re-import the marketplace from **Settings > Plugins > Team Marketplaces** to pull the latest version.
+
+**Auto Refresh (optional)** — have Cursor update automatically:
+
+<Steps>
+  <Step title="Install the Cursor GitHub App">
+    Install it on the `cekura-ai/cekura-skills` repository (Cursor prompts for this; it's required for Auto Refresh).
+  </Step>
+  <Step title="Enable Auto Refresh">
+    In **Settings > Plugins > Team Marketplaces**, find the imported Cekura marketplace and toggle on **Auto Refresh**.
+  </Step>
+</Steps>
+
+Cursor then re-indexes the marketplace at most once every ~10 minutes. Auto Refresh updates the *existing* plugin only — if a brand-new plugin is added to the repo later, re-import the marketplace.
+
+**Team-wide auto-install (Teams / Enterprise):** a workspace admin can mark the Cekura plugin **Required** for a distribution group in the Team Marketplace settings — that installs and keeps it updated for everyone automatically, with no per-developer action.
+
+## No plugin?
+
+Set up [Skills + MCP manually](/mcp/mcp-only), or use the [behavior preset](/mcp/other-agents) fallback.
+
+## Recommended workflow
+
+<Steps>
+  <Step title="Let Cursor read your agent repo">
+    Ask Cursor to inspect prompts, tool definitions, schemas, and test data so the evaluator plan is grounded in your actual agent behavior.
+  </Step>
+
+  <Step title="Design coverage before creating anything">
+    Ask for workflow, edge-case, regression, and tool-call coverage. Approve the plan before creating evaluators.
+  </Step>
+
+  <Step title="Run evaluators through MCP">
+    Once approved, ask Cursor to run the evaluators with a low frequency first. Increase frequency after the first run succeeds.
+  </Step>
+
+  <Step title="Triage failures in context">
+    Cursor can compare Cekura transcripts against your prompt and codebase, then propose fixes and rerun targeted evaluators.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Plugin or MCP tools do not appear">
+    Re-import the marketplace from **Settings > Plugins > Team Marketplaces**, confirm **cekura** is installed, and restart Cursor. Make sure you completed the OAuth sign-in when prompted.
+  </Accordion>
+
+  <Accordion title="Skills do not seem to load">
+    Confirm the plugin is installed, then ask explicitly: *"Use the Cekura skills to design evaluators."* If you're on the rules-file fallback instead, confirm `.cursor/rules/cekura.md` exists.
+  </Accordion>
+
+  <Accordion title="OAuth opens the wrong account">
+    Sign out of the wrong Cekura account in your browser, re-authorize the plugin, and sign in with the intended account.
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,92 @@
+---
+title: "Using Cekura with other assistants"
+sidebarTitle: "Other assistants"
+description: "Set up OpenCode, Windsurf, and other AI assistants with Cekura Skills, MCP, or a portable behavior preset."
+icon: "wand-magic-sparkles"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+Use this page for assistants without a native Cekura plugin. The generic pattern is the same: install Cekura guidance, then connect MCP if your assistant supports it. Gemini CLI is an exception — it has a native extension, covered at the end.
+
+## Choose the right path
+
+| Path | Use when | Result |
+|---|---|---|
+| Agent Skills + MCP | Your assistant supports Agent Skills and MCP | Best non-Claude-Code setup |
+| Behavior preset + MCP | Your assistant supports rules/context files and MCP | Good fallback when Agent Skills are not loaded automatically |
+| Behavior preset only | Your assistant has no MCP support | Cekura guidance without live workspace actions |
+| MCP only | You only want direct Cekura tools | API access without Cekura workflow guidance |
+
+## Install Cekura guidance
+
+Try Agent Skills first:
+
+```bash
+npx skills add cekura-ai/cekura-skills --all
+```
+
+If your assistant does not load Agent Skills, install the portable behavior preset wherever your assistant reads project rules or agent instructions:
+
+```bash
+curl -L https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/codex/AGENTS.md -o AGENTS.md
+```
+
+For assistants with a dedicated rules directory, place the file there instead.
+
+## Connect MCP
+
+If your assistant supports HTTP MCP, use:
+
+```plaintext
+https://api.cekura.ai/mcp
+```
+
+If your assistant requires a local command shim, use `mcp-remote`:
+
+```json
+{
+  "mcpServers": {
+    "cekura": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://api.cekura.ai/mcp"]
+    }
+  }
+}
+```
+
+For client-specific OAuth and API-key examples, see [manual setup](/mcp/mcp-only).
+
+## Verify setup
+
+Ask your assistant:
+
+```plaintext
+Use the Cekura skills and MCP. List my Cekura agents, pick one, and propose 3 evaluators I should create first. Do not create anything until I approve.
+```
+
+If the assistant cannot list agents, MCP is not connected. If it lists agents but gives generic testing advice, add the behavior preset or confirm Agent Skills are enabled.
+
+## Gemini CLI
+
+Gemini CLI has a native Cekura extension that includes the **MCP server** and the Cekura context file. (Gemini extensions don't bundle Agent Skills yet, so this ships domain knowledge as context rather than `SKILL.md` skills.)
+
+```bash
+gemini extensions install https://github.com/cekura-ai/cekura-skills --auto-update
+```
+
+The `--auto-update` flag self-checks GitHub on each launch and applies new versions on the next restart — no manual updates. Omit it if you prefer to update manually.
+
+On first use of a Cekura MCP tool, Gemini runs an OAuth browser sign-in — no API key. The extension loads `GEMINI.md` (metric design, eval design, API reference, anti-patterns) as context.
+
+To update manually, or to force it now:
+
+```bash
+gemini extensions update cekura
+```
+
+## When to use Claude Code instead
+
+Use [Claude Code](/mcp/claude-code-guide) if you want the full Cekura plugin experience: Skills, slash commands, MCP auto-configuration, update support, and MCP failure help.

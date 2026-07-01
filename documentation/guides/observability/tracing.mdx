@@ -13,12 +13,12 @@ export const otelPrompt = [
   "You are integrating OpenTelemetry tracing into an existing voice AI agent codebase to export traces to Cekura.",
   "",
   "OBJECTIVE",
-  "Instrument the agent with OpenTelemetry so that every call produces a trace with span-level timing for STT, LLM, TTS, and tool calls. Export traces to Cekura and link them to call logs via trace_id.",
+  "Instrument the agent with OpenTelemetry so that every call produces a trace with span-level timing for STT, LLM, TTS (or a single S2S span for realtime speech-to-speech models), and tool calls. Export traces to Cekura and link them to call logs via trace_id.",
   "",
   "BEFORE YOU START",
   '1. Ask the user: "What is your Cekura agent ID (or project ID)? You can find it in the Cekura dashboard. If you don\'t know it, I can look it up for you."',
   '2. Ask the user: "Do you prefer gRPC or HTTP for the OTel exporter? gRPC is recommended for most cases."',
-  "3. Find the main conversation loop or call handler in the codebase (where STT, LLM, and TTS calls happen).",
+  "3. Find the main conversation loop or call handler in the codebase (where STT, LLM, and TTS calls happen, or where a single realtime S2S model handles the turn).",
   "4. Check if OpenTelemetry is already configured in the codebase. If so, reuse the existing TracerProvider and just add the Cekura exporter.",
   "5. Find existing error handling and service patterns in the codebase. Follow them.",
   "",
@@ -40,6 +40,7 @@ export const otelPrompt = [
   '   - "stt" for speech-to-text calls — set stt.provider, stt.transcript',
   '   - "llm" for LLM calls — set gen_ai.system, gen_ai.request.model, gen_ai.usage.input_tokens, gen_ai.usage.output_tokens',
   '   - "tts" for text-to-speech calls — set tts.provider, tts.characters',
+  '   - "s2s" for speech-to-speech / realtime model calls (e.g. OpenAI Realtime, Gemini Live) — set gen_ai.provider.name, gen_ai.request.model, gen_ai.usage.input_tokens, gen_ai.usage.output_tokens',
   '   - "tool_call" for tool/function calls — set function.name, function.input, function.output',
   '   - Wrap the entire call in a root "conversation" span.',
   "",
@@ -53,12 +54,12 @@ export const otelPrompt = [
   "",
   "INTEGRATION POINTS",
   "- The OTel setup should be initialized once at module/application startup, not per-call.",
-  "- Spans wrap existing service calls (STT, LLM, TTS) — insert them around the existing code, do not restructure.",
+  "- Spans wrap existing service calls (STT, LLM, TTS, or a single S2S realtime model) — insert them around the existing code, do not restructure.",
   "- The trace_id links OTel traces to call logs in the Cekura dashboard — include it in the observe API payload.",
   "- If the codebase already has an OTel TracerProvider, add the Cekura exporter as an additional span processor rather than replacing the existing setup.",
   "",
   "SUCCESS CRITERIA",
-  "- Every call produces an OTel trace with a root conversation span and child spans for STT, LLM, TTS, and tool calls.",
+  "- Every call produces an OTel trace with a root conversation span and child spans for STT, LLM, TTS (or S2S), and tool calls.",
   "- Traces appear in the Cekura dashboard linked to their corresponding call logs.",
   "- Span attributes include provider names, token usage, and timing information.",
   "- Credentials are read from environment variables.",
@@ -348,9 +349,23 @@ Cekura recognizes these span names and renders them with specialized UI:
 | `stt` | Speech-to-text | `stt.provider`, `stt.transcript`, `stt.confidence` |
 | `llm` | LLM / model call | `gen_ai.system`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` |
 | `tts` | Text-to-speech | `tts.provider`, `tts.characters` |
+| `s2s` | Speech-to-speech (realtime model) | `gen_ai.provider.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` |
 | `tool_call` | Tool / function call | `function.name`, `function.input`, `function.output` |
 
 Custom span names work too - they just won't have specialized styling in the UI.
+
+<Tip>
+Use `s2s` when a single realtime model handles the full audio-in/audio-out turn (e.g. OpenAI Realtime, Gemini Live), instead of a cascading `stt` → `llm` → `tts` pipeline:
+
+```python
+with tracer.start_as_current_span("s2s") as s2s_span:
+    audio_out = realtime_model.respond(user_audio)
+    s2s_span.set_attribute("gen_ai.provider.name", "openai")
+    s2s_span.set_attribute("gen_ai.request.model", "gpt-4o-realtime-preview")
+    s2s_span.set_attribute("gen_ai.usage.input_tokens", usage.input_tokens)
+    s2s_span.set_attribute("gen_ai.usage.output_tokens", usage.output_tokens)
+```
+</Tip>
 
 <Note>
 For workflows that require audit-grade explainability — capturing the reasoning behind individual agent decisions, not just pass/fail outcomes — see [Decision-Level Reasoning and Explainability](/documentation/FAQ#how-does-cekura-handle-decision-level-reasoning-and-explainability-and-what-data-do-i-need-to-provide-for-audit-purposes) in the FAQ.

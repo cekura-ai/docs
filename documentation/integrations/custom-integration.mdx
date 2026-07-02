@@ -29,8 +29,9 @@ The custom integration feature allows you to send call transcripts from your own
 
 1. Create or edit an agent in the Cekura dashboard
 2. Set the transcript provider to "Custom"
-3. Copy the webhook URL provided by Cekura
-4. Note your API key for authentication
+3. **Enable *Send Post Conversation Metadata*** in the agent settings — this tells Cekura that your system will push transcript data via the webhook, so Cekura waits for the transcript before surfacing evaluation results. Without this toggle enabled, Cekura does not know to expect a webhook payload for this agent, and transcripts sent to the endpoint will not be attached to run results. In the Cekura API and MCP data, this agent-level setting is exposed as the `use_provider_transcript` field on the agent object (`false` means the toggle is off).
+4. Copy the webhook URL provided by Cekura
+5. Note your API key for authentication
 
 <Note>
 **One webhook URL per project:** Cekura provides a single webhook URL per project. If you need separate webhook destinations for different environments (e.g., development vs. production), create separate projects in Cekura — each project gets its own webhook URL and API key. This is the recommended approach for environment isolation.
@@ -243,6 +244,14 @@ For successful webhook integration, ensure:
 ## Troubleshooting
 
 If your webhook integration isn't working as expected:
+
+### Transcripts not attached to run results
+
+If you send data to the webhook with no errors (HTTP 200 response) but the transcript is not appearing in run results:
+
+- **Check that *Send Post Conversation Metadata* is enabled** in the agent's settings (API/MCP field: `use_provider_transcript` on the agent object — `false` means the toggle is off). This is the most common cause. Without it, Cekura does not know to wait for transcript data from your custom integration, so the webhook payload is received but not matched to any run. Enable the setting and re-send the webhook.
+- Confirm the call data was sent within 5 minutes after the call ended — Cekura stops listening after that window.
+- If you are using `run_id` per call (deterministic matching), verify the run IDs in your payload match the actual Cekura run IDs for those calls.
 
 ### No calls appear in Cekura
 

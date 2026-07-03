@@ -6448,6 +6448,91 @@
                 }
             }
         },
+        "/observability/v1/metric-failure-mode-insights/categories/": {
+            "get": {
+                "operationId": "metric-failure-mode-insights-categories-retrieve",
+                "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range; results are sorted by count descending.",
+                "summary": "List accumulating failure categories for a metric",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricFailureModeInsight"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/metric-failure-mode-insights/categories/{category_slug}/fix-metric/": {
+            "post": {
+                "operationId": "metric-failure-mode-insights-categories-fix-metric-create",
+                "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass).",
+                "summary": "Add an accumulating failure category's example calls to Labs",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "category_slug",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[^/]+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeFixMetric"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeFixMetric"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricFailureModeFixMetric"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricFailureModeFixMetric"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/observability/v1/metric-failure-mode-insights/generate/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-generate-create",
@@ -11472,6 +11557,14 @@
                             "type": "integer"
                         },
                         "description": "Filter by project ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Search agents by name. A numeric value also matches the agent id."
                     }
                 ],
                 "tags": [
@@ -13878,7 +13971,7 @@
                         "schema": {
                             "type": "string"
                         },
-                        "description": "Search agents by name"
+                        "description": "Search agents by name. A numeric value also matches the agent id."
                     }
                 ],
                 "tags": [
@@ -29653,7 +29746,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             },
                             "examples": {
                                 "WebsocketVoiceRun": {
@@ -29670,12 +29763,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             }
                         }
                     }
@@ -29858,7 +29951,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             },
                             "examples": {
                                 "ElevenLabsRun": {
@@ -29876,12 +29969,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             }
                         }
                     }
@@ -30264,6 +30357,24 @@
                                         "frequency": 1
                                     },
                                     "summary": "LiveKit v2 run"
+                                },
+                                "LiveKitV2RunWithOverrides": {
+                                    "value": {
+                                        "scenarios": [
+                                            {
+                                                "scenario": 101
+                                            }
+                                        ],
+                                        "frequency": 1,
+                                        "livekit_data": {
+                                            "agent_name": "my-dispatch-agent",
+                                            "config": {
+                                                "empty_timeout": 300,
+                                                "max_participants": 2
+                                            }
+                                        }
+                                    },
+                                    "summary": "LiveKit v2 run with overrides"
                                 }
                             }
                         },
@@ -31084,7 +31195,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             },
                             "examples": {
                                 "SIPRun": {
@@ -31101,12 +31212,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             }
                         }
                     }
@@ -35003,7 +35114,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             },
                             "examples": {
                                 "WebsocketVoiceRun": {
@@ -35020,12 +35131,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             }
                         }
                     }
@@ -35216,7 +35327,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             },
                             "examples": {
                                 "ElevenLabsRun": {
@@ -35234,12 +35345,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             }
                         }
                     }
@@ -35630,6 +35741,24 @@
                                         "frequency": 1
                                     },
                                     "summary": "LiveKit v2 run"
+                                },
+                                "LiveKitV2RunWithOverrides": {
+                                    "value": {
+                                        "scenarios": [
+                                            {
+                                                "scenario": 101
+                                            }
+                                        ],
+                                        "frequency": 1,
+                                        "livekit_data": {
+                                            "agent_name": "my-dispatch-agent",
+                                            "config": {
+                                                "empty_timeout": 300,
+                                                "max_participants": 2
+                                            }
+                                        }
+                                    },
+                                    "summary": "LiveKit v2 run with overrides"
                                 }
                             }
                         },
@@ -36482,7 +36611,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             },
                             "examples": {
                                 "SIPRun": {
@@ -36499,12 +36628,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             }
                         }
                     }
@@ -38750,6 +38879,14 @@
                             "type": "integer"
                         },
                         "description": "Filter by project ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "q",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Search agents by name. A numeric value also matches the agent id."
                     }
                 ],
                 "tags": [
@@ -40576,7 +40713,7 @@
                         "schema": {
                             "type": "string"
                         },
-                        "description": "Search agents by name"
+                        "description": "Search agents by name. A numeric value also matches the agent id."
                     }
                 ],
                 "tags": [
@@ -43593,7 +43730,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             },
                             "examples": {
                                 "WebsocketVoiceRun": {
@@ -43610,12 +43747,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosChirp"
                             }
                         }
                     }
@@ -43798,7 +43935,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             },
                             "examples": {
                                 "ElevenLabsRun": {
@@ -43816,12 +43953,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosElevenLabs"
                             }
                         }
                     }
@@ -44204,6 +44341,24 @@
                                         "frequency": 1
                                     },
                                     "summary": "LiveKit v2 run"
+                                },
+                                "LiveKitV2RunWithOverrides": {
+                                    "value": {
+                                        "scenarios": [
+                                            {
+                                                "scenario": 101
+                                            }
+                                        ],
+                                        "frequency": 1,
+                                        "livekit_data": {
+                                            "agent_name": "my-dispatch-agent",
+                                            "config": {
+                                                "empty_timeout": 300,
+                                                "max_participants": 2
+                                            }
+                                        }
+                                    },
+                                    "summary": "LiveKit v2 run with overrides"
                                 }
                             }
                         },
@@ -45024,7 +45179,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             },
                             "examples": {
                                 "SIPRun": {
@@ -45041,12 +45196,12 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostRunScenarios"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosSip"
                             }
                         }
                     }
@@ -53161,6 +53316,7 @@
             },
             "CallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -53352,6 +53508,7 @@
             },
             "CallLogList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -54487,6 +54644,7 @@
             },
             "Dashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -54618,6 +54776,7 @@
             },
             "DashboardList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -55866,6 +56025,29 @@
                 ],
                 "title": "LiveKit"
             },
+            "LivekitRunDataOverride": {
+                "type": "object",
+                "description": "Per-run LiveKit overrides. Credentials (api_key/api_secret) are never taken here — they are read from the agent/project ProviderCredential.",
+                "properties": {
+                    "config": {
+                        "description": "Room configuration to use for this run (e.g. empty_timeout, max_participants). Fully replaces the agent/project saved config — no merge."
+                    },
+                    "agent_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "LiveKit agent name for explicit dispatch. Overrides the agent/project saved agent_name."
+                    },
+                    "url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "LiveKit server URL override. Falls back to the agent/project saved url when omitted."
+                    }
+                }
+            },
             "LivekitScenario": {
                 "type": "object",
                 "description": "",
@@ -56869,6 +57051,7 @@
             },
             "MetricList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -59387,6 +59570,7 @@
             },
             "PatchedCallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -59815,6 +59999,7 @@
             },
             "PatchedDashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -62233,6 +62418,7 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -65456,6 +65642,7 @@
             },
             "RunList": {
                 "type": "object",
+                "description": "Adds outbound dial-window fields read from cekura_metadata.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -65740,6 +65927,35 @@
                             "type": "integer"
                         },
                         "description": "List of test profile IDs to override for this run. If not provided, uses the scenario's default test profile."
+                    },
+                    "livekit_data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/LivekitRunDataOverride"
+                            }
+                        ],
+                        "description": "Per-run LiveKit overrides (config, agent_name, url). Credentials are always read from the agent/project."
+                    },
+                    "concurrency_limit": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Optional cap on how many of this run's calls execute concurrently."
+                    },
+                    "personality_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single personality ID override. Merged into personality_ids; prefer personality_ids for multiple."
+                    },
+                    "test_profile_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single test profile ID override. Merged into test_profile_ids; prefer test_profile_ids for multiple."
                     }
                 },
                 "required": [
@@ -65903,6 +66119,7 @@
             },
             "Scenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -66785,6 +67002,7 @@
             },
             "ScenarioList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67004,6 +67222,7 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67506,6 +67725,19 @@
                     "token"
                 ]
             },
+            "SchemaElevenLabsData": {
+                "type": "object",
+                "description": "Per-run ElevenLabs overrides. Credentials are read from the agent.",
+                "properties": {
+                    "elevenlabs_base_url_override": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Override the ElevenLabs base URL for this run (e.g. a regional or self-hosted endpoint)."
+                    }
+                }
+            },
             "SchemaGenerateMetricsMetricCreate": {
                 "type": "object",
                 "properties": {
@@ -67688,6 +67920,25 @@
                     "pipecat_room_url",
                     "scenario"
                 ]
+            },
+            "SchemaPipecatV2Data": {
+                "type": "object",
+                "description": "Per-run Pipecat Cloud overrides. Credentials are read from the agent/project ProviderCredential.",
+                "properties": {
+                    "pipecat_agent_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Pipecat Cloud agent name. Overrides the agent/project saved pipecat_agent_name."
+                    },
+                    "config": {
+                        "description": "Session configuration for this run. Replaces the agent/project saved config — no merge."
+                    },
+                    "room_properties": {
+                        "description": "Daily.co room properties for this run. Replaces the agent/project saved room_properties — no merge."
+                    }
+                }
             },
             "SchemaPipecatV2Scenario": {
                 "type": "object",
@@ -68447,6 +68698,7 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -68513,6 +68765,20 @@
                         },
                         "description": "\nList of test profile IDs to override for this run. If not provided, uses the scenario's default test profile.\nExample: `[123, 456, 789]`\n"
                     },
+                    "personality_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single personality ID override. Merged into personality_ids; prefer personality_ids for multiple."
+                    },
+                    "test_profile_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single test profile ID override. Merged into test_profile_ids; prefer test_profile_ids for multiple."
+                    },
                     "mode": {
                         "enum": [
                             "same_number",
@@ -68531,6 +68797,230 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    }
+                }
+            },
+            "SchemaPostRunScenariosChirp": {
+                "type": "object",
+                "description": "Schema for the run_scenarios_chirp endpoint (raw-PCM WebSocket voice).",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "ID of the agent to run evaluators for"
+                    },
+                    "assistant_id": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAlternative to agent ID - the assistant ID to use for this scenario\nExample: `\"asst_1234567890\"`\n"
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nList of tags to filter evaluators to run. Either evaluators or tags must be provided.\nExample: `[\"tag1\", \"tag2\", \"tag3\"]`\n"
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "description": "\nDot-separated folder path to select evaluators from (e.g. `\"Sales.Inbound\"`).\nMutually exclusive with `scenarios` and `tags`. Requires `project_id`.\n"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "description": "\nProject ID. Required when using `folder_path` (or when passing a folder path string via `scenarios`).\nExample: `1376`\n"
+                    },
+                    "frequency": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1,
+                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Label text for result"
+                    },
+                    "outbound_phone_number": {
+                        "type": "string",
+                        "description": "\nOverride the phone number to use for outbound calls.\nExample: \"+1234567890\"\n"
+                    },
+                    "personality_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of personality IDs to override for this run. If not provided, uses the scenario's default personality.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "test_profile_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of test profile IDs to override for this run. If not provided, uses the scenario's default test profile.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "personality_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single personality ID override. Merged into personality_ids; prefer personality_ids for multiple."
+                    },
+                    "test_profile_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single test profile ID override. Merged into test_profile_ids; prefer test_profile_ids for multiple."
+                    },
+                    "mode": {
+                        "enum": [
+                            "same_number",
+                            "different_numbers"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "9ea0c9743bd9d873",
+                        "default": "same_number",
+                        "description": "Using same or different phone numbers for each evaluation\n\n* `same_number` - same_number\n* `different_numbers` - different_numbers"
+                    },
+                    "agent_number": {
+                        "type": "string",
+                        "description": "\nOverride the phone number from which the agent under test receives the call during outbound runs.\nThis allows overriding the default agent contact number for testing purposes.\nExample: \"+1234567890\"\n"
+                    },
+                    "concurrency_limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "websocket_url": {
+                        "type": "string",
+                        "description": "Override the agent's stored raw-PCM WebSocket endpoint (telephony.websocket_url) for this run."
+                    }
+                }
+            },
+            "SchemaPostRunScenariosElevenLabs": {
+                "type": "object",
+                "description": "Schema for the run_scenarios_elevenlabs endpoint.",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "ID of the agent to run evaluators for"
+                    },
+                    "assistant_id": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAlternative to agent ID - the assistant ID to use for this scenario\nExample: `\"asst_1234567890\"`\n"
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nList of tags to filter evaluators to run. Either evaluators or tags must be provided.\nExample: `[\"tag1\", \"tag2\", \"tag3\"]`\n"
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "description": "\nDot-separated folder path to select evaluators from (e.g. `\"Sales.Inbound\"`).\nMutually exclusive with `scenarios` and `tags`. Requires `project_id`.\n"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "description": "\nProject ID. Required when using `folder_path` (or when passing a folder path string via `scenarios`).\nExample: `1376`\n"
+                    },
+                    "frequency": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1,
+                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Label text for result"
+                    },
+                    "outbound_phone_number": {
+                        "type": "string",
+                        "description": "\nOverride the phone number to use for outbound calls.\nExample: \"+1234567890\"\n"
+                    },
+                    "personality_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of personality IDs to override for this run. If not provided, uses the scenario's default personality.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "test_profile_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of test profile IDs to override for this run. If not provided, uses the scenario's default test profile.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "personality_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single personality ID override. Merged into personality_ids; prefer personality_ids for multiple."
+                    },
+                    "test_profile_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single test profile ID override. Merged into test_profile_ids; prefer test_profile_ids for multiple."
+                    },
+                    "mode": {
+                        "enum": [
+                            "same_number",
+                            "different_numbers"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "9ea0c9743bd9d873",
+                        "default": "same_number",
+                        "description": "Using same or different phone numbers for each evaluation\n\n* `same_number` - same_number\n* `different_numbers` - different_numbers"
+                    },
+                    "agent_number": {
+                        "type": "string",
+                        "description": "\nOverride the phone number from which the agent under test receives the call during outbound runs.\nThis allows overriding the default agent contact number for testing purposes.\nExample: \"+1234567890\"\n"
+                    },
+                    "concurrency_limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "elevenlabs_agent_id": {
+                        "type": "string",
+                        "description": "ElevenLabs agent ID to test against. Overrides the agent's stored assistant_id for this run."
+                    },
+                    "elevenlabs_data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SchemaElevenLabsData"
+                            }
+                        ],
+                        "description": "Per-run ElevenLabs overrides (e.g. elevenlabs_base_url_override). Credentials are read from the agent."
                     }
                 }
             },
@@ -68598,11 +69088,148 @@
                             "type": "integer"
                         },
                         "description": "List of test profile IDs to override for this run. If not provided, uses the scenario's default test profile."
+                    },
+                    "personality_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single personality ID override. Merged into personality_ids; prefer personality_ids for multiple."
+                    },
+                    "test_profile_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single test profile ID override. Merged into test_profile_ids; prefer test_profile_ids for multiple."
+                    },
+                    "pipecat_data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/SchemaPipecatV2Data"
+                            }
+                        ],
+                        "description": "Per-run Pipecat Cloud overrides (pipecat_agent_name, config, room_properties). Credentials are read from the agent/project."
+                    },
+                    "concurrency_limit": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Optional cap on how many of this run's calls execute concurrently."
                     }
                 },
                 "required": [
                     "scenarios"
                 ]
+            },
+            "SchemaPostRunScenariosSip": {
+                "type": "object",
+                "description": "Schema for the run_scenarios_sip endpoint.",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "ID of the agent to run evaluators for"
+                    },
+                    "assistant_id": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAlternative to agent ID - the assistant ID to use for this scenario\nExample: `\"asst_1234567890\"`\n"
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nList of tags to filter evaluators to run. Either evaluators or tags must be provided.\nExample: `[\"tag1\", \"tag2\", \"tag3\"]`\n"
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "description": "\nDot-separated folder path to select evaluators from (e.g. `\"Sales.Inbound\"`).\nMutually exclusive with `scenarios` and `tags`. Requires `project_id`.\n"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "description": "\nProject ID. Required when using `folder_path` (or when passing a folder path string via `scenarios`).\nExample: `1376`\n"
+                    },
+                    "frequency": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1,
+                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Label text for result"
+                    },
+                    "outbound_phone_number": {
+                        "type": "string",
+                        "description": "\nOverride the phone number to use for outbound calls.\nExample: \"+1234567890\"\n"
+                    },
+                    "personality_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of personality IDs to override for this run. If not provided, uses the scenario's default personality.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "test_profile_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of test profile IDs to override for this run. If not provided, uses the scenario's default test profile.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "personality_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single personality ID override. Merged into personality_ids; prefer personality_ids for multiple."
+                    },
+                    "test_profile_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single test profile ID override. Merged into test_profile_ids; prefer test_profile_ids for multiple."
+                    },
+                    "mode": {
+                        "enum": [
+                            "same_number",
+                            "different_numbers"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "9ea0c9743bd9d873",
+                        "default": "same_number",
+                        "description": "Using same or different phone numbers for each evaluation\n\n* `same_number` - same_number\n* `different_numbers` - different_numbers"
+                    },
+                    "agent_number": {
+                        "type": "string",
+                        "description": "\nOverride the phone number from which the agent under test receives the call during outbound runs.\nThis allows overriding the default agent contact number for testing purposes.\nExample: \"+1234567890\"\n"
+                    },
+                    "concurrency_limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "sip_endpoint": {
+                        "type": "string",
+                        "description": "Override the agent's stored SIP endpoint for this run."
+                    }
+                }
             },
             "SchemaPostRunScenariosText": {
                 "type": "object",
@@ -68695,6 +69322,7 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -68844,6 +69472,7 @@
             },
             "SchemaScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",

@@ -1,0 +1,107 @@
+---
+title: 'Agent Dispatch Reliability'
+sidebarTitle: "Dispatch Reliability"
+icon: "shield-check"
+iconType: "regular"
+description: 'Strategies for handling LiveKit agent dispatch latency and failures in production'
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## Overview
+
+LiveKit agent dispatch is generally reliable, but transient platform delays can occasionally cause an agent to join a room with latency or fail to dispatch at all. In voice applications, this gap means a recipient answers a call and hears silence — a poor user experience.
+
+This page covers patterns for making your outbound and inbound LiveKit flows resilient to these issues.
+
+---
+
+## Debugging First: Use the Cekura SDK
+
+Before tuning your room lifecycle, determine whether you're dealing with a configuration issue or a transient dispatch delay. The [Cekura LiveKit SDK](/documentation/integrations/livekit/tracing) captures all session traces and logs automatically, giving you a timestamped record of:
+
+- Agent join timing relative to room creation
+- Full job dispatch metadata (scenario, run ID, test profile)
+- Session logs with timestamps and log levels
+- Raw STT, TTS, LLM, and EOU metrics per session
+
+With this data you can quickly distinguish between a dispatch failure (agent never appeared) and join latency (agent appeared late). You can then point an AI assistant at the captured logs to triage whether the delay originated in the dispatch layer, the LLM initialization, or the infrastructure.
+
+---
+
+## Always Pass `agent_name` Explicitly
+
+Passing `agent_name` explicitly in your `CreateAgentDispatchRequest` has been shown to fix cases where the dispatcher fails to route correctly — even when only one agent is running. Do not rely on implicit routing:
+
+```python
+from livekit.api import LiveKitAPI, CreateAgentDispatchRequest
+import json
+
+livekit_api = LiveKitAPI(
+    url="wss://<YOUR_LIVEKIT_URL>",
+    api_key="<YOUR_API_KEY>",
+    api_secret="<YOUR_API_SECRET>",
+)
+
+await livekit_api.agent_dispatch.create_dispatch(
+    CreateAgentDispatchRequest(
+        agent_name="your-agent-name",   # Always specify this explicitly
+        room="your-room-name",
+        metadata=json.dumps({}),
+    )
+)
+```
+
+---
+
+## Outbound Calls: Wait-then-Dial
+
+The most reliable pattern for outbound calling is to confirm the agent has joined the room **before** initiating the SIP dial. Dialing immediately after room creation means a recipient can answer and hear silence while the agent is still joining.
+
+Recommended sequence:
+
+<Steps>
+<Step title="Create the LiveKit room">
+Create and hold the room without placing any calls yet.
+</Step>
+<Step title="Dispatch the agent">
+Send a `CreateAgentDispatchRequest` targeting the new room, with `agent_name` set explicitly.
+</Step>
+<Step title="Confirm the agent has joined">
+Poll the room's participant list (or subscribe to participant-joined events) and wait until your agent appears as an active participant.
+</Step>
+<Step title="Initiate the SIP dial">
+Only once the agent is confirmed present, add the SIP participant to place the outbound call.
+</Step>
+</Steps>
+
+This sequence eliminates the silent-join window entirely by ensuring the agent is ready before the recipient's phone rings.
+
+---
+
+## Inbound Calls: Keep an Agent Pre-warmed
+
+For inbound call flows you cannot apply a wait-then-dial delay — the caller connects immediately. The standard mitigation is to keep one agent instance **always running** in a standby state so it can handle an incoming room join without a cold-start dispatch round-trip.
+
+<Note>
+A pre-warmed agent introduces a small ongoing cost (an idle process), but eliminates the latency gap between caller arrival and agent readiness. The trade-off is generally worthwhile for production inbound flows where call quality is critical.
+</Note>
+
+---
+
+## Provider-Level Fallback
+
+For flows where dispatch reliability is critical, consider configuring a secondary provider (such as Retell) as a fallback if the primary dispatch does not succeed within a timeout window. A two-provider setup adds operational complexity but provides a hard safety net during provider outages.
+
+<Note>
+Provider-level outages are rare and transient. The strategies above (wait-then-dial, explicit `agent_name`, pre-warmed agents) address the more common case of per-dispatch latency spikes without requiring a full fallback stack. Reserve the provider-fallback approach for flows where any dispatch failure is unacceptable.
+</Note>
+
+---
+
+## Related Resources
+
+- [LiveKit Tracing](/documentation/integrations/livekit/tracing) — Set up the Cekura SDK to capture session logs and metrics
+- [LiveKit Automated Testing](/documentation/integrations/livekit/testing) — Run evaluator scenarios with automated room and token management

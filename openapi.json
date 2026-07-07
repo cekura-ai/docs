@@ -333,6 +333,44 @@
                 }
             }
         },
+        "/app/v2/product-chat/conversations/{conversation_id}/status/": {
+            "get": {
+                "operationId": "app-v2-product-chat-conversations-status-retrieve",
+                "description": "Return the current run state of the conversation's latest assistant turn: its status, partial or final content, and any error. Use this to recover the true state of an in-flight or finished turn when the live stream is interrupted — the tab was backgrounded, the page reloaded, or the connection dropped. `active_message` is null when the conversation has no assistant turns yet; clarification prompts are included only when the turn is waiting on the user.",
+                "summary": "Get a conversation's live turn status",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "conversation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConversationStatus"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/app/v2/product-chat/messages/{message_id}/cancel/": {
             "post": {
                 "operationId": "app-v2-product-chat-messages-cancel-create",
@@ -443,9 +481,36 @@
             }
         },
         "/app/v2/product-chat/org-skills/{skill_id}/": {
+            "get": {
+                "operationId": "app-v2-product-chat-org-skills-retrieve_2",
+                "description": "Retrieve a Read , toggle active/inactive or delete one skill by ID",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "skill_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            },
             "patch": {
                 "operationId": "app-v2-product-chat-org-skills-partial-update",
-                "description": "Toggle active/inactive or delete a single custom skill.",
+                "description": "Update a Read , toggle active/inactive or delete one skill",
                 "parameters": [
                     {
                         "in": "path",
@@ -472,7 +537,7 @@
             },
             "delete": {
                 "operationId": "app-v2-product-chat-org-skills-destroy",
-                "description": "Toggle active/inactive or delete a single custom skill.",
+                "description": "Delete a Read , toggle active/inactive or delete one skill",
                 "parameters": [
                     {
                         "in": "path",
@@ -6360,7 +6425,8 @@
         "/observability/v1/metric-failure-mode-insights/{id}/generate-scenario/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-generate-scenario-create",
-                "description": "Queue generation of a test scenario from one failure mode.\n\nReturns a ``progress_id`` the frontend polls via the existing\n``scenarios/generate-progress`` endpoint; the generated scenario\nid lands in that progress state's ``scenarios_list`` when done.",
+                "description": "Turn one failure mode of a metric failure-mode insight into a test scenario that reproduces the issue against a target agent. Choose the failure mode with `failure_mode_index` and the agent with `agent`. Set `redact_transcripts` to strip personal identifiers from the source call transcripts before they are used to draft the scenario. Runs in the background and returns a `progress_id`; poll scenario generation progress to retrieve the generated scenario id.",
+                "summary": "Generate a test scenario from an insight failure mode",
                 "parameters": [
                     {
                         "in": "path",
@@ -6410,6 +6476,14 @@
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-generate-scenario-create",
+                        "description": "Turn one failure mode of a metric failure-mode insight into a test scenario that reproduces the issue against a target agent. Choose the failure mode with `failure_mode_index` and the agent with `agent`. Set `redact_transcripts` to strip personal identifiers from the source call transcripts before they are used to draft the scenario. Runs in the background and returns a `progress_id`; poll scenario generation progress to retrieve the generated scenario id."
                     }
                 }
             }
@@ -24558,6 +24632,13 @@
                     },
                     {
                         "in": "query",
+                        "name": "tags",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "personalities",
                         "schema": {
                             "type": "string"
@@ -24910,6 +24991,13 @@
                     {
                         "in": "query",
                         "name": "scenarios",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "tags",
                         "schema": {
                             "type": "string"
                         }
@@ -51928,6 +52016,43 @@
                     "description"
                 ]
             },
+            "ActiveMessageStatus": {
+                "type": "object",
+                "description": "Slim status view of a conversation's latest assistant message.\n\nUsed by the polling recovery endpoint: carries just enough for the client\nto converge on server truth after a dropped SSE stream — the run status,\nthe (possibly partial) content, and any error. Clarification chips are\nsurfaced only while the turn is parked awaiting a reply, so routine polls\nof streaming/terminal turns stay small (no tool-call audit trail, etc.).",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "enum": [
+                            "complete",
+                            "streaming",
+                            "failed",
+                            "cancelled",
+                            "needs_clarification"
+                        ],
+                        "type": "string",
+                        "description": "* `complete` - Complete\n* `streaming` - Streaming\n* `failed` - Failed\n* `cancelled` - Cancelled\n* `needs_clarification` - Needs Clarification",
+                        "x-spec-enum-id": "c5be2d08d42db9aa",
+                        "readOnly": true
+                    },
+                    "content": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "error": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
             "AgentAutoFetchErrorResponse": {
                 "type": "object",
                 "properties": {
@@ -53652,7 +53777,6 @@
             },
             "CallLogDetail": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -53844,7 +53968,6 @@
             },
             "CallLogList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -54393,6 +54516,30 @@
                 "required": [
                     "content",
                     "role"
+                ]
+            },
+            "ConversationStatus": {
+                "type": "object",
+                "description": "Body of GET /v2/product-chat/conversations/:id/status/.\n\n`active_message` is null when the conversation has no assistant turns yet.",
+                "properties": {
+                    "conversation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "active_message": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/ActiveMessageStatus"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "active_message",
+                    "conversation_id"
                 ]
             },
             "CreateCallLog": {
@@ -54980,7 +55127,6 @@
             },
             "Dashboard": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -55112,7 +55258,6 @@
             },
             "DashboardList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -57394,7 +57539,6 @@
             },
             "MetricList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -59913,7 +60057,6 @@
             },
             "PatchedCallLogDetail": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -60342,7 +60485,6 @@
             },
             "PatchedDashboard": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -62762,7 +62904,6 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -65987,7 +66128,6 @@
             },
             "RunList": {
                 "type": "object",
-                "description": "Adds outbound dial-window fields read from cekura_metadata.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -66464,7 +66604,6 @@
             },
             "Scenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67347,7 +67486,6 @@
             },
             "ScenarioList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67567,7 +67705,6 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69043,7 +69180,6 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -69667,7 +69803,6 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -69817,7 +69952,6 @@
             },
             "SchemaScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",

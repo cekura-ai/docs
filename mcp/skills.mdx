@@ -1,7 +1,7 @@
 ---
 title: "Cekura Skills"
-sidebarTitle: "Skills"
-description: "Install Cekura skills into Claude Code, Cursor, Codex, or any Agent Skills client."
+sidebarTitle: "Skills Catalog"
+description: "Reference for Cekura Skills, install paths, slash commands, updates, and compatibility."
 icon: "sparkles"
 ---
 
@@ -9,218 +9,208 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 <CopyPageButton />
 
-
-Cekura skills give your AI coding agent the playbook for designing evaluators, creating metrics, running tests, and triaging results on the Cekura platform. They auto-activate when your conversation matches a relevant task.
-
-## What you get
-
-Nine skills, scoped to specific Cekura workflows:
-
-| Skill | Activates on |
-|---|---|
-| `cekura-coordinator` | "What can Cekura do?" — routes to the right skill |
-| `cekura-onboarding` | "Get started with Cekura" — full platform walkthrough |
-| `cekura-create-agent` | "Connect my voice agent to Cekura" |
-| `cekura-self-improving-agent` | "Improve my agent / auto-tune from eval results" |
-| `cekura-metric-design` | "Create a metric / measure call quality" |
-| `cekura-metric-improvement` | "Improve a metric / fix metric accuracy" |
-| `cekura-predefined-metrics` | "What predefined metrics are available / which built-in metrics should I use" |
-| `cekura-eval-design` | "Design test scenarios for my voice agent" |
-| `cekura-fixing-prod-issues` | "Fix a production call bug / reproduce and test a fix before raising a PR" |
-
 <Note>
-**Best with MCP, but optional.** Skills work standalone as a knowledge layer (workflows, design patterns, anti-patterns) and pair best with the Cekura MCP server, which lets the agent perform platform actions for you. Without MCP, the agent walks you through direct API calls or dashboard steps. See [MCP overview](/mcp/overview) for setup.
+If you are setting up Cekura for the first time, start with the [MCP & Skills setup](/mcp/overview). This page is the Skills catalog and maintenance reference.
 </Note>
+
+Cekura Skills give your AI assistant the playbook for designing evaluators, creating metrics, running tests, improving prompts, and triaging production failures on Cekura.
+
+## Install paths
+
+| Install path | Best for | Skills | Slash commands | MCP config | Hooks |
+|---|---|---:|---:|---:|---:|
+| Native plugin | Claude Code, Cursor, Codex, Claude Desktop | Yes | Claude Code only | Yes | Claude Code only |
+| Native extension | Gemini CLI | Context file | No | Yes | No |
+| `npx skills add` | Any Agent Skills client | Yes | No | No | No |
+| Behavior preset | Assistants without a plugin | Rules only | No | No | No |
+| MCP only | Direct API/tool access | No | No | Yes | No |
+
+The native plugin is the preferred route on every client that has one — it bundles Skills and the MCP server (no separate MCP setup), and on Claude Code it adds slash commands, update support, and the MCP failure hook. See your [assistant's guide](/mcp/overview#set-up) for the exact install.
 
 ## Install
 
-**Claude Code users — install the marketplace plugin.** It bundles all 9 skills, 14 slash commands, the MCP server config, and a failure-detection hook in a single install. Other agents (Cursor, Codex, Windsurf, etc.) use `npx skills add` to get the skills only.
-
 <Tabs>
-  <Tab title="Claude Code (recommended)">
-    The full marketplace install — skills, slash commands, MCP auto-config, and hooks. **This is the recommended path for any Claude Code user.**
+  <Tab title="Claude Code plugin">
+    Use this for Claude Code in the terminal or VS Code.
 
-    **CLI:**
-    1. Run `/plugin` inside a Claude Code session
-    2. **Marketplaces** tab → **Add Marketplace**
-    3. Paste `https://github.com/cekura-ai/cekura-skills.git` and confirm
-    4. **Discover** tab → search `cekura` → install the `cekura` plugin
-    5. Restart your Claude Code session
-    6. Run `/setup-mcp` to configure the MCP server (or follow the [MCP overview](/mcp/overview) for the OAuth flow — it's a one-click sign-in)
+    **Terminal:**
+
+    1. Run `/plugin` inside a Claude Code session.
+    2. Open **Marketplaces > Add Marketplace**.
+    3. Paste `cekura-ai/cekura-skills` and confirm.
+    4. Open **Discover**, search `cekura`, and install the `cekura` plugin.
+    5. Run `/setup-mcp` and complete the OAuth sign-in.
 
     **VS Code:**
-    1. Open the Claude Code chat panel
-    2. **Manage Plugins** → **Marketplaces** → paste the same URL → **Add**
-    3. **Plugins** tab → install the `cekura` plugin
-    4. Restart VS Code, then run `/setup-mcp`
 
-    After install you get all 14 commands (`/cekura-onboarding`, `/setup-mcp`, `/upgrade-skills`, `/report-bug`, `/create-metric`, `/list-metrics`, `/evaluate-calls`, `/improve-metric`, `/autogen-eval`, `/manual-create-update-eval`, `/list-evals`, `/run-evals`, `/eval-results`, `/cekura-report`) plus the auto-configured MCP server and the MCP-failure detection hook.
+    1. Open the Claude Code chat panel.
+    2. Open **Manage Plugins > Marketplaces**.
+    3. Add `cekura-ai/cekura-skills`.
+    4. Install the `cekura` plugin.
+    5. Restart VS Code, then run `/setup-mcp`.
   </Tab>
 
-  <Tab title="Other agents (npx skills)">
-    For Cursor, Codex, Windsurf, OpenCode, Antigravity, and any other [Agent Skills](https://agentskills.io)–compatible client. Installs **skills only** — no slash commands, no auto-MCP-config, no hooks.
-
-    ```bash
-    npx skills add cekura-ai/cekura-skills
-    ```
-
-    The CLI prompts you to pick which skills to install and which agents to install them into. Install everything non-interactively:
+  <Tab title="Agent Skills">
+    Use this for Agent Skills-compatible clients when you do not need Claude Code slash commands.
 
     ```bash
     npx skills add cekura-ai/cekura-skills --all
     ```
 
-    Pair this with the [MCP setup](/mcp/overview) — OAuth gives you the same API access as Claude Code without managing keys.
+    This installs Skills only. Pair it with [manual MCP setup](/mcp/mcp-only) if you want live Cekura workspace access.
+  </Tab>
+
+  <Tab title="Behavior preset fallback">
+    Use this when your assistant does not load Agent Skills yet, or when you want a portable project-level rules file.
+
+    ```bash
+    curl -L https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/codex/AGENTS.md -o AGENTS.md
+    ```
+
+    For Cursor project rules:
+
+    ```bash
+    mkdir -p .cursor/rules && curl -L https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/codex/AGENTS.md -o .cursor/rules/cekura.md
+    ```
   </Tab>
 </Tabs>
 
-## Update / refresh
+## Skills catalog
+
+<Note>
+The [cekura-skills repo](https://github.com/cekura-ai/cekura-skills) is the canonical, always-current list. The catalog below may lag when new skills ship.
+</Note>
+
+| Skill | Use when |
+|---|---|
+| `cekura-coordinator` | The user asks what Cekura can do or which workflow to use |
+| `cekura-onboarding` | First-time setup, testing path, observability path, and platform walkthroughs |
+| `cekura-create-agent` | Connecting a voice agent, provider setup, mock tools, knowledge base, and dynamic variables |
+| `cekura-self-improving-agent` | Improving an agent from evaluation results and re-validating changes |
+| `cekura-metric-design` | Designing new metrics or choosing the right metric type |
+| `cekura-metric-improvement` | Improving metric accuracy with feedback, labs, and iteration |
+| `cekura-predefined-metrics` | Understanding built-in metrics, configuration, cost, and constraints |
+| `cekura-eval-design` | Designing evaluator coverage, test profiles, conditional actions, and regression suites |
+| `cekura-fixing-prod-issues` | Turning a production failure into a reproduced, fixed, and regression-tested issue |
+| `cekura-infra-test-suite` | Creating CI/CD infrastructure tests for voice pipelines and local bots |
+| `cekura-generate-scenarios` | Converting production call failures into reproducible evaluator scenarios |
+
+## Claude Code slash commands
+
+Slash commands are available only through the Claude Code plugin install.
+
+| Command | What it does |
+|---|---|
+| `/cekura-onboarding` | Guided end-to-end setup with state-aware resume |
+| `/setup-mcp` | Configure the Cekura MCP server |
+| `/upgrade-skills` | Pull the latest plugin and skill updates |
+| `/report-bug` | Report a setup, MCP, skill, or command issue |
+| `/create-metric` | Create or update a metric |
+| `/list-metrics` | List metrics for an agent or project |
+| `/evaluate-calls` | Run metrics on selected production calls |
+| `/improve-metric` | Improve metric accuracy through feedback and lab workflows |
+| `/autogen-eval` | Generate evaluators or bulk-create from structured input |
+| `/manual-create-update-eval` | Create or update one evaluator with a guided field walkthrough |
+| `/list-evals` | List evaluators for an agent or project |
+| `/run-evals` | Run evaluator suites |
+| `/eval-results` | Review a test run's results |
+| `/cekura-report` | Generate, run, and summarize an end-to-end quality report |
+
+## Update
 
 <Tabs>
-  <Tab title="Claude Code marketplace">
-    Run `/upgrade-skills` in any Claude Code session, or pull manually:
+  <Tab title="Claude Code plugin">
+    Run this in Claude Code:
 
-    ```bash
-    cd ~/.claude/plugins/marketplaces/cekura-skills
-    git pull origin main
+    ```plaintext
+    /upgrade-skills
     ```
 
-    Restart Claude Code after upgrading.
-
-    <Tip>
-      **Enable auto-update for hands-off refreshes.** Claude Code can auto-refresh marketplaces and installed plugins at startup, but third-party marketplaces are opt-in. Turn it on once and you're done:
-
-      1. Run `/plugin` to open the plugin manager
-      2. Go to the **Marketplaces** tab
-      3. Select **cekura-skills**
-      4. Choose **Enable auto-update**
-
-      Every Claude Code session will then refresh the marketplace and install the latest plugin versions automatically. If anything updated, you'll see a prompt to run `/reload-plugins`.
-
-      Or set `FORCE_AUTOUPDATE_PLUGINS=1` in your shell environment to force auto-update for every marketplace globally.
-    </Tip>
+    You can also enable marketplace auto-update from the Claude Code plugin manager so new skill versions are picked up automatically on startup.
   </Tab>
 
-  <Tab title="Other agents (npx skills)">
+  <Tab title="Agent Skills">
     <Note>
-      Auto-update is not available for `npx skills` installs. Unlike the Claude Code marketplace, Codex, Cursor, Windsurf, and other agents have no background refresh option — run the commands below manually whenever you want the latest skills.
+      Auto-update is not available for `npx skills` installs. Unlike the Claude Code marketplace, Codex, Cursor, Windsurf, and other agents have no background refresh option. Run the commands below manually whenever you want the latest skills.
     </Note>
 
-    ```bash
-    # Refresh existing skills
-    npx skills update
+    Refresh existing skills:
 
-    # Or refresh existing AND pick up any newly-added skills
+    ```bash
+    npx skills update
+    ```
+
+    Refresh existing skills and pick up newly added skills:
+
+    ```bash
     npx skills add cekura-ai/cekura-skills --all
+    ```
+  </Tab>
+
+  <Tab title="Behavior preset">
+    Re-download the preset:
+
+    ```bash
+    curl -L https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/codex/AGENTS.md -o AGENTS.md
     ```
   </Tab>
 </Tabs>
 
-## Reinstall
+## Remove
 
-If `/upgrade-skills` reports stale plugin entries, or `/plugin install` fails with `Source path does not exist`, your Claude Code install needs a clean reinstall. Run these 4 commands in order in any Claude Code session:
+For `npx skills` installs:
 
+```bash
+npx skills remove cekura-coordinator   # one skill
+npx skills remove --all                 # everything
 ```
+
+For the Claude Code plugin, remove the marketplace entry with `/plugin marketplace remove cekura-skills` (see [Reinstall](#reinstall-claude-code-plugin) for the full sequence).
+
+## Reinstall Claude Code plugin
+
+If plugin install or upgrade reports stale entries, run these in Claude Code, in order:
+
+```plaintext
 /plugin marketplace remove cekura-skills
 /plugin marketplace add cekura-ai/cekura-skills
 /plugin marketplace update cekura-skills
 /plugin install cekura@cekura-skills
 ```
 
-Step 3 is the critical one — it forces Claude Code to re-read the marketplace manifest. After step 4, `claude plugin list` should show one `cekura@cekura-skills` entry and all 14 slash commands resolve under `cekura:*`.
-
-If `/plugin install` still errors after step 4, fully restart Claude Code (close and reopen the session), then redo steps 2–4.
-
-## Remove
-
-```bash
-# npx skills install
-npx skills remove cekura-coordinator   # one skill
-npx skills remove --all                 # everything
-```
-
-For the Claude Code marketplace install, remove the marketplace from `/plugins` → **Marketplaces**.
+After reinstalling, `claude plugin list` should show one `cekura@cekura-skills` entry and the Cekura slash commands should resolve.
 
 ## Compatibility
 
-| Client | Method | Skills | Slash commands | MCP tools |
-|---|---|---|---|---|
-| Any Agent Skills client | `npx skills add` | ✅ | — | — |
-| Claude Code (CLI / VS Code) | Marketplace install | ✅ | ✅ | ✅ |
-| Cursor | `npx skills add` | ✅ | — | — |
-| Codex | `npx skills add` | ✅ | — | — |
-| Windsurf / others | `npx skills add` | ✅ | — | — |
-
-MCP tools work in any client that supports MCP — see [MCP overview](/mcp/overview) for client-specific config.
-
-## Frequently asked questions
-
-### What are Cekura skills?
-
-Cekura skills are domain-specific instructions that teach AI coding agents how to work with the Cekura platform — designing metrics, building test scenarios, onboarding voice agents, and improving evaluation accuracy. They activate automatically when you describe a relevant task.
-
-### Which AI agents are supported?
-
-Any agent that supports the [Agent Skills](https://agentskills.io) format. Verified compatibility includes Claude Code (VS Code and CLI), Cursor, OpenAI Codex, Antigravity, OpenCode, Amp, Goose, Junie, GitHub Copilot, Roo Code, Letta, Firebender, Mistral Vibe, and others.
-
-### Do I need a Cekura account?
-
-Yes — sign up free at [dashboard.cekura.ai](https://dashboard.cekura.ai). OAuth is the default; use an API key only if you need project/org scoping or want to share one credential across CI / teammates.
-
-### Should I use the Claude Code plugin install or `npx skills add`?
-
-| You want | Use |
-|---|---|
-| Full Claude Code experience (slash commands, MCP auto-config, hooks) | Plugin marketplace |
-| Skills only, on Cursor / Codex / Antigravity / any other agent | `npx skills add` |
-| A lighter Claude Code install without slash commands | `npx skills add` |
-
-### What's the difference between a skill and a slash command?
-
-- **Skill** — knowledge / behavior the agent loads when you describe a related task (e.g., "design a metric that..."). Works on every Agent Skills-compatible agent.
-- **Slash command** — a Claude Code-specific shortcut that performs a specific operation (e.g., `/create-metric` actually creates a metric via the API). Only available with the Claude Code plugin install.
-
-You can use skills without commands. Commands always come with their corresponding skill.
-
-### How do skills activate?
-
-Two ways:
-
-1. **Automatically by description** — describe what you want ("create a metric for call quality"), the agent loads the matching skill.
-2. **Explicitly** — type `/skill-name` (Cursor, Codex) or mention the skill by name.
-
-### Can I customize a skill?
-
-Yes — skills are plain markdown files. After install, edit `SKILL.md` directly, or fork [cekura-ai/cekura-skills](https://github.com/cekura-ai/cekura-skills) and install from your fork:
-
-```bash
-npx skills add <your-org>/cekura-skills
-```
-
-### Are skills shared across my team?
-
-Per-user install in most cases — share the install command in your team's onboarding doc. The Claude API custom-skills upload path supports workspace-wide sharing once a skill is uploaded.
+| Client | Recommended path | Notes |
+|---|---|---|
+| Claude Code | Plugin + `/setup-mcp` | Full Skills, slash commands, MCP config, update support, and hooks |
+| Cursor | Native plugin | Skills + MCP via the marketplace plugin; `npx skills add` / `.cursor/rules` are no-MCP fallbacks |
+| Codex | Native plugin | Skills + MCP via `codex plugin add` + `codex mcp login`; no slash commands |
+| Gemini CLI | Native extension | MCP + `GEMINI.md` context via `gemini extensions install`; no Skills bundling yet |
+| Claude Desktop | Native plugin | Customize → Plugins gives Skills + MCP (Skills in Chat & Cowork); the connector UI is the MCP-only alternative |
+| Windsurf, other assistants | `npx skills add` or behavior preset | Skills (no MCP) or portable `AGENTS.md`; add MCP manually if supported |
 
 ### Why didn't `/plugin marketplace add` install the plugin automatically?
 
-Marketplaces and plugins are separate concerns in Claude Code. `marketplace add` registers where to find plugins; `plugin install <name>@<marketplace>` installs a specific plugin from a registered marketplace. Adding a marketplace doesn't auto-install everything in it — see the [Reinstall](#reinstall) section for the full clean-install sequence.
+Marketplaces and plugins are separate concerns in Claude Code. `marketplace add` registers where to find plugins; `plugin install <name>@<marketplace>` installs a specific plugin from a registered marketplace. Adding a marketplace does not auto-install everything in it. See [Reinstall Claude Code plugin](#reinstall-claude-code-plugin) for the full clean-install sequence.
 
 ## Links
 
 <CardGroup cols={2}>
-  <Card title="GitHub" icon="github" href="https://github.com/cekura-ai/cekura-skills">
-    Source, issues, and changelog
+  <Card title="MCP & Skills Setup" icon="sparkles" href="/mcp/overview">
+    Choose the right install path for your assistant.
   </Card>
-  <Card title="MCP Overview" icon="shield-halved" href="/mcp/overview">
-    Set up MCP (required for full skill functionality)
-  </Card>
+
   <Card title="Claude Code Guide" icon="code" href="/mcp/claude-code-guide">
-    End-to-end walkthrough using skills + MCP
+    Recommended plugin-based setup.
   </Card>
-  <Card title="Claude Desktop Guide" icon="desktop" href="/mcp/claude-desktop-guide">
-    Connector setup, skill upload, and writing custom skills
+
+  <Card title="Manual setup" icon="wrench" href="/mcp/mcp-only">
+    Install Skills, then connect MCP — for clients without a plugin.
   </Card>
-  <Card title="Dashboard" icon="gauge" href="https://dashboard.cekura.ai">
-    Manage your Cekura workspace
+
+  <Card title="GitHub" icon="github" href="https://github.com/cekura-ai/cekura-skills">
+    Source, issues, and changelog.
   </Card>
 </CardGroup>

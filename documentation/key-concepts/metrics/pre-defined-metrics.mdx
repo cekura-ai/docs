@@ -99,12 +99,13 @@ These metrics evaluate whether your agent provides correct and consistent inform
     | Word type | Weight per error |
     | --- | --- |
     | Names, common nouns, numbers | **1.0** |
+    | Negation flips (e.g. "can" vs "can't", a dropped "no"/"not") | **1.0** |
     | Verbs | **0.5** |
-    | Everything else (articles, pronouns, fillers, prepositions…) | **0** (ignored) |
+    | Everything else (articles, pronouns, fillers, prepositions…) | **0** toward the weighted count — treated as a *minor variation* (see below) |
 
-    The same distinct word mistranscribed multiple times is only counted once. This POS-weighted approach works across common languages including Spanish. The weighted error count then maps to the score:
+    The same distinct significant word mistranscribed multiple times is only counted once. This POS-weighted approach works across common languages including Spanish. The weighted error count maps to a base score:
 
-    | Score | Weighted errors |
+    | Base score | Weighted errors |
     | --- | --- |
     | 100% | 0 |
     | 80% | 1–3 |
@@ -112,7 +113,9 @@ These metrics evaluate whether your agent provides correct and consistent inform
     | 40% | 7–12 |
     | 20% | 13+ |
 
-    **Reading the explanation.** Errors are grouped into **Major Variations** (affect the metric score) and **Minor Variations** (do not affect the score), so you can see exactly which mistranscriptions drove the score. Both sections always appear — `None` means there were no errors of that kind. A summary at the bottom shows the **Metric Score** and the **WER** percentage.
+    **Minor variations.** Every remaining difference — articles, pronouns, fillers, prepositions and other function words — is a *minor variation*. These don't count toward the weighted error count, but each one applies a small **absolute 0.1% penalty** to the score. So a transcript with no significant errors and, say, 3 minor variations scores 99.7% instead of a flat 100%, and a call scored 60% on significant errors with 6 minor variations lands at 59.4%. Significant errors still dominate; the minor penalty only lets you tell a flawless transcript apart from one with a few small differences by looking at the score alone. This applies to both Runs and Call Logs.
+
+    **Reading the explanation.** Errors are grouped into **Major Variations** (drive the base score) and **Minor Variations** (each applies the 0.1% penalty), so you can see exactly which mistranscriptions drove the score. Both sections always appear — `None` means there were no errors of that kind. A summary at the bottom shows the **Metric Score** and the **WER** percentage.
 
     **Interpretation**: Higher scores indicate better transcription accuracy. Use this metric when you need to verify that the agent's TTS is rendering content correctly (correct words, correct numbers), not just that speech is audible.
   </Accordion>
@@ -165,6 +168,14 @@ These metrics evaluate the flow and dynamics of the conversation.
     **Interpretation**: High counts may indicate Testing Agent frustration, Main Agent speaking too long, or poor turn-taking.
   </Accordion>
 
+  <Accordion title="Interruption Score">
+    **Result**: Score (0-5, shown as a percentage on the Results page) | **Cost**: 0 credits
+
+    Normalizes how often the Main Agent interrupts the Testing Agent against the number of turns: `5 * (1 - interruptions / turns)`, clamped to 0-5. Uses VAD on stereo audio where available, otherwise transcript analysis. The Results page shows it as a percentage of the 5-point maximum (e.g. 5.0 → 100%).
+
+    **Interpretation**: Higher is better. 5 (100%) means no interruptions; lower scores indicate the Main Agent increasingly talks over the Testing Agent.
+  </Accordion>
+
   <Accordion title="Latency (in ms)">
     **Result**: Numeric (average milliseconds) | **Cost**: 0 credits
 
@@ -181,6 +192,14 @@ These metrics evaluate the flow and dynamics of the conversation.
     Identifies instances where the Main Agent unnecessarily repeated information it had already provided. An LLM analyzes the conversation for redundant statements.
 
     **Interpretation**: Lower is better. Repetition wastes time and can frustrate the Testing Agent.
+  </Accordion>
+
+  <Accordion title="Unnecessary Repetition Score">
+    **Result**: Score (0-5) | **Cost**: 0.2 credits per call
+
+    The 0-5 score companion to **Unnecessary Repetition Count**, normalizing repetitions against the number of turns: `5 * (1 - repetitions / turns)`, clamped to 0-5. An LLM flags when the Main Agent re-confirms the same, unchanged information two or more times.
+
+    **Interpretation**: Higher is better. 5 means no unnecessary repetition; lower scores mean the agent keeps re-confirming the same information.
   </Accordion>
 
   <Accordion title="Verbosity">

@@ -1,0 +1,125 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "mcp-server",
+      "image": "212351099297.dkr.ecr.us-west-2.amazonaws.com/cekura/mcp-server:<IMAGE_TAG>",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8001,
+          "hostPort": 8001,
+          "protocol": "tcp",
+          "name": "mcp-server-8001-port",
+          "appProtocol": "http"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "AWS_SECRET_NAME",
+          "value": "arn:aws:secretsmanager:us-west-2:593108103736:secret:cet-prd-usw2-mcp-secret-HnC2v3"
+        },
+        {
+          "name": "CEKURA_BASE_URL",
+          "value": "https://api.cekura.ai"
+        },
+        {
+          "name": "CEKURA_OPENAPI_SPEC_PATH",
+          "value": "/app/openapi.json"
+        }
+      ],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "secrets": [],
+      "logConfiguration": {
+        "logDriver": "awsfirelens",
+        "options": {
+          "dd_message_key": "log",
+          "provider": "ecs",
+          "dd_service": "mcp-server",
+          "Host": "http-intake.logs.us5.datadoghq.com",
+          "TLS": "on",
+          "dd_source": "mcp-server",
+          "dd_tags": "env:prod-new,version:<IMAGE_TAG>",
+          "Name": "datadog"
+        },
+        "secretOptions": [
+          {
+            "name": "apikey",
+            "valueFrom": "arn:aws:secretsmanager:us-west-2:593108103736:secret:cet-prd-usw2-datadog-api-key-secret-HSzirQ"
+          }
+        ]
+      },
+      "systemControls": []
+    },
+    {
+      "name": "log_router",
+      "image": "public.ecr.aws/aws-observability/aws-for-fluent-bit:stable",
+      "cpu": 0,
+      "memoryReservation": 51,
+      "portMappings": [],
+      "essential": false,
+      "environment": [],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "user": "0",
+      "systemControls": [],
+      "firelensConfiguration": {
+        "type": "fluentbit",
+        "options": {
+          "enable-ecs-log-metadata": "true"
+        }
+      }
+    },
+    {
+      "name": "datadog-agent",
+      "image": "212351099297.dkr.ecr.us-west-2.amazonaws.com/datadog/agent:7.70.0",
+      "cpu": 0,
+      "portMappings": [],
+      "essential": false,
+      "environment": [
+        {
+          "name": "ECS_FARGATE",
+          "value": "true"
+        },
+        {
+          "name": "DD_APM_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_TAGS",
+          "value": "service:mcp-server env:prod-new version:<IMAGE_TAG>"
+        },
+        {
+          "name": "DD_SITE",
+          "value": "us5.datadoghq.com"
+        }
+      ],
+      "environmentFiles": [],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "secrets": [
+        {
+          "name": "DD_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-west-2:593108103736:secret:cet-prd-usw2-datadog-api-key-secret-HSzirQ"
+        }
+      ],
+      "systemControls": []
+    }
+  ],
+  "family": "mcp-server",
+  "taskRoleArn": "arn:aws:iam::593108103736:role/cet-prd-usw2-mcp-server-task-iam-role",
+  "executionRoleArn": "arn:aws:iam::593108103736:role/cet-prd-usw2-backend-task-exec-iam-role",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048"
+}

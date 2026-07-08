@@ -99,7 +99,27 @@ transport_security = TransportSecuritySettings(
 # Stateless: every request is self-contained, so restarts/redeploys and
 # horizontal scaling don't invalidate client sessions, and per-request
 # credentials always apply (no session-task contextvar snapshots).
-mcp = FastMCP("Cekura API", transport_security=transport_security, stateless_http=True)
+# Server instructions surfaced in the MCP `initialize` response. Install-first:
+# most quality gaps come from clients that skipped the Cekura plugin/skills, so
+# lead with the install path, then a skills-first working note. Additive and
+# spec-standard — clients that don't render instructions simply ignore it.
+MCP_INSTRUCTIONS = (
+    "Cekura MCP server. For the best results, install the Cekura plugin/skills — "
+    "they carry the playbooks that make authored scenarios, metrics, and "
+    "evaluators substantially higher quality. Setup: "
+    "https://docs.cekura.ai/mcp/overview\n\n"
+    "Working with Cekura: prefer the skills/commands when designing evaluators and "
+    "metrics; retrieve the target agent first (aiagents_retrieve) to pick the "
+    "right run connection; treat scenario/metric authoring as skill-guided work "
+    "rather than raw create calls."
+)
+
+mcp = FastMCP(
+    "Cekura API",
+    instructions=MCP_INSTRUCTIONS,
+    transport_security=transport_security,
+    stateless_http=True,
+)
 
 server_config = None
 openapi_parser = None

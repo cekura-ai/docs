@@ -25,6 +25,7 @@ if os.getenv("AWS_SECRET_NAME"):
     _config = json.loads(_secret_value["SecretString"])
     os.environ.update({key: str(value) for key, value in _config.items()})
 
+import skill_gate
 from config import load_config
 from http_client import create_client
 from openapi_parser import load_openapi_spec
@@ -212,6 +213,9 @@ async def initialize_server():
                 tool_description = maybe_append_org_project_hint(tool_name, input_schema, tool_description)
                 tool_description = apply_overlay_to_description(tool_name, tool_description)
                 input_schema = apply_overlay_to_schema(tool_name, input_schema)
+                input_schema = skill_gate.maybe_inject_skill_ack(
+                    tool_name, input_schema, server_config.skill_gate_mode
+                )
 
                 annotations = compute_annotations(operation)
                 register_tool(tool_name, tool_description, input_schema, operation, annotations=annotations)
@@ -250,6 +254,26 @@ async def initialize_server():
         # Register Mintlify documentation search tool
         register_mintlify_search_tool()
         logger.info("Registered Mintlify documentation search tool")
+
+        # Load the skill-gate tag manifest (remote with baked fallback) and
+        # report the active mode. `off` is inert; enforce/strict behave as warn.
+        gate_mode = server_config.skill_gate_mode
+        manifest_source = await skill_gate.load_manifest()
+        logger.info(
+            f"Skill gate: mode={gate_mode}, manifest_source={manifest_source}, "
+            f"slugs={len(skill_gate.get_manifest())}"
+        )
+        if gate_mode in ("enforce", "strict"):
+            logger.warning(
+                f"Skill gate mode '{gate_mode}' HOLDS gated writes that lack a valid "
+                "skill_ack (deny + ask-the-user recovery). Flip only after shadow shows "
+                "installed traffic reliably threads the ack."
+            )
+        if gate_mode == "strict":
+            logger.warning(
+                "Skill gate 'strict' currently uses 'enforce' behavior; strict-specific "
+                "hardening (tag redaction) is deferred."
+            )
 
         setup_dynamic_tool_handlers()
 
@@ -569,6 +593,87 @@ async def cekura_report_issue(
 # -- Skill activation beacon -------------------------------------------------
 
 
+def _parse_version(v: Any) -> Tuple[int, ...]:
+    parts: List[int] = []
+    for chunk in str(v).split("."):
+        digits = "".join(ch for ch in chunk if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def _is_older_version(reported: str, latest: str) -> bool:
+    try:
+        return _parse_version(reported) < _parse_version(latest)
+    except Exception:
+        return False
+
+
+def _latest_plugin_version() -> str:
+    return os.environ.get("CEKURA_LATEST_PLUGIN_VERSION", "0.8.1")
+
+
+def _update_command_for_client() -> str:
+    # Match the documented update paths (mcp/skills.mdx). Only Claude Code has a
+    # first-class slash command; everyone else is routed to the docs update
+    # section, which carries the per-client (npx / marketplace) instructions.
+    client = (_resolve_client_identifier() or "").lower()
+    if "claude" in client:
+        return "run /upgrade-skills (docs: https://docs.cekura.ai/mcp/skills#update)"
+    return "https://docs.cekura.ai/mcp/skills#update"
+
+
+async def _forward_skill_activation(
+    event: str,
+    skill_slug: str,
+    verification_tag: Optional[str],
+    plugin_version: Optional[str],
+    skill_version: Optional[str],
+    client_id: Optional[str],
+) -> None:
+    """Best-effort, fire-and-forget activation report so skill usage can be joined
+    to the canonical principal backend-side. Never raises; never blocks a write."""
+    try:
+        credential, credential_type = get_request_credential()
+    except ValueError:
+        return
+    base_url = request_base_url.get() or (server_config.base_url if server_config else None)
+    if not base_url:
+        return
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-MCP-Call-Id": f"call_{uuid.uuid4().hex[:16]}",
+    }
+    if credential_type == "bearer":
+        headers["Authorization"] = f"Bearer {credential}"
+    else:
+        headers["X-CEKURA-API-KEY"] = credential
+    skill_header = skill_slug or ""
+    if plugin_version:
+        skill_header = f"{skill_header}@{plugin_version}"
+    if verification_tag:
+        skill_header = f"{skill_header}#{verification_tag}"
+    if skill_header:
+        headers["X-MCP-Skill"] = skill_header
+    if client_id:
+        headers["X-MCP-Client"] = client_id
+
+    body: Dict[str, Any] = {"event": event, "skill_slug": skill_slug}
+    if verification_tag:
+        body["verification_tag"] = verification_tag
+    if plugin_version:
+        body["plugin_version"] = plugin_version
+    if skill_version:
+        body["skill_version"] = skill_version
+
+    url = f"{base_url}/observability/v1/mcp-skill-activations/"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(1.5, connect=1.0)) as client:
+            await client.post(url, headers=headers, json=body)
+    except Exception:
+        pass
+
+
 @mcp.tool(
     name="cekura_skill_started",
     description=(
@@ -578,7 +683,11 @@ async def cekura_report_issue(
         "  skill_name: the slug of the skill — e.g. \"autogen-eval\".\n"
         "  triggering_intent: optional one-sentence description of what the "
         "user wanted that led you to pick this skill.\n"
-        "  conversation_id: optional Cekura sandbox / chat conversation ID."
+        "  conversation_id: optional Cekura sandbox / chat conversation ID.\n"
+        "  verification_tag: optional tag carried in the skill/command (the value "
+        "to thread as `skill_ack` on gated authoring calls).\n"
+        "  plugin_version: optional installed Cekura plugin version (e.g. \"0.8.1\").\n"
+        "  skill_version: optional per-skill version if the skill declares one."
     ),
     annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False),
 )
@@ -586,10 +695,14 @@ async def cekura_skill_started(
     skill_name: str,
     triggering_intent: Optional[str] = None,
     conversation_id: Optional[str] = None,
+    verification_tag: Optional[str] = None,
+    plugin_version: Optional[str] = None,
+    skill_version: Optional[str] = None,
 ) -> Dict[str, Any]:
     cred_hash = _credential_fingerprint()
     intent_redacted = (_redact_pii(triggering_intent) or "")[:200] or None
     event_id = f"skill_{uuid.uuid4().hex[:12]}"
+    client_id = _resolve_client_identifier()
 
     logger.info(json.dumps({
         "event": "skill_started",
@@ -597,11 +710,132 @@ async def cekura_skill_started(
         "skill": skill_name,
         "triggering_intent": intent_redacted,
         "conversation_id": conversation_id,
-        "client_id": _resolve_client_identifier(),
+        "verification_tag": verification_tag,
+        "plugin_version": plugin_version,
+        "skill_version": skill_version,
+        "client_id": client_id,
         "cred_hash": cred_hash,
     }))
 
-    return {"status": "ok", "event_id": event_id}
+    response: Dict[str, Any] = {"status": "ok", "event_id": event_id}
+
+    # `off` keeps the beacon exactly as before: log-only, instant, same contract.
+    gate_mode = server_config.skill_gate_mode if server_config else "off"
+    if gate_mode == "off":
+        return response
+
+    await _forward_skill_activation(
+        "skill_started", skill_name, verification_tag, plugin_version, skill_version, client_id
+    )
+
+    # Migration grace: a recognised skill/command that reported no tag (an older
+    # installed version) is handed the current tag so it can still thread an ack.
+    if not verification_tag:
+        tag = skill_gate.current_tag_for_slug(skill_name)
+        if tag:
+            response["skill_ack"] = tag
+            response["skill_ack_hint"] = (
+                "Pass this value as `skill_ack` on gated authoring calls in this session."
+            )
+            logger.info(json.dumps({
+                "event": "legacy_beacon", "skill": skill_name, "event_id": event_id,
+            }))
+            # No tag AND no version is the pre-tagging signature — recommend an
+            # update (informational; the grace tag above already unblocks them).
+            if not plugin_version:
+                response["update_recommended"] = True
+                response["update_hint"] = (
+                    "Your Cekura skills look outdated (no verification tag). Update them "
+                    f"for the best experience: {_update_command_for_client()}."
+                )
+
+    # Freshness nudge — recommendation only, never blocks anything.
+    latest = _latest_plugin_version()
+    if plugin_version and latest and _is_older_version(plugin_version, latest):
+        response["status"] = "update_available"
+        response["current_version"] = plugin_version
+        response["latest_version"] = latest
+        response["update_command"] = _update_command_for_client()
+        response["docs_url"] = "https://docs.cekura.ai/mcp/overview"
+
+    return response
+
+
+# -- Server-delivered skill playbooks ----------------------------------------
+
+_LOADABLE_SKILLS = [
+    "cekura-eval-design",
+    "cekura-generate-scenarios",
+    "cekura-self-improving-agent",
+    "cekura-infra-test-suite",
+    "cekura-metric-design",
+    "cekura-metric-improvement",
+    "cekura-predefined-metrics",
+]
+
+_SKILL_RAW_BASE = os.environ.get(
+    "CEKURA_SKILL_RAW_BASE",
+    "https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/cekura/skills",
+)
+_SKILL_CONTENT_TTL_SECONDS = 900
+_skill_content_cache: Dict[str, Tuple[float, str]] = {}
+
+
+async def _fetch_skill_content(slug: str) -> Tuple[str, str]:
+    """Return (playbook_text, source). Fetches the public SKILL.md with a short
+    in-process cache; on any failure returns a graceful pointer to the docs."""
+    now = time.time()
+    cached = _skill_content_cache.get(slug)
+    if cached and now - cached[0] < _SKILL_CONTENT_TTL_SECONDS:
+        return cached[1], "cache"
+    url = f"{_SKILL_RAW_BASE}/{slug}/SKILL.md"
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(8.0, connect=3.0), follow_redirects=True
+        ) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            content = resp.text
+            _skill_content_cache[slug] = (now, content)
+            return content, "remote"
+    except Exception as e:
+        logger.warning("load_skill: fetch failed for %s: %s", slug, e)
+        return (
+            f"The {slug} playbook could not be fetched right now. For the full, "
+            "always-current guidance install the Cekura plugin/skills: "
+            "https://docs.cekura.ai/mcp/overview",
+            "unavailable",
+        )
+
+
+@mcp.tool(
+    name="cekura_load_skill",
+    description=(
+        "Load a Cekura design playbook into context when the plugin/skills are "
+        "not installed. Returns the skill's guidance plus a verification tag to "
+        "thread as `skill_ack` on gated authoring calls. Prefer this BEFORE "
+        "authoring scenarios, test profiles, or metrics.\n\n"
+        "skill_name must be one of: " + ", ".join(_LOADABLE_SKILLS) + "."
+    ),
+    annotations=ToolAnnotations(readOnlyHint=True),
+)
+async def cekura_load_skill(skill_name: str) -> Dict[str, Any]:
+    slug = (skill_name or "").strip()
+    if slug not in _LOADABLE_SKILLS:
+        return {"status": "unknown_skill", "available": _LOADABLE_SKILLS}
+    content, source = await _fetch_skill_content(slug)
+    tag = skill_gate.current_tag_for_slug(slug)
+    return {
+        "status": "ok",
+        "skill": slug,
+        "source": source,
+        "verification_tag": tag,
+        "skill_ack_hint": (
+            "Pass verification_tag as `skill_ack` on gated authoring calls."
+            if tag else None
+        ),
+        "playbook": content,
+    }
 
 
 def _claude_jsonl_to_cekura_transcript(jsonl_text: str) -> List[Dict[str, object]]:
@@ -891,6 +1125,81 @@ def setup_dynamic_tool_handlers():
         telemetry = _resolve_telemetry()
         mcp_call_id = telemetry["call_id"]
         call_id_suffix = f"\n\n[cekura_mcp_call_id: {mcp_call_id}]"
+
+        # Strip the optional skill-gate ack from tool args up front so it never
+        # reaches the backend (request body stays byte-identical to today). This
+        # happens in EVERY mode, including `off`.
+        skill_ack = None
+        if arguments and "skill_ack" in arguments:
+            skill_ack = arguments.pop("skill_ack")
+
+        gate_nudge = None
+        gate_mode = server_config.skill_gate_mode if server_config else "off"
+        if gate_mode != "off" and name in skill_gate.GATED_TOOLS:
+            # Quality gate. Fails open on any error (a write is never lost to a
+            # gate bug). Only `enforce`/`strict` hold the write (action=deny).
+            try:
+                decision = skill_gate.evaluate(
+                    name, skill_ack, gate_mode,
+                    is_sandbox=bool(telemetry["conversation_id"]),
+                )
+                if decision.action == "deny":
+                    logger.info(json.dumps({
+                        "event": "skill_gate_blocked",
+                        "mode": gate_mode,
+                        "tool": name,
+                        "family": decision.family,
+                        "ack_present": decision.ack_present,
+                        "blocked": True,
+                        "client_id": telemetry["client_id"],
+                        "cred_hash": _credential_fingerprint(),
+                        "call_id": mcp_call_id,
+                    }))
+                    # Write withheld; hand the model the ask-the-user recovery.
+                    return [{"type": "text", "text": f"{decision.nudge}{call_id_suffix}"}]
+                if decision.action in ("shadow_block", "warn"):
+                    logger.info(json.dumps({
+                        "event": "skill_gate_blocked",
+                        "mode": gate_mode,
+                        "tool": name,
+                        "family": decision.family,
+                        "ack_present": decision.ack_present,
+                        "blocked": False,
+                        "client_id": telemetry["client_id"],
+                        "cred_hash": _credential_fingerprint(),
+                        "call_id": mcp_call_id,
+                    }))
+                    if decision.action == "warn":
+                        gate_nudge = decision.nudge
+                elif decision.reason == "user_override":
+                    logger.info(json.dumps({
+                        "event": "skill_gate_user_override",
+                        "mode": gate_mode,
+                        "tool": name,
+                        "family": decision.family,
+                        "client_id": telemetry["client_id"],
+                        "cred_hash": _credential_fingerprint(),
+                        "call_id": mcp_call_id,
+                    }))
+                elif decision.ack_valid:
+                    # Thread-rate signal: a gated write carried a valid ack.
+                    logger.info(json.dumps({
+                        "event": "skill_gate_ack_ok",
+                        "mode": gate_mode,
+                        "tool": name,
+                        "family": decision.family,
+                        "call_id": mcp_call_id,
+                    }))
+                elif decision.reason == "sandbox_bypass":
+                    logger.info(json.dumps({
+                        "event": "skill_gate_sandbox_bypass",
+                        "tool": name,
+                        "family": decision.family,
+                        "call_id": mcp_call_id,
+                    }))
+            except Exception:
+                logger.exception("skill_gate_error tool=%s (failing open)", name)
+
         try:
             tool_data = operations_registry[name]
 
@@ -937,7 +1246,8 @@ def setup_dynamic_tool_handlers():
                 await user_api_client.close()
 
             text = json.dumps(result, default=str, ensure_ascii=False)
-            return [{"type": "text", "text": f"{text}{call_id_suffix}"}]
+            nudge = gate_nudge or ""
+            return [{"type": "text", "text": f"{text}{nudge}{call_id_suffix}"}]
 
         except ValueError as e:
             return [{"type": "text", "text": f"Authentication Error: {e}{call_id_suffix}"}]

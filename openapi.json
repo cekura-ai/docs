@@ -6215,6 +6215,72 @@
                 }
             }
         },
+        "/observability/v1/insight-reproduction-sessions/": {
+            "get": {
+                "operationId": "insight-reproduction-sessions-list",
+                "description": "List + retrieve reproduction sessions kicked off from a metric\ninsight's ``reproduce`` action.\n\nEach session drafts a scenario from a failure mode, then runs it against\nthe agent until a run fails the insight's metric (``reproduced``) or the\nattempt budget is spent (``exhausted``). The frontend polls a row's\n``status`` and, once ``reproduced``, links to ``reproducing_result``.\nRead-only: sessions are created via\n``metric-failure-mode-insights/<id>/reproduce``.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/InsightReproductionSession"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/insight-reproduction-sessions/{id}/": {
+            "get": {
+                "operationId": "insight-reproduction-sessions-retrieve",
+                "description": "List + retrieve reproduction sessions kicked off from a metric\ninsight's ``reproduce`` action.\n\nEach session drafts a scenario from a failure mode, then runs it against\nthe agent until a run fails the insight's metric (``reproduced``) or the\nattempt budget is spent (``exhausted``). The frontend polls a row's\n``status`` and, once ``reproduced``, links to ``reproducing_result``.\nRead-only: sessions are created via\n``metric-failure-mode-insights/<id>/reproduce``.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this insight reproduction session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InsightReproductionSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/observability/v1/livekit/observe/": {
             "post": {
                 "operationId": "livekit-observe-create",
@@ -6484,6 +6550,63 @@
                         "enabled": true,
                         "name": "metric-failure-mode-insights-generate-scenario-create",
                         "description": "Turn one failure mode of a metric failure-mode insight into a test scenario that reproduces the issue against a target agent. Choose the failure mode with `failure_mode_index` and the agent with `agent`. Set `redact_transcripts` to strip personal identifiers from the source call transcripts before they are used to draft the scenario. Runs in the background and returns a `progress_id`; poll scenario generation progress to retrieve the generated scenario id."
+                    }
+                }
+            }
+        },
+        "/observability/v1/metric-failure-mode-insights/{id}/reproduce/": {
+            "post": {
+                "operationId": "metric-failure-mode-insights-reproduce-create",
+                "description": "Draft a scenario from one failure mode AND run it until reproduced.\n\nUnlike ``generate-scenario`` (which only drafts + persists a scenario),\nthis orchestrates the whole loop: draft the reproducing scenario(s),\nthen run them against the agent — on the same channel the cited call\nlogs came through — up to ``max_attempts`` times, stopping the moment a\nrun FAILS this insight's metric.\n\nReturns a ``reproduction_session_id``; poll\n``GET /insight-reproduction-sessions/<id>/?project=<id>`` for status.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this metric failure mode insight.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightReproductionRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightReproductionRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightReproductionRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InsightReproductionRequest"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -12606,256 +12729,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/AutoFetchProgressErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/aiagents/{agent_id}/tools/disable-mock/": {
-            "post": {
-                "operationId": "aiagents-tools-disable-mock-create",
-                "description": "Restore the agent's tools to their original (non-mock) state. For managed providers this PATCHes the provider assistant back to its `original_tool_ids` and deletes the cloned tools. For provider=\"custom\" this only flips `mock_enabled` off; the `mcp_server_url` is preserved so re-enable works.",
-                "summary": "Disable mock tools for an agent",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "agent_id",
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^\\d+$"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/DisableMockToolsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/DisableMockToolsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/DisableMockToolsRequest"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "deprecated": true,
-                "responses": {
-                    "202": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DisableMockToolsResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DisableMockErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/aiagents/{agent_id}/tools/disable-mock-progress/": {
-            "get": {
-                "operationId": "aiagents-tools-disable-mock-progress-retrieve",
-                "description": "Poll the status of a background disable-mock task.",
-                "summary": "Poll status of a disable-mock task",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "agent_id",
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^\\d+$"
-                        },
-                        "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "deprecated": true,
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DisableMockProgressResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/DisableMockProgressErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/aiagents/{agent_id}/tools/enable-mock/": {
-            "post": {
-                "operationId": "aiagents-tools-enable-mock-create",
-                "description": "Activate mock-tool mode using the data created by `auto-fetch`. For managed providers (vapi/retell/elevenlabs) this clones the provider's tools at the provider and swaps URLs to Cekura-hosted endpoints. For provider=\"custom\" it just registers `mcp_sub_tool_map` so MockMCPView can serve `/mcp/N/` calls. Returns a `progress_id`; poll `enable-mock-progress/` for the resulting `mcp_endpoints`. Run `auto-fetch` first.",
-                "summary": "Enable mock tools for an agent",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "agent_id",
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^\\d+$"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/EnableMockToolsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/EnableMockToolsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/EnableMockToolsRequest"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "deprecated": true,
-                "responses": {
-                    "202": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/EnableMockToolsResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/EnableMockErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/aiagents/{agent_id}/tools/enable-mock-progress/": {
-            "get": {
-                "operationId": "aiagents-tools-enable-mock-progress-retrieve",
-                "description": "Poll the status of a background enable-mock task.",
-                "summary": "Poll status of an enable-mock task",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "agent_id",
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^\\d+$"
-                        },
-                        "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "deprecated": true,
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/EnableMockProgressResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/EnableMockProgressErrorResponse"
                                 }
                             }
                         },
@@ -28032,7 +27905,7 @@
         "/test_framework/v1/scenarios-external/create-from-transcript-bg/": {
             "post": {
                 "operationId": "scenarios-create-from-transcript-bg",
-                "description": "Create a new evaluator from a call transcript in the background. Returns a `progress_id` immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until `status` is `completed` or `failed`.\n\nAnalyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**Response fields:** `progress_id` (UUID string) for polling.",
+                "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, which searches across all agents in your organization. Returns a `progress_id`immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until",
                 "tags": [
                     "test_framework"
                 ],
@@ -28226,8 +28099,8 @@
         },
         "/test_framework/v1/scenarios-external/create_scenario_from_transcript/": {
             "post": {
-                "operationId": "scenarios-create-from-transcript",
-                "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, which searches across all agents in your organization.",
+                "operationId": "scenarios-external-create-scenario-from-transcript-create",
+                "description": "Create a test scenario from a call transcript",
                 "tags": [
                     "test_framework"
                 ],
@@ -28235,17 +28108,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/Scenario"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/Scenario"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/Scenario"
                             }
                         }
                     },
@@ -28261,25 +28134,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ScenarioList"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "field_name": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
+                                    "$ref": "#/components/schemas/Scenario"
                                 }
                             }
                         },
@@ -28692,186 +28547,6 @@
                 }
             }
         },
-        "/test_framework/v1/scenarios-external/generate/": {
-            "post": {
-                "operationId": "scenarios-external-generate-create",
-                "description": "Generate test scenarios from an agent's configuration using AI",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/SchemaGenerateScenarios"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/SchemaGenerateScenarios"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/SchemaGenerateScenarios"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "deprecated": true,
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "id": {
-                                                "type": "integer",
-                                                "description": "Unique identifier for the scenario"
-                                            },
-                                            "name": {
-                                                "type": "string",
-                                                "description": "Name of the scenario"
-                                            },
-                                            "agent": {
-                                                "type": "integer",
-                                                "description": "ID of the AI agent this scenario belongs to"
-                                            },
-                                            "assistant_id": {
-                                                "type": "string",
-                                                "description": "Alternative to agent ID - the assistant ID to use for this scenario"
-                                            },
-                                            "personality": {
-                                                "type": "integer",
-                                                "description": "ID of the personality used in this scenario"
-                                            },
-                                            "personality_name": {
-                                                "type": "string",
-                                                "description": "Name of the personality used in this scenario"
-                                            },
-                                            "tags": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                },
-                                                "description": "Tags associated with this scenario."
-                                            },
-                                            "runs": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "integer"
-                                                },
-                                                "description": "List of IDs for the last run of this scenario"
-                                            },
-                                            "metrics": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "integer"
-                                                },
-                                                "description": "List of metric IDs to associate with this scenario"
-                                            },
-                                            "metric_names": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                },
-                                                "description": "List of metric names associated with this scenario"
-                                            },
-                                            "phone_number": {
-                                                "type": "string",
-                                                "description": "Phone number used for outbound calls in this scenario"
-                                            },
-                                            "phone_number_queue_length": {
-                                                "type": "integer",
-                                                "description": "Number of runs in queue for this phone number"
-                                            },
-                                            "first_message": {
-                                                "type": "string",
-                                                "description": "First message to be sent in the scenario"
-                                            },
-                                            "inbound_phone_number": {
-                                                "type": "integer",
-                                                "description": "ID of the phone number used for inbound calls"
-                                            },
-                                            "inbound_phone_number_data": {
-                                                "type": "object",
-                                                "description": "Details of the phone number used for inbound calls",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "description": "ID of the inbound phone number"
-                                                    },
-                                                    "number": {
-                                                        "type": "string",
-                                                        "description": "The actual phone number"
-                                                    },
-                                                    "phone_number_id": {
-                                                        "type": "string",
-                                                        "description": "External ID of the phone number"
-                                                    }
-                                                }
-                                            },
-                                            "instructions": {
-                                                "type": "string",
-                                                "description": "Instructions for the AI agent in this scenario"
-                                            },
-                                            "simulation_description": {
-                                                "type": "string",
-                                                "description": "Description of the simulation if this scenario was created by simulation"
-                                            },
-                                            "information_fields": {
-                                                "type": "object",
-                                                "description": "Additional information fields for the scenario"
-                                            },
-                                            "expected_outcome_prompt": {
-                                                "type": "string",
-                                                "description": "Expected outcome prompt for the scenario"
-                                            },
-                                            "scenario_language": {
-                                                "type": "string",
-                                                "description": "Language of the scenario"
-                                            },
-                                            "is_simulating": {
-                                                "type": "boolean",
-                                                "description": "Whether this scenario was created by simulation"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "field_name": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/test_framework/v1/scenarios-external/generate-bg/": {
             "post": {
                 "operationId": "scenarios-generate-bg",
@@ -28931,6 +28606,58 @@
                                             "items": {
                                                 "type": "string"
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios-external/generate-clarify-answer/": {
+            "post": {
+                "operationId": "scenarios-generate-clarify-answer",
+                "description": "When GET /scenarios/generate-progress/ returns status='pending_clarification', the agentic generation agent has asked one or more clarifying questions. Submit the user's answer here to resume generation. Continue polling /scenarios/generate-progress/ after calling this endpoint.",
+                "summary": "Answer a clarification question during agentic scenario generation",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "progress_id": {
+                                            "type": "string"
                                         }
                                     }
                                 }
@@ -33272,7 +32999,7 @@
         "/test_framework/v1/scenarios/create-from-transcript-bg/": {
             "post": {
                 "operationId": "scenarios-create-from-transcript-bg_2",
-                "description": "Create a new evaluator from a call transcript in the background. Returns a `progress_id` immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until `status` is `completed` or `failed`.\n\nAnalyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**Response fields:** `progress_id` (UUID string) for polling.",
+                "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, which searches across all agents in your organization. Returns a `progress_id`immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until",
                 "tags": [
                     "test_framework"
                 ],
@@ -33341,7 +33068,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-create-from-transcript-bg",
-                        "description": "Create a new evaluator from a call transcript in the background. Returns a `progress_id` immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until `status` is `completed` or `failed`.\n\nAnalyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**Response fields:** `progress_id` (UUID string) for polling."
+                        "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, which searches across all agents in your organization. Returns a `progress_id`immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until"
                     }
                 }
             }
@@ -33490,8 +33217,8 @@
         },
         "/test_framework/v1/scenarios/create_scenario_from_transcript/": {
             "post": {
-                "operationId": "scenarios-create-from-transcript_2",
-                "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, which searches across all agents in your organization.",
+                "operationId": "scenarios-create-scenario-from-transcript-create",
+                "description": "Create a test scenario from a call transcript",
                 "tags": [
                     "test_framework"
                 ],
@@ -33499,17 +33226,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/Scenario"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/Scenario"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/Scenario"
                             }
                         }
                     },
@@ -33525,37 +33252,11 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ScenarioList"
+                                    "$ref": "#/components/schemas/Scenario"
                                 }
                             }
                         },
                         "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "field_name": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mcp-expose": true,
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-create-from-transcript",
-                        "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, which searches across all agents in your organization."
                     }
                 }
             }
@@ -34079,6 +33780,58 @@
                         "enabled": true,
                         "name": "scenarios-generate-bg",
                         "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios/generate-clarify-answer/": {
+            "post": {
+                "operationId": "scenarios-generate-clarify-answer_2",
+                "description": "When GET /scenarios/generate-progress/ returns status='pending_clarification', the agentic generation agent has asked one or more clarifying questions. Submit the user's answer here to resume generation. Continue polling /scenarios/generate-progress/ after calling this endpoint.",
+                "summary": "Answer a clarification question during agentic scenario generation",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "progress_id": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -40421,147 +40174,6 @@
                 }
             }
         },
-        "/test_framework/v2/aiagents/{id}/toggle-mock-tools/": {
-            "post": {
-                "operationId": "aiagents-toggle-mock-tools-create",
-                "description": "Toggle mock-tool mode on the agent's provider. `enabled=true` replaces the provider tools with Cekura-hosted mocks; `enabled=false` restores the originals (mock data is preserved). Returns a `progress_id`; poll `toggle-mock-tools-progress/`. Run `auto-fetch` first to populate mock tool data before enabling.",
-                "summary": "Enable or disable mock tools on the provider",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this ai agent.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentToggleMockToolsRequest"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentToggleMockToolsRequest"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AgentToggleMockToolsRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "202": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentToggleMockToolsResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentToggleMockToolsErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mcp-expose": true,
-                "x-mcp-destructive": true,
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "aiagents-toggle-mock-tools-create",
-                        "description": "Toggle mock-tool mode on the agent's provider. `enabled=true` replaces the provider tools with Cekura-hosted mocks; `enabled=false` restores the originals (mock data is preserved). Returns a `progress_id`; poll `toggle-mock-tools-progress/`. Run `auto-fetch` first to populate mock tool data before enabling."
-                    }
-                }
-            }
-        },
-        "/test_framework/v2/aiagents/{id}/toggle-mock-tools-progress/": {
-            "get": {
-                "operationId": "aiagents-toggle-mock-tools-progress-retrieve",
-                "description": "Poll the enable/disable task. The progress_id is unique, so we resolve it\nagainst both task namespaces and return whichever holds it.",
-                "summary": "Poll status of a toggle-mock-tools task",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this ai agent.",
-                        "required": true
-                    },
-                    {
-                        "in": "query",
-                        "name": "progress_id",
-                        "schema": {
-                            "type": "string"
-                        },
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentToggleMockToolsProgressResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AgentToggleMockToolsProgressErrorResponse"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mcp-expose": true,
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "aiagents-toggle-mock-tools-progress-retrieve",
-                        "description": "Poll the enable/disable task. The progress_id is unique, so we resolve it\nagainst both task namespaces and return whichever holds it."
-                    }
-                }
-            }
-        },
         "/test_framework/v2/aiagents/{id}/upload_knowledge_base/": {
             "post": {
                 "operationId": "aiagents-upload-knowledge-base_2",
@@ -41892,7 +41504,7 @@
         "/test_framework/v2/scenarios/create-from-transcript-bg/": {
             "post": {
                 "operationId": "scenarios-create-from-transcript-bg_3",
-                "description": "Create a new evaluator from a call transcript in the background. Returns a `progress_id` immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until `status` is `completed` or `failed`.\n\nAnalyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**Response fields:** `progress_id` (UUID string) for polling.",
+                "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, which searches across all agents in your organization. Returns a `progress_id`immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until",
                 "tags": [
                     "test_framework"
                 ],
@@ -42086,8 +41698,8 @@
         },
         "/test_framework/v2/scenarios/create_scenario_from_transcript/": {
             "post": {
-                "operationId": "scenarios-create-from-transcript_3",
-                "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, which searches across all agents in your organization.",
+                "operationId": "test-framework-v2-scenarios-create-scenario-from-transcript-crea",
+                "description": "Scenarios create scenario from transcript crea",
                 "tags": [
                     "test_framework"
                 ],
@@ -42095,17 +41707,17 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/ScenarioSerializerV2"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/ScenarioSerializerV2"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                                "$ref": "#/components/schemas/ScenarioSerializerV2"
                             }
                         }
                     },
@@ -42121,25 +41733,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ScenarioList"
-                                }
-                            }
-                        },
-                        "description": ""
-                    },
-                    "400": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "field_name": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
+                                    "$ref": "#/components/schemas/ScenarioSerializerV2"
                                 }
                             }
                         },
@@ -42611,6 +42205,58 @@
                                             "items": {
                                                 "type": "string"
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/scenarios/generate-clarify-answer/": {
+            "post": {
+                "operationId": "scenarios-generate-clarify-answer_3",
+                "description": "When GET /scenarios/generate-progress/ returns status='pending_clarification', the agentic generation agent has asked one or more clarifying questions. Submit the user's answer here to resume generation. Continue polling /scenarios/generate-progress/ after calling this endpoint.",
+                "summary": "Answer a clarification question during agentic scenario generation",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateClarifyAnswer"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "progress_id": {
+                                            "type": "string"
                                         }
                                     }
                                 }
@@ -51058,6 +50704,7 @@
             },
             "AIAgentList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -51179,6 +50826,7 @@
             },
             "AIAgentTestProfile": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -51923,101 +51571,6 @@
                         "description": "Phone numbers authorized for outbound calls (E.164 format). Example: `[\"+14155551234\", \"+14155550000\"]`"
                     }
                 }
-            },
-            "AgentToggleMockToolsErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "AgentToggleMockToolsProgressErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "AgentToggleMockToolsProgressResponse": {
-                "type": "object",
-                "properties": {
-                    "status": {
-                        "enum": [
-                            "in_progress",
-                            "completed",
-                            "failed"
-                        ],
-                        "type": "string",
-                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
-                        "x-spec-enum-id": "6e9575e5767aaee0"
-                    },
-                    "mock_enabled": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ]
-                    },
-                    "mcp_endpoints": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/ToggleMockToolsMCPEndpoint"
-                        },
-                        "description": "MCP mock endpoints registered after enabling. Empty for agents without MCP tools or when disabling."
-                    },
-                    "message": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "error": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    }
-                },
-                "required": [
-                    "error",
-                    "message",
-                    "mock_enabled",
-                    "status"
-                ]
-            },
-            "AgentToggleMockToolsRequest": {
-                "type": "object",
-                "properties": {
-                    "enabled": {
-                        "type": "boolean",
-                        "description": "True to enable mock mode, false to disable."
-                    },
-                    "api_key": {
-                        "type": "string",
-                        "description": "Optional API key. If not provided, stored credentials are used."
-                    }
-                },
-                "required": [
-                    "enabled"
-                ]
-            },
-            "AgentToggleMockToolsResponse": {
-                "type": "object",
-                "properties": {
-                    "progress_id": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "progress_id"
-                ]
             },
             "AgentforceChatConfig": {
                 "type": "object",
@@ -55011,87 +54564,6 @@
                     "project_id"
                 ]
             },
-            "DisableMockErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "DisableMockProgressErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "DisableMockProgressResponse": {
-                "type": "object",
-                "properties": {
-                    "status": {
-                        "enum": [
-                            "in_progress",
-                            "completed",
-                            "failed"
-                        ],
-                        "type": "string",
-                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
-                        "x-spec-enum-id": "6e9575e5767aaee0"
-                    },
-                    "mock_enabled": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ]
-                    },
-                    "message": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "error": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    }
-                },
-                "required": [
-                    "error",
-                    "message",
-                    "mock_enabled",
-                    "status"
-                ]
-            },
-            "DisableMockToolsRequest": {
-                "type": "object",
-                "properties": {
-                    "api_key": {
-                        "type": "string",
-                        "description": "Optional API key for the provider. If not provided, will use stored credentials."
-                    }
-                }
-            },
-            "DisableMockToolsResponse": {
-                "type": "object",
-                "properties": {
-                    "progress_id": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "progress_id"
-                ]
-            },
             "DisablePersonalitiesRequest": {
                 "type": "object",
                 "properties": {
@@ -55204,94 +54676,6 @@
                 },
                 "required": [
                     "personalities"
-                ]
-            },
-            "EnableMockErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "EnableMockProgressErrorResponse": {
-                "type": "object",
-                "properties": {
-                    "detail": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "detail"
-                ]
-            },
-            "EnableMockProgressResponse": {
-                "type": "object",
-                "properties": {
-                    "status": {
-                        "enum": [
-                            "in_progress",
-                            "completed",
-                            "failed"
-                        ],
-                        "type": "string",
-                        "description": "* `in_progress` - in_progress\n* `completed` - completed\n* `failed` - failed",
-                        "x-spec-enum-id": "6e9575e5767aaee0"
-                    },
-                    "mock_enabled": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ]
-                    },
-                    "mcp_endpoints": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/MockMCPEndpoint"
-                        },
-                        "description": "MCP mock endpoints registered for this agent (one per MCP-typed tool). Empty for agents without MCP tools."
-                    },
-                    "message": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "error": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    }
-                },
-                "required": [
-                    "error",
-                    "message",
-                    "mock_enabled",
-                    "status"
-                ]
-            },
-            "EnableMockToolsRequest": {
-                "type": "object",
-                "properties": {
-                    "api_key": {
-                        "type": "string",
-                        "description": "Optional API key. If not provided, uses stored credentials."
-                    }
-                }
-            },
-            "EnableMockToolsResponse": {
-                "type": "object",
-                "properties": {
-                    "progress_id": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "progress_id"
                 ]
             },
             "EnablePersonalitiesRequest": {
@@ -55445,6 +54829,25 @@
                     "explanation",
                     "outcome_alignments",
                     "score"
+                ]
+            },
+            "GenerateClarifyAnswer": {
+                "type": "object",
+                "description": "Body for POST /scenarios/generate-clarify-answer/.",
+                "properties": {
+                    "progress_id": {
+                        "type": "string",
+                        "description": "UUID progress_id returned by the generate-bg endpoint."
+                    },
+                    "answer": {
+                        "type": "string",
+                        "description": "User's answer to the clarification question(s) asked by the agent.",
+                        "maxLength": 10000
+                    }
+                },
+                "required": [
+                    "answer",
+                    "progress_id"
                 ]
             },
             "GenerateCleanDescriptionBgResponse": {
@@ -55615,6 +55018,153 @@
                     "progress_id",
                     "project_id"
                 ]
+            },
+            "InsightReproductionRequest": {
+                "type": "object",
+                "description": "Request body for\n``POST /metric-failure-mode-insights/<id>/reproduce/``.\n\nKicks off the full reproduction loop for one failure mode: draft a\nscenario, then run it against the agent — on the same channel the cited\ncall logs used — until a run fails the insight's metric or the attempt\nbudget is spent. Returns a ``reproduction_session_id`` to poll.",
+                "properties": {
+                    "failure_mode_index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Zero-based index of the failure mode within the insight's failure_modes list."
+                    },
+                    "agent": {
+                        "type": "integer",
+                        "description": "ID of the agent to reproduce the failure against (resolved from the failure mode's example calls on the frontend)."
+                    },
+                    "max_attempts": {
+                        "type": "integer",
+                        "maximum": 25,
+                        "minimum": 1,
+                        "default": 10,
+                        "description": "How many times to run the scenario before giving up. The loop stops early as soon as one run reproduces the failure. Defaults to 10."
+                    },
+                    "redact_transcripts": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, strip personal identifiers from the example call transcripts before they are used to draft the reproducing scenario. Semantic context is preserved. Defaults to false."
+                    }
+                },
+                "required": [
+                    "agent",
+                    "failure_mode_index"
+                ]
+            },
+            "InsightReproductionSession": {
+                "type": "object",
+                "description": "Read view of a reproduction session — what the frontend polls to track\nprogress and, once done, link to the run that reproduced the failure.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "insight": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "project": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "agent": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "failure_mode_index": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "failure_mode_title": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "metric": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "predefined_metric": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "metric_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "execution_mode": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "enum": [
+                            "pending",
+                            "generating_scenario",
+                            "running",
+                            "reproduced",
+                            "exhausted",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `pending` - Pending\n* `generating_scenario` - Generating Scenario\n* `running` - Running\n* `reproduced` - Reproduced\n* `exhausted` - Exhausted\n* `failed` - Failed",
+                        "x-spec-enum-id": "cd33c9bed092472e",
+                        "readOnly": true
+                    },
+                    "scenario_ids": {
+                        "readOnly": true
+                    },
+                    "max_attempts": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "attempts_made": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "reproduced": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "current_result": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "reproducing_run": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "reproducing_result": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "error_message": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
             },
             "Invite": {
                 "type": "object",
@@ -57734,28 +57284,6 @@
                 },
                 "required": [
                     "metric"
-                ]
-            },
-            "MockMCPEndpoint": {
-                "type": "object",
-                "properties": {
-                    "mock_index": {
-                        "type": "integer"
-                    },
-                    "url": {
-                        "type": "string"
-                    },
-                    "tool_names": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "required": [
-                    "mock_index",
-                    "tool_names",
-                    "url"
                 ]
             },
             "MockStatusMCPEndpoint": {
@@ -61555,6 +61083,11 @@
                         "readOnly": true,
                         "default": "Scenario Deleted"
                     },
+                    "scenario_type": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Type of the run's scenario (e.g. instruction, conditional_actions), null if the scenario was deleted"
+                    },
                     "personality": {
                         "type": [
                             "integer",
@@ -63665,6 +63198,7 @@
             },
             "Personality": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -65337,6 +64871,11 @@
                         "readOnly": true,
                         "default": "Scenario Deleted"
                     },
+                    "scenario_type": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Type of the run's scenario (e.g. instruction, conditional_actions), null if the scenario was deleted"
+                    },
                     "personality": {
                         "type": [
                             "integer",
@@ -65873,6 +65412,16 @@
                         },
                         "description": "List of test profile IDs to override for this run. If not provided, uses the scenario's default test profile."
                     },
+                    "mock_tool_names": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Names of mock tools to activate for this run. Omit or pass an empty list to mock every tool configured on the agent."
+                    },
                     "livekit_data": {
                         "allOf": [
                             {
@@ -65990,6 +65539,13 @@
                     },
                     "concurrency_limit": {
                         "type": "integer"
+                    },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Names of mock tools to activate for this run. Omit or pass an empty list to mock every tool configured on the agent."
                     }
                 },
                 "required": [
@@ -66026,6 +65582,13 @@
                     },
                     "concurrency_limit": {
                         "type": "integer"
+                    },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Names of mock tools to activate for this run. Omit or pass an empty list to mock every tool configured on the agent."
                     }
                 },
                 "required": [
@@ -66055,6 +65618,16 @@
                         "maximum": 100,
                         "minimum": 1,
                         "description": "Frequency to run"
+                    },
+                    "mock_tool_names": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Names of mock tools to activate for this run. Omit or pass an empty list to mock every tool configured on the agent."
                     }
                 },
                 "required": [
@@ -66442,6 +66015,20 @@
                             "additionalProperties": {}
                         },
                         "description": "Tool calls held from a previous agent-clarification response"
+                    },
+                    "tool_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Tools that will be enabled on the generated evaluators (validated up front)"
+                    },
+                    "inbound_phone_numbers": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Inbound numbers that will be attached to the generated evaluators (validated up front)"
                     }
                 }
             },
@@ -67778,6 +67365,13 @@
                         ],
                         "description": "Custom expected outcome for the scenario. If not provided, a default is generated based on the attack type."
                     },
+                    "knowledge_base": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "List of Knowledge Base file IDs for the agent to reference during scenario generation"
+                    },
                     "extra_instructions": {
                         "type": "string",
                         "description": "Additional instructions to guide evaluator generation"
@@ -68731,6 +68325,13 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nNames of mock tools to activate for this run. Cekura swaps those tools' URLs to mock endpoints while the\nrun is active and restores the originals when it finishes. Omit or pass an empty list to mock every tool\nconfigured on the agent. Example: `[\"get_appointments\", \"cancel_booking\"]`\n"
                     }
                 }
             },
@@ -68835,6 +68436,13 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nNames of mock tools to activate for this run. Cekura swaps those tools' URLs to mock endpoints while the\nrun is active and restores the originals when it finishes. Omit or pass an empty list to mock every tool\nconfigured on the agent. Example: `[\"get_appointments\", \"cancel_booking\"]`\n"
                     },
                     "websocket_url": {
                         "type": "string",
@@ -68944,6 +68552,13 @@
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
                     },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nNames of mock tools to activate for this run. Cekura swaps those tools' URLs to mock endpoints while the\nrun is active and restores the originals when it finishes. Omit or pass an empty list to mock every tool\nconfigured on the agent. Example: `[\"get_appointments\", \"cancel_booking\"]`\n"
+                    },
                     "elevenlabs_agent_id": {
                         "type": "string",
                         "description": "ElevenLabs agent ID to test against. Overrides the agent's stored assistant_id for this run."
@@ -68972,6 +68587,16 @@
                     "agent": {
                         "type": "integer",
                         "description": "Agent ID to run the scenarios against. If omitted, the agent is derived from the first scenario's configured agent."
+                    },
+                    "mock_tool_names": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Names of mock tools to activate for this run. Omit or pass an empty list to mock every tool configured on the agent."
                     }
                 },
                 "required": [
@@ -69022,6 +68647,16 @@
                             "type": "integer"
                         },
                         "description": "List of test profile IDs to override for this run. If not provided, uses the scenario's default test profile."
+                    },
+                    "mock_tool_names": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Names of mock tools to activate for this run. Omit or pass an empty list to mock every tool configured on the agent."
                     },
                     "personality_id": {
                         "type": [
@@ -69159,6 +68794,13 @@
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
                     },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nNames of mock tools to activate for this run. Cekura swaps those tools' URLs to mock endpoints while the\nrun is active and restores the originals when it finishes. Omit or pass an empty list to mock every tool\nconfigured on the agent. Example: `[\"get_appointments\", \"cancel_booking\"]`\n"
+                    },
                     "sip_endpoint": {
                         "type": "string",
                         "description": "Override the agent's stored SIP endpoint for this run."
@@ -69251,6 +68893,13 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nNames of mock tools to activate for this run. Cekura swaps those tools' URLs to mock endpoints while the\nrun is active and restores the originals when it finishes. Omit or pass an empty list to mock every tool\nconfigured on the agent. Example: `[\"get_appointments\", \"cancel_booking\"]`\n"
                     }
                 }
             },
@@ -70763,28 +70412,6 @@
                 },
                 "required": [
                     "agent"
-                ]
-            },
-            "ToggleMockToolsMCPEndpoint": {
-                "type": "object",
-                "properties": {
-                    "mock_index": {
-                        "type": "integer"
-                    },
-                    "url": {
-                        "type": "string"
-                    },
-                    "tool_names": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        }
-                    }
-                },
-                "required": [
-                    "mock_index",
-                    "tool_names",
-                    "url"
                 ]
             },
             "TokenRefresh": {

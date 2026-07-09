@@ -216,9 +216,12 @@ def _deny_text(family, tool_name):
         "Ask the user whether to use the Cekura design skills here, then act on their answer:\n"
         "  • Yes (recommended): tell the user to install or update the Cekura skills so future "
         "sessions are skill-guided automatically (https://docs.cekura.ai/mcp/overview), AND — to "
-        f"complete THIS call now — call {family['load_hint']}, then retry this call with the "
-        "returned verification tag as `skill_ack`.\n"
-        f'  • No, proceed without the skills: retry this call with skill_ack="{OVERRIDE_ACK}".\n\n'
+        f"complete THIS call now — call {family['load_hint']}, then retry with the returned "
+        "verification tag as `skill_ack`. Reuse that tag as `skill_ack` on every subsequent "
+        "authoring call this session so you are not asked again.\n"
+        f'  • No, proceed without the skills: retry this call with skill_ack="{OVERRIDE_ACK}", and '
+        f'pass skill_ack="{OVERRIDE_ACK}" on every subsequent authoring call this session too — '
+        "otherwise you will be prompted again on each one.\n\n"
         "Do not proceed until the user has chosen."
     )
 

@@ -215,8 +215,9 @@ def _deny_text(family, tool_name):
         "Ask the user, then:\n"
         "  • Use the skills (recommended): suggest they install or update the Cekura skills "
         f"(https://docs.cekura.ai/mcp/overview), call {family['load_hint']}, and pass the "
-        "returned tag as `skill_ack` on write calls.\n"
-        f'  • Proceed without: pass skill_ack="{OVERRIDE_ACK}" on write calls.\n\n'
+        "returned tag as `skill_ack` on this and every subsequent write call.\n"
+        f'  • Proceed without: pass skill_ack="{OVERRIDE_ACK}" on this and every subsequent '
+        "write call.\n\n"
         "Do not proceed until the user has chosen."
     )
 

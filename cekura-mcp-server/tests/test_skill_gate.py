@@ -96,10 +96,13 @@ class TestEvaluate:
         d = skill_gate.evaluate("scenarios_create", "ack:manual-create-update-eval:5m4p7c", "enforce")
         assert d.action == "allow" and d.ack_valid is True
 
-    def test_wrong_family_ack_does_not_satisfy(self):
-        # a metric-family tag must NOT satisfy an eval-family write
-        d = skill_gate.evaluate("scenarios_create", METRIC_TAG, "warn")
-        assert d.action == "warn" and d.ack_valid is False
+    def test_wrong_family_ack_allows_but_is_flagged(self):
+        # a recognized tag from another family still proves a playbook is in
+        # context: allow (never deny an installed user), but mark the mismatch
+        for mode in ("warn", "enforce", "shadow"):
+            d = skill_gate.evaluate("scenarios_create", METRIC_TAG, mode)
+            assert d.action == "allow" and d.reason == "ack_wrong_family"
+            assert d.ack_valid is False and d.nudge is None
 
     def test_unknown_ack_shadow_would_block(self):
         d = skill_gate.evaluate("metrics_create", "ack:bogus:zzzzzz", "shadow")
@@ -132,6 +135,10 @@ class TestEvaluate:
         assert "NOT executed" in d.nudge
         # both recovery paths must tell the model to keep passing the value on later calls
         assert "subsequent write call" in d.nudge
+        # already-installed users get a recovery path that doesn't say "install"
+        assert "already installed" in d.nudge
+        # a choice made earlier in the conversation must not trigger a re-ask
+        assert "without asking again" in d.nudge
 
     def test_sandbox_bypass(self):
         d = skill_gate.evaluate("scenarios_create", None, "enforce", is_sandbox=True)
@@ -306,6 +313,12 @@ class TestGateLogEvents:
         (e,) = self._run(caplog, "scenarios_create", {"skill_ack": VALID_TAG}, "warn")
         assert e["event"] == "skill_gate_ack_ok" and e["mode"] == "warn"
         # thread-rate signal is anonymous: no identity fields
+        assert "client_id" not in e and "cred_hash" not in e
+
+    def test_wrong_family_event_shape(self, caplog):
+        (e,) = self._run(caplog, "scenarios_create", {"skill_ack": METRIC_TAG}, "enforce")
+        assert e["event"] == "skill_gate_ack_wrong_family"
+        assert e["family"] == "eval-design" and e["mode"] == "enforce"
         assert "client_id" not in e and "cred_hash" not in e
 
     def test_sandbox_event_shape(self, caplog):

@@ -755,9 +755,7 @@ async def cekura_skill_started(
         tag = skill_gate.current_tag_for_slug(skill_name)
         if tag:
             response["skill_ack"] = tag
-            response["skill_ack_hint"] = (
-                "Pass this value as `skill_ack` on gated authoring calls in this session."
-            )
+            response["skill_ack_hint"] = skill_gate.ack_hint_for_slug(skill_name)
             logger.info(json.dumps({
                 "event": "legacy_beacon", "skill": skill_name, "event_id": event_id,
             }))
@@ -857,8 +855,7 @@ async def cekura_load_skill(skill_name: str) -> Dict[str, Any]:
         "source": source,
         "verification_tag": tag,
         "skill_ack_hint": (
-            "Pass verification_tag as `skill_ack` on gated authoring calls."
-            if tag else None
+            skill_gate.ack_hint_for_slug(slug, subject="verification_tag") if tag else None
         ),
         "playbook": content,
     }

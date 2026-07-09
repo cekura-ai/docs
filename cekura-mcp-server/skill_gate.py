@@ -43,13 +43,14 @@ logger = logging.getLogger(__name__)
 # the family's gate.
 
 
-def _family(name, write_tools, skill_slugs, command_slugs, load_hint):
+def _family(name, write_tools, skill_slugs, command_slugs, load_hint, write_hint):
     return {
         "name": name,
         "write_tools": frozenset(write_tools),
         "skill_slugs": frozenset(skill_slugs),
         "slugs": frozenset(skill_slugs) | frozenset(command_slugs),
         "load_hint": load_hint,
+        "write_hint": write_hint,
     }
 
 
@@ -74,6 +75,7 @@ _FAMILIES = (
         },
         command_slugs={"manual-create-update-eval", "autogen-eval"},
         load_hint='cekura_load_skill(skill_name="cekura-eval-design")',
+        write_hint="scenario / test-profile write calls (`scenarios_*`, `test_profiles_*`)",
     ),
     _family(
         "metric-design",
@@ -89,6 +91,7 @@ _FAMILIES = (
         },
         command_slugs={"create-metric", "improve-metric"},
         load_hint='cekura_load_skill(skill_name="cekura-metric-design")',
+        write_hint="metric write calls (`metrics_create`, `metrics_bulk_create`, `metrics_partial_update`)",
     ),
 )
 
@@ -118,6 +121,7 @@ _REMOTE_MANIFEST_URL = os.environ.get(
 _manifest = {}          # slug -> [tags]
 _manifest_source = "unloaded"
 _family_tags = {}       # family name -> frozenset of every recognized tag
+_all_tags = frozenset() # every recognized tag across all families
 
 
 def _parse_manifest(data):
@@ -135,11 +139,12 @@ def _parse_manifest(data):
 def _rebuild_family_tags():
     """Precompute each family's recognized-tag set; the manifest only changes at
     load time, so `evaluate` does a plain membership test per call."""
-    global _family_tags
+    global _family_tags, _all_tags
     _family_tags = {
         f["name"]: frozenset(tag for slug in f["slugs"] for tag in _manifest.get(slug, []))
         for f in _FAMILIES
     }
+    _all_tags = frozenset().union(*_family_tags.values()) if _family_tags else frozenset()
 
 
 def set_manifest(mapping):
@@ -203,6 +208,15 @@ def current_tag_for_slug(slug):
     return tags[-1] if tags else None
 
 
+def ack_hint_for_slug(slug, subject="this value"):
+    """Threading hint for a tag delivered for `slug`, scoped to its family's
+    write tools so the model doesn't reuse the tag across families."""
+    for family in _FAMILIES:
+        if slug in family["slugs"]:
+            return f"Pass {subject} as `skill_ack` on {family['write_hint']} in this session."
+    return f"Pass {subject} as `skill_ack` on gated authoring calls in this session."
+
+
 def _family_for_tool(tool_name):
     for family in _FAMILIES:
         if tool_name in family["write_tools"]:
@@ -240,11 +254,13 @@ def _deny_text(family, tool_name):
         "playbook loaded, which isn't loaded here. This write was NOT executed.\n\n"
         "Ask the user, then:\n"
         "  • Use the skills (recommended): suggest they install or update the Cekura skills "
-        f"(https://docs.cekura.ai/mcp/overview), call {family['load_hint']}, and pass the "
+        "(https://docs.cekura.ai/mcp/overview) — or, if already installed, invoke the matching "
+        f"Cekura skill/command. Either way, call {family['load_hint']} now and pass the "
         "returned tag as `skill_ack` on this and every subsequent write call.\n"
         f'  • Proceed without: pass skill_ack="{OVERRIDE_ACK}" on this and every subsequent '
         "write call.\n\n"
-        "Do not proceed until the user has chosen."
+        "Do not proceed until the user has chosen. If they already chose earlier in this "
+        "conversation, keep that choice and continue without asking again."
     )
 
 
@@ -266,6 +282,12 @@ def evaluate(tool_name, skill_ack, mode, is_sandbox=False):
     ack_valid = ack_present and skill_ack in _family_tags.get(family["name"], frozenset())
     if ack_valid:
         return GateDecision("allow", family["name"], True, True, "ack_ok")
+
+    # A recognized tag from another family still proves a Cekura playbook is in
+    # context (skills are installed/loaded) — allow, but log the mismatch so the
+    # cross-family rate is visible.
+    if ack_present and skill_ack in _all_tags:
+        return GateDecision("allow", family["name"], True, False, "ack_wrong_family")
 
     if mode == "shadow":
         return GateDecision("shadow_block", family["name"], ack_present, False, "would_block")
@@ -293,6 +315,7 @@ _GATE_LOG_EVENTS = {
     "user_override": ("skill_gate_user_override", None),
     "sandbox_bypass": ("skill_gate_sandbox_bypass", None),
     "ack_ok": ("skill_gate_ack_ok", None),
+    "ack_wrong_family": ("skill_gate_ack_wrong_family", None),
 }
 
 

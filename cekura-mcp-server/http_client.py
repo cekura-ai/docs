@@ -3,6 +3,39 @@ from typing import Dict, Any, Optional
 import json
 
 
+def build_mcp_headers(
+    credential: str,
+    credential_type: str = "api_key",
+    mcp_call_id: Optional[str] = None,
+    mcp_client_id: Optional[str] = None,
+    mcp_tool: Optional[str] = None,
+    mcp_skill: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+) -> Dict[str, str]:
+    """Standard header set for any request the MCP server makes to the Cekura
+    API: the credential header for the given type, the client-source marker,
+    and the X-MCP-* telemetry headers the analytics pipeline reads. Single home
+    for this composition — used by both the API client and one-off posts."""
+    headers = {
+        "Content-Type": "application/json",
+        "X-Client-Source": "mcp",
+    }
+    if credential_type == "bearer":
+        headers["Authorization"] = f"Bearer {credential}"
+    else:
+        headers["X-CEKURA-API-KEY"] = credential
+    for name, value in (
+        ("X-MCP-Call-Id", mcp_call_id),
+        ("X-MCP-Client", mcp_client_id),
+        ("X-MCP-Tool", mcp_tool),
+        ("X-MCP-Skill", mcp_skill),
+        ("X-Cekura-Conversation-Id", conversation_id),
+    ):
+        if value:
+            headers[name] = value
+    return headers
+
+
 class CekuraAPIClient:
     def __init__(
         self,
@@ -18,29 +51,16 @@ class CekuraAPIClient:
     ):
         self.base_url = base_url
         self.credential_type = credential_type
-        auth_header = (
-            {"Authorization": f"Bearer {credential}"}
-            if credential_type == "bearer"
-            else {"X-CEKURA-API-KEY": credential}
-        )
-        telemetry_headers = {
-            name: value
-            for name, value in (
-                ("X-MCP-Call-Id", mcp_call_id),
-                ("X-MCP-Client", mcp_client_id),
-                ("X-MCP-Tool", mcp_tool),
-                ("X-MCP-Skill", mcp_skill),
-                ("X-Cekura-Conversation-Id", conversation_id),
-            )
-            if value
-        }
         self.client = httpx.AsyncClient(
-            headers={
-                **auth_header,
-                "Content-Type": "application/json",
-                "X-Client-Source": "mcp",
-                **telemetry_headers,
-            },
+            headers=build_mcp_headers(
+                credential,
+                credential_type,
+                mcp_call_id=mcp_call_id,
+                mcp_client_id=mcp_client_id,
+                mcp_tool=mcp_tool,
+                mcp_skill=mcp_skill,
+                conversation_id=conversation_id,
+            ),
             timeout=timeout,
         )
 

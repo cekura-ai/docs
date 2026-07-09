@@ -14,7 +14,7 @@ raise the bar for honest clients, not to be uncircumventable.
 Rollout ladder (env ``CEKURA_SKILL_GATE_MODE``):
 
 * ``off``     — inert. No schema change; no evaluation. (``skill_ack`` is still
-  stripped from tool args by the caller so it never reaches the backend.)
+  stripped from tool args so it never reaches the backend.)
 * ``shadow``  — log-only. Emits ``skill_gate_blocked`` when a gated write lacks a
   valid ack, but the call proceeds unchanged.
 * ``warn``    — the call proceeds and a short nudge is appended to the response.
@@ -29,62 +29,79 @@ Everything fails OPEN: any unexpected error should leave the write allowed.
 """
 
 import json
+import logging
 import os
 
 import httpx
 
+logger = logging.getLogger(__name__)
+
 # ── Families (mirror of the server-side design gate) ─────────────────────────
+# One entry per gated tool-family. ``skill_slugs`` are skill-backed playbooks the
+# server can deliver via ``cekura_load_skill``; ``command_slugs`` are slash-command
+# playbooks that ship only inside the installed plugin. Tags from either satisfy
+# the family's gate.
 
-EVAL_DESIGN_TOOLS = frozenset({
-    "scenarios_create",
-    "scenarios_bulk_update",
-    "scenarios_partial_update",
-    "scenarios_create_from_transcript",
-    "scenarios_create_from_transcript_bg",
-    "scenarios_update_scenario_with_transcript_create",
-    "test_profiles_create",
-    "test_profiles_partial_update",
-})
-EVAL_DESIGN_SLUGS = frozenset({
-    "cekura-eval-design",
-    "manual-create-update-eval",
-    "autogen-eval",
-    "cekura-generate-scenarios",
-    "cekura-self-improving-agent",
-    "cekura-infra-test-suite",
-})
 
-METRIC_DESIGN_TOOLS = frozenset({
-    "metrics_create",
-    "metrics_bulk_create",
-    "metrics_partial_update",
-})
-METRIC_DESIGN_SLUGS = frozenset({
-    "cekura-metric-design",
-    "create-metric",
-    "improve-metric",
-    "cekura-metric-improvement",
-    "cekura-predefined-metrics",
-})
+def _family(name, write_tools, skill_slugs, command_slugs, load_hint):
+    return {
+        "name": name,
+        "write_tools": frozenset(write_tools),
+        "skill_slugs": frozenset(skill_slugs),
+        "slugs": frozenset(skill_slugs) | frozenset(command_slugs),
+        "load_hint": load_hint,
+    }
+
 
 _FAMILIES = (
-    {
-        "name": "eval-design",
-        "write_tools": EVAL_DESIGN_TOOLS,
-        "slugs": EVAL_DESIGN_SLUGS,
-        "load_hint": 'cekura_load_skill(skill_name="cekura-eval-design")',
-    },
-    {
-        "name": "metric-design",
-        "write_tools": METRIC_DESIGN_TOOLS,
-        "slugs": METRIC_DESIGN_SLUGS,
-        "load_hint": 'cekura_load_skill(skill_name="cekura-metric-design")',
-    },
+    _family(
+        "eval-design",
+        write_tools={
+            "scenarios_create",
+            "scenarios_bulk_update",
+            "scenarios_partial_update",
+            "scenarios_create_from_transcript",
+            "scenarios_create_from_transcript_bg",
+            "scenarios_update_scenario_with_transcript_create",
+            "test_profiles_create",
+            "test_profiles_partial_update",
+        },
+        skill_slugs={
+            "cekura-eval-design",
+            "cekura-generate-scenarios",
+            "cekura-self-improving-agent",
+            "cekura-infra-test-suite",
+        },
+        command_slugs={"manual-create-update-eval", "autogen-eval"},
+        load_hint='cekura_load_skill(skill_name="cekura-eval-design")',
+    ),
+    _family(
+        "metric-design",
+        write_tools={
+            "metrics_create",
+            "metrics_bulk_create",
+            "metrics_partial_update",
+        },
+        skill_slugs={
+            "cekura-metric-design",
+            "cekura-metric-improvement",
+            "cekura-predefined-metrics",
+        },
+        command_slugs={"create-metric", "improve-metric"},
+        load_hint='cekura_load_skill(skill_name="cekura-metric-design")',
+    ),
 )
 
 # Every tool the gate can act on. Read/list/run and server-side generation tools
 # are intentionally absent — the model does not author their payload content.
-GATED_TOOLS = frozenset(EVAL_DESIGN_TOOLS | METRIC_DESIGN_TOOLS)
+GATED_TOOLS = frozenset().union(*(f["write_tools"] for f in _FAMILIES))
+
+# Every slug that can carry a recognized tag.
+ALL_FAMILY_SLUGS = frozenset().union(*(f["slugs"] for f in _FAMILIES))
+
+# Slugs `cekura_load_skill` can deliver (skill-backed; command playbooks exist
+# only in the installed plugin).
+LOADABLE_SKILLS = tuple(sorted(frozenset().union(*(f["skill_slugs"] for f in _FAMILIES))))
 
 # Sentinel a caller passes as `skill_ack` to proceed without the skills, AFTER the
 # user has explicitly chosen to (enforce/strict only). Recorded as an override.
@@ -100,6 +117,7 @@ _REMOTE_MANIFEST_URL = os.environ.get(
 
 _manifest = {}          # slug -> [tags]
 _manifest_source = "unloaded"
+_family_tags = {}       # family name -> frozenset of every recognized tag
 
 
 def _parse_manifest(data):
@@ -114,19 +132,26 @@ def _parse_manifest(data):
     return out
 
 
+def _rebuild_family_tags():
+    """Precompute each family's recognized-tag set; the manifest only changes at
+    load time, so `evaluate` does a plain membership test per call."""
+    global _family_tags
+    _family_tags = {
+        f["name"]: frozenset(tag for slug in f["slugs"] for tag in _manifest.get(slug, []))
+        for f in _FAMILIES
+    }
+
+
 def set_manifest(mapping):
     """Directly set the in-memory manifest (used by tests)."""
     global _manifest, _manifest_source
     _manifest = _parse_manifest(mapping)
     _manifest_source = "explicit"
+    _rebuild_family_tags()
 
 
 def get_manifest():
     return dict(_manifest)
-
-
-def manifest_source():
-    return _manifest_source
 
 
 def _load_baked():
@@ -138,6 +163,7 @@ def _load_baked():
     except Exception:
         _manifest = {}
         _manifest_source = "empty"
+    _rebuild_family_tags()
     return _manifest_source
 
 
@@ -157,6 +183,7 @@ async def load_manifest(client_factory=httpx.AsyncClient):
             if parsed:
                 _manifest = parsed
                 _manifest_source = "remote"
+                _rebuild_family_tags()
                 return _manifest_source
     except Exception:
         pass
@@ -176,23 +203,15 @@ def _family_for_tool(tool_name):
     return None
 
 
-def _recognized_tags(family):
-    tags = set()
-    for slug in family["slugs"]:
-        tags.update(_manifest.get(slug, []))
-    return tags
-
-
 # ── Decision ─────────────────────────────────────────────────────────────────
 
 
 class GateDecision:
-    __slots__ = ("action", "family", "tool", "ack_present", "ack_valid", "reason", "nudge")
+    __slots__ = ("action", "family", "ack_present", "ack_valid", "reason", "nudge")
 
-    def __init__(self, action, family, tool, ack_present, ack_valid, reason, nudge=None):
-        self.action = action          # "allow" | "shadow_block" | "warn"
+    def __init__(self, action, family, ack_present, ack_valid, reason, nudge=None):
+        self.action = action          # "allow" | "shadow_block" | "warn" | "deny"
         self.family = family          # family name or None
-        self.tool = tool
         self.ack_present = ack_present
         self.ack_valid = ack_valid
         self.reason = reason
@@ -227,32 +246,102 @@ def evaluate(tool_name, skill_ack, mode, is_sandbox=False):
     ack_present = bool(skill_ack)
     family = _family_for_tool(tool_name)
     if family is None:
-        return GateDecision("allow", None, tool_name, ack_present, False, "not_gated")
+        return GateDecision("allow", None, ack_present, False, "not_gated")
     if mode == "off":
-        return GateDecision("allow", family["name"], tool_name, ack_present, False, "mode_off")
+        return GateDecision("allow", family["name"], ack_present, False, "mode_off")
     if is_sandbox:
-        return GateDecision("allow", family["name"], tool_name, ack_present, False, "sandbox_bypass")
+        return GateDecision("allow", family["name"], ack_present, False, "sandbox_bypass")
 
     # Explicit user override: proceed without skills (blocking modes only).
     if skill_ack == OVERRIDE_ACK and mode in ("enforce", "strict"):
-        return GateDecision("allow", family["name"], tool_name, ack_present, False, "user_override")
+        return GateDecision("allow", family["name"], ack_present, False, "user_override")
 
-    ack_valid = ack_present and skill_ack in _recognized_tags(family)
+    ack_valid = ack_present and skill_ack in _family_tags.get(family["name"], frozenset())
     if ack_valid:
-        return GateDecision("allow", family["name"], tool_name, True, True, "ack_ok")
+        return GateDecision("allow", family["name"], True, True, "ack_ok")
 
     if mode == "shadow":
-        return GateDecision("shadow_block", family["name"], tool_name, ack_present, False, "would_block")
+        return GateDecision("shadow_block", family["name"], ack_present, False, "would_block")
     if mode in ("enforce", "strict"):
         # Hold the write; the model must ask the user (install/load or proceed).
         return GateDecision(
-            "deny", family["name"], tool_name, ack_present, False, "deny",
+            "deny", family["name"], ack_present, False, "deny",
             nudge=_deny_text(family, tool_name),
         )
     # warn -> proceed with a nudge
     return GateDecision(
-        "warn", family["name"], tool_name, ack_present, False, "warn", nudge=_nudge_text(family)
+        "warn", family["name"], ack_present, False, "warn", nudge=_nudge_text(family)
     )
+
+
+# ── Handler-side application ─────────────────────────────────────────────────
+
+# decision.reason -> (log event, blocked flag). Allows with reason
+# mode_off/not_gated log nothing. `blocked` None means the event doesn't carry
+# the ack_present/blocked pair.
+_GATE_LOG_EVENTS = {
+    "deny": ("skill_gate_blocked", True),
+    "would_block": ("skill_gate_blocked", False),
+    "warn": ("skill_gate_blocked", False),
+    "user_override": ("skill_gate_user_override", None),
+    "sandbox_bypass": ("skill_gate_sandbox_bypass", None),
+    "ack_ok": ("skill_gate_ack_ok", None),
+}
+
+
+def _log_decision(decision, mode, tool_name, call_id, client_id, cred_hash_fn):
+    entry = _GATE_LOG_EVENTS.get(decision.reason)
+    if entry is None:
+        return
+    event, blocked = entry
+    payload = {
+        "event": event,
+        "tool": tool_name,
+        "family": decision.family,
+        "call_id": call_id,
+    }
+    if event != "skill_gate_sandbox_bypass":
+        payload["mode"] = mode
+    if event in ("skill_gate_blocked", "skill_gate_user_override"):
+        payload["client_id"] = client_id
+        payload["cred_hash"] = cred_hash_fn()
+    if blocked is not None:
+        payload["ack_present"] = decision.ack_present
+        payload["blocked"] = blocked
+    logger.info(json.dumps(payload))
+
+
+def apply_gate(tool_name, arguments, mode, *, is_sandbox=False, client_id=None,
+               call_id=None, cred_hash_fn=lambda: None):
+    """The complete handler-side gate step for one tool call.
+
+    Returns ``(deny_text, nudge)``: ``deny_text`` set means the write must NOT
+    be executed (enforce/strict deny); ``nudge`` set means proceed and append it
+    to the response (warn).
+
+    Always strips ``skill_ack`` from ``arguments`` in place — in EVERY mode,
+    including ``off`` — so the backend request stays byte-identical to a call
+    that never carried it. Evaluation and logging run only for gated tools with
+    the gate on; any internal error fails open (write allowed).
+    """
+    skill_ack = None
+    if arguments and "skill_ack" in arguments:
+        skill_ack = arguments.pop("skill_ack")
+
+    if mode == "off" or tool_name not in GATED_TOOLS:
+        return None, None
+
+    try:
+        decision = evaluate(tool_name, skill_ack, mode, is_sandbox=is_sandbox)
+        _log_decision(decision, mode, tool_name, call_id, client_id, cred_hash_fn)
+        if decision.action == "deny":
+            return decision.nudge, None
+        if decision.action == "warn":
+            return None, decision.nudge
+        return None, None
+    except Exception:
+        logger.exception("skill_gate_error tool=%s (failing open)", tool_name)
+        return None, None
 
 
 # ── Schema injection ─────────────────────────────────────────────────────────

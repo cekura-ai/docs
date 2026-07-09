@@ -27,7 +27,7 @@ if os.getenv("AWS_SECRET_NAME"):
 
 import skill_gate
 from config import load_config
-from http_client import create_client
+from http_client import build_mcp_headers, create_client
 from openapi_parser import load_openapi_spec
 from tool_generator import (
     apply_overlay_to_description,
@@ -640,23 +640,18 @@ async def _forward_skill_activation(
     if not base_url:
         return
 
-    headers = {
-        "Content-Type": "application/json",
-        "X-MCP-Call-Id": f"call_{uuid.uuid4().hex[:16]}",
-    }
-    if credential_type == "bearer":
-        headers["Authorization"] = f"Bearer {credential}"
-    else:
-        headers["X-CEKURA-API-KEY"] = credential
     skill_header = skill_slug or ""
     if plugin_version:
         skill_header = f"{skill_header}@{plugin_version}"
     if verification_tag:
         skill_header = f"{skill_header}#{verification_tag}"
-    if skill_header:
-        headers["X-MCP-Skill"] = skill_header
-    if client_id:
-        headers["X-MCP-Client"] = client_id
+    headers = build_mcp_headers(
+        credential,
+        credential_type,
+        mcp_call_id=f"call_{uuid.uuid4().hex[:16]}",
+        mcp_client_id=client_id,
+        mcp_skill=skill_header or None,
+    )
 
     body: Dict[str, Any] = {"event": event, "skill_slug": skill_slug}
     if verification_tag:
@@ -763,16 +758,6 @@ async def cekura_skill_started(
 
 # -- Server-delivered skill playbooks ----------------------------------------
 
-_LOADABLE_SKILLS = [
-    "cekura-eval-design",
-    "cekura-generate-scenarios",
-    "cekura-self-improving-agent",
-    "cekura-infra-test-suite",
-    "cekura-metric-design",
-    "cekura-metric-improvement",
-    "cekura-predefined-metrics",
-]
-
 _SKILL_RAW_BASE = os.environ.get(
     "CEKURA_SKILL_RAW_BASE",
     "https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/cekura/skills",
@@ -815,16 +800,31 @@ async def _fetch_skill_content(slug: str) -> Tuple[str, str]:
         "not installed. Returns the skill's guidance plus a verification tag to "
         "thread as `skill_ack` on gated authoring calls. Prefer this BEFORE "
         "authoring scenarios, test profiles, or metrics.\n\n"
-        "skill_name must be one of: " + ", ".join(_LOADABLE_SKILLS) + "."
+        "skill_name must be one of: " + ", ".join(skill_gate.LOADABLE_SKILLS) + "."
     ),
     annotations=ToolAnnotations(readOnlyHint=True),
 )
 async def cekura_load_skill(skill_name: str) -> Dict[str, Any]:
     slug = (skill_name or "").strip()
-    if slug not in _LOADABLE_SKILLS:
-        return {"status": "unknown_skill", "available": _LOADABLE_SKILLS}
+    if slug not in skill_gate.LOADABLE_SKILLS:
+        logger.info(json.dumps({
+            "event": "load_skill",
+            "skill": slug[:80],
+            "status": "unknown_skill",
+            "client_id": _resolve_client_identifier(),
+            "cred_hash": _credential_fingerprint(),
+        }))
+        return {"status": "unknown_skill", "available": list(skill_gate.LOADABLE_SKILLS)}
     content, source = await _fetch_skill_content(slug)
     tag = skill_gate.current_tag_for_slug(slug)
+    logger.info(json.dumps({
+        "event": "load_skill",
+        "skill": slug,
+        "status": "ok",
+        "source": source,
+        "client_id": _resolve_client_identifier(),
+        "cred_hash": _credential_fingerprint(),
+    }))
     return {
         "status": "ok",
         "skill": slug,
@@ -1126,79 +1126,21 @@ def setup_dynamic_tool_handlers():
         mcp_call_id = telemetry["call_id"]
         call_id_suffix = f"\n\n[cekura_mcp_call_id: {mcp_call_id}]"
 
-        # Strip the optional skill-gate ack from tool args up front so it never
-        # reaches the backend (request body stays byte-identical to today). This
-        # happens in EVERY mode, including `off`.
-        skill_ack = None
-        if arguments and "skill_ack" in arguments:
-            skill_ack = arguments.pop("skill_ack")
-
-        gate_nudge = None
-        gate_mode = server_config.skill_gate_mode if server_config else "off"
-        if gate_mode != "off" and name in skill_gate.GATED_TOOLS:
-            # Quality gate. Fails open on any error (a write is never lost to a
-            # gate bug). Only `enforce`/`strict` hold the write (action=deny).
-            try:
-                decision = skill_gate.evaluate(
-                    name, skill_ack, gate_mode,
-                    is_sandbox=bool(telemetry["conversation_id"]),
-                )
-                if decision.action == "deny":
-                    logger.info(json.dumps({
-                        "event": "skill_gate_blocked",
-                        "mode": gate_mode,
-                        "tool": name,
-                        "family": decision.family,
-                        "ack_present": decision.ack_present,
-                        "blocked": True,
-                        "client_id": telemetry["client_id"],
-                        "cred_hash": _credential_fingerprint(),
-                        "call_id": mcp_call_id,
-                    }))
-                    # Write withheld; hand the model the ask-the-user recovery.
-                    return [{"type": "text", "text": f"{decision.nudge}{call_id_suffix}"}]
-                if decision.action in ("shadow_block", "warn"):
-                    logger.info(json.dumps({
-                        "event": "skill_gate_blocked",
-                        "mode": gate_mode,
-                        "tool": name,
-                        "family": decision.family,
-                        "ack_present": decision.ack_present,
-                        "blocked": False,
-                        "client_id": telemetry["client_id"],
-                        "cred_hash": _credential_fingerprint(),
-                        "call_id": mcp_call_id,
-                    }))
-                    if decision.action == "warn":
-                        gate_nudge = decision.nudge
-                elif decision.reason == "user_override":
-                    logger.info(json.dumps({
-                        "event": "skill_gate_user_override",
-                        "mode": gate_mode,
-                        "tool": name,
-                        "family": decision.family,
-                        "client_id": telemetry["client_id"],
-                        "cred_hash": _credential_fingerprint(),
-                        "call_id": mcp_call_id,
-                    }))
-                elif decision.ack_valid:
-                    # Thread-rate signal: a gated write carried a valid ack.
-                    logger.info(json.dumps({
-                        "event": "skill_gate_ack_ok",
-                        "mode": gate_mode,
-                        "tool": name,
-                        "family": decision.family,
-                        "call_id": mcp_call_id,
-                    }))
-                elif decision.reason == "sandbox_bypass":
-                    logger.info(json.dumps({
-                        "event": "skill_gate_sandbox_bypass",
-                        "tool": name,
-                        "family": decision.family,
-                        "call_id": mcp_call_id,
-                    }))
-            except Exception:
-                logger.exception("skill_gate_error tool=%s (failing open)", name)
+        # Skill gate. Strips `skill_ack` from the args in EVERY mode (the backend
+        # request stays byte-identical to a call that never carried it); may hold
+        # the write in enforce/strict; fails open on any internal error.
+        gate_deny, gate_nudge = skill_gate.apply_gate(
+            name,
+            arguments,
+            server_config.skill_gate_mode if server_config else "off",
+            is_sandbox=bool(telemetry["conversation_id"]),
+            client_id=telemetry["client_id"],
+            call_id=mcp_call_id,
+            cred_hash_fn=_credential_fingerprint,
+        )
+        if gate_deny:
+            # Write withheld; hand the model the ask-the-user recovery.
+            return [{"type": "text", "text": f"{gate_deny}{call_id_suffix}"}]
 
         try:
             tool_data = operations_registry[name]

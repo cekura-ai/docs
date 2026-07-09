@@ -186,8 +186,70 @@ class TestManifest:
         m = skill_gate.get_manifest()
         assert len(m) == 11
         # every family slug in the code table is present in the shipped snapshot
-        for slug in (skill_gate.EVAL_DESIGN_SLUGS | skill_gate.METRIC_DESIGN_SLUGS):
+        for slug in skill_gate.ALL_FAMILY_SLUGS:
             assert slug in m
+
+    def test_loadable_skills_derived_from_families(self):
+        # loadable = the skill-backed subset of the family slugs (commands ship
+        # only inside the plugin and have no SKILL.md to deliver)
+        assert set(skill_gate.LOADABLE_SKILLS) <= skill_gate.ALL_FAMILY_SLUGS
+        assert len(skill_gate.LOADABLE_SKILLS) == 7
+
+
+# ── apply_gate: the complete handler-side step ───────────────────────────────
+
+class TestApplyGate:
+    def test_off_mode_still_strips(self):
+        args = {"name": "x", "skill_ack": VALID_TAG}
+        deny, nudge = skill_gate.apply_gate("scenarios_create", args, "off")
+        assert deny is None and nudge is None
+        assert "skill_ack" not in args
+
+    def test_non_gated_tool_strips_and_allows_even_in_enforce(self):
+        args = {"query": "q", "skill_ack": "whatever"}
+        deny, nudge = skill_gate.apply_gate("scenarios_list", args, "enforce")
+        assert deny is None and nudge is None
+        assert "skill_ack" not in args
+
+    def test_enforce_denies_without_ack(self):
+        args = {"name": "x"}
+        deny, nudge = skill_gate.apply_gate("metrics_create", args, "enforce")
+        assert deny is not None and "NOT executed" in deny
+        assert nudge is None
+        assert args == {"name": "x"}  # other args untouched
+
+    def test_enforce_allows_valid_ack(self):
+        args = {"name": "x", "skill_ack": VALID_TAG}
+        deny, nudge = skill_gate.apply_gate("scenarios_create", args, "enforce")
+        assert deny is None and nudge is None
+        assert "skill_ack" not in args
+
+    def test_enforce_allows_user_override(self):
+        args = {"name": "x", "skill_ack": skill_gate.OVERRIDE_ACK}
+        deny, nudge = skill_gate.apply_gate("scenarios_create", args, "enforce")
+        assert deny is None and nudge is None
+
+    def test_warn_returns_nudge_and_proceeds(self):
+        deny, nudge = skill_gate.apply_gate("metrics_create", {}, "warn")
+        assert deny is None
+        assert nudge and "cekura_load_skill" in nudge
+
+    def test_sandbox_bypasses_enforce(self):
+        deny, nudge = skill_gate.apply_gate("scenarios_create", {}, "enforce", is_sandbox=True)
+        assert deny is None and nudge is None
+
+    def test_fails_open_on_internal_error(self, monkeypatch):
+        def boom(*a, **k):
+            raise RuntimeError("boom")
+        monkeypatch.setattr(skill_gate, "evaluate", boom)
+        args = {"name": "x", "skill_ack": "junk"}
+        deny, nudge = skill_gate.apply_gate("scenarios_create", args, "enforce")
+        assert deny is None and nudge is None  # write proceeds
+        assert "skill_ack" not in args         # strip happened before the failure
+
+    def test_none_arguments_tolerated(self):
+        deny, nudge = skill_gate.apply_gate("scenarios_create", None, "enforce")
+        assert deny is not None  # gated, no ack -> deny; and no crash on None args
 
 
 # ── no-regression: skill_ack never reaches the backend ───────────────────────
@@ -196,7 +258,7 @@ class TestSkillAckStripped:
     def test_stripped_before_object_body_dispatch(self):
         op = FakeOp(path="/scenarios/", request_body=JSON_OBJECT_BODY)
         args = {"name": "x", "project": 5, "skill_ack": VALID_TAG}
-        args.pop("skill_ack", None)  # mirrors call_tool_with_dynamic
+        skill_gate.apply_gate("scenarios_create", args, "warn")
         path, query, body = _dispatch_args(op, args)
         assert "skill_ack" not in (body or {})
         assert "skill_ack" not in query
@@ -206,13 +268,13 @@ class TestSkillAckStripped:
         # metrics_bulk_create: top-level array body via `items`
         op = FakeOp(path="/metrics/bulk/", request_body=JSON_ARRAY_BODY)
         args = {"items": [{"name": "m1"}], "skill_ack": METRIC_TAG}
-        args.pop("skill_ack", None)
+        skill_gate.apply_gate("metrics_bulk_create", args, "shadow")
         path, query, body = _dispatch_args(op, args)
         assert body == [{"name": "m1"}]  # bare array, no skill_ack anywhere
 
     def test_stripped_when_no_body_routes_to_query(self):
         op = FakeOp(path="/scenarios/", parameters=[{"name": "project_id", "in": "query"}])
         args = {"project_id": 5, "skill_ack": VALID_TAG}
-        args.pop("skill_ack", None)
+        skill_gate.apply_gate("scenarios_create", args, "off")
         path, query, body = _dispatch_args(op, args)
         assert "skill_ack" not in query and query == {"project_id": 5}

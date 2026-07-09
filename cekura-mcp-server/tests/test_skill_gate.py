@@ -128,8 +128,8 @@ class TestEvaluate:
         assert "docs.cekura.ai/mcp/overview" in d.nudge
         assert 'skill_ack="proceed-without-skill"' in d.nudge
         assert "NOT executed" in d.nudge
-        # both recovery paths must tell the model to reuse the value on later calls
-        assert "subsequent" in d.nudge
+        # both recovery paths must tell the model to pass the value on write calls
+        assert "on write calls" in d.nudge
 
     def test_sandbox_bypass(self):
         d = skill_gate.evaluate("scenarios_create", None, "enforce", is_sandbox=True)

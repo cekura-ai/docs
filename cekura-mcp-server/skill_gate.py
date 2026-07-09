@@ -210,18 +210,13 @@ def _nudge_text(family):
 
 def _deny_text(family, tool_name):
     return (
-        f"[cekura skills] '{tool_name}' produces much better results with the Cekura "
-        f"{family['name']} playbook loaded, which isn't loaded in this session. This "
-        "write was NOT executed.\n\n"
-        "Ask the user whether to use the Cekura design skills here, then act on their answer:\n"
-        "  • Yes (recommended): tell the user to install or update the Cekura skills so future "
-        "sessions are skill-guided automatically (https://docs.cekura.ai/mcp/overview), AND — to "
-        f"complete THIS call now — call {family['load_hint']}, then retry with the returned "
-        "verification tag as `skill_ack`. Reuse that tag as `skill_ack` on every subsequent "
-        "authoring call this session so you are not asked again.\n"
-        f'  • No, proceed without the skills: retry this call with skill_ack="{OVERRIDE_ACK}", and '
-        f'pass skill_ack="{OVERRIDE_ACK}" on every subsequent authoring call this session too — '
-        "otherwise you will be prompted again on each one.\n\n"
+        f"[cekura skills] '{tool_name}' works much better with the Cekura {family['name']} "
+        "playbook loaded, which isn't loaded here. This write was NOT executed.\n\n"
+        "Ask the user, then:\n"
+        "  • Use the skills (recommended): suggest they install or update the Cekura skills "
+        f"(https://docs.cekura.ai/mcp/overview), call {family['load_hint']}, and pass the "
+        "returned tag as `skill_ack` on write calls.\n"
+        f'  • Proceed without: pass skill_ack="{OVERRIDE_ACK}" on write calls.\n\n'
         "Do not proceed until the user has chosen."
     )
 

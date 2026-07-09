@@ -263,6 +263,12 @@ async def initialize_server():
             f"Skill gate: mode={gate_mode}, manifest_source={manifest_source}, "
             f"slugs={len(skill_gate.get_manifest())}"
         )
+        if gate_mode != "off" and manifest_source != "remote":
+            logger.warning(
+                f"Skill gate is '{gate_mode}' but the tag manifest came from "
+                f"'{manifest_source}' — tags added after this build won't be "
+                "recognized until connectivity to the manifest URL is restored."
+            )
         if gate_mode in ("enforce", "strict"):
             logger.warning(
                 f"Skill gate mode '{gate_mode}' HOLDS gated writes that lack a valid "
@@ -452,6 +458,15 @@ def _redact_pii(text: Optional[str]) -> Optional[str]:
     for pattern, replacement in _PII_PATTERNS:
         redacted = pattern.sub(replacement, redacted)
     return redacted
+
+
+def _clip(value: Any, limit: int) -> Optional[str]:
+    """Bound a caller-supplied identifier for logs and header composition:
+    collapse control whitespace, trim, cap the length. None when empty."""
+    if not isinstance(value, str):
+        return None
+    cleaned = re.sub(r"[\r\n\t]+", " ", value).strip()
+    return cleaned[:limit] or None
 
 
 def _credential_fingerprint() -> str:
@@ -650,6 +665,10 @@ async def _forward_skill_activation(
         credential_type,
         mcp_call_id=f"call_{uuid.uuid4().hex[:16]}",
         mcp_client_id=client_id,
+        mcp_tool={
+            "skill_started": "cekura_skill_started",
+            "load_skill": "cekura_load_skill",
+        }.get(event),
         mcp_skill=skill_header or None,
     )
 
@@ -673,7 +692,7 @@ async def _forward_skill_activation(
     name="cekura_skill_started",
     description=(
         "Call this as the FIRST action of any Cekura skill or command. Lets us "
-        "know which skills are actually being used. Returns immediately.\n\n"
+        "know which skills are actually being used. Returns quickly.\n\n"
         "Args:\n"
         "  skill_name: the slug of the skill — e.g. \"autogen-eval\".\n"
         "  triggering_intent: optional one-sentence description of what the "
@@ -694,6 +713,13 @@ async def cekura_skill_started(
     plugin_version: Optional[str] = None,
     skill_version: Optional[str] = None,
 ) -> Dict[str, Any]:
+    # Bound caller-supplied identifiers before they reach logs or the
+    # X-MCP-Skill header composition.
+    skill_name = _clip(skill_name, 80) or ""
+    verification_tag = _clip(verification_tag, 120)
+    plugin_version = _clip(plugin_version, 40)
+    skill_version = _clip(skill_version, 40)
+
     cred_hash = _credential_fingerprint()
     intent_redacted = (_redact_pii(triggering_intent) or "")[:200] or None
     event_id = f"skill_{uuid.uuid4().hex[:12]}"

@@ -185,8 +185,15 @@ async def load_manifest(client_factory=httpx.AsyncClient):
                 _manifest_source = "remote"
                 _rebuild_family_tags()
                 return _manifest_source
-    except Exception:
-        pass
+        logger.warning(
+            "ack-tag manifest at %s fetched but empty/unparseable — falling back to baked snapshot",
+            _REMOTE_MANIFEST_URL,
+        )
+    except Exception as e:
+        logger.warning(
+            "ack-tag manifest fetch failed (%s): %s — falling back to baked snapshot",
+            _REMOTE_MANIFEST_URL, e,
+        )
     return _load_baked()
 
 

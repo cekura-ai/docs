@@ -5,6 +5,8 @@ schema injection, the append-only manifest + baked fallback, and the hard
 no-regression invariant: `skill_ack` is stripped before dispatch so it never
 reaches the backend.
 """
+import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -250,6 +252,71 @@ class TestApplyGate:
     def test_none_arguments_tolerated(self):
         deny, nudge = skill_gate.apply_gate("scenarios_create", None, "enforce")
         assert deny is not None  # gated, no ack -> deny; and no crash on None args
+
+
+# ── log-event contract (Datadog dashboards key off these exact shapes) ───────
+
+class TestGateLogEvents:
+    def _events(self, caplog):
+        out = []
+        for record in caplog.records:
+            msg = record.getMessage()
+            if msg.startswith("{"):
+                out.append(json.loads(msg))
+        return out
+
+    def _run(self, caplog, tool, args, mode, **kw):
+        kw.setdefault("client_id", "test-client/1.0")
+        kw.setdefault("call_id", "call_test123")
+        kw.setdefault("cred_hash_fn", lambda: "cafecafecafecafe")
+        with caplog.at_level(logging.INFO, logger="skill_gate"):
+            skill_gate.apply_gate(tool, args, mode, **kw)
+        return self._events(caplog)
+
+    def test_deny_event_shape(self, caplog):
+        (e,) = self._run(caplog, "metrics_create", {}, "enforce")
+        assert e == {
+            "event": "skill_gate_blocked",
+            "tool": "metrics_create",
+            "family": "metric-design",
+            "call_id": "call_test123",
+            "mode": "enforce",
+            "client_id": "test-client/1.0",
+            "cred_hash": "cafecafecafecafe",
+            "ack_present": False,
+            "blocked": True,
+        }
+
+    def test_shadow_event_shape(self, caplog):
+        (e,) = self._run(caplog, "scenarios_create", {"skill_ack": "junk"}, "shadow")
+        assert e["event"] == "skill_gate_blocked"
+        assert e["blocked"] is False and e["ack_present"] is True
+        assert e["mode"] == "shadow" and e["family"] == "eval-design"
+
+    def test_override_event_shape(self, caplog):
+        (e,) = self._run(
+            caplog, "scenarios_create", {"skill_ack": skill_gate.OVERRIDE_ACK}, "enforce"
+        )
+        assert e["event"] == "skill_gate_user_override"
+        assert e["client_id"] == "test-client/1.0" and e["cred_hash"] == "cafecafecafecafe"
+        # override events do not carry the ack_present/blocked pair
+        assert "ack_present" not in e and "blocked" not in e
+
+    def test_ack_ok_event_shape(self, caplog):
+        (e,) = self._run(caplog, "scenarios_create", {"skill_ack": VALID_TAG}, "warn")
+        assert e["event"] == "skill_gate_ack_ok" and e["mode"] == "warn"
+        # thread-rate signal is anonymous: no identity fields
+        assert "client_id" not in e and "cred_hash" not in e
+
+    def test_sandbox_event_shape(self, caplog):
+        (e,) = self._run(caplog, "scenarios_create", {}, "enforce", is_sandbox=True)
+        assert e["event"] == "skill_gate_sandbox_bypass"
+        assert "mode" not in e  # bypass is mode-independent
+
+    def test_off_and_non_gated_log_nothing(self, caplog):
+        assert self._run(caplog, "metrics_create", {}, "off") == []
+        caplog.clear()
+        assert self._run(caplog, "scenarios_list", {}, "enforce") == []
 
 
 # ── no-regression: skill_ack never reaches the backend ───────────────────────

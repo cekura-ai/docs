@@ -10,6 +10,12 @@ load_dotenv()
 # Each has a dedicated opt-in env flag so ops teams can enable them explicitly.
 DEFAULT_DANGEROUS_TOOLS: Set[str] = {"projects_destroy"}
 
+# Skill-gate rollout ladder. `off` ships inert (no schema change, no evaluation).
+# `shadow` logs would-block volume; `warn` appends a nudge but still proceeds;
+# `enforce` HOLDS a gated write with no valid ack (deny + ask-the-user recovery).
+# `strict` currently uses `enforce` behavior (tag-redaction hardening deferred).
+VALID_SKILL_GATE_MODES = ("off", "shadow", "warn", "enforce", "strict")
+
 
 class MCPServerConfig(BaseModel):
     base_url: str = Field(default_factory=lambda: os.getenv("CEKURA_BASE_URL", "https://api.cekura.ai"))
@@ -18,6 +24,7 @@ class MCPServerConfig(BaseModel):
     expose_project_destroy: bool = Field(default_factory=lambda: _parse_bool_env("CEKURA_EXPOSE_PROJECT_DESTROY", False))
     blocked_tools: List[str] = Field(default_factory=lambda: _parse_list_env("CEKURA_BLOCKED_TOOLS") or [])
     max_examples_per_tool: int = Field(default_factory=lambda: _parse_int_env("CEKURA_MAX_EXAMPLES_PER_TOOL") or 2)
+    skill_gate_mode: str = Field(default_factory=lambda: _parse_gate_mode_env())
 
     def resolve_blocked_tools(self) -> Set[str]:
         """Final set of tool names to suppress at registration."""
@@ -63,6 +70,12 @@ def _parse_bool_env(key: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _parse_gate_mode_env() -> str:
+    """Resolve CEKURA_SKILL_GATE_MODE; unknown/absent values fall back to `off`."""
+    raw = (os.getenv("CEKURA_SKILL_GATE_MODE") or "off").strip().lower()
+    return raw if raw in VALID_SKILL_GATE_MODES else "off"
 
 
 def load_config() -> MCPServerConfig:

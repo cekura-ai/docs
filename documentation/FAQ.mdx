@@ -1358,6 +1358,28 @@ When using an organization-level API key, providing either `project_id` or `agen
 - **Consolidate into one project:** If you recently migrated an agent to a new project and data is now split, the Cekura team can help move historical data into a single project. Reach out via your support channel to request this.
 
 
+## Are agent IDs globally unique, or only unique within a region?
+
+Agent IDs are unique within a Cekura region (for example, all agents in the US region have distinct IDs among themselves, and all agents in the EU region have distinct IDs among themselves). However, the same integer agent ID can appear in both regions — there is no guarantee of uniqueness across regions.
+
+For most API operations, this does not matter: when you scope a query using `agent_id`, Cekura automatically resolves it within the region your API key belongs to. If your platform operates across multiple Cekura regions, use `project_id` or the full region-qualified context to avoid ambiguity.
+
+
+## Does the internal Cekura call ID change when call data is migrated between projects?
+
+Yes. Cekura's internal integer call ID — the `callId=` query parameter in dashboard URLs (e.g. `https://dashboard.cekura.ai/{project_id}/calls?callId=7293214`) — is not guaranteed to survive a project migration. When the Cekura team moves historical call data to a different project, the internal ID can change.
+
+The external `call_id` you supply at submission time (via the [Send Calls API](https://docs.cekura.ai/api-reference/observability/send-calls#body-call-id)) is your own identifier and always stays the same — Cekura never modifies it.
+
+**Recommended approach for building stable dashboard links:**
+
+1. Store your external `call_id` (the string you sent to Cekura) as the long-term identifier for each conversation.
+2. When you need to construct a dashboard link, query the [List Calls API](https://docs.cekura.ai/api-reference/observability/list-calls) filtering by `call_id` to retrieve the current internal `id`.
+3. Use that internal `id` as the `callId=` parameter in the URL.
+
+Note: Cekura does not offer automatic URL redirection from an external `call_id` to an internal ID, because external call IDs are not guaranteed unique across all organisations and regions.
+
+
 ## How can I view my total credit usage or expenses from a previous month?
 
 The Cekura dashboard does not currently provide a single consolidated "last month" credit summary or billing history export. What is available:

@@ -645,8 +645,8 @@ async def _forward_skill_activation(
     skill_version: Optional[str],
     client_id: Optional[str],
 ) -> None:
-    """Best-effort, fire-and-forget activation report so skill usage can be joined
-    to the canonical principal backend-side. Never raises; never blocks a write."""
+    """Best-effort, fire-and-forget activation report so skill usage can be
+    recorded. Never raises; never blocks a write."""
     try:
         credential, credential_type = get_request_credential()
     except ValueError:

@@ -14,8 +14,8 @@ def build_mcp_headers(
 ) -> Dict[str, str]:
     """Standard header set for any request the MCP server makes to the Cekura
     API: the credential header for the given type, the client-source marker,
-    and the X-MCP-* telemetry headers the analytics pipeline reads. Single home
-    for this composition — used by both the API client and one-off posts."""
+    and the X-MCP-* telemetry headers. Single home for this composition — used
+    by both the API client and one-off posts."""
     headers = {
         "Content-Type": "application/json",
         "X-Client-Source": "mcp",

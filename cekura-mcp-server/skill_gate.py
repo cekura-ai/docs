@@ -6,10 +6,10 @@ them: the quality-critical write tools accept an OPTIONAL ``skill_ack`` argument
 whose value is a short verification tag carried inside each design playbook.
 Presenting the tag is direct evidence the playbook is in the model's context.
 
-Two families and their write-tool sets mirror the server-side design gate; keep
-them in sync by hand (families change rarely). This is a quality nudge, not a
-security boundary: the tag is copyable from a public repo, so the point is to
-raise the bar for honest clients, not to be uncircumventable.
+Two families each pair a set of quality-critical write tools with the design
+playbooks that cover them. This is a quality nudge, not a security boundary: the
+tag is copyable from a public repo, so the point is to raise the bar for honest
+clients, not to be uncircumventable.
 
 Rollout ladder (env ``CEKURA_SKILL_GATE_MODE``):
 
@@ -36,7 +36,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# ── Families (mirror of the server-side design gate) ─────────────────────────
+# ── Families (gated write tools ↔ their design playbooks) ────────────────────
 # One entry per gated tool-family. ``skill_slugs`` are skill-backed playbooks the
 # server can deliver via ``cekura_load_skill``; ``command_slugs`` are slash-command
 # playbooks that ship only inside the installed plugin. Tags from either satisfy
@@ -95,8 +95,8 @@ _FAMILIES = (
     ),
 )
 
-# Every tool the gate can act on. Read/list/run and server-side generation tools
-# are intentionally absent — the model does not author their payload content.
+# Every tool the gate can act on. Read/list/run and generation tools are
+# intentionally absent — the model does not author their payload content.
 GATED_TOOLS = frozenset().union(*(f["write_tools"] for f in _FAMILIES))
 
 # Every slug that can carry a recognized tag.

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 import skill_gate
-from openapi_mcp_server import _dispatch_args, _upgrade_skills_reliable
+from openapi_mcp_server import _dispatch_args, _upgrade_skills_reliable, MCP_INSTRUCTIONS
 
 
 # ── fixtures / helpers ───────────────────────────────────────────────────────
@@ -89,6 +89,13 @@ class TestEvaluate:
         # the nudge must instruct the model to surface the install path to the user
         assert "docs.cekura.ai/mcp/overview" in d.nudge
         assert "user" in d.nudge
+
+    def test_initialize_instructions_direct_the_model_to_tell_the_user(self):
+        # the session-start instructions must push the model to surface the
+        # install path to the user, not just note it, and carry the docs link
+        assert "tell the user" in MCP_INSTRUCTIONS.lower()
+        assert "docs.cekura.ai/mcp/overview" in MCP_INSTRUCTIONS
+        assert "once per session" in MCP_INSTRUCTIONS.lower()
 
     def test_upgrade_skills_reliable_threshold(self):
         # /upgrade-skills reliably moves the version pin only from 0.8.1 on;

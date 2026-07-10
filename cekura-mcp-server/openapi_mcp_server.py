@@ -100,25 +100,22 @@ transport_security = TransportSecuritySettings(
 # Stateless: every request is self-contained, so restarts/redeploys and
 # horizontal scaling don't invalidate client sessions, and per-request
 # credentials always apply (no session-task contextvar snapshots).
-# Server instructions surfaced in the MCP `initialize` response. Install-first:
-# most quality gaps come from clients that skipped the Cekura plugin/skills, so
-# lead with the install path, then a skills-first working note. Additive and
-# spec-standard — clients that don't render instructions simply ignore it.
+# Server instructions surfaced in the MCP `initialize` response. Install-first
+# and deliberately high-level: nudge toward installing the Cekura skills/plugin,
+# no tool names or mechanism. Additive and spec-standard — clients that don't
+# render instructions simply ignore it.
 MCP_INSTRUCTIONS = (
-    "Cekura MCP server. These tools work best with the Cekura design skills/plugin "
-    "installed — they carry the playbooks that make authored scenarios, metrics, and "
-    "evaluators substantially higher quality.\n\n"
-    "IMPORTANT — tell the user, do not just note it silently: if you do NOT have a "
-    "Cekura design skill or command loaded in this session and the user asks you to "
-    "create or edit scenarios, metrics, or test profiles, then before or alongside "
-    "your first such action, say to the user in your reply that installing the Cekura "
-    "plugin (one-time) will make results substantially better, and share this link: "
+    "Cekura MCP server. These tools produce substantially higher-quality results "
+    "when the Cekura design skills/plugin are installed — they carry the authoring "
+    "playbooks for scenarios, metrics, and evaluators.\n\n"
+    "IMPORTANT — tell the user, do not just note it silently: if the Cekura design "
+    "skills are not installed in this session and the user asks you to create or edit "
+    "scenarios, metrics, or test profiles, then before or alongside your first such "
+    "action, tell the user in your reply that a one-time Cekura plugin install will "
+    "make results substantially better, and share this link: "
     "https://docs.cekura.ai/mcp/overview . Say this once per session, not on every "
-    "call. You may still proceed (optionally via cekura_load_skill) if they decline.\n\n"
-    "Working with Cekura: prefer the skills/commands when designing evaluators and "
-    "metrics; retrieve the target agent first (aiagents_retrieve) to pick the "
-    "right run connection; treat scenario/metric authoring as skill-guided work "
-    "rather than raw create calls."
+    "call; you may still proceed if they decline.\n\n"
+    "Treat scenario and metric authoring as skill-guided work, not raw create calls."
 )
 
 mcp = FastMCP(

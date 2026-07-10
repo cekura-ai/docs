@@ -97,6 +97,12 @@ class TestEvaluate:
         assert "docs.cekura.ai/mcp/overview" in MCP_INSTRUCTIONS
         assert "once per session" in MCP_INSTRUCTIONS.lower()
 
+    def test_initialize_instructions_name_no_tools_or_mechanism(self):
+        # instructions stay high-level: no tool names, no gate mechanism leaked
+        for token in ("cekura_load_skill", "aiagents_retrieve", "skill_ack",
+                      "metrics_create", "scenarios_create", "proceed-without-skill"):
+            assert token not in MCP_INSTRUCTIONS, f"instructions should not mention {token}"
+
     def test_upgrade_skills_reliable_threshold(self):
         # /upgrade-skills reliably moves the version pin only from 0.8.1 on;
         # older or unknown versions must reinstall instead.

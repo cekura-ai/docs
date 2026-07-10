@@ -86,6 +86,9 @@ class TestEvaluate:
         d = skill_gate.evaluate("scenarios_create", None, "warn")
         assert d.action == "warn"
         assert d.nudge and "cekura_load_skill" in d.nudge
+        # the nudge must instruct the model to surface the install path to the user
+        assert "docs.cekura.ai/mcp/overview" in d.nudge
+        assert "user" in d.nudge
 
     def test_valid_ack_allows(self):
         d = skill_gate.evaluate("scenarios_create", VALID_TAG, "warn")

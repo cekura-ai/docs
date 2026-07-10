@@ -624,7 +624,7 @@ def _is_older_version(reported: str, latest: str) -> bool:
 
 
 def _latest_plugin_version() -> str:
-    return os.environ.get("CEKURA_LATEST_PLUGIN_VERSION", "0.8.1")
+    return os.environ.get("CEKURA_LATEST_PLUGIN_VERSION", "0.9.0")
 
 
 def _update_command_for_client() -> str:

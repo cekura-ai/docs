@@ -105,10 +105,16 @@ transport_security = TransportSecuritySettings(
 # lead with the install path, then a skills-first working note. Additive and
 # spec-standard — clients that don't render instructions simply ignore it.
 MCP_INSTRUCTIONS = (
-    "Cekura MCP server. For the best results, install the Cekura plugin/skills — "
-    "they carry the playbooks that make authored scenarios, metrics, and "
-    "evaluators substantially higher quality. Setup: "
-    "https://docs.cekura.ai/mcp/overview\n\n"
+    "Cekura MCP server. These tools work best with the Cekura design skills/plugin "
+    "installed — they carry the playbooks that make authored scenarios, metrics, and "
+    "evaluators substantially higher quality.\n\n"
+    "IMPORTANT — tell the user, do not just note it silently: if you do NOT have a "
+    "Cekura design skill or command loaded in this session and the user asks you to "
+    "create or edit scenarios, metrics, or test profiles, then before or alongside "
+    "your first such action, say to the user in your reply that installing the Cekura "
+    "plugin (one-time) will make results substantially better, and share this link: "
+    "https://docs.cekura.ai/mcp/overview . Say this once per session, not on every "
+    "call. You may still proceed (optionally via cekura_load_skill) if they decline.\n\n"
     "Working with Cekura: prefer the skills/commands when designing evaluators and "
     "metrics; retrieve the target agent first (aiagents_retrieve) to pick the "
     "right run connection; treat scenario/metric authoring as skill-guided work "

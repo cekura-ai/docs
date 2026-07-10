@@ -20,6 +20,59 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 **Webhook JSON Example:**
 
+## Pre-run Notifications
+
+Sent once at the start of a run, **before any calls are dispatched**. Use it to
+provision or configure your external test environment (seed data, feature flags)
+for the evaluators about to run — for example, enabling appointment cancellation
+in a sandbox business before your cancellation evaluators run.
+
+The run **waits for your endpoint to respond** before dispatching calls (30s
+timeout, retried up to 3 times), so the sandbox is ready before the first call.
+Enable it with the **Pre-run Webhook** toggle in your project's webhook settings.
+
+Each entry in `runs` carries the scenario, the resolved `test_profile`
+(its `information` holds your `main_agent_variables`), the `personality`, and the
+`phone_number` for that run. The `X-CEKURA-IDEMPOTENCY-KEY` header is set to
+`result_pre_trigger:<result_id>` so retries can be de-duplicated.
+
+<CodeGroup>
+  ```json Pre-run Trigger
+{
+  "event_type": "result.pre_trigger",
+  "data": {
+    "result_id": 95,
+    "label": "My test run",
+    "agent_id": "1",
+    "timestamp": "2025-07-31T11:13:42Z",
+    "runs": {
+      "1": {
+        "id": 1,
+        "scenario": {
+          "id": 205,
+          "name": "Customer's Specific Preference Confirmation"
+        },
+        "test_profile": {
+          "id": 12,
+          "name": "Default profile",
+          "information": {
+            "main_agent_variables": {
+              "allow_cancellation": true
+            }
+          }
+        },
+        "personality": {
+          "id": 7,
+          "name": "Direct Communicator"
+        },
+        "phone_number": "+14155550123"
+      }
+    }
+  }
+}
+  ```
+</CodeGroup>
+
 ## Result Notifications
 <CodeGroup>
   ```json Result Success

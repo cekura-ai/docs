@@ -627,13 +627,33 @@ def _latest_plugin_version() -> str:
     return os.environ.get("CEKURA_LATEST_PLUGIN_VERSION", "0.9.0")
 
 
-def _update_command_for_client() -> str:
-    # Match the documented update paths (mcp/skills.mdx). Only Claude Code has a
-    # first-class slash command; everyone else is routed to the docs update
-    # section, which carries the per-client (npx / marketplace) instructions.
+# /upgrade-skills only moves the installed version pin from this version on
+# (earlier releases silently no-op); older installs must uninstall + reinstall.
+_UPGRADE_SKILLS_MIN_VERSION = "0.8.1"
+
+
+def _upgrade_skills_reliable(current_version) -> bool:
+    if not current_version:
+        return False
+    try:
+        return _parse_version(current_version) >= _parse_version(_UPGRADE_SKILLS_MIN_VERSION)
+    except Exception:
+        return False
+
+
+def _update_command_for_client(current_version=None) -> str:
+    # Match the documented update paths (mcp/skills.mdx). Claude Code can
+    # self-upgrade via /upgrade-skills, but only from _UPGRADE_SKILLS_MIN_VERSION
+    # on; older or unknown installs are routed to reinstall, which always works.
+    # Everyone else goes to the docs update section (per-client instructions).
     client = (_resolve_client_identifier() or "").lower()
     if "claude" in client:
-        return "run /upgrade-skills (docs: https://docs.cekura.ai/mcp/skills#update)"
+        if _upgrade_skills_reliable(current_version):
+            return "run /upgrade-skills (docs: https://docs.cekura.ai/mcp/skills#update)"
+        return (
+            "uninstall and reinstall the plugin — older versions can't self-upgrade: "
+            "https://docs.cekura.ai/mcp/skills#reinstall-claude-code-plugin"
+        )
     return "https://docs.cekura.ai/mcp/skills#update"
 
 
@@ -764,8 +784,8 @@ async def cekura_skill_started(
             if not plugin_version:
                 response["update_recommended"] = True
                 response["update_hint"] = (
-                    "Your Cekura skills look outdated (no verification tag). Update them "
-                    f"for the best experience: {_update_command_for_client()}."
+                    "Your Cekura skills look outdated (no verification tag). To get the "
+                    f"current version, {_update_command_for_client(plugin_version)}."
                 )
 
     # Freshness nudge — recommendation only, never blocks anything.
@@ -774,7 +794,7 @@ async def cekura_skill_started(
         response["status"] = "update_available"
         response["current_version"] = plugin_version
         response["latest_version"] = latest
-        response["update_command"] = _update_command_for_client()
+        response["update_command"] = _update_command_for_client(plugin_version)
         response["docs_url"] = "https://docs.cekura.ai/mcp/overview"
 
     return response

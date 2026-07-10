@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 import skill_gate
-from openapi_mcp_server import _dispatch_args
+from openapi_mcp_server import _dispatch_args, _upgrade_skills_reliable
 
 
 # ── fixtures / helpers ───────────────────────────────────────────────────────
@@ -89,6 +89,18 @@ class TestEvaluate:
         # the nudge must instruct the model to surface the install path to the user
         assert "docs.cekura.ai/mcp/overview" in d.nudge
         assert "user" in d.nudge
+
+    def test_upgrade_skills_reliable_threshold(self):
+        # /upgrade-skills reliably moves the version pin only from 0.8.1 on;
+        # older or unknown versions must reinstall instead.
+        assert _upgrade_skills_reliable("0.8.1") is True
+        assert _upgrade_skills_reliable("0.9.0") is True
+        assert _upgrade_skills_reliable("1.0.0") is True
+        assert _upgrade_skills_reliable("0.8.0") is False
+        assert _upgrade_skills_reliable("0.4.2") is False
+        assert _upgrade_skills_reliable("0.1.1") is False
+        assert _upgrade_skills_reliable(None) is False
+        assert _upgrade_skills_reliable("") is False
 
     def test_valid_ack_allows(self):
         d = skill_gate.evaluate("scenarios_create", VALID_TAG, "warn")

@@ -84,7 +84,7 @@ These metrics evaluate whether your agent provides correct and consistent inform
 
     **For Call Logs**: Uses two separate state-of-the-art transcription models to generate ground truth transcriptions. Compares these against the candidate transcript to find inconsistencies, with the score based on the number of errors found. No text normalisation is applied before scoring — the raw transcript is sent directly to the LLM judge so it can assess exactly what was transcribed.
 
-    **For Runs/Simulations**: Compares the provider transcript (what the Main Agent's TTS actually said) against the Cekura ground truth transcript (what the Main Agent should have said). This makes it the recommended metric for detecting **TTS content fidelity errors** — for example, if the agent's TTS renders "2:30pm" as "two thirteen", or drops a digit from a number, the WER metric will catch it.
+    **For Runs/Simulations**: Measures how accurately the provider's speech-to-text transcribed the **testing agent** (the simulated caller). It compares the provider transcript against Cekura's ground-truth transcript of what the testing agent actually said — Cekura generates the testing agent's speech, so it knows the exact words spoken. Only the testing agent's turns are scored: Cekura has no independent ground truth for the main agent's turns (both transcripts there are just speech-to-text of the same audio), so scoring them would be circular. Use this to catch cases where the provider's transcription mishears the caller — a wrong word, a dropped digit in a number, or a name transcribed incorrectly.
 
     **What is Word Error Rate (WER)?** WER is the standard speech-recognition accuracy measure — the fraction of spoken words the speech-to-text got wrong:
 
@@ -114,6 +114,8 @@ These metrics evaluate whether your agent provides correct and consistent inform
     | 20% | 13+ |
 
     **Minor variations.** Every remaining difference — articles, pronouns, fillers, prepositions and other function words — is a *minor variation*. These don't count toward the weighted error count, but each one applies a small **absolute 0.1% penalty** to the score. So a transcript with no significant errors and, say, 3 minor variations scores 99.7% instead of a flat 100%, and a call scored 60% on significant errors with 6 minor variations lands at 59.4%. Significant errors still dominate; the minor penalty only lets you tell a flawless transcript apart from one with a few small differences by looking at the score alone. This applies to both Runs and Call Logs.
+
+    **Rendering-only differences are not errors.** Differences that only change how a value is *rendered* are treated as equivalent and don't count at all — spelled-out vs digit numbers, and spelled-out vs abbreviated units (e.g. "five kilowatts" vs "5 kW", "two hundred thirty volt" vs "230 V"). Only a genuine change in the value or the unit ("20 watts" vs "20 volts") is a real error. Backchannel acknowledgements ("uh-huh" vs "aha") are treated as minor variations.
 
     **Reading the explanation.** Errors are grouped into **Major Variations** (drive the base score) and **Minor Variations** (each applies the 0.1% penalty), so you can see exactly which mistranscriptions drove the score. Both sections always appear — `None` means there were no errors of that kind. A summary at the bottom shows the **Metric Score** and the **WER** percentage.
 

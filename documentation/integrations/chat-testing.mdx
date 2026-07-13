@@ -429,6 +429,123 @@ async def handle_connection(websocket, path):
 
 </Tab>
 
+  <Tab title="API Chat">
+
+Drive the conversation from **your own code** over REST. Unlike the other chat
+connections, Cekura does not connect to your agent — *you* call your agent and relay
+its messages to Cekura's Testing Agent (the simulated user). Ideal for bespoke
+transports (REST/SSE, gRPC, Slack bots, CLI agents, browser widgets) and CI.
+
+<Note>API Chat needs no configuration — no credentials, assistant ID, or URL.</Note>
+
+<Steps>
+  <Step title="Enable the API Chat connection">
+    In **Agent → Configuration → Provider → Connections**, under **CHAT** select **API Chat**, then **Save Changes**.
+
+    <img src="/images/api-chat/connections.png" alt="Select API Chat under CHAT connections" />
+  </Step>
+
+  <Step title="Start a run">
+    Start a run against your scenarios — from the **Evaluator** page (select scenarios → **Run** → pick **API Chat** under CHAT → **Run**), or via the API.
+
+    <img src="/images/api-chat/configure-run.png" alt="Select API Chat in the Configure Run dialog" />
+
+    ```bash
+    curl --request POST \
+      --url https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_text/ \
+      --header 'X-CEKURA-API-KEY: <api-key>' \
+      --header 'Content-Type: application/json' \
+      --data '{ "agent_id": 123, "scenarios": [456] }'
+    ```
+
+    Take the `run_id` from the created run and poll `GET /test_framework/v1/runs/{run_id}/` until `status` is `in_progress` — that's when it's open to drive.
+  </Step>
+
+  <Step title="Drive the conversation">
+    For each turn, send your agent's latest message; the response is the simulated
+    user's reply. Repeat until `ended` is `true`.
+
+    ```bash
+    curl --request POST \
+      --url https://api.cekura.ai/test_framework/v1/runs/<run_id>/chat/ \
+      --header 'X-CEKURA-API-KEY: <api-key>' \
+      --header 'Content-Type: application/json' \
+      --data '{ "content": "<your agent'\''s latest message>" }'
+    ```
+
+    ```json
+    { "message": "<simulated user reply>", "ended": false, "ended_reason": null, "status": "running" }
+    ```
+  </Step>
+
+  <Step title="Finish">
+    End the chat to score it with your evaluators; the run appears in the dashboard
+    like any other.
+
+    ```bash
+    curl --request POST \
+      --url https://api.cekura.ai/test_framework/v1/runs/<run_id>/end-chat/ \
+      --header 'X-CEKURA-API-KEY: <api-key>' \
+      --header 'Content-Type: application/json' \
+      --data '{ "reason": "client-finished" }'
+    ```
+  </Step>
+</Steps>
+
+### Reference loop
+
+A complete driver — start, exchange messages, finish. Swap the placeholder for how
+you actually call your own agent.
+
+```python
+import time, requests
+
+BASE = "https://api.cekura.ai/test_framework/v1"
+HEADERS = {"X-CEKURA-API-KEY": "<api-key>", "Content-Type": "application/json"}
+AGENT_ID, SCENARIO_ID = 123, 456
+
+
+def your_agent_reply(user_message: str) -> str:
+    """Call YOUR agent here and return its reply text."""
+    ...
+
+
+# Create the run, find it, and wait until it's open.
+result = requests.post(f"{BASE}/scenarios/run_scenarios_text/", headers=HEADERS,
+                       json={"agent_id": AGENT_ID, "scenarios": [SCENARIO_ID]}).json()
+runs = requests.get(f"{BASE}/runs/", headers=HEADERS,
+                    params={"agent_id": AGENT_ID, "result_id": result["id"]}).json()
+run_id = (runs.get("results", runs) if isinstance(runs, dict) else runs)[0]["id"]
+for _ in range(40):
+    run = requests.get(f"{BASE}/runs/{run_id}/", headers=HEADERS).json()
+    if run["status"] == "in_progress":
+        break
+    time.sleep(1.5)
+
+# Opening line, if the simulated user speaks first.
+transcript = run.get("transcript_object") or []
+pending = transcript[0]["content"] if transcript else ""
+
+# Drive the conversation, then finish.
+while True:
+    turn = requests.post(f"{BASE}/runs/{run_id}/chat/", headers=HEADERS,
+                         json={"content": your_agent_reply(pending)}).json()
+    print("simulated user:", turn["message"])
+    if turn["ended"]:
+        break
+    pending = turn["message"]
+
+requests.post(f"{BASE}/runs/{run_id}/end-chat/", headers=HEADERS,
+              json={"reason": "client-finished"})
+```
+
+<Note>
+Once ended, further `/chat/` calls return `409`. If your script stops driving a run,
+it is auto-closed after the project's timeout so it never stays open indefinitely.
+</Note>
+
+  </Tab>
+
   <Tab title="Code">
 
 Run chat tests programmatically via API.

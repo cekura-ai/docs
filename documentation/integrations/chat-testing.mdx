@@ -429,6 +429,87 @@ async def handle_connection(websocket, path):
 
 </Tab>
 
+  <Tab title="API Chat">
+
+<Steps>
+  <Step title="Start the run">
+    ```bash
+    curl --request POST \
+      --url https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_api_chat/ \
+      --header 'X-CEKURA-API-KEY: <api-key>' \
+      --header 'Content-Type: application/json' \
+      --data '{ "agent_id": 123, "scenarios": [456], "frequency": 1, "timeout": 1800 }'
+    ```
+
+    Each `runs[].id` in the response is a conversation to drive. `timeout` is the overall run lifetime in seconds (defaults to your project setting, max 3600).
+  </Step>
+
+  <Step title="Wait until the run is ready">
+    Poll the run until its `status` is `in_progress` (it opens once capacity is available):
+
+    ```bash
+    curl --request GET \
+      --url https://api.cekura.ai/test_framework/v1/runs/<run_id>/ \
+      --header 'X-CEKURA-API-KEY: <api-key>'
+    ```
+
+    If the scenario has an opening line, the simulated user speaks first — it's the first `transcript_object` entry. Otherwise you speak first.
+  </Step>
+
+  <Step title="Submit a turn">
+    Send your agent's latest message. The reply is generated in the background, so this returns a `turn_id` to poll.
+
+    ```bash
+    curl --request POST \
+      --url https://api.cekura.ai/test_framework/v1/runs/<run_id>/chat/ \
+      --header 'X-CEKURA-API-KEY: <api-key>' \
+      --header 'Content-Type: application/json' \
+      --data '{ "content": "Hello! How can I help you today?" }'
+    ```
+
+    ```json
+    { "run_id": 987, "result_id": 654, "turn_id": 1, "status": "generating" }
+    ```
+
+    <Info>
+    Submitting a new turn while the previous one is still generating supersedes it — the older turn becomes `dropped` and only your newest message is answered.
+    </Info>
+  </Step>
+
+  <Step title="Poll for the reply">
+    Poll the turn until `status` is `ready`; the reply is in `message`. Feed it to your agent and submit the next turn. Repeat until `ended` is `true`.
+
+    ```bash
+    curl --request GET \
+      --url https://api.cekura.ai/test_framework/v1/runs/<run_id>/chat/<turn_id>/ \
+      --header 'X-CEKURA-API-KEY: <api-key>'
+    ```
+
+    ```json
+    { "run_id": 987, "result_id": 654, "turn_id": 1, "status": "ready",
+      "message": "Hi! I'd like to check the status of my order.", "ended": false, "ended_reason": null }
+    ```
+
+    Statuses: `generating` (keep polling), `ready` (reply in `message`), `dropped` (superseded — use the newer turn), `error` (submit again). Turns stay pollable after the run finishes.
+  </Step>
+
+  <Step title="Finish (optional)">
+    End explicitly to score it right away; otherwise it finalizes when the simulated user ends the chat or `timeout` elapses.
+
+    ```bash
+    curl --request POST \
+      --url https://api.cekura.ai/test_framework/v1/runs/<run_id>/end-chat/ \
+      --header 'X-CEKURA-API-KEY: <api-key>' \
+      --header 'Content-Type: application/json' \
+      --data '{ "reason": "client-finished" }'
+    ```
+
+    Results appear in the dashboard with the full transcript and metrics, like any other run.
+  </Step>
+</Steps>
+
+  </Tab>
+
   <Tab title="Code">
 
 Run chat tests programmatically via API.

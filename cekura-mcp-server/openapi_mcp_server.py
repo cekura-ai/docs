@@ -814,30 +814,35 @@ _skill_content_cache: Dict[str, Tuple[float, str]] = {}
 
 
 async def _fetch_skill_content(slug: str) -> Tuple[str, str]:
-    """Return (playbook_text, source). Fetches the public SKILL.md with a short
+    """Return (playbook_text, source). Prefers the pre-built BUNDLE.md (SKILL.md +
+    key references) and falls back to SKILL.md for skills without one; short
     in-process cache; on any failure returns a graceful pointer to the docs."""
     now = time.time()
     cached = _skill_content_cache.get(slug)
     if cached and now - cached[0] < _SKILL_CONTENT_TTL_SECONDS:
         return cached[1], "cache"
-    url = f"{_SKILL_RAW_BASE}/{slug}/SKILL.md"
-    try:
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(8.0, connect=3.0), follow_redirects=True
-        ) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            content = resp.text
-            _skill_content_cache[slug] = (now, content)
-            return content, "remote"
-    except Exception as e:
-        logger.warning("load_skill: fetch failed for %s: %s", slug, e)
-        return (
-            f"The {slug} playbook could not be fetched right now. For the full, "
-            "always-current guidance install the Cekura plugin/skills: "
-            "https://docs.cekura.ai/mcp/overview",
-            "unavailable",
-        )
+    for fname, source in (("BUNDLE.md", "remote-bundle"), ("SKILL.md", "remote")):
+        url = f"{_SKILL_RAW_BASE}/{slug}/{fname}"
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(8.0, connect=3.0), follow_redirects=True
+            ) as client:
+                resp = await client.get(url)
+                if resp.status_code == 404:
+                    continue  # no bundle for this skill -> try SKILL.md
+                resp.raise_for_status()
+                content = resp.text
+                _skill_content_cache[slug] = (now, content)
+                return content, source
+        except Exception as e:
+            logger.warning("load_skill: fetch failed for %s/%s: %s", slug, fname, e)
+            continue
+    return (
+        f"The {slug} playbook could not be fetched right now. For the full, "
+        "always-current guidance install the Cekura plugin/skills: "
+        "https://docs.cekura.ai/mcp/overview",
+        "unavailable",
+    )
 
 
 @mcp.tool(

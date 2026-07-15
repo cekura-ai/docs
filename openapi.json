@@ -2428,6 +2428,115 @@
                 "description": "Notifications v1 push vapid public key"
             }
         },
+        "/observability/v1/agent-improvement-sessions/": {
+            "get": {
+                "operationId": "agent-improvement-sessions-list",
+                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\ncall logs, validates it is a VAPI / ElevenLabs agent with a configured\nprovider key, then opens a Claude Agent SDK session (product-chat sandbox\nruntime) seeded to run generate-scenarios → self-improving-agent. Returns\nthe new session row.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AgentImprovementSession"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "operationId": "agent-improvement-sessions-create",
+                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\ncall logs, validates it is a VAPI / ElevenLabs agent with a configured\nprovider key, then opens a Claude Agent SDK session (product-chat sandbox\nruntime) seeded to run generate-scenarios → self-improving-agent. Returns\nthe new session row.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/agent-improvement-sessions/{id}/": {
+            "get": {
+                "operationId": "agent-improvement-sessions-retrieve",
+                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\ncall logs, validates it is a VAPI / ElevenLabs agent with a configured\nprovider key, then opens a Claude Agent SDK session (product-chat sandbox\nruntime) seeded to run generate-scenarios → self-improving-agent. Returns\nthe new session row.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this agent improvement session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/observability/v1/alerts/": {
             "get": {
                 "operationId": "alerts-list",
@@ -6141,7 +6250,8 @@
         "/observability/v1/deep-research-insights/dismiss_mode/": {
             "post": {
                 "operationId": "deep-research-insights-dismiss-mode-create",
-                "description": "Record a thumbs-down on one failure mode.\n\nProject-scoped: the dismissal hides the mode (matched by\nnormalized title) from every subsequent render of every\ninsight in the project. No undo via this API in v1 — admin\nonly.",
+                "description": "Suppress one Deep Research failure mode across the project — matched by `mode_title`, it is hidden from every subsequent render of every insight in the project. Scope with `project`; `note` is optional. ⚠ There is no undo via this API.",
+                "summary": "Dismiss a Deep Research failure mode",
                 "tags": [
                     "observability"
                 ],
@@ -6181,13 +6291,23 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "deep-research-insights-dismiss-mode-create",
+                        "description": "Suppress one Deep Research failure mode across the project — matched by `mode_title`, it is hidden from every subsequent render of every insight in the project. Scope with `project`; `note` is optional. ⚠ There is no undo via this API."
+                    }
                 }
             }
         },
         "/observability/v1/deep-research-insights/generate/": {
             "post": {
                 "operationId": "deep-research-insights-generate-create",
-                "description": "Queue a Deep Research audit; returns the new row in ``pending``.\n\nCost: ``get_deep_research_cost()`` credits per press that actually\nqueues a fresh audit — spam protection for an expensive\nModal-sandboxed agent run. The price is admin-configurable via the\n``DEEP_RESEARCH_GENERATION_COST`` SettingValue. Insufficient\nbalance → HTTP 402 from the global exception handler before any\nwork is queued. A press that only gets an already-in-flight row\nback (double-click while one is still running) is not charged.",
+                "description": "Queue a project-level Deep Research audit over recent calls and return the new row in `pending`. Scope with `project`; tune the lookback with `window_days` and the sample ceiling with `max_calls`. Poll the returned row's `status` until it reaches `succeeded`. ⚠ Consumes credits per audit — see the pricing endpoint.",
+                "summary": "Generate a Deep Research audit for a project",
                 "tags": [
                     "observability"
                 ],
@@ -6227,13 +6347,23 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "deep-research-insights-generate-create",
+                        "description": "Queue a project-level Deep Research audit over recent calls and return the new row in `pending`. Scope with `project`; tune the lookback with `window_days` and the sample ceiling with `max_calls`. Poll the returned row's `status` until it reaches `succeeded`. ⚠ Consumes credits per audit — see the pricing endpoint."
+                    }
                 }
             }
         },
         "/observability/v1/deep-research-insights/pricing/": {
             "get": {
                 "operationId": "deep-research-insights-pricing-retrieve",
-                "description": "Flat credit cost of a Deep Research ``Generate`` press.\n\nLets the FE label the button with the live price (e.g. \"Generate\n(20 credits)\") instead of hardcoding a number that would drift\nfrom the admin-set ``DEEP_RESEARCH_GENERATION_COST``. Scoped by\n``?project=<id>`` so the standard project-access permission check\napplies; the price itself is global.",
+                "description": "Return the flat credit cost of generating a Deep Research audit. Scope with `project`. Check this before `generate` to know the charge.",
+                "summary": "Get the credit cost of a Deep Research audit",
                 "tags": [
                     "observability"
                 ],
@@ -6253,13 +6383,33 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "deep-research-insights-pricing-retrieve",
+                        "description": "Return the flat credit cost of generating a Deep Research audit. Scope with `project`. Check this before `generate` to know the charge."
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ]
             }
         },
         "/observability/v1/insight-reproduction-sessions/": {
             "get": {
                 "operationId": "insight-reproduction-sessions-list",
-                "description": "List + retrieve reproduction sessions kicked off from a metric\ninsight's ``reproduce`` action.\n\nEach session drafts a scenario from a failure mode, then runs it against\nthe agent until a run fails the insight's metric (``reproduced``) or the\nattempt budget is spent (``exhausted``). The frontend polls a row's\n``status`` and, once ``reproduced``, links to ``reproducing_result``.\nRead-only: sessions are created via\n``metric-failure-mode-insights/<id>/reproduce``.",
+                "description": "Return reproduction sessions for a project, newest first. Each session tracks the attempt to reproduce a metric failure mode by running a drafted scenario against the agent. Scope with `project`.",
+                "summary": "List insight reproduction sessions",
                 "tags": [
                     "observability"
                 ],
@@ -6282,13 +6432,33 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "insight-reproduction-sessions-list",
+                        "description": "Return reproduction sessions for a project, newest first. Each session tracks the attempt to reproduce a metric failure mode by running a drafted scenario against the agent. Scope with `project`."
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ]
             }
         },
         "/observability/v1/insight-reproduction-sessions/{id}/": {
             "get": {
                 "operationId": "insight-reproduction-sessions-retrieve",
-                "description": "List + retrieve reproduction sessions kicked off from a metric\ninsight's ``reproduce`` action.\n\nEach session drafts a scenario from a failure mode, then runs it against\nthe agent until a run fails the insight's metric (``reproduced``) or the\nattempt budget is spent (``exhausted``). The frontend polls a row's\n``status`` and, once ``reproduced``, links to ``reproducing_result``.\nRead-only: sessions are created via\n``metric-failure-mode-insights/<id>/reproduce``.",
+                "description": "Return a single reproduction session with its `status`, attempts made, and — once reproduced — the run and result that reproduced the failure. Poll this after calling reproduce on an insight.",
+                "summary": "Get one insight reproduction session",
                 "parameters": [
                     {
                         "in": "path",
@@ -6319,6 +6489,14 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "insight-reproduction-sessions-retrieve",
+                        "description": "Return a single reproduction session with its `status`, attempts made, and — once reproduced — the run and result that reproduced the failure. Poll this after calling reproduce on an insight."
+                    }
                 }
             }
         },
@@ -6344,7 +6522,8 @@
         "/observability/v1/metric-failure-mode-insights/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-list",
-                "description": "List metric failure mode insights",
+                "description": "Return generated failure-mode insights for a project, newest first. Each insight groups a metric's failing calls into named failure modes with example call ids. Scope with `project` (required); optionally filter by `metric_name`, a single `date` (YYYY-MM-DD), or pass `latest_only=true` for one row per metric. Use before `generate` to check for an existing insight.",
+                "summary": "List metric failure-mode insights",
                 "tags": [
                     "observability"
                 ],
@@ -6367,13 +6546,33 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-list",
+                        "description": "Return generated failure-mode insights for a project, newest first. Each insight groups a metric's failing calls into named failure modes with example call ids. Scope with `project` (required); optionally filter by `metric_name`, a single `date` (YYYY-MM-DD), or pass `latest_only=true` for one row per metric. Use before `generate` to check for an existing insight."
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ]
             }
         },
         "/observability/v1/metric-failure-mode-insights/{id}/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-retrieve",
-                "description": "Retrieve a metric failure mode insight by ID",
+                "description": "Return a single failure-mode insight with its full failure_modes list. Read this to pick a `failure_mode_index` before calling generate-scenario, reproduce, or fix-metric.",
+                "summary": "Get one metric failure-mode insight",
                 "parameters": [
                     {
                         "in": "path",
@@ -6404,11 +6603,20 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-retrieve",
+                        "description": "Return a single failure-mode insight with its full failure_modes list. Read this to pick a `failure_mode_index` before calling generate-scenario, reproduce, or fix-metric."
+                    }
                 }
             },
             "delete": {
                 "operationId": "metric-failure-mode-insights-destroy",
-                "description": "Delete a metric failure mode insight",
+                "description": "Permanently delete one failure-mode insight. ⚠ Cannot be undone.",
+                "summary": "Delete a metric failure-mode insight",
                 "parameters": [
                     {
                         "in": "path",
@@ -6432,13 +6640,23 @@
                     "204": {
                         "description": "No response body"
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-destroy",
+                        "description": "Permanently delete one failure-mode insight. ⚠ Cannot be undone."
+                    }
                 }
             }
         },
         "/observability/v1/metric-failure-mode-insights/{id}/failure-mode-agents/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-failure-mode-agents-retrieve",
-                "description": "List the agents implicated by a failure mode's example calls.\n\nThe frontend uses this to decide which agent(s) to create a\nscenario for: it resolves each example call's agent and, when a\nfailure mode spans several agents, posts ``generate-scenario``\nonce per agent. Falls back to the project's agents when no example\ncall resolves to an agent.",
+                "description": "Return the agents whose calls appear in one failure mode's example calls, with a per-agent call count. Select the failure mode with the `index` query parameter. Use this to choose the `agent` for generate-scenario or reproduce; falls back to the project's agents when no example call resolves to an agent.",
+                "summary": "List agents implicated by a failure mode",
                 "parameters": [
                     {
                         "in": "path",
@@ -6469,13 +6687,22 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-failure-mode-agents-retrieve",
+                        "description": "Return the agents whose calls appear in one failure mode's example calls, with a per-agent call count. Select the failure mode with the `index` query parameter. Use this to choose the `agent` for generate-scenario or reproduce; falls back to the project's agents when no example call resolves to an agent."
+                    }
                 }
             }
         },
         "/observability/v1/metric-failure-mode-insights/{id}/fix-metric/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-fix-metric-create",
-                "description": "Add a sample of one failure mode's example calls to Labs.\n\nThe metric flagged these calls as failing; the user supplies feedback\nexplaining why and a corrected ``expected_value`` (the label these\ncalls should carry). We sample 2-3 of the mode's example calls and\ncreate a Labs metric review for each — expected value pinned to the\nuser's label, the feedback as the human note — so the metric can be\niterated on against them. When no label is sent we default to a pass.",
+                "description": "Sample a few of one failure mode's example calls and add them to Labs as metric reviews for the insight's metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass). Select the failure mode with `failure_mode_index`. Overwrites any existing review for the same calls on this metric.",
+                "summary": "Add a failure mode's example calls to Labs",
                 "parameters": [
                     {
                         "in": "path",
@@ -6525,6 +6752,15 @@
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-fix-metric-create",
+                        "description": "Sample a few of one failure mode's example calls and add them to Labs as metric reviews for the insight's metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass). Select the failure mode with `failure_mode_index`. Overwrites any existing review for the same calls on this metric."
                     }
                 }
             }
@@ -6598,7 +6834,8 @@
         "/observability/v1/metric-failure-mode-insights/{id}/reproduce/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-reproduce-create",
-                "description": "Draft a scenario from one failure mode AND run it until reproduced.\n\nUnlike ``generate-scenario`` (which only drafts + persists a scenario),\nthis orchestrates the whole loop: draft the reproducing scenario(s),\nthen run them against the agent — on the same channel the cited call\nlogs came through — up to ``max_attempts`` times, stopping the moment a\nrun FAILS this insight's metric.\n\nReturns a ``reproduction_session_id``; poll\n``GET /insight-reproduction-sessions/<id>/?project=<id>`` for status.",
+                "description": "Draft a scenario from one failure mode and run it against the agent on the same channel the cited calls used, retrying until a run reproduces the failure or `max_attempts` is reached. Choose the failure mode with `failure_mode_index` and the target with `agent`. Returns a `reproduction_session_id`; poll the reproduction session for status. ⚠ Executes real evaluator runs against the agent.",
+                "summary": "Reproduce a failure mode by running it against an agent",
                 "parameters": [
                     {
                         "in": "path",
@@ -6649,13 +6886,23 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-reproduce-create",
+                        "description": "Draft a scenario from one failure mode and run it against the agent on the same channel the cited calls used, retrying until a run reproduces the failure or `max_attempts` is reached. Choose the failure mode with `failure_mode_index` and the target with `agent`. Returns a `reproduction_session_id`; poll the reproduction session for status. ⚠ Executes real evaluator runs against the agent."
+                    }
                 }
             }
         },
         "/observability/v1/metric-failure-mode-insights/available_dates/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-available-dates-retrieve",
-                "description": "Distinct calendar dates (newest first) that have a generated\ninsight for the project, so the UI can offer a date picker for\nbrowsing historical daily insights. Only dates with a definitive\nresult row (succeeded / no-failures marker) are listed.",
+                "description": "Return the distinct calendar dates (newest first) on which the project has a completed failure-mode insight, so you can page back through historical daily insights via the `date` filter on list.",
+                "summary": "List dates that have generated insights",
                 "tags": [
                     "observability"
                 ],
@@ -6675,13 +6922,33 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-available-dates-retrieve",
+                        "description": "Return the distinct calendar dates (newest first) on which the project has a completed failure-mode insight, so you can page back through historical daily insights via the `date` filter on list."
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ]
             }
         },
         "/observability/v1/metric-failure-mode-insights/bulk_generate/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-bulk-generate-create",
-                "description": "Fan out audits to every eligible metric in the project.\n\nTriggered by the Insights page's \"Generate\" button. Uses the\nsliding ``T-24h`` to ``T`` window (where ``T`` is now), so the\nresult is fresh even between the daily cron firings. Returns\nthe new insight rows so the FE can poll their status.\n\nMetrics with no failing calls in the window get a\n``skipped_no_failures`` marker row (no Celery task queued);\nmetrics already mid-run from a recent cron are returned as-is\ninstead of being re-queued (dedupe inside the kickoff helper).\n\nCost: ``get_insight_generation_cost()`` credits per metric that\nactually produces an insight (i.e. had ≥1 failing call in the 24h\nwindow). Eligible metrics with no failing calls generate nothing\nand are not charged — you pay only for the insight cards you get.\nThe per-metric price is admin-configurable via the\n``INSIGHT_GENERATION_COST`` SettingValue. Insufficient balance →\nHTTP 402 from the global exception handler before any work is\nqueued.",
+                "description": "Queue a failure-mode audit for every eligible metric in the project over the last 24 hours and return the new insight rows to poll. Optionally restrict to specific metrics with `metric_names`. Metrics with no failing calls are skipped and not charged. ⚠ Consumes credits per metric that produces an insight — see the pricing endpoint.",
+                "summary": "Generate failure-mode insights for every metric in a project",
                 "tags": [
                     "observability"
                 ],
@@ -6721,6 +6988,15 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-bulk-generate-create",
+                        "description": "Queue a failure-mode audit for every eligible metric in the project over the last 24 hours and return the new insight rows to poll. Optionally restrict to specific metrics with `metric_names`. Metrics with no failing calls are skipped and not charged. ⚠ Consumes credits per metric that produces an insight — see the pricing endpoint."
+                    }
                 }
             }
         },
@@ -6748,7 +7024,26 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-categories-retrieve",
+                        "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range; results are sorted by count descending."
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ]
             }
         },
         "/observability/v1/metric-failure-mode-insights/categories/{category_slug}/fix-metric/": {
@@ -6806,13 +7101,23 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-categories-fix-metric-create",
+                        "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass)."
+                    }
                 }
             }
         },
         "/observability/v1/metric-failure-mode-insights/generate/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-generate-create",
-                "description": "Queue a failure-mode audit; returns the new row in ``pending``.\n\nProject scoping comes from the JSON body (``project`` field),\nnot query params — that's why this action sits in\n``permission_query_params_skip_actions``. The project-level\npermission classes still gate the request via the serializer\nvalidation + ``get_object_or_404`` below.",
+                "description": "Queue a failure-mode audit of one metric's recent failing calls and return the new insight row in `pending`. Identify the metric with `metric_name` plus either `metric` (custom) or `predefined_metric`. Poll the returned row's `status` until it reaches `succeeded`. ⚠ Consumes credits per generated insight — see the pricing endpoint.",
+                "summary": "Generate a failure-mode insight for one metric",
                 "tags": [
                     "observability"
                 ],
@@ -6852,13 +7157,23 @@
                         },
                         "description": ""
                     }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-generate-create",
+                        "description": "Queue a failure-mode audit of one metric's recent failing calls and return the new insight row in `pending`. Identify the metric with `metric_name` plus either `metric` (custom) or `predefined_metric`. Poll the returned row's `status` until it reaches `succeeded`. ⚠ Consumes credits per generated insight — see the pricing endpoint."
+                    }
                 }
             }
         },
         "/observability/v1/metric-failure-mode-insights/pricing/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-pricing-retrieve",
-                "description": "Per-metric credit cost of a manual Insights ``Generate`` press.\n\nLets the FE label the button with the live price (e.g. \"Generate\n(10 credits/metric)\") instead of hardcoding a number that would\ndrift from the admin-set ``INSIGHT_GENERATION_COST``. Scoped by\n``?project=<id>`` so the standard project-access permission check\napplies; the price itself is global.",
+                "description": "Return the per-metric credit cost of manually generating a metric failure-mode insight. Scope with `project`. Check this before `generate` or `bulk_generate` to know the charge.",
+                "summary": "Get the credit cost of generating an insight",
                 "tags": [
                     "observability"
                 ],
@@ -6878,7 +7193,26 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-pricing-retrieve",
+                        "description": "Return the per-metric credit cost of manually generating a metric failure-mode insight. Scope with `project`. Check this before `generate` or `bulk_generate` to know the charge."
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ]
             }
         },
         "/observability/v1/observe/": {
@@ -23801,7 +24135,8 @@
         "/test_framework/v1/results-external/{id}/rerun/": {
             "post": {
                 "operationId": "results-external-rerun-create",
-                "description": "Re-run a test result evaluation",
+                "description": "Re-execute every scenario from a completed result against the same agent, creating a new result with a fresh set of runs. The connection mode (voice or text) and provider are inherited from the original runs. Consumes simulation credits (one run per scenario) and launches live calls, so the new result populates asynchronously.",
+                "summary": "Re-run the scenarios from a completed test result",
                 "parameters": [
                     {
                         "in": "path",
@@ -24892,7 +25227,8 @@
         "/test_framework/v1/results/{id}/rerun/": {
             "post": {
                 "operationId": "results-rerun-create",
-                "description": "Re-run a test result evaluation",
+                "description": "Re-execute every scenario from a completed result against the same agent, creating a new result with a fresh set of runs. The connection mode (voice or text) and provider are inherited from the original runs. Consumes simulation credits (one run per scenario) and launches live calls, so the new result populates asynchronously.",
+                "summary": "Re-run the scenarios from a completed test result",
                 "parameters": [
                     {
                         "in": "path",
@@ -26183,7 +26519,7 @@
         "/test_framework/v1/runs-external/{id}/chat/": {
             "post": {
                 "operationId": "runs-api-chat",
-                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating supersedes it: the older turn is marked `dropped` and only the newest is answered. Repeat until `ended` is true (or call end-chat).",
+                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating interrupts it: the older turn is marked `dropped` but its message is kept, and the newest turn's reply answers all messages received since the last reply. Repeat until `ended` is true (or call end-chat).",
                 "summary": "Submit a turn to an API-chat run",
                 "parameters": [
                     {
@@ -26216,8 +26552,7 @@
                                 "$ref": "#/components/schemas/ApiChatTurn"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -26244,7 +26579,7 @@
         "/test_framework/v1/runs-external/{id}/chat/{turn_id}/": {
             "get": {
                 "operationId": "runs-api-chat-turn",
-                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission; `error` means generation failed. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
+                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission — its message is kept and the newer turn's reply answers both; `error` means generation failed. Turn 0 is the run's opening: `message` is the evaluator's first message, or null when your agent speaks first. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
                 "summary": "Poll a submitted API-chat turn",
                 "parameters": [
                     {
@@ -27046,7 +27381,7 @@
         "/test_framework/v1/runs/{id}/chat/": {
             "post": {
                 "operationId": "runs-api-chat_2",
-                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating supersedes it: the older turn is marked `dropped` and only the newest is answered. Repeat until `ended` is true (or call end-chat).",
+                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating interrupts it: the older turn is marked `dropped` but its message is kept, and the newest turn's reply answers all messages received since the last reply. Repeat until `ended` is true (or call end-chat).",
                 "summary": "Submit a turn to an API-chat run",
                 "parameters": [
                     {
@@ -27079,8 +27414,7 @@
                                 "$ref": "#/components/schemas/ApiChatTurn"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -27107,7 +27441,7 @@
         "/test_framework/v1/runs/{id}/chat/{turn_id}/": {
             "get": {
                 "operationId": "runs-api-chat-turn_2",
-                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission; `error` means generation failed. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
+                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission — its message is kept and the newer turn's reply answers both; `error` means generation failed. Turn 0 is the run's opening: `message` is the evaluator's first message, or null when your agent speaks first. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
                 "summary": "Poll a submitted API-chat turn",
                 "parameters": [
                     {
@@ -45144,7 +45478,8 @@
         "/test_framework/v2/results/{id}/rerun/": {
             "post": {
                 "operationId": "test-framework-v2-results-rerun-create",
-                "description": "Results rerun",
+                "description": "Re-execute every scenario from a completed result against the same agent, creating a new result with a fresh set of runs. The connection mode (voice or text) and provider are inherited from the original runs. Consumes simulation credits (one run per scenario) and launches live calls, so the new result populates asynchronously.",
+                "summary": "Re-run the scenarios from a completed test result",
                 "parameters": [
                     {
                         "in": "path",
@@ -45181,7 +45516,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "test-framework-v2-results-rerun-create",
-                        "description": "Results rerun"
+                        "description": "Re-execute every scenario from a completed result against the same agent, creating a new result with a fresh set of runs. The connection mode (voice or text) and provider are inherited from the original runs. Consumes simulation credits (one run per scenario) and launches live calls, so the new result populates asynchronously."
                     }
                 }
             }
@@ -46075,7 +46410,7 @@
         "/test_framework/v2/runs/{id}/chat/": {
             "post": {
                 "operationId": "runs-api-chat_3",
-                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating supersedes it: the older turn is marked `dropped` and only the newest is answered. Repeat until `ended` is true (or call end-chat).",
+                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating interrupts it: the older turn is marked `dropped` but its message is kept, and the newest turn's reply answers all messages received since the last reply. Repeat until `ended` is true (or call end-chat).",
                 "summary": "Submit a turn to an API-chat run",
                 "parameters": [
                     {
@@ -46108,8 +46443,7 @@
                                 "$ref": "#/components/schemas/ApiChatTurn"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -46136,7 +46470,7 @@
         "/test_framework/v2/runs/{id}/chat/{turn_id}/": {
             "get": {
                 "operationId": "runs-api-chat-turn_3",
-                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission; `error` means generation failed. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
+                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission — its message is kept and the newer turn's reply answers both; `error` means generation failed. Turn 0 is the run's opening: `message` is the evaluator's first message, or null when your agent speaks first. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
                 "summary": "Poll a submitted API-chat turn",
                 "parameters": [
                     {
@@ -52244,14 +52578,6 @@
                         },
                         "description": ""
                     }
-                },
-                "x-mcp-expose": true,
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "user-api-key-create",
-                        "description": "Create a new API key. When using API key authentication, only project-level API keys can be created."
-                    }
                 }
             }
         },
@@ -53311,6 +53637,17 @@
         "/user/organizations/": {
             "get": {
                 "operationId": "user-organizations-list",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "required": false,
+                        "in": "query",
+                        "description": "A search term.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "tags": [
                     "user"
                 ],
@@ -56461,6 +56798,69 @@
                 },
                 "description": "Projects members"
             }
+        },
+        "/user/v2/organizations/": {
+            "get": {
+                "operationId": "user-v2-organizations-list",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "required": false,
+                        "in": "query",
+                        "description": "A search term.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedOrganizationList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "user-v2-organizations-list",
+                        "description": "List user v2 organizations"
+                    }
+                },
+                "description": "List user v2 organizations"
+            }
         }
     },
     "components": {
@@ -57769,6 +58169,79 @@
                     "name"
                 ]
             },
+            "AgentImprovementSession": {
+                "type": "object",
+                "description": "Read view of an Improve-Agent session — what the frontend polls to\ntrack progress. `provider_key` and other secrets are never serialized.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "project": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "agent": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "provider": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "insights": {
+                        "readOnly": true
+                    },
+                    "call_log_ids": {
+                        "readOnly": true
+                    },
+                    "status": {
+                        "enum": [
+                            "pending",
+                            "running",
+                            "succeeded",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `pending` - Pending\n* `running` - Running\n* `succeeded` - Succeeded\n* `failed` - Failed",
+                        "x-spec-enum-id": "7a7ee2ea425ee5c6",
+                        "readOnly": true
+                    },
+                    "conversation_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "message_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "error_message": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
             "AgentKnowledgeBaseFileWrite": {
                 "type": "object",
                 "description": "One knowledge base file entry in the v2 agent write payload (request side of `knowledge_base_files`).",
@@ -58450,16 +58923,32 @@
             },
             "ApiChatTurn": {
                 "type": "object",
-                "description": "Request body for POST /runs/{run_id}/chat/ (submit one turn).",
+                "description": "Request body for POST /runs/{run_id}/chat/ (submit one turn). Same message shape\nas the websocket chat integration: a normal message (`content`), optional `metadata`\nmerged into the run, and/or a function call (`role` + `data`).",
                 "properties": {
                     "content": {
                         "type": "string",
                         "description": "Your agent-under-test's latest message. Submitting it returns a `turn_id`; poll GET /runs/{run_id}/chat/{turn_id}/ for the simulated user's reply."
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Optional metadata merged into the run (last-write-wins). Can be sent alone."
+                    },
+                    "role": {
+                        "enum": [
+                            "Function Call",
+                            "Function Call Result"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "96979c0bc176b860",
+                        "description": "Set to record a tool call instead of a message (no reply is generated).\n\n* `Function Call` - Function Call\n* `Function Call Result` - Function Call Result"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Function-call payload: {id, name, arguments} for a call, {id, result} for a result."
                     }
-                },
-                "required": [
-                    "content"
-                ]
+                }
             },
             "ApiChatTurnPollResponse": {
                 "type": "object",
@@ -58508,7 +58997,7 @@
             },
             "ApiChatTurnSubmitResponse": {
                 "type": "object",
-                "description": "Response for POST /runs/{run_id}/chat/ (turn accepted, reply generating).",
+                "description": "Response for POST /runs/{run_id}/chat/ (turn accepted).",
                 "properties": {
                     "run_id": {
                         "type": "integer"
@@ -58522,7 +59011,7 @@
                     },
                     "status": {
                         "type": "string",
-                        "description": "Always 'generating' — poll for the reply."
+                        "description": "Turn status; poll for the reply if 'generating'."
                     }
                 },
                 "required": [
@@ -61074,13 +61563,15 @@
                 "description": "Request body for thumbs-down submission.",
                 "properties": {
                     "project": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "Project ID the dismissal applies to."
                     },
                     "insight": {
                         "type": [
                             "integer",
                             "null"
-                        ]
+                        ],
+                        "description": "Optional Deep Research insight ID the mode was seen on."
                     },
                     "mode_title": {
                         "type": "string",
@@ -61089,11 +61580,13 @@
                     },
                     "mode_details": {
                         "type": "string",
-                        "default": ""
+                        "default": "",
+                        "description": "Optional detail text of the failure mode, stored with the dismissal."
                     },
                     "mode_severity": {
                         "type": "string",
                         "default": "",
+                        "description": "Optional severity label of the failure mode, stored with the dismissal.",
                         "maxLength": 20
                     },
                     "note": {
@@ -61643,46 +62136,42 @@
                         "readOnly": true
                     },
                     "insight": {
-                        "type": "integer",
-                        "readOnly": true
+                        "type": "integer"
                     },
                     "project": {
-                        "type": "integer",
-                        "readOnly": true
+                        "type": "integer"
                     },
                     "agent": {
-                        "type": "integer",
-                        "readOnly": true
+                        "type": "integer"
                     },
                     "failure_mode_index": {
                         "type": "integer",
-                        "readOnly": true
+                        "maximum": 2147483647,
+                        "minimum": -2147483648
                     },
                     "failure_mode_title": {
                         "type": "string",
-                        "readOnly": true
+                        "maxLength": 255
                     },
                     "metric": {
                         "type": [
                             "integer",
                             "null"
-                        ],
-                        "readOnly": true
+                        ]
                     },
                     "predefined_metric": {
                         "type": [
                             "integer",
                             "null"
-                        ],
-                        "readOnly": true
+                        ]
                     },
                     "metric_name": {
                         "type": "string",
-                        "readOnly": true
+                        "maxLength": 255
                     },
                     "execution_mode": {
                         "type": "string",
-                        "readOnly": true
+                        "maxLength": 32
                     },
                     "status": {
                         "enum": [
@@ -61695,48 +62184,42 @@
                         ],
                         "type": "string",
                         "description": "* `pending` - Pending\n* `generating_scenario` - Generating Scenario\n* `running` - Running\n* `reproduced` - Reproduced\n* `exhausted` - Exhausted\n* `failed` - Failed",
-                        "x-spec-enum-id": "cd33c9bed092472e",
-                        "readOnly": true
+                        "x-spec-enum-id": "cd33c9bed092472e"
                     },
-                    "scenario_ids": {
-                        "readOnly": true
-                    },
+                    "scenario_ids": {},
                     "max_attempts": {
                         "type": "integer",
-                        "readOnly": true
+                        "maximum": 2147483647,
+                        "minimum": -2147483648
                     },
                     "attempts_made": {
                         "type": "integer",
-                        "readOnly": true
+                        "maximum": 2147483647,
+                        "minimum": -2147483648
                     },
                     "reproduced": {
-                        "type": "boolean",
-                        "readOnly": true
+                        "type": "boolean"
                     },
                     "current_result": {
                         "type": [
                             "integer",
                             "null"
-                        ],
-                        "readOnly": true
+                        ]
                     },
                     "reproducing_run": {
                         "type": [
                             "integer",
                             "null"
-                        ],
-                        "readOnly": true
+                        ]
                     },
                     "reproducing_result": {
                         "type": [
                             "integer",
                             "null"
-                        ],
-                        "readOnly": true
+                        ]
                     },
                     "error_message": {
-                        "type": "string",
-                        "readOnly": true
+                        "type": "string"
                     },
                     "created_at": {
                         "type": "string",
@@ -61748,7 +62231,13 @@
                         "format": "date-time",
                         "readOnly": true
                     }
-                }
+                },
+                "required": [
+                    "agent",
+                    "failure_mode_index",
+                    "insight",
+                    "project"
+                ]
             },
             "Invite": {
                 "type": "object",
@@ -62198,6 +62687,7 @@
             },
             "MembershipInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -62989,6 +63479,30 @@
                     "evaluation_trigger_custom_code": {
                         "type": "string",
                         "description": "\nPython custom code to determine metric relevance. Code should set _result (bool) and _explanation (str).\nExample:\n```python\n_result = True\n_explanation = \"Metric is relevant\"\nif \"call_end_reason\" in data and data[\"call_end_reason\"] == \"customer-hung-up\":\n    _result = False\n    _explanation = \"Customer hung up, metric not applicable\"\n```\n"
+                    },
+                    "llm_provider": {
+                        "enum": [
+                            "openai",
+                            "gemini",
+                            "dspy-gepa-gemini-flash",
+                            "deepseek-v4-flash"
+                        ],
+                        "type": "string",
+                        "description": "* `openai` - OpenAI\n* `gemini` - Gemini\n* `dspy-gepa-gemini-flash` - Dspy Gepa Gemini Flash\n* `deepseek-v4-flash` - DeepSeek V4 Flash",
+                        "x-spec-enum-id": "6d1d2e77c71d1721",
+                        "writeOnly": true
+                    },
+                    "relevance_llm_provider": {
+                        "enum": [
+                            "openai",
+                            "gemini",
+                            "dspy-gepa-gemini-flash",
+                            "deepseek-v4-flash"
+                        ],
+                        "type": "string",
+                        "description": "* `openai` - OpenAI\n* `gemini` - Gemini\n* `dspy-gepa-gemini-flash` - Dspy Gepa Gemini Flash\n* `deepseek-v4-flash` - DeepSeek V4 Flash",
+                        "x-spec-enum-id": "6d1d2e77c71d1721",
+                        "writeOnly": true
                     },
                     "vocera_defined_metric_code": {
                         "type": "string",
@@ -64829,6 +65343,7 @@
             },
             "Organization": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -66034,6 +66549,37 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/Notification"
+                        }
+                    }
+                }
+            },
+            "PaginatedOrganizationList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Organization"
                         }
                     }
                 }
@@ -67323,6 +67869,30 @@
                         "type": "string",
                         "description": "\nPython custom code to determine metric relevance. Code should set _result (bool) and _explanation (str).\nExample:\n```python\n_result = True\n_explanation = \"Metric is relevant\"\nif \"call_end_reason\" in data and data[\"call_end_reason\"] == \"customer-hung-up\":\n    _result = False\n    _explanation = \"Customer hung up, metric not applicable\"\n```\n"
                     },
+                    "llm_provider": {
+                        "enum": [
+                            "openai",
+                            "gemini",
+                            "dspy-gepa-gemini-flash",
+                            "deepseek-v4-flash"
+                        ],
+                        "type": "string",
+                        "description": "* `openai` - OpenAI\n* `gemini` - Gemini\n* `dspy-gepa-gemini-flash` - Dspy Gepa Gemini Flash\n* `deepseek-v4-flash` - DeepSeek V4 Flash",
+                        "x-spec-enum-id": "6d1d2e77c71d1721",
+                        "writeOnly": true
+                    },
+                    "relevance_llm_provider": {
+                        "enum": [
+                            "openai",
+                            "gemini",
+                            "dspy-gepa-gemini-flash",
+                            "deepseek-v4-flash"
+                        ],
+                        "type": "string",
+                        "description": "* `openai` - OpenAI\n* `gemini` - Gemini\n* `dspy-gepa-gemini-flash` - Dspy Gepa Gemini Flash\n* `deepseek-v4-flash` - DeepSeek V4 Flash",
+                        "x-spec-enum-id": "6d1d2e77c71d1721",
+                        "writeOnly": true
+                    },
                     "vocera_defined_metric_code": {
                         "type": "string",
                         "readOnly": true,
@@ -67612,6 +68182,7 @@
             },
             "PatchedOrganization": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -68153,6 +68724,11 @@
                             }
                         ],
                         "readOnly": true
+                    },
+                    "organization_id": {
+                        "type": "integer",
+                        "writeOnly": true,
+                        "description": "ID of the organization to create the project under. Required when authenticating as a user (you must be an admin of that organization); omit it when using an organization-scoped API key, where the organization is inferred from the key."
                     },
                     "outbound_timeout": {
                         "type": "integer",
@@ -71557,6 +72133,11 @@
                         "items": {},
                         "description": "Expected-value changes detected in the run that lacked explicit user approval"
                     },
+                    "unresolved_samples": {
+                        "type": "array",
+                        "items": {},
+                        "description": "Samples the optimizer could not resolve, each with a verdict (noise / ambiguous label / prompt limit), the observed pass rate across repeated evaluations, and a user-facing explanation of why 100% accuracy was not reachable for it."
+                    },
                     "optimization_summary": {
                         "type": "string",
                         "default": "",
@@ -71593,6 +72174,11 @@
                             }
                         ],
                         "readOnly": true
+                    },
+                    "organization_id": {
+                        "type": "integer",
+                        "writeOnly": true,
+                        "description": "ID of the organization to create the project under. Required when authenticating as a user (you must be an admin of that organization); omit it when using an organization-scoped API key, where the organization is inferred from the key."
                     },
                     "outbound_timeout": {
                         "type": "integer",
@@ -71879,6 +72465,7 @@
             },
             "ProjectInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78451,6 +79038,7 @@
             },
             "UserInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",

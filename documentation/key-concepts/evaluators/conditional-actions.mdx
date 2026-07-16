@@ -1121,6 +1121,23 @@ One `auto_run` function feeding both flows: condition 1 drops a fetched value in
 
 If the API call fails, the declared `default`s take over: condition 1 speaks "It's under unknown." and the testing agent in condition 2 is told the lookup failed rather than inventing a status.
 
+**On-demand variant (`auto_run: false`):** to run the lookup only at a specific point in the flow instead of at call start, turn off `auto_run` and invoke it with a tag — the function completes before the rest of the action is spoken:
+
+```json
+"functions": [
+  { "name": "lookup", "type": "rest_api", "auto_run": false,
+    "config": { "method": "GET", "url": "https://api.example.com/orders/{{test_profile.order_id}}",
+      "response_mapping": { "customer": { "path": "$.customer_name", "default": "unknown" } } } }
+],
+"conditions": [
+  { "id": 1, "condition": "The agent asks for the name on the order",
+    "action": "One moment. <function name=\"lookup\"/> It's under {{function.lookup.customer}}.",
+    "type": "standard", "fixed_message": true }
+]
+```
+
+Nothing runs at call start; the request fires the moment condition 1 executes, and the same fixed/non-fixed usage rules apply from there.
+
 ## Best Practices
 
 <CardGroup cols={2}>

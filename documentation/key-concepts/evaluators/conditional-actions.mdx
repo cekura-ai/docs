@@ -813,27 +813,7 @@ A failed function never breaks the conversation. On a timeout, an error response
 - Placeholders require `fixed_message: true`, and the key must be an output declared in that function's `response_mapping`.
 - Neither tags nor placeholders may appear on the First Message (`id: 0`) — use `auto_run` and reference the values from a later condition.
 
-### Complete example
-
-```json
-{
-  "role": "You are a customer checking on an order",
-  "functions": [
-    { "name": "lookup", "type": "rest_api", "auto_run": true,
-      "config": { "method": "GET", "url": "https://api.example.com/orders/{{test_profile.order_id}}",
-        "response_mapping": {
-          "status": { "path": "$.status", "default": "unknown" },
-          "customer": { "path": "$.customer_name", "default": "unknown" } } } }
-  ],
-  "conditions": [
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hi, I'd like to check my order.", "type": "standard", "fixed_message": true },
-    { "id": 1, "condition": "The agent asks for the name on the order", "action": "It's under {{function.lookup.customer}}.", "type": "standard", "fixed_message": true },
-    { "id": 2, "condition": 1, "action": "Ask whether the order status they see matches yours, mentioning the real status.", "type": "action_followup", "fixed_message": false }
-  ]
-}
-```
-
-`lookup` runs in the background as the call starts. Condition 1 speaks the fetched customer name verbatim; condition 2 lets the testing agent phrase the status naturally from the same response.
+For a full scenario showing both flows — a fixed-message placeholder and a non-fixed grounded reply from one `auto_run` function — see [Example 5](#example-5-live-data-via-a-custom-function) below.
 
 ## Complete Examples
 
@@ -1075,6 +1055,71 @@ A failed function never breaks the conversation. On a timeout, an error response
   ]
 }
 ```
+
+### Example 5: Live Data via a Custom Function
+
+One `auto_run` function feeding both flows: condition 1 drops a fetched value into a **fixed message** with a `{{function.*}}` placeholder, and condition 2 lets the testing agent phrase a **non-fixed** reply from the same response — no placeholder needed.
+
+```json
+{
+  "role": "You are a customer checking on an order",
+  "functions": [
+    {
+      "name": "lookup",
+      "type": "rest_api",
+      "auto_run": true,
+      "config": {
+        "method": "GET",
+        "url": "https://api.example.com/orders/{{test_profile.order_id}}",
+        "timeout_seconds": 5,
+        "response_mapping": {
+          "status": { "path": "$.status", "default": "unknown" },
+          "customer": { "path": "$.customer_name", "default": "unknown" }
+        }
+      }
+    }
+  ],
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "FIRST_MESSAGE",
+      "action": "Hi, I'd like to check on my order.",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent asks for the name on the order",
+      "action": "It's under {{function.lookup.customer}}.",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 2,
+      "condition": 1,
+      "action": "Ask whether the order status they see matches yours, mentioning the real status from the lookup.",
+      "type": "action_followup",
+      "fixed_message": false
+    },
+    {
+      "id": 3,
+      "condition": "The agent confirms the order status",
+      "action": "Great, that's all I needed. Thanks! <endcall />",
+      "type": "standard",
+      "fixed_message": true
+    }
+  ]
+}
+```
+
+**Turn-by-turn flow for Example 5:**
+1. As the call connects, `lookup` runs once in the background (`auto_run`) — say it returns `{"status": "shipped", "customer_name": "Jane Doe"}`
+2. Testing agent sends condition 0: "Hi, I'd like to check on my order."
+3. The agent asks for the name — condition 1 (**fixed**) fires with the placeholder substituted verbatim: "It's under Jane Doe."
+4. The agent replies — condition 2 (**non-fixed**) fires; the testing agent is given the lookup results automatically and phrases them naturally: e.g. "On my side it shows as shipped — is that what you see?"
+5. The agent confirms — condition 3 closes the call
+
+If the API call fails, the declared `default`s take over: condition 1 speaks "It's under unknown." and the testing agent in condition 2 is told the lookup failed rather than inventing a status.
 
 ## Best Practices
 

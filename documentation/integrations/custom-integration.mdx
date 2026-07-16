@@ -275,11 +275,89 @@ If your webhook integration isn't working as expected:
 
 ## Mock Tools (optional)
 
-If your agent calls tools and you want to test it without hitting live third-party services, use [Mock Tools](/documentation/key-concepts/evaluators/mock-tools). With a custom integration there are two independent pieces — both are required for tool-based evaluation to work.
+If your agent calls tools and you want to test it without hitting live third-party services, use [Mock Tools](/documentation/key-concepts/evaluators/mock-tools). There are two ways to wire mocking into a custom / self-hosted integration:
 
-### 1. Call the Cekura mock endpoint during the call
+- **MCP auto-discovery (recommended if your agent uses an MCP server).** Cekura reads your tool list directly from your own MCP server, generates mock data, and then hosts a drop-in mock MCP endpoint you point your agent at during test runs. No per-tool wiring. Covered in [Mock an MCP server](#mock-an-mcp-server).
+- **Per-tool webhooks (works for any agent).** Point each tool at its individual Cekura mock endpoint. Covered in [Per-tool webhook mocking](#per-tool-webhook-mocking).
 
-Point the tool at its Cekura mock endpoint instead of the real service. During the call, your agent makes a normal HTTP request and gets back the mock output you configured.
+Whichever you use, you must also [report each tool call in your transcript](#report-the-tool-call-in-your-transcript) — otherwise tool-based metrics have nothing to score against.
+
+### Mock an MCP server
+
+If your self-hosted agent talks to an [MCP](https://modelcontextprotocol.io) server (JSON-RPC 2.0) for its tools, Cekura can discover those tools automatically and stand in for the server during tests. You never rewrite individual tool URLs — you swap one MCP endpoint.
+
+**Prerequisite:** your agent's MCP server must be reachable by Cekura and expose the standard `tools/list` method. Provide any auth as headers; they are stored encrypted.
+
+<Steps>
+  <Step title="Auto-fetch tools from your MCP server">
+    Call auto-fetch with `provider="custom"` and your MCP server URL. Cekura queries `tools/list`, LLM-generates realistic mock input/output data for each tool from your agent's context, and registers them all under a single Cekura-hosted mock MCP endpoint.
+
+    ```bash
+    curl -X POST https://api.cekura.ai/test_framework/v1/aiagents/{agent_id}/tools/auto-fetch/ \
+      -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "provider": "custom",
+        "mcp_server_url": "https://your-agent.example.com/mcp",
+        "mcp_server_headers": {"Authorization": "Bearer <token>"}
+      }'
+    ```
+
+    Returns a `progress_id`. Poll `GET .../tools/auto-fetch-progress/?progress_id=<id>` until `status` is `completed`. That's the only setup call — there is no separate "enable" step for a self-hosted agent.
+
+    <Note>
+      The `mcp_server_url` is validated before any request is made: only `http`/`https` schemes are allowed, private / loopback / link-local / cloud-metadata addresses are blocked (DNS is resolved and checked), and headers that could rewrite the request (`Host`, `Cookie`, `X-Forwarded-*`) are rejected. Headers are stored encrypted. An agent is pinned to a single MCP server — re-running auto-fetch with the same URL refreshes the tools; switching to a different URL requires deleting the existing mock tools first.
+    </Note>
+  </Step>
+  <Step title="Review and edit the generated mock data">
+    List the tools with `GET .../tools/` and refine any input/output mappings (`PATCH` the mock tool). Add one entry per input variation your evaluators exercise — see [Handling Dynamic Input Parameters](/documentation/key-concepts/evaluators/mock-tools#handling-dynamic-input-parameters). Re-running auto-fetch preserves tools that already have mock data.
+  </Step>
+  <Step title="Get your mock MCP endpoint URL">
+    Read `GET .../tools/mock-status/` — it returns the stable Cekura-hosted MCP endpoint for your agent under `mcp_endpoints[]`:
+
+    ```json
+    {
+      "mock_enabled": true,
+      "provider": "custom",
+      "mcp_endpoints": [
+        {
+          "mock_index": 1,
+          "url": "https://api.cekura.ai/test_framework/v1/aiagents/{agent_id}/mcp/1/",
+          "tool_names": ["get_account", "book_appointment"]
+        }
+      ],
+      "tool_endpoints": []
+    }
+    ```
+
+    **Always read the URL from the API** — don't hand-build it, so it stays correct across environments.
+  </Step>
+  <Step title="Point your agent at the mock endpoint during test runs">
+    Configure your agent's MCP client to use `mcp_endpoints[0].url` instead of your real MCP server for the duration of a test. It is a standard MCP JSON-RPC 2.0 server (`initialize`, `tools/list`, `tools/call`) and requires no authentication. A `tools/call` returns your configured mock output:
+
+    ```json
+    // Request  POST .../mcp/1/
+    {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+     "params": {"name": "get_account", "arguments": {"user_id": 1}}}
+
+    // Response
+    {"jsonrpc": "2.0", "id": 1,
+     "result": {"content": [{"type": "text", "text": "{\"account_tier\": \"Premium\"}"}]}}
+    ```
+
+    Enabling and disabling mocking is entirely on your side: point the MCP client at this URL to use the mocks, or back at your real server to stop. Cekura can't reach into a self-hosted agent to flip it for you.
+  </Step>
+</Steps>
+
+<Warning>
+  The mock MCP endpoint makes your tools *respond* correctly, but the [Mock Tool Call Accuracy](/documentation/key-concepts/evaluators/mock-tools#verifying-tool-calls-the-mock-tool-call-accuracy-metric) metric scores the **transcript**, not the endpoint. You must still emit a `function_call` message per tool call in the transcript you post — see [Report the tool call in your transcript](#report-the-tool-call-in-your-transcript) below.
+</Warning>
+
+### Per-tool webhook mocking
+
+If your agent does not use MCP, mock each tool individually. There are two pieces — both required for tool-based evaluation to work.
+
+**1. Call the Cekura mock endpoint during the call.** Point the tool at its Cekura mock endpoint instead of the real service. During the call, your agent makes a normal HTTP request and gets back the mock output you configured.
 
 - **Method:** `POST`
 - **Body:** the tool's arguments as a flat JSON object — the same shape as the `input` in your mock configuration. For example, a tool whose mock entry is `{"input": {"user_id": 1}, ...}` is called with body `{"user_id": 1}`.
@@ -288,7 +366,7 @@ Point the tool at its Cekura mock endpoint instead of the real service. During t
 
 See the [Mock Tool API reference](/api-reference/test_framework/post-mock-tool) for the exact endpoint and request/response schema.
 
-### 2. Report the tool call in your transcript
+### Report the tool call in your transcript
 
 Calling the mock endpoint makes the tool *respond* correctly during the call, but it does **not** by itself tell Cekura's metrics that a tool was used. The [Mock Tool Call Accuracy](/documentation/key-concepts/evaluators/mock-tools#verifying-tool-calls-the-mock-tool-call-accuracy-metric) metric (and any tool-based metric) reads the **transcript** to determine what was called.
 

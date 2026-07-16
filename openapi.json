@@ -26516,6 +26516,173 @@
                 }
             }
         },
+        "/test_framework/v1/runs-external/{id}/chat/": {
+            "post": {
+                "operationId": "runs-api-chat",
+                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating interrupts it: the older turn is marked `dropped` but its message is kept, and the newest turn's reply answers all messages received since the last reply. Repeat until `ended` is true (or call end-chat).",
+                "summary": "Submit a turn to an API-chat run",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatTurnSubmitResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "description": "Run is still starting, or has already ended."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/runs-external/{id}/chat/{turn_id}/": {
+            "get": {
+                "operationId": "runs-api-chat-turn",
+                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission — its message is kept and the newer turn's reply answers both; `error` means generation failed. Turn 0 is the run's opening: `message` is the evaluator's first message, or null when your agent speaks first. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
+                "summary": "Poll a submitted API-chat turn",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "turn_id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatTurnPollResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "Unknown turn."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/runs-external/{id}/end-chat/": {
+            "post": {
+                "operationId": "runs-api-chat-end",
+                "description": "Finish an API-chat run",
+                "summary": "Finish an API-chat run",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatFinishResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/runs-external/{id}/end_call/": {
             "post": {
                 "operationId": "end-call",
@@ -27207,6 +27374,173 @@
                 "responses": {
                     "204": {
                         "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/runs/{id}/chat/": {
+            "post": {
+                "operationId": "runs-api-chat_2",
+                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating interrupts it: the older turn is marked `dropped` but its message is kept, and the newest turn's reply answers all messages received since the last reply. Repeat until `ended` is true (or call end-chat).",
+                "summary": "Submit a turn to an API-chat run",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatTurnSubmitResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "description": "Run is still starting, or has already ended."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/runs/{id}/chat/{turn_id}/": {
+            "get": {
+                "operationId": "runs-api-chat-turn_2",
+                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission — its message is kept and the newer turn's reply answers both; `error` means generation failed. Turn 0 is the run's opening: `message` is the evaluator's first message, or null when your agent speaks first. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
+                "summary": "Poll a submitted API-chat turn",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "turn_id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatTurnPollResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "Unknown turn."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/runs/{id}/end-chat/": {
+            "post": {
+                "operationId": "runs-api-chat-end_2",
+                "description": "Finish an API-chat run",
+                "summary": "Finish an API-chat run",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatFinishResponse"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -31101,6 +31435,70 @@
                                             "example": "2025-02-25T21:00:01.990052Z"
                                         }
                                     }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios-external/run_scenarios_api_chat/": {
+            "post": {
+                "operationId": "scenarios-run-api-chat",
+                "description": "API CHAT RUN (pull mode): open one or more chat conversations that YOU drive turn-by-turn over REST — Cekura plays the simulated user, you play the agent under test. No agent connection is dialed; there is no server-side conversation loop, so a conversation can span minutes or up to an hour with turns arbitrarily far apart.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Driving each run** (the response `result.runs[].id` are the run IDs):\n1. If the scenario has a first message, the simulated user speaks first — read it from the run transcript. Otherwise you speak first.\n2. `POST /runs/{run_id}/chat/` with your agent's message → returns a `turn_id`.\n3. Poll `GET /runs/{run_id}/chat/{turn_id}/` until `status` is `ready` to read the reply.\n4. Repeat until `ended` is true, or call `POST /runs/{run_id}/end-chat/`.\n\n`timeout` is the overall run timeout: each conversation is finalized and scored automatically once it elapses (defaults to the project's duration, capped at 1 hour).",
+                "summary": "Start customer-driven (API chat) evaluator runs",
+                "tags": [
+                    "Evaluators"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RunScenarioResult"
                                 }
                             }
                         },
@@ -36384,6 +36782,70 @@
                         "enabled": true,
                         "name": "scenarios-run-agora",
                         "description": "AGORA RTC VOICE RUN: Execute evaluators against an agent reachable in an Agora RTC channel. Cekura joins the channel as a participant and converses. The agent must have `agora_data.session_endpoint_url` configured — an endpoint that mints the per-call channel and token; Cekura calls it at run time and never stores the join details.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)\n- `scenarios_run_pipecat_v2` — Pipecat Cloud WebRTC"
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios/run_scenarios_api_chat/": {
+            "post": {
+                "operationId": "scenarios-run-api-chat_2",
+                "description": "API CHAT RUN (pull mode): open one or more chat conversations that YOU drive turn-by-turn over REST — Cekura plays the simulated user, you play the agent under test. No agent connection is dialed; there is no server-side conversation loop, so a conversation can span minutes or up to an hour with turns arbitrarily far apart.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Driving each run** (the response `result.runs[].id` are the run IDs):\n1. If the scenario has a first message, the simulated user speaks first — read it from the run transcript. Otherwise you speak first.\n2. `POST /runs/{run_id}/chat/` with your agent's message → returns a `turn_id`.\n3. Poll `GET /runs/{run_id}/chat/{turn_id}/` until `status` is `ready` to read the reply.\n4. Repeat until `ended` is true, or call `POST /runs/{run_id}/end-chat/`.\n\n`timeout` is the overall run timeout: each conversation is finalized and scored automatically once it elapses (defaults to the project's duration, capped at 1 hour).",
+                "summary": "Start customer-driven (API chat) evaluator runs",
+                "tags": [
+                    "Evaluators"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RunScenarioResult"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -45945,6 +46407,173 @@
                 }
             }
         },
+        "/test_framework/v2/runs/{id}/chat/": {
+            "post": {
+                "operationId": "runs-api-chat_3",
+                "description": "Submit your agent-under-test's latest message on a customer-driven (API chat) run. The simulated user's reply is generated in the background — the response returns a `turn_id` immediately; poll GET /runs/{run_id}/chat/{turn_id}/ until its `status` is `ready` to read the reply, then submit the next turn. Submitting a new turn while one is still generating interrupts it: the older turn is marked `dropped` but its message is kept, and the newest turn's reply answers all messages received since the last reply. Repeat until `ended` is true (or call end-chat).",
+                "summary": "Submit a turn to an API-chat run",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatTurn"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatTurnSubmitResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "description": "Run is still starting, or has already ended."
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/runs/{id}/chat/{turn_id}/": {
+            "get": {
+                "operationId": "runs-api-chat-turn_3",
+                "description": "Poll for the simulated user's reply to a turn submitted via POST /runs/{run_id}/chat/. `status` is `generating` until the reply is ready, then `ready` (with `message` and `ended`). `dropped` means the turn was superseded by a newer submission — its message is kept and the newer turn's reply answers both; `error` means generation failed. Turn 0 is the run's opening: `message` is the evaluator's first message, or null when your agent speaks first. Any turn stays pollable until the run's turn history expires, so the last reply is still retrievable after the run finishes.",
+                "summary": "Poll a submitted API-chat turn",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "turn_id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatTurnPollResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "Unknown turn."
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/runs/{id}/end-chat/": {
+            "post": {
+                "operationId": "runs-api-chat-end_3",
+                "description": "Finish an API-chat run",
+                "summary": "Finish an API-chat run",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this run.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Runs"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApiChatFinish"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiChatFinishResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v2/runs/{id}/end_call/": {
             "post": {
                 "operationId": "end-call_3",
@@ -49324,6 +49953,70 @@
                                             "example": "2025-02-25T21:00:01.990052Z"
                                         }
                                     }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/scenarios/run_scenarios_api_chat/": {
+            "post": {
+                "operationId": "scenarios-run-api-chat_3",
+                "description": "API CHAT RUN (pull mode): open one or more chat conversations that YOU drive turn-by-turn over REST — Cekura plays the simulated user, you play the agent under test. No agent connection is dialed; there is no server-side conversation loop, so a conversation can span minutes or up to an hour with turns arbitrarily far apart.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Driving each run** (the response `result.runs[].id` are the run IDs):\n1. If the scenario has a first message, the simulated user speaks first — read it from the run transcript. Otherwise you speak first.\n2. `POST /runs/{run_id}/chat/` with your agent's message → returns a `turn_id`.\n3. Poll `GET /runs/{run_id}/chat/{turn_id}/` until `status` is `ready` to read the reply.\n4. Repeat until `ended` is true, or call `POST /runs/{run_id}/end-chat/`.\n\n`timeout` is the overall run timeout: each conversation is finalized and scored automatically once it elapses (defaults to the project's duration, capped at 1 hour).",
+                "summary": "Start customer-driven (API chat) evaluator runs",
+                "tags": [
+                    "Evaluators"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosApiChat"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RunScenarioResult"
                                 }
                             }
                         },
@@ -58198,6 +58891,136 @@
                     }
                 }
             },
+            "ApiChatFinish": {
+                "type": "object",
+                "description": "Request body for POST /runs/{run_id}/end-chat/ (finish the chat).",
+                "properties": {
+                    "reason": {
+                        "type": "string",
+                        "description": "Optional end reason, e.g. 'main_agent_ended_call'."
+                    }
+                }
+            },
+            "ApiChatFinishResponse": {
+                "type": "object",
+                "description": "Response for POST /runs/{run_id}/end-chat/.",
+                "properties": {
+                    "run_id": {
+                        "type": "integer"
+                    },
+                    "result_id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "result_id",
+                    "run_id",
+                    "status"
+                ]
+            },
+            "ApiChatTurn": {
+                "type": "object",
+                "description": "Request body for POST /runs/{run_id}/chat/ (submit one turn). Same message shape\nas the websocket chat integration: a normal message (`content`), optional `metadata`\nmerged into the run, and/or a function call (`role` + `data`).",
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "Your agent-under-test's latest message. Submitting it returns a `turn_id`; poll GET /runs/{run_id}/chat/{turn_id}/ for the simulated user's reply."
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Optional metadata merged into the run (last-write-wins). Can be sent alone."
+                    },
+                    "role": {
+                        "enum": [
+                            "Function Call",
+                            "Function Call Result"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "96979c0bc176b860",
+                        "description": "Set to record a tool call instead of a message (no reply is generated).\n\n* `Function Call` - Function Call\n* `Function Call Result` - Function Call Result"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Function-call payload: {id, name, arguments} for a call, {id, result} for a result."
+                    }
+                }
+            },
+            "ApiChatTurnPollResponse": {
+                "type": "object",
+                "description": "Response for GET /runs/{run_id}/chat/{turn_id}/ (poll for the reply).",
+                "properties": {
+                    "run_id": {
+                        "type": "integer"
+                    },
+                    "result_id": {
+                        "type": "integer"
+                    },
+                    "turn_id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "'generating' until ready, then 'ready' (or 'error')."
+                    },
+                    "message": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "The simulated user's reply; null until status is 'ready'."
+                    },
+                    "ended": {
+                        "type": "boolean",
+                        "description": "True when the conversation has ended."
+                    },
+                    "ended_reason": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "ended",
+                    "ended_reason",
+                    "message",
+                    "result_id",
+                    "run_id",
+                    "status",
+                    "turn_id"
+                ]
+            },
+            "ApiChatTurnSubmitResponse": {
+                "type": "object",
+                "description": "Response for POST /runs/{run_id}/chat/ (turn accepted).",
+                "properties": {
+                    "run_id": {
+                        "type": "integer"
+                    },
+                    "result_id": {
+                        "type": "integer"
+                    },
+                    "turn_id": {
+                        "type": "integer",
+                        "description": "Poll this turn for the simulated user's reply."
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Turn status; poll for the reply if 'generating'."
+                    }
+                },
+                "required": [
+                    "result_id",
+                    "run_id",
+                    "status",
+                    "turn_id"
+                ]
+            },
             "AskAboutFailuresReportsRequest": {
                 "type": "object",
                 "properties": {
@@ -59040,7 +59863,6 @@
             },
             "CallLogDetail": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -59232,7 +60054,6 @@
             },
             "CallLogList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -60396,7 +61217,6 @@
             },
             "Dashboard": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -60528,7 +61348,6 @@
             },
             "DashboardList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -63384,7 +64203,6 @@
             },
             "MetricList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -63643,7 +64461,6 @@
             },
             "MetricListSerializerV2": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -66174,7 +66991,6 @@
             },
             "PatchedCallLogDetail": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -66607,7 +67423,6 @@
             },
             "PatchedDashboard": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69340,7 +70155,6 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -72600,7 +73414,6 @@
             },
             "RunList": {
                 "type": "object",
-                "description": "Adds outbound dial-window fields read from cekura_metadata.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -72983,6 +73796,86 @@
                     }
                 }
             },
+            "RunScenarioResult": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "\nUnique identifier for the Result\nExample: `123`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "\nName of the Result\nExample: `\"Test Result 1\"`\n",
+                        "maxLength": 255
+                    },
+                    "agent": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "\nID of the AI agent that was tested\nExample: `123`\n"
+                    },
+                    "agent_inbound": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "\nWhether the agent is configured for inbound calls (true) or outbound calls (false)\nExample: `true` or `false`\n"
+                    },
+                    "status": {
+                        "enum": [
+                            "running",
+                            "completed",
+                            "failed",
+                            "pending",
+                            "in_progress",
+                            "evaluating",
+                            "in_queue",
+                            "timeout",
+                            "cancelled",
+                            "scaling_up"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "623e22fc1eb17833",
+                        "default": "pending",
+                        "description": "\nCurrent status of the result\n\n\n* `running` - Running\n* `completed` - Completed\n* `failed` - Failed\n* `pending` - Pending\n* `in_progress` - In Progress\n* `evaluating` - Evaluating\n* `in_queue` - In Queue\n* `timeout` - Timeout\n* `cancelled` - Cancelled\n* `scaling_up` - Scaling Up"
+                    },
+                    "success_rate": {
+                        "type": "number",
+                        "format": "double",
+                        "default": 0.0,
+                        "description": "Success rate of the test runs as a decimal (0.0 to 1.0)"
+                    },
+                    "run_as_text": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "\nWhether this test was run in text mode instead of voice mode\nExample: `true` or `false`\n"
+                    },
+                    "is_cronjob": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "\nWhether this result was created by a scheduled cronjob\nExample: `true` or `false`\n"
+                    },
+                    "runs": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Run summaries for this result. For full run data including transcripts and metric scores, fetch the result detail endpoint — there `runs` is a dict keyed by run ID.",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "\nTimestamp when this test result was created\nExample: `2021-01-01 00:00:00`\n"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "Timestamp when this test result was last updated"
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
             "RunScenariosRetellWebRTCRequest": {
                 "type": "object",
                 "properties": {
@@ -73111,7 +74004,6 @@
             },
             "Scenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -74008,7 +74900,6 @@
             },
             "ScenarioList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -74228,7 +75119,6 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -75703,7 +76593,6 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -75809,6 +76698,82 @@
                             "type": "string"
                         },
                         "description": "\nNames of mock tools to activate for this run. Cekura swaps those tools' URLs to mock endpoints while the\nrun is active and restores the originals when it finishes. Omit (or send null) to mock every tool\nconfigured on the agent; send an empty list to mock none so every tool keeps its original endpoint.\nExample: `[\"get_appointments\", \"cancel_booking\"]`\n"
+                    }
+                }
+            },
+            "SchemaPostRunScenariosApiChat": {
+                "type": "object",
+                "description": "Schema for the run_scenarios_api_chat endpoint (customer-driven pull mode).\nSame selection fields as the other run endpoints (agent_id, scenarios/tags/\nfolder_path, frequency, personality/test-profile overrides) plus `timeout`.",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "ID of the agent to run evaluators for"
+                    },
+                    "assistant_id": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAlternative to agent ID - the assistant ID to use for this scenario\nExample: `\"asst_1234567890\"`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Label text for result"
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nList of tags to filter evaluators to run. Either evaluators or tags must be provided.\nExample: `[\"tag1\", \"tag2\", \"tag3\"]`\n"
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "description": "\nDot-separated folder path to select evaluators from (e.g. `\"Sales.Inbound\"`).\nMutually exclusive with `scenarios` and `tags`. Requires `project_id`.\n"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "description": "\nProject ID. Required when using `folder_path` (or when passing a folder path string via `scenarios`).\nExample: `1376`\n"
+                    },
+                    "frequency": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1,
+                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                    },
+                    "personality_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Personality IDs to override for this run. Defaults to each scenario's personality."
+                    },
+                    "test_profile_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Test-profile IDs to override for this run. Defaults to each scenario's test profile."
+                    },
+                    "timeout": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 3600,
+                        "minimum": 1,
+                        "description": "Overall run timeout in seconds — the whole conversation's max lifetime (NOT a per-message timeout). When it elapses the run is finalized and scored automatically. Defaults to the project's configured duration. Capped at 3600 (1 hour)."
                     }
                 }
             },
@@ -76382,7 +77347,6 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -76532,7 +77496,6 @@
             },
             "SchemaScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",

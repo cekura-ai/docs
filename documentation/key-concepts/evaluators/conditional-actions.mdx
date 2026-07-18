@@ -826,12 +826,12 @@ Audio can only be attached to a **fixed-message** condition (`fixed_message: tru
 ### How it works
 
 1. You upload an audio file to a specific condition (from the editor UI or the API).
-2. Cekura transcodes it to a standard format, stores it, and **transcribes it automatically** (with word-level timing) in the background.
+2. Cekura **transcribes it automatically** in the background — this is why a clip is briefly *processing* before it's ready to use.
 3. The condition's `action` is replaced with a managed reference tag — `<audio id="…"/>` — pointing at the uploaded clip. **You don't write this tag by hand**; attaching and removing audio manages it for you.
-4. On the call, when the condition fires, the testing agent plays the recording. The transcript appears in the conversation transcript just like spoken text, and if the main agent barges in mid-clip, the transcript is trimmed at the right word.
+4. On the call, when the condition fires, the testing agent plays the recording, and its transcript appears in the conversation transcript just like spoken text.
 
 <Warning>
-The transcript is **derived from the recording** and is read-only — it is what the clip is transcribed as, used for matching and for the conversation transcript. It is not editable, and it is never stored in the `action` (the `action` holds only the `<audio>` reference tag).
+The transcript is **derived from the recording** and is read-only — you can't edit it, and it's never stored in the `action` (which holds only the `<audio>` reference tag).
 </Warning>
 
 ### Attaching audio (UI)
@@ -881,7 +881,6 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
   "transcript": "Hello, thanks for calling.",
   "duration": 1.78,
   "filename": "greeting.mp3",
-  "timing_source": "deepgram",
   "playback_url": "https://…/ab12cd34.wav"
 }
 ```
@@ -891,7 +890,7 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
 </ParamField>
 
 <ParamField path="file" type="file" required>
-  The audio file. Max **25 MB**; accepted formats: `wav`, `mp3`, `m4a`, `ogg`, `webm`, `flac`. Cekura transcodes it to 24 kHz mono PCM WAV on upload.
+  The audio file. Max **25 MB**; accepted formats: `wav`, `mp3`, `m4a`, `ogg`, `webm`, `flac`.
 </ParamField>
 
 ### Statuses & run gating
@@ -905,7 +904,7 @@ Each attached clip moves through these statuses:
 | `ready` | Transcript available; the clip will play on runs. |
 | `failed` | Transcription failed. Retry (re-upload) or remove the clip. |
 
-A scenario **cannot be run while any attached clip is not `ready`** — the run is rejected with a clear message (`"still transcribing — wait for it to finish"` for pending/processing, `"failed to transcribe — retry or remove it"` for failed). This guarantees every clip that plays on a call has a transcript for matching and fallback.
+A scenario **cannot be run while any attached clip is not `ready`** — the run is rejected with a clear message (`"still transcribing — wait for it to finish"` for pending/processing, `"failed to transcribe — retry or remove it"` for failed).
 
 <Note>
 A scenario that already uses **generated audio samples** can't also use attached audio — the upload returns `409`. Pick one per scenario.

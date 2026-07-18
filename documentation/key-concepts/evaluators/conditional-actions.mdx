@@ -815,6 +815,101 @@ A failed function never breaks the conversation. On a timeout, an error response
 
 For a full scenario showing both flows — a fixed-message placeholder and a non-fixed grounded reply from one `auto_run` function — see [Example 5](#example-5-live-data-via-a-custom-function) below.
 
+## Attached Audio
+
+Attach a pre-recorded audio clip to a condition and the testing agent **plays the recording instead of speaking the text with TTS** when that condition fires. Use it when the exact voice, accent, tone, or non-speech sound matters — reproducing a real caller's recording, a specific IVR prompt, background audio a synthetic voice can't recreate, or a regression case captured from a live call.
+
+<Note>
+Audio can only be attached to a **fixed-message** condition (`fixed_message: true`). It is not available on instruction-based (`fixed_message: false`) conditions — those are meant to vary, and a recording is fixed by definition.
+</Note>
+
+### How it works
+
+1. You upload an audio file to a specific condition (from the editor UI or the API).
+2. Cekura **transcribes it automatically** in the background — this is why a clip is briefly *processing* before it's ready to use.
+3. The condition's `action` is replaced with a managed reference tag — `<audio id="…"/>` — pointing at the uploaded clip. **You don't write this tag by hand**; attaching and removing audio manages it for you.
+4. On the call, when the condition fires, the testing agent plays the recording, and its transcript appears in the conversation transcript just like spoken text.
+
+<Warning>
+The transcript is **derived from the recording** and is read-only — you can't edit it, and it's never stored in the `action` (which holds only the `<audio>` reference tag).
+</Warning>
+
+### Attaching audio (UI)
+
+In the Conditional Actions editor, each fixed-message condition has an **Attach audio** control:
+
+1. Click **Attach audio** and pick a file. A **Processing** badge appears while the clip transcribes.
+2. When it finishes, the condition shows the **read-only transcript** and an audio player. Use **Replace** to swap the clip or **Remove** to detach it (which restores the condition's original text action).
+3. While any attached clip is still processing (or has failed), **runs are blocked** for that scenario until it resolves — see [Statuses & run gating](#statuses-run-gating).
+
+### Attaching audio (API)
+
+Three endpoints on the scenario manage attached audio. The clip is uploaded as `multipart/form-data`.
+
+<CodeGroup>
+
+```bash Upload
+# Attach a clip to condition 2 of scenario 39001
+curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
+  -H "Authorization: Bearer $CEKURA_API_KEY" \
+  -F "condition_id=2" \
+  -F "file=@greeting.mp3"
+# 202 Accepted — transcription runs in the background
+```
+
+```bash List
+# List every attached clip on the scenario and its current status
+curl "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
+  -H "Authorization: Bearer $CEKURA_API_KEY"
+```
+
+```bash Delete
+# Detach and delete a clip by its audio_id
+curl -X DELETE "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/ab12cd34/" \
+  -H "Authorization: Bearer $CEKURA_API_KEY"
+```
+
+</CodeGroup>
+
+The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry looks like:
+
+```json
+{
+  "audio_id": "ab12cd34",
+  "condition_id": 2,
+  "status": "ready",
+  "transcript": "Hello, thanks for calling.",
+  "duration": 1.78,
+  "filename": "greeting.mp3",
+  "playback_url": "https://…/ab12cd34.wav"
+}
+```
+
+<ParamField path="condition_id" type="integer" required>
+  The `id` of the condition to attach the clip to. The condition must already exist and have `fixed_message: true`. **Save the scenario first** — you attach to a saved condition.
+</ParamField>
+
+<ParamField path="file" type="file" required>
+  The audio file. Max **25 MB**; accepted formats: `wav`, `mp3`, `m4a`, `ogg`, `webm`, `flac`.
+</ParamField>
+
+### Statuses & run gating
+
+Each attached clip moves through these statuses:
+
+| Status | Meaning |
+|---|---|
+| `pending` | Uploaded; transcription queued. |
+| `processing` | Transcribing. |
+| `ready` | Transcript available; the clip will play on runs. |
+| `failed` | Transcription failed. Retry (re-upload) or remove the clip. |
+
+A scenario **cannot be run while any attached clip is not `ready`** — the run is rejected with a clear message (`"still transcribing — wait for it to finish"` for pending/processing, `"failed to transcribe — retry or remove it"` for failed).
+
+<Note>
+A scenario that already uses **generated audio samples** can't also use attached audio — the upload returns `409`. Pick one per scenario.
+</Note>
+
 ## Complete Examples
 
 ### Example 1: Appointment Cancellation
@@ -1367,6 +1462,21 @@ Chain `action_followup` conditions to deliver an exact sequence of messages acro
     - Verify `fixed_message: true` is set on the first condition
     - Check that the role is defined
     - If the agent speaks first, set `action` to `""` (empty string is allowed for FIRST_MESSAGE only)
+  </Accordion>
+
+  <Accordion title="Can't run — an attached audio clip is still transcribing / failed" icon="waveform">
+    **Issue**: Runs are blocked with a message about an attached audio clip.
+
+    **Solution**: A scenario can't run while any [attached audio](#attached-audio) clip is not `ready`. Wait for transcription to finish (`pending`/`processing`), or if a clip `failed`, re-upload it or remove it. Check clip statuses via `GET scenarios/{id}/condition-audio/`.
+  </Accordion>
+
+  <Accordion title="Attach audio option is missing on a condition" icon="microphone-slash">
+    **Issue**: A condition has no way to attach a recording.
+
+    **Solutions**:
+    - Audio attaches only to **fixed-message** conditions — set `fixed_message: true` on the condition first.
+    - Save the scenario before attaching — uploads target a saved condition by its `id`.
+    - If the upload returns `409`, the scenario already uses generated audio samples; the two features are mutually exclusive per scenario.
   </Accordion>
 </AccordionGroup>
 

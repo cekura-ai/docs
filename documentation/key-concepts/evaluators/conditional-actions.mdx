@@ -661,6 +661,160 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
   </Accordion>
 </AccordionGroup>
 
+## Custom Functions
+
+Functions let the testing agent fetch **live data from your systems during the call** and use it in what it says — look up an order, pull an account record, then respond with the real values instead of invented ones. Declare functions once in a top-level `functions` array (a sibling of `role` and `conditions`), then use them from any condition's `action`.
+
+```json
+{
+  "role": "You are a customer checking on an order",
+  "functions": [
+    {
+      "name": "lookup_order",
+      "type": "rest_api",
+      "auto_run": true,
+      "config": {
+        "method": "GET",
+        "url": "https://api.example.com/orders/{{test_profile.order_id}}",
+        "headers": { "Accept": "application/json" },
+        "timeout_seconds": 5,
+        "response_mapping": {
+          "status": { "path": "$.data.status", "default": "unknown" },
+          "eta_days": "$.data.eta"
+        }
+      }
+    }
+  ],
+  "conditions": [ ... ]
+}
+```
+
+### Function fields
+
+<ParamField path="name" type="string" required>
+  Unique name used in tags and placeholders. Letters, digits, `_`, `-`; up to 64 characters.
+</ParamField>
+
+<ParamField path="type" type="string" required>
+  The function type. Currently `rest_api` — an HTTP call to your API.
+</ParamField>
+
+<ParamField path="auto_run" type="boolean" default="true">
+  When `true` (the default), the function runs once automatically at the start of the call, in the background — its values are ready before the conversation needs them. Set `false` to run the function only when a condition invokes it with a `<function>` tag.
+</ParamField>
+
+<ParamField path="config.method" type="string" default="GET">
+  `GET` or `POST`.
+</ParamField>
+
+<ParamField path="config.url" type="string" required>
+  The endpoint to call. Supports `{{test_profile.*}}` substitution. Must be an `http(s)` URL that is **publicly reachable** — internal and loopback addresses are refused at call time.
+</ParamField>
+
+<ParamField path="config.headers" type="object">
+  Request headers, e.g. `{ "Authorization": "Bearer ..." }`. Values must be strings or numbers.
+</ParamField>
+
+<ParamField path="config.query_params" type="object">
+  Query parameters appended to the URL. Values must be strings or numbers.
+</ParamField>
+
+<ParamField path="config.body" type="object | array | string">
+  Request body (`POST` only). Objects and arrays are sent as JSON; strings are sent as-is.
+</ParamField>
+
+<ParamField path="config.timeout_seconds" type="number" default="10">
+  Between 1 and 30 seconds. Keep it short — a slow endpoint delays the turn that's waiting on it.
+</ParamField>
+
+<ParamField path="config.response_mapping" type="object">
+  Names the values you want out of the JSON response — see [Response mapping](#response-mapping-jsonpath) below.
+</ParamField>
+
+### When a function runs
+
+| Trigger | Runs | Choose it when |
+|---------|------|----------------|
+| `auto_run: true` (default) | Once, at the start of the call, in the background | The data will be needed at some point in the call — it's fetched before any turn waits on it |
+| `<function name="lookup_order"/>` tag in an action | The moment that condition fires | The call must happen at a specific point in the flow (e.g. only after the agent asks), or you need to **re-fetch** — a tag always makes a fresh request |
+
+The tag is allowed on any condition except the First Message (`id: 0`), on both `standard` and `action_followup` conditions, fixed or non-fixed.
+
+### Using the response
+
+Two ways to get fetched values into the testing agent's replies:
+
+- **Value placeholder — `{{function.lookup_order.status}}`** (fixed messages only). Substitutes one mapped output into the exact spoken text:
+
+  ```json
+  { "id": 2, "condition": 1, "action": "My order shows as {{function.lookup_order.status}}.", "type": "action_followup", "fixed_message": true }
+  ```
+
+- **Non-fixed actions — no placeholder needed.** When `fixed_message` is `false`, the testing agent is automatically given the function's results (your named outputs plus the response) and phrases its reply from them:
+
+  ```json
+  { "id": 2, "condition": 1, "action": "Ask about the order and mention its real status.", "type": "action_followup", "fixed_message": false }
+  ```
+
+<Note>
+A single fixed action can both invoke and use a function — put the tag **before** the placeholder. The function completes before the text is spoken:
+
+`"Let me check. <function name=\"lookup_order\"/> It shows as {{function.lookup_order.status}}."`
+</Note>
+
+### Response mapping (JSONPath)
+
+Each `response_mapping` entry gives a short output name to a value in the JSON response. An entry is either a path string, or an object with `path` and a `default`:
+
+```json
+"response_mapping": {
+  "status": "$.data.status",
+  "eta_days": { "path": "$.data.eta", "default": "a few" }
+}
+```
+
+| Syntax | Meaning |
+|--------|---------|
+| `$.data.status` | Nested key |
+| `$.items[0].sku` | Array index (negative indexes allowed) |
+| `$.meta["order-id"]` | Bracket notation for keys with special characters |
+
+Wildcards, filters, and recursive descent are **not** supported — point each output at one exact value.
+
+### Chaining functions
+
+A function's `config` can reference an earlier function's outputs, so one call can feed the next — for example, look up a customer, then verify with the fetched name:
+
+```json
+"functions": [
+  { "name": "lookup", "type": "rest_api",
+    "config": { "method": "GET", "url": "https://api.example.com/orders/ORD-1",
+      "response_mapping": { "customer": "$.customer_name" } } },
+  { "name": "verify", "type": "rest_api", "auto_run": false,
+    "config": { "method": "GET",
+      "url": "https://api.example.com/verify?name={{function.lookup.customer}}",
+      "response_mapping": { "verified": "$.ok" } } }
+]
+```
+
+Make sure the referenced function has already run — via `auto_run` or a tag on an earlier condition.
+
+### If the call fails
+
+A failed function never breaks the conversation. On a timeout, an error response, or an unreachable URL:
+
+- Mapped outputs fall back to their declared `default`.
+- A placeholder with **no** default is spoken as-is (`"...status is {{function.lookup_order.status}}"`) — declare defaults for anything a fixed message references.
+- On non-fixed actions, the testing agent is told the lookup failed, so it doesn't invent values.
+
+### Rules
+
+- Function `name`s must be unique; `<function>` tags and `{{function.*}}` placeholders must reference a declared function.
+- Placeholders require `fixed_message: true`, and the key must be an output declared in that function's `response_mapping`.
+- Neither tags nor placeholders may appear on the First Message (`id: 0`) — use `auto_run` and reference the values from a later condition.
+
+For a full scenario showing both flows — a fixed-message placeholder and a non-fixed grounded reply from one `auto_run` function — see [Example 5](#example-5-live-data-via-a-custom-function) below.
+
 ## Complete Examples
 
 ### Example 1: Appointment Cancellation
@@ -901,6 +1055,88 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
   ]
 }
 ```
+
+### Example 5: Live Data via a Custom Function
+
+One `auto_run` function feeding both flows: condition 1 drops a fetched value into a **fixed message** with a `{{function.*}}` placeholder, and condition 2 lets the testing agent phrase a **non-fixed** reply from the same response — no placeholder needed.
+
+```json
+{
+  "role": "You are a customer checking on an order",
+  "functions": [
+    {
+      "name": "lookup",
+      "type": "rest_api",
+      "auto_run": true,
+      "config": {
+        "method": "GET",
+        "url": "https://api.example.com/orders/{{test_profile.order_id}}",
+        "timeout_seconds": 5,
+        "response_mapping": {
+          "status": { "path": "$.status", "default": "unknown" },
+          "customer": { "path": "$.customer_name", "default": "unknown" }
+        }
+      }
+    }
+  ],
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "FIRST_MESSAGE",
+      "action": "Hi, I'd like to check on my order.",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent asks for the name on the order",
+      "action": "It's under {{function.lookup.customer}}.",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 2,
+      "condition": 1,
+      "action": "Ask whether the order status they see matches yours, mentioning the real status from the lookup.",
+      "type": "action_followup",
+      "fixed_message": false
+    },
+    {
+      "id": 3,
+      "condition": "The agent confirms the order status",
+      "action": "Great, that's all I needed. Thanks! <endcall />",
+      "type": "standard",
+      "fixed_message": true
+    }
+  ]
+}
+```
+
+**Turn-by-turn flow for Example 5:**
+1. As the call connects, `lookup` runs once in the background (`auto_run`) — say it returns `{"status": "shipped", "customer_name": "Jane Doe"}`
+2. Testing agent sends condition 0: "Hi, I'd like to check on my order."
+3. The agent asks for the name — condition 1 (**fixed**) fires with the placeholder substituted verbatim: "It's under Jane Doe."
+4. The agent replies — condition 2 (**non-fixed**) fires; the testing agent is given the lookup results automatically and phrases them naturally: e.g. "On my side it shows as shipped — is that what you see?"
+5. The agent confirms — condition 3 closes the call
+
+If the API call fails, the declared `default`s take over: condition 1 speaks "It's under unknown." and the testing agent in condition 2 is told the lookup failed rather than inventing a status.
+
+**On-demand variant (`auto_run: false`):** to run the lookup only at a specific point in the flow instead of at call start, turn off `auto_run` and invoke it with a tag — the function completes before the rest of the action is spoken:
+
+```json
+"functions": [
+  { "name": "lookup", "type": "rest_api", "auto_run": false,
+    "config": { "method": "GET", "url": "https://api.example.com/orders/{{test_profile.order_id}}",
+      "response_mapping": { "customer": { "path": "$.customer_name", "default": "unknown" } } } }
+],
+"conditions": [
+  { "id": 1, "condition": "The agent asks for the name on the order",
+    "action": "One moment. <function name=\"lookup\"/> It's under {{function.lookup.customer}}.",
+    "type": "standard", "fixed_message": true }
+]
+```
+
+Nothing runs at call start; the request fires the moment condition 1 executes, and the same fixed/non-fixed usage rules apply from there.
 
 ## Best Practices
 

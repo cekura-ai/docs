@@ -1,4 +1,8 @@
-name: Build and deploy MCP server
+name: Deploy MCP Server (PROD)
+
+# Targets the new AWS account (cet-prd-cekura-workload-prod, us-west-2).
+# Builds + pushes image to shared-services ECR (212351099297), then
+# deploys to the new prod workload account (593108103736) us-west-2 cluster.
 
 on:
   push:
@@ -12,10 +16,10 @@ on:
       - '.github/workflows/deploy-mcp-server.yml'
 
 env:
-  AWS_REGION: us-west-1
+  AWS_REGION: us-west-2
   ECR_REPOSITORY: cekura/mcp-server
-  ECS_CLUSTER: prod
-  SERVICE_NAME: mcp-server
+  ECS_CLUSTER: cet-prd-usw2-cekura-ecs-cluster
+  ECS_SERVICE: cet-prd-usw2-mcp-server-ecs-service
 
 permissions:
   id-token: write
@@ -36,10 +40,10 @@ jobs:
         with:
           version: latest
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (shared services for ECR push)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_SHARED }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -56,27 +60,6 @@ jobs:
 
       - name: Generate structured llms.txt
         run: python3 scripts/generate_llms_txt.py --write
-
-      - name: Validate API reference descriptions
-        run: |
-          python3 -c "
-          import os
-          missing = []
-          api_ref = 'api-reference'
-          for dirpath, _, filenames in os.walk(api_ref):
-              for f in sorted(filenames):
-                  if not f.endswith('.mdx'):
-                      continue
-                  path = os.path.join(dirpath, f)
-                  with open(path) as fh:
-                      content = fh.read()
-                  if 'description:' not in content.split('---')[1] if '---' in content else '':
-                      missing.append(os.path.relpath(path))
-          if missing:
-              print(f'INFO: {len(missing)} API reference pages still lack description frontmatter')
-          else:
-              print('All API reference pages have description frontmatter.')
-          "
 
       - name: Construct Docker image tag
         id: construct-tag
@@ -99,143 +82,78 @@ jobs:
           cache-to: type=gha,mode=max,scope=mcp-server-${{ github.ref_name }}
 
   deploy:
-    needs: build
+    name: deploy
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (workload account for ECS deploy)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Register new ECS task definition revision
-        id: register-task
+      - name: Render + register task definition
+        id: register
         run: |
-          TASK_DEF_FILE="cekura-mcp-server/deployment/ecs/prod/mcp-server-task-def.json"
-          TEMP_TASK_DEF=$(mktemp)
-          sed 's|<IMAGE_TAG>|${{ needs.build.outputs.image-tag }}|g' $TASK_DEF_FILE > $TEMP_TASK_DEF
-
-          NEW_TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file://$TEMP_TASK_DEF \
-            --region ${{ env.AWS_REGION }} \
+          sed "s|<IMAGE_TAG>|${{ needs.build.outputs.image-tag }}|g" \
+            cekura-mcp-server/deployment/ecs/prod-usw2/mcp-server-task-def.json \
+            > /tmp/mcp-server-task-def.rendered.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/mcp-server-task-def.rendered.json \
             --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task-def-arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
 
-          echo "task-def-arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
-          rm -f $TEMP_TASK_DEF
-
-      - name: Update ECS service to new revision
-        id: update-service
+      - name: Update ECS service
         run: |
-          DEPLOYMENT_ID=$(aws ecs update-service \
-            --cluster "${{ env.ECS_CLUSTER }}" \
-            --service "${{ env.SERVICE_NAME }}-service" \
-            --task-definition "${{ steps.register-task.outputs.task-def-arn }}" \
-            --desired-count 1 \
-            --region ${{ env.AWS_REGION }} \
-            --query 'service.deployments[0].id' --output text)
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "${{ steps.register.outputs.task-def-arn }}" \
+            --force-new-deployment \
+            --query 'service.[serviceName,taskDefinition,desiredCount]' --output text
 
-          echo "deployment-id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
-
-      - name: Wait for deployment to complete
+      - name: Wait for service stable
         run: |
-          DEPLOYMENT_ID="${{ steps.update-service.outputs.deployment-id }}"
-
-          echo "Waiting for deployment $DEPLOYMENT_ID to complete..."
-
-          TIMEOUT=600
-          INTERVAL=10
-          ELAPSED=0
-
-          while [ $ELAPSED -lt $TIMEOUT ]; do
-            echo "Checking deployment status... (${ELAPSED}s elapsed)"
-
-            DEPLOYMENT_STATUS=$(aws ecs describe-services \
-              --cluster "${{ env.ECS_CLUSTER }}" \
-              --services "${{ env.SERVICE_NAME }}-service" \
-              --query "services[0].deployments[?id=='$DEPLOYMENT_ID']" \
-              --output json)
-
-            if [ "$DEPLOYMENT_STATUS" = "[]" ] || [ -z "$DEPLOYMENT_STATUS" ]; then
-              echo "Deployment not found"
-              exit 1
-            fi
-
-            ROLLOUT_STATE=$(echo "$DEPLOYMENT_STATUS" | jq -r '.[0].rolloutState // "UNKNOWN"')
-            FAILED_TASKS=$(echo "$DEPLOYMENT_STATUS" | jq -r '.[0].failedTasks // 0')
-
-            echo "Rollout State: $ROLLOUT_STATE, Failed Tasks: $FAILED_TASKS"
-
-            if [ "$ROLLOUT_STATE" = "COMPLETED" ]; then
-              echo "Deployment completed successfully!"
-              exit 0
-            fi
-
-            if [ "$ROLLOUT_STATE" = "FAILED" ] || [ "$FAILED_TASKS" -gt 0 ]; then
-              echo "Deployment failed!"
-              exit 1
-            fi
-
-            sleep $INTERVAL
-            ELAPSED=$((ELAPSED + INTERVAL))
-          done
-
-          echo "Deployment did not complete within ${TIMEOUT} seconds"
-          exit 1
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          echo "✅ Service stable"
 
   notify:
     needs: [build, deploy]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Build Slack message
-        id: message
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compose message
+        id: collect
         run: |
           IMAGE_TAG="${{ needs.build.outputs.image-tag }}"
-          CLUSTER="${{ env.ECS_CLUSTER }}"
-          REGION="${{ env.AWS_REGION }}"
-
-          if [ "${{ needs.build.result }}" = "cancelled" ] || [ "${{ needs.deploy.result }}" = "cancelled" ]; then
-            echo "text=*⚠️ MCP server deployment was cancelled!*" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
           if [ "${{ needs.build.result }}" != "success" ]; then
-            echo "text=*❌ MCP server build failed!*" >> $GITHUB_OUTPUT
-            exit 0
+            echo "message=*❌ mcp-server build failed for prod!* (tag: ${IMAGE_TAG:-n/a})" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "message=*✅ mcp-server deployed to prod* (tag: ${IMAGE_TAG})" >> "$GITHUB_OUTPUT"
+          else
+            DD_LINK="https://us5.datadoghq.com/logs?query=env%3Aprod%20version%3A${IMAGE_TAG}%20service%3Amcp-server"
+            echo "message=*❌ mcp-server deploy to prod failed* (tag: ${IMAGE_TAG}) - <${DD_LINK}|Datadog logs>" >> "$GITHUB_OUTPUT"
           fi
-
-          if [ "${{ needs.deploy.result }}" != "success" ]; then
-            AWS_LINK="https://${REGION}.console.aws.amazon.com/ecs/v2/clusters/${CLUSTER}/services"
-            echo "text=*❌ MCP server deployment to prod failed!* - <${AWS_LINK}|AWS ECS>" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          echo "text<<EOF" >> $GITHUB_OUTPUT
-          echo "*✅ MCP server deployment to prod completed successfully!*" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Notify Slack
+        if: vars.SLACK_DEPLOYMENTS_CHANNEL != ''
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_BOT_BEARER_TOKEN }}
+          SLACK_CHANNEL: ${{ vars.SLACK_DEPLOYMENTS_CHANNEL }}
+          MESSAGE: ${{ steps.collect.outputs.message }}
         run: |
-          WORKFLOW_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          CONTEXT="Branch: ${{ github.ref_name }} | <${WORKFLOW_URL}|View Workflow>"
-
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.SLACK_BOT_BEARER_TOKEN }}" \
-            -H "Content-type: application/json" \
-            --data "{
-              \"channel\": \"${{ vars.SLACK_DEPLOYMENTS_CHANNEL }}\",
-              \"blocks\": [
-                {
-                  \"type\": \"section\",
-                  \"text\": {\"type\": \"mrkdwn\", \"text\": \"${{ steps.message.outputs.text }}\"}
-                },
-                {
-                  \"type\": \"context\",
-                  \"elements\": [{\"type\": \"mrkdwn\", \"text\": \"${CONTEXT}\"}]
-                }
-              ]
-            }" \
-            https://slack.com/api/chat.postMessage
+          if [ -z "$SLACK_TOKEN" ] || [ -z "$SLACK_CHANNEL" ]; then
+            echo "(Slack creds missing — skipping notification)"
+            exit 0
+          fi
+          curl -sS -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_TOKEN" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            -d "$(jq -n --arg ch "$SLACK_CHANNEL" --arg msg "$MESSAGE" '{channel:$ch,text:$msg}')" \
+            | jq '{ok,error}'

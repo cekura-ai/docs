@@ -10859,6 +10859,52 @@
                 "description": "Subscriptions packs add pack"
             }
         },
+        "/subscriptions/packs/add_payg_pack/": {
+            "post": {
+                "operationId": "subscriptions-packs-add-payg-pack-create",
+                "description": "Start the free pay-as-you-go plan for an organization.\n\nThe plan never expires: the first pack.free_members_count member(s) are free\nand only additional members are billed through Stripe. Eligible signups\n(business email whose domain hasn't used a plan before, org's first plan)\nalso receive the pack's one-time complimentary credits in the never-expiring\nbalance. Orgs whose previous plan expired or was cancelled can activate too,\nwith 0 complimentary credits. Requires a verified phone number.",
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pack"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/subscriptions/packs/check-trial-eligibility/": {
             "get": {
                 "operationId": "subscriptions-packs-check-trial-eligibility-retrieve",
@@ -10866,6 +10912,52 @@
                 "tags": [
                     "subscriptions"
                 ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pack"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/subscriptions/packs/switch_to_payg/": {
+            "post": {
+                "operationId": "subscriptions-packs-switch-to-payg-create",
+                "description": "Switch a legacy Stripe-managed self-serve plan (the old developer plan\nwith recurring monthly credits) to the free first-user-free\npay-as-you-go plan. Admin-only, opt-in from the billing page.\n\nWhat it does: cancels the old Stripe subscription immediately (unpaid\ninvoices voided), moves the Stripe customer/card to the org, keeps the\nremaining credit balance until its normal expiry, and creates a seat\nsubscription for members beyond the free seats that starts billing only\nwhen the already-paid period ends. No complimentary credits.",
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "api_key": []
@@ -11187,6 +11279,116 @@
                     }
                 },
                 "description": "Subscriptions subscriptions renew"
+            }
+        },
+        "/subscriptions/subscriptions/{id}/restart-seat-billing/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-restart-seat-billing-create",
+                "description": "Recreate the seat subscription of a perpetual (free base) plan after its\npaid seats ended (voluntary cancellation completed, or payment failure\nafter dunning). One click when a card is on file: charges immediately\nfor the current billable seats and lifts the overdue member block —\nno dependency on the setup-checkout webhook.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/subscriptions/subscriptions/{id}/setup-payment-method/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-setup-payment-method-create",
+                "description": "Start a Stripe setup-mode checkout to save a payment method for the\norganization. Used by plans without a Stripe subscription (e.g. the free\npay-as-you-go plan) before top-ups, auto-refill, or adding paid members.\nThe checkout.session.completed webhook makes the card the customer default.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
             }
         },
         "/subscriptions/subscriptions/{id}/update_payment_method/": {
@@ -67364,6 +67566,18 @@
                         "minimum": -2147483648,
                         "description": "Data retention period in days. Leave blank to skip archival for this plan."
                     },
+                    "free_members_count": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "description": "Number of members included for free (e.g. 1 = first user free). <b>Only applies to self-serve billing.</b> Self-serve packs with free members never expire: the base plan is free and only the seats beyond this count are billed through Stripe."
+                    },
+                    "one_time_credits": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
+                        "description": "One-time complimentary credits granted when the pack is provisioned. Added to the never-expiring extra balance; they do not recur."
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -67550,6 +67764,18 @@
                     "extra_member_price": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "free_members_count": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "description": "Number of members included for free (e.g. 1 = first user free). <b>Only applies to self-serve billing.</b> Self-serve packs with free members never expire: the base plan is free and only the seats beyond this count are billed through Stripe."
+                    },
+                    "one_time_credits": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
+                        "description": "One-time complimentary credits granted when the pack is provisioned. Added to the never-expiring extra balance; they do not recur."
                     }
                 },
                 "required": [
@@ -80060,6 +80286,19 @@
                     "next_billing_cost": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "has_payment_method": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "seat_payment_overdue_since": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "When a renewal payment for this perpetual plan's seat subscription first failed. Once older than SUBSCRIPTION_GRACE_PERIOD_DAYS, billable members other than the free-plan owner are blocked at the API level until the payment is fixed. Cleared when a seat invoice is paid."
                     },
                     "last_payment_at": {
                         "type": "string",

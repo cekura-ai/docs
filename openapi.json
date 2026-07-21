@@ -2431,7 +2431,7 @@
         "/observability/v1/agent-improvement-sessions/": {
             "get": {
                 "operationId": "agent-improvement-sessions-list",
-                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\ncall logs, validates it is a VAPI / ElevenLabs agent with a configured\nprovider key, then opens a Claude Agent SDK session (product-chat sandbox\nruntime) seeded to run generate-scenarios → self-improving-agent. Returns\nthe new session row.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\nids, validates it is a VAPI / ElevenLabs agent with a configured provider\nkey, then opens a Claude Agent SDK session (product-chat sandbox runtime)\nand returns the new session row. ``source`` picks the flow: ``call_log``\n(default) resolves the agent from CallLogs and seeds generate-scenarios →\nself-improving-agent; ``run`` resolves the agent + failing scenarios from\nsimulation Runs and seeds self-improving-agent directly (scenarios already\nexist, so generation is skipped).\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
                 "tags": [
                     "observability"
                 ],
@@ -2458,7 +2458,7 @@
             },
             "post": {
                 "operationId": "agent-improvement-sessions-create",
-                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\ncall logs, validates it is a VAPI / ElevenLabs agent with a configured\nprovider key, then opens a Claude Agent SDK session (product-chat sandbox\nruntime) seeded to run generate-scenarios → self-improving-agent. Returns\nthe new session row.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\nids, validates it is a VAPI / ElevenLabs agent with a configured provider\nkey, then opens a Claude Agent SDK session (product-chat sandbox runtime)\nand returns the new session row. ``source`` picks the flow: ``call_log``\n(default) resolves the agent from CallLogs and seeds generate-scenarios →\nself-improving-agent; ``run`` resolves the agent + failing scenarios from\nsimulation Runs and seeds self-improving-agent directly (scenarios already\nexist, so generation is skipped).\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
                 "tags": [
                     "observability"
                 ],
@@ -2503,7 +2503,7 @@
         "/observability/v1/agent-improvement-sessions/{id}/": {
             "get": {
                 "operationId": "agent-improvement-sessions-retrieve",
-                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\ncall logs, validates it is a VAPI / ElevenLabs agent with a configured\nprovider key, then opens a Claude Agent SDK session (product-chat sandbox\nruntime) seeded to run generate-scenarios → self-improving-agent. Returns\nthe new session row.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions launched from the Insights page.\n\n``create`` resolves the target agent from the selected insights' example\nids, validates it is a VAPI / ElevenLabs agent with a configured provider\nkey, then opens a Claude Agent SDK session (product-chat sandbox runtime)\nand returns the new session row. ``source`` picks the flow: ``call_log``\n(default) resolves the agent from CallLogs and seeds generate-scenarios →\nself-improving-agent; ``run`` resolves the agent + failing scenarios from\nsimulation Runs and seeds self-improving-agent directly (scenarios already\nexist, so generation is skipped).\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
                 "parameters": [
                     {
                         "in": "path",
@@ -7064,6 +7064,46 @@
                 ]
             }
         },
+        "/observability/v1/metric-failure-mode-insights/categories/{category_slug}/delete/": {
+            "delete": {
+                "operationId": "metric-failure-mode-insights-categories-delete-destroy",
+                "description": "Remove one persistent failure category and all of its stored call assignments. Future calls are classified only against the remaining categories. Scope with `project` and `metric_id`. ⚠ Cannot be undone.",
+                "summary": "Delete an accumulating failure category",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "category_slug",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[^/]+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "metric-failure-mode-insights-categories-delete-destroy",
+                        "description": "Remove one persistent failure category and all of its stored call assignments. Future calls are classified only against the remaining categories. Scope with `project` and `metric_id`. ⚠ Cannot be undone."
+                    }
+                }
+            }
+        },
         "/observability/v1/metric-failure-mode-insights/categories/{category_slug}/fix-metric/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-categories-fix-metric-create",
@@ -10867,6 +10907,52 @@
                 "description": "Subscriptions packs add pack"
             }
         },
+        "/subscriptions/packs/add_payg_pack/": {
+            "post": {
+                "operationId": "subscriptions-packs-add-payg-pack-create",
+                "description": "Start the free pay-as-you-go plan for an organization.\n\nThe plan never expires: the first pack.free_members_count member(s) are free\nand only additional members are billed through Stripe. Eligible signups\n(business email whose domain hasn't used a plan before, org's first plan)\nalso receive the pack's one-time complimentary credits in the never-expiring\nbalance. Orgs whose previous plan expired or was cancelled can activate too,\nwith 0 complimentary credits. Requires a verified phone number.",
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pack"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/subscriptions/packs/check-trial-eligibility/": {
             "get": {
                 "operationId": "subscriptions-packs-check-trial-eligibility-retrieve",
@@ -10874,6 +10960,52 @@
                 "tags": [
                     "subscriptions"
                 ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Pack"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/subscriptions/packs/switch_to_payg/": {
+            "post": {
+                "operationId": "subscriptions-packs-switch-to-payg-create",
+                "description": "Switch a legacy Stripe-managed self-serve plan (the old developer plan\nwith recurring monthly credits) to the free first-user-free\npay-as-you-go plan. Admin-only, opt-in from the billing page.\n\nWhat it does: cancels the old Stripe subscription immediately (unpaid\ninvoices voided), moves the Stripe customer/card to the org, keeps the\nremaining credit balance until its normal expiry, and creates a seat\nsubscription for members beyond the free seats that starts billing only\nwhen the already-paid period ends. No complimentary credits.",
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Pack"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "api_key": []
@@ -11195,6 +11327,116 @@
                     }
                 },
                 "description": "Subscriptions subscriptions renew"
+            }
+        },
+        "/subscriptions/subscriptions/{id}/restart-seat-billing/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-restart-seat-billing-create",
+                "description": "Recreate the seat subscription of a perpetual (free base) plan after its\npaid seats ended (voluntary cancellation completed, or payment failure\nafter dunning). One click when a card is on file: charges immediately\nfor the current billable seats and lifts the overdue member block —\nno dependency on the setup-checkout webhook.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/subscriptions/subscriptions/{id}/setup-payment-method/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-setup-payment-method-create",
+                "description": "Start a Stripe setup-mode checkout to save a payment method for the\norganization. Used by plans without a Stripe subscription (e.g. the free\npay-as-you-go plan) before top-ups, auto-refill, or adding paid members.\nThe checkout.session.completed webhook makes the card the customer default.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
             }
         },
         "/subscriptions/subscriptions/{id}/update_payment_method/": {
@@ -17756,7 +17998,7 @@
             },
             "patch": {
                 "operationId": "metrics-v1-external-partial-update",
-                "description": "Partially update a metric. Same field shape as create — see `metrics_create` for details.\n\n**Note:** `project` and `agent` are read-only once set — you cannot move a metric between projects/agents after creation. To relocate, create a new metric and delete the old one.",
+                "description": "Partially update a metric. Same field shape as create — see `metrics_create` for details.\n\n**Note:** `project`, `agent`, and `audio_enabled` are read-only once set. To change `audio_enabled` on an existing metric, create a new metric with the desired setting and delete the old one.",
                 "summary": "Update a metric (partial)",
                 "parameters": [
                     {
@@ -19494,7 +19736,7 @@
             },
             "patch": {
                 "operationId": "metrics-v1-partial-update",
-                "description": "Partially update a metric. Same field shape as create — see `metrics_create` for details.\n\n**Note:** `project` and `agent` are read-only once set — you cannot move a metric between projects/agents after creation. To relocate, create a new metric and delete the old one.",
+                "description": "Partially update a metric. Same field shape as create — see `metrics_create` for details.\n\n**Note:** `project`, `agent`, and `audio_enabled` are read-only once set. To change `audio_enabled` on an existing metric, create a new metric with the desired setting and delete the old one.",
                 "summary": "Update a metric (partial)",
                 "parameters": [
                     {
@@ -24376,7 +24618,7 @@
         "/test_framework/v1/results-external/{id}/regenerate_ai_summary/": {
             "post": {
                 "operationId": "results-v1-external-regenerate-ai-summary-create",
-                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix) and recommended next steps for this result, based on its current failure clusters. The new summary appears on the next `results_retrieve` call once the job finishes.",
+                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix), recommended next steps, and the workflow coverage for this result, based on its current runs. The new values appear on the next `results_retrieve` call once the job finishes.",
                 "summary": "Regenerate the AI summary for a result",
                 "parameters": [
                     {
@@ -25468,7 +25710,7 @@
         "/test_framework/v1/results/{id}/regenerate_ai_summary/": {
             "post": {
                 "operationId": "results-v1-regenerate-ai-summary-create",
-                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix) and recommended next steps for this result, based on its current failure clusters. The new summary appears on the next `results_retrieve` call once the job finishes.",
+                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix), recommended next steps, and the workflow coverage for this result, based on its current runs. The new values appear on the next `results_retrieve` call once the job finishes.",
                 "summary": "Regenerate the AI summary for a result",
                 "parameters": [
                     {
@@ -28679,7 +28921,7 @@
             },
             "post": {
                 "operationId": "scenarios-create",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator (scenario)",
                 "tags": [
                     "Scenarios"
@@ -28803,7 +29045,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-create",
-                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
+                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
                     }
                 }
             }
@@ -28914,7 +29156,7 @@
             },
             "post": {
                 "operationId": "scenarios-external-create",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator (scenario)",
                 "tags": [
                     "Scenarios"
@@ -30304,52 +30546,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ScenarioFolder"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/scenarios-external/create_scenario_from_transcript/": {
-            "post": {
-                "operationId": "scenarios-external-create-scenario-from-transcript-create",
-                "description": "Create a test scenario from a call transcript",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
                                 }
                             }
                         },
@@ -35832,52 +36028,6 @@
                         "enabled": true,
                         "name": "scenarios-folder-create",
                         "description": "Scenarios folder"
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/scenarios/create_scenario_from_transcript/": {
-            "post": {
-                "operationId": "scenarios-create-scenario-from-transcript-create",
-                "description": "Create a test scenario from a call transcript",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
-                                }
-                            }
-                        },
-                        "description": ""
                     }
                 }
             }
@@ -46436,7 +46586,7 @@
         "/test_framework/v2/results/{id}/regenerate_ai_summary/": {
             "post": {
                 "operationId": "results-regenerate-ai-summary-create",
-                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix) and recommended next steps for this result, based on its current failure clusters. The new summary appears on the next `results_retrieve` call once the job finishes.",
+                "description": "Queue a background job that regenerates the structured AI summary (what_happened / why_it_happened / how_to_fix), recommended next steps, and the workflow coverage for this result, based on its current runs. The new values appear on the next `results_retrieve` call once the job finishes.",
                 "summary": "Regenerate the AI summary for a result",
                 "parameters": [
                     {
@@ -48187,7 +48337,7 @@
             },
             "post": {
                 "operationId": "test-framework-v2-scenarios-create",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**Creating from a real call transcript:** if you want an evaluator that replays a past production call, use `POST /test_framework/v1/scenarios/create_scenario_from_transcript/` instead — it derives a `conditional_actions` scenario automatically.\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator (scenario)",
                 "tags": [
                     "Scenarios"
@@ -49577,52 +49727,6 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ScenarioFolder"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v2/scenarios/create_scenario_from_transcript/": {
-            "post": {
-                "operationId": "test-framework-v2-scenarios-create-scenario-from-transcript-crea",
-                "description": "Scenarios create scenario from transcript crea",
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ScenarioSerializerV2"
                                 }
                             }
                         },
@@ -58139,174 +58243,6 @@
                 },
                 "description": "List user v2 organizations"
             }
-        },
-        "/test_framework/v1/runs-external/{id}/run_expected_outcome/": {
-            "post": {
-                "operationId": "runs-v1-external-run-expected-outcome-create",
-                "description": "Runs v1 run expected outcome",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this run.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Run"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v1/runs/{id}/run_expected_outcome/": {
-            "post": {
-                "operationId": "runs-v1-run-expected-outcome-create",
-                "description": "Runs v1 run expected outcome",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this run.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Run"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v2/runs/{id}/run_expected_outcome/": {
-            "post": {
-                "operationId": "runs-run-expected-outcome-create",
-                "description": "Runs run expected outcome",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this run.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Run"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Run"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
         }
     },
     "components": {
@@ -59427,8 +59363,7 @@
                     },
                     "mock_tools_enabled": {
                         "type": "boolean",
-                        "readOnly": true,
-                        "description": "Whether mock-tool mode is currently active on the provider. Default false."
+                        "description": "Whether mock tools should be selected by default when configuring a run."
                     },
                     "mock_tools_provider": {
                         "type": [
@@ -59676,6 +59611,22 @@
                     "call_log_ids": {
                         "readOnly": true
                     },
+                    "source": {
+                        "enum": [
+                            "call_log",
+                            "run"
+                        ],
+                        "type": "string",
+                        "description": "* `call_log` - Call Log\n* `run` - Run",
+                        "x-spec-enum-id": "6541dca1762577cf",
+                        "readOnly": true
+                    },
+                    "run_ids": {
+                        "readOnly": true
+                    },
+                    "scenario_ids": {
+                        "readOnly": true
+                    },
                     "status": {
                         "enum": [
                             "pending",
@@ -59705,6 +59656,42 @@
                         "readOnly": true
                     },
                     "error_message": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "summary_json": {
+                        "readOnly": true
+                    },
+                    "slack_notification_status": {
+                        "enum": [
+                            "not_attempted",
+                            "sending",
+                            "sent",
+                            "skipped_no_channel",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `not_attempted` - Not Attempted\n* `sending` - Sending\n* `sent` - Sent\n* `skipped_no_channel` - Skipped No Channel\n* `failed` - Failed",
+                        "x-spec-enum-id": "f90ffa468a33b565",
+                        "readOnly": true
+                    },
+                    "routed_to": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slack_channel_id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slack_message_ts": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slack_message_text": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "slack_error": {
                         "type": "string",
                         "readOnly": true
                     },
@@ -59760,6 +59747,15 @@
                     },
                     "served_via": {
                         "$ref": "#/components/schemas/AgentMockToolServedVia"
+                    },
+                    "mcp_server": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "MCP server this tool was fetched from, as {name, key}. Null for standalone tools. Server-managed — ignored on writes."
                     }
                 },
                 "required": [
@@ -61341,6 +61337,7 @@
             },
             "CallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -61532,6 +61529,7 @@
             },
             "CallLogList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -62781,6 +62779,7 @@
             },
             "Dashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -62912,6 +62911,7 @@
             },
             "DashboardList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -65767,6 +65767,7 @@
             },
             "MetricList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -66025,6 +66026,7 @@
             },
             "MetricListSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67509,6 +67511,18 @@
                         "minimum": -2147483648,
                         "description": "Data retention period in days. Leave blank to skip archival for this plan."
                     },
+                    "free_members_count": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "description": "Number of members included for free (e.g. 1 = first user free). <b>Only applies to self-serve billing.</b> Self-serve packs with free members never expire: the base plan is free and only the seats beyond this count are billed through Stripe."
+                    },
+                    "one_time_credits": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
+                        "description": "One-time complimentary credits granted when the pack is provisioned. Added to the never-expiring extra balance; they do not recur."
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -67695,6 +67709,18 @@
                     "extra_member_price": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "free_members_count": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648,
+                        "description": "Number of members included for free (e.g. 1 = first user free). <b>Only applies to self-serve billing.</b> Self-serve packs with free members never expire: the base plan is free and only the seats beyond this count are billed through Stripe."
+                    },
+                    "one_time_credits": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
+                        "description": "One-time complimentary credits granted when the pack is provisioned. Added to the never-expiring extra balance; they do not recur."
                     }
                 },
                 "required": [
@@ -68586,6 +68612,7 @@
             },
             "PatchedCallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69018,6 +69045,7 @@
             },
             "PatchedDashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -70879,6 +70907,16 @@
                         "readOnly": true,
                         "description": "\nLLM-suggested next steps to fix the issues found in this result, ordered by impact.\nExample:\n```json\n[\n    {\"title\": \"Seed test profile in production\", \"description\": \"Unblocks 6 runs; ~5 min.\"},\n    {\"title\": \"Tighten competitor guardrail\", \"description\": \"1 prompt edit; review drift run.\"}\n]\n```\n"
                     },
+                    "path_coverage": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nWorkflow-coverage summary for this result: which of the agent's critical paths the\nruns exercised, and which they missed.\nExample:\n```json\n{\n    \"coverage_pct\": 66.7,\n    \"total_paths\": 3,\n    \"covered_paths\": [\"Book appointment\", \"Reschedule appointment\"],\n    \"uncovered_paths\": [\"Cancel appointment\"],\n    \"generated_at\": \"2026-07-14T12:00:00Z\"\n}\n```\n"
+                    },
                     "performance_metrics": {
                         "type": "string",
                         "readOnly": true,
@@ -71443,8 +71481,7 @@
                     },
                     "mock_tools_enabled": {
                         "type": "boolean",
-                        "readOnly": true,
-                        "description": "Whether mock-tool mode is currently active on the provider. Default false."
+                        "description": "Whether mock tools should be selected by default when configuring a run."
                     },
                     "mock_tools_provider": {
                         "type": [
@@ -71773,6 +71810,7 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -72556,7 +72594,12 @@
                     "served_via": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "How this tool is accessed at runtime. `{'type': 'direct'}` for standalone tools; `{'type': 'mcp', 'mock_index': N, 'url': '.../mcp/N/'}` for MCP sub-tools."
+                        "description": "How this tool is accessed at runtime. `{'type': 'direct'}` for standalone tools; `{'type': 'mcp', 'mock_index': N, 'url': '.../mcp/N/', 'server_name': ...}` for MCP sub-tools."
+                    },
+                    "mcp_server": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "MCP server this tool was fetched from, as `{'name', 'key'}`. Null for standalone (non-MCP) tools. Server-managed — ignored on writes."
                     }
                 }
             },
@@ -74669,6 +74712,16 @@
                         "readOnly": true,
                         "description": "\nLLM-suggested next steps to fix the issues found in this result, ordered by impact.\nExample:\n```json\n[\n    {\"title\": \"Seed test profile in production\", \"description\": \"Unblocks 6 runs; ~5 min.\"},\n    {\"title\": \"Tighten competitor guardrail\", \"description\": \"1 prompt edit; review drift run.\"}\n]\n```\n"
                     },
+                    "path_coverage": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true,
+                        "description": "\nWorkflow-coverage summary for this result: which of the agent's critical paths the\nruns exercised, and which they missed.\nExample:\n```json\n{\n    \"coverage_pct\": 66.7,\n    \"total_paths\": 3,\n    \"covered_paths\": [\"Book appointment\", \"Reschedule appointment\"],\n    \"uncovered_paths\": [\"Cancel appointment\"],\n    \"generated_at\": \"2026-07-14T12:00:00Z\"\n}\n```\n"
+                    },
                     "performance_metrics": {
                         "type": "string",
                         "readOnly": true,
@@ -75070,6 +75123,7 @@
             },
             "RunList": {
                 "type": "object",
+                "description": "Adds outbound dial-window fields read from cekura_metadata.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -75363,7 +75417,7 @@
                         "items": {
                             "type": "string"
                         },
-                        "description": "Names of mock tools to activate for this run. Omit (or send null) to mock every tool configured on the agent; send an empty list to mock none so every tool keeps its original endpoint; send specific names to mock only those."
+                        "description": "Names of mock tools to activate for this run. Omit (or send null) to mock every tool configured on the agent; send an empty list to mock none so every tool keeps its original endpoint; send specific names to mock only those. Tools that belong to an MCP server should be selected via the MCP server's name or key, which mocks all of that server's tools as one unit. Legacy MCP sub-tool names are accepted as aliases for the whole parent MCP."
                     },
                     "livekit_data": {
                         "allOf": [
@@ -75687,7 +75741,7 @@
                         "items": {
                             "type": "string"
                         },
-                        "description": "Names of mock tools to activate for this run. Omit (or send null) to mock every tool configured on the agent; send an empty list to mock none so every tool keeps its original endpoint; send specific names to mock only those."
+                        "description": "Names of mock tools to activate for this run. Omit (or send null) to mock every tool configured on the agent; send an empty list to mock none so every tool keeps its original endpoint; send specific names to mock only those. Tools that belong to an MCP server should be selected via the MCP server's name or key, which mocks all of that server's tools as one unit. Legacy MCP sub-tool names are accepted as aliases for the whole parent MCP."
                     }
                 },
                 "required": [
@@ -75713,6 +75767,7 @@
             },
             "Scenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -76609,6 +76664,7 @@
             },
             "ScenarioList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -76828,6 +76884,7 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -77731,8 +77788,7 @@
                     },
                     "mock_tools_enabled": {
                         "type": "boolean",
-                        "readOnly": true,
-                        "description": "Whether mock-tool mode is currently active on the provider. Default false."
+                        "description": "Whether mock tools should be selected by default when configuring a run."
                     },
                     "mock_tools_provider": {
                         "type": [
@@ -78303,6 +78359,7 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -79057,6 +79114,7 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -79206,6 +79264,7 @@
             },
             "SchemaScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -80199,6 +80258,19 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "has_payment_method": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "seat_payment_overdue_since": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "readOnly": true,
+                        "description": "When a renewal payment for this perpetual plan's seat subscription first failed. Once older than SUBSCRIPTION_GRACE_PERIOD_DAYS, billable members other than the free-plan owner are blocked at the API level until the payment is fixed. Cleared when a seat invoice is paid."
+                    },
                     "last_payment_at": {
                         "type": "string",
                         "format": "date-time",
@@ -80656,7 +80728,12 @@
                     "served_via": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "How this tool is accessed at runtime. `{'type': 'direct'}` for standalone tools; `{'type': 'mcp', 'mock_index': N, 'url': '.../mcp/N/'}` for MCP sub-tools."
+                        "description": "How this tool is accessed at runtime. `{'type': 'direct'}` for standalone tools; `{'type': 'mcp', 'mock_index': N, 'url': '.../mcp/N/', 'server_name': ...}` for MCP sub-tools."
+                    },
+                    "mcp_server": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "MCP server this tool was fetched from, as `{'name', 'key'}`. Null for standalone (non-MCP) tools. Server-managed — ignored on writes."
                     }
                 },
                 "required": [

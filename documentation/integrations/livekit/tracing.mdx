@@ -37,7 +37,7 @@ export const livekitPrompt = [
   "- Note: track_session takes an additional agent parameter (the Agent instance) so it can inject mock tools.",
   "",
   "Common setup for both (Python):",
-  "1. Install the SDK: pip install cekura[livekit]==1.5.1",
+  "1. Install the SDK: pip install \"cekura[livekit]>=1.5.2\"",
   "2. Import LiveKitTracer: from cekura.livekit import LiveKitTracer",
   "3. Initialize the tracer (outside the entrypoint function):",
   "   cekura = LiveKitTracer(",
@@ -210,7 +210,7 @@ Use this setup in your test agents while running simulation calls from the Cekur
 <Tab title="Python">
 
 ```bash
-pip install cekura[livekit]==1.5.1
+pip install "cekura[livekit]>=1.5.2"
 ```
 
 </Tab>
@@ -352,7 +352,7 @@ Use this setup in your production agents for monitoring live calls with audio re
 <Tab title="Python">
 
 ```bash
-pip install cekura[livekit]==1.5.1
+pip install "cekura[livekit]>=1.5.2"
 ```
 
 </Tab>
@@ -468,6 +468,7 @@ With tracing enabled, you'll see enriched information in the Cekura platform:
 The run now displays:
 - **Room Session ID**: Visible in the call provider ID field, allowing you to correlate Cekura test runs with specific LiveKit sessions
 - **Complete Transcript**: Full conversation history from the LiveKit agent, including tool/function call requests and responses
+- **OpenTelemetry Traces**: User and agent turns with STT, LLM, tool, and TTS spans
 - **Provider Call Data**: Detailed metadata accessible in the run details, including job information, room configuration, session logs, and raw performance metrics
 
 <img src="/images/livekit/tracing-enhanced-ui.png" alt="Enhanced Data Display" />
@@ -483,6 +484,65 @@ The run now displays:
   - **LLM**: Token usage, response time, and inference latency
   - **EOU (End-of-Utterance)**: Detection timing and accuracy
 - **Custom Metadata**: Additional metadata passed to the SDK via the `metadata` parameter
+
+## OpenTelemetry Tracing
+
+The Python SDK automatically exports LiveKit's native OpenTelemetry spans to Cekura. The trace is correlated with the simulation run created by `track_session()` or the call log created by `observe_session()`, so the full execution timeline is available alongside the transcript, metrics, and, in observability mode, the recording.
+
+<Note>
+OpenTelemetry trace export requires Cekura Python SDK 1.5.2 or later. Call `track_session()` or `observe_session()` before `session.start()` so tracing is configured before LiveKit starts the agent session.
+</Note>
+
+### Trace Structure
+
+Each call produces a hierarchical trace containing the LiveKit spans emitted during user and agent turns:
+
+```
+Agent session
+├── User turn
+│   ├── User speaking
+│   └── STT / end-of-utterance detection
+└── Agent turn
+    ├── LLM
+    ├── Tool
+    ├── TTS
+    └── Agent speaking
+```
+
+The trace view groups LiveKit's internal LLM and TTS spans into readable operations while retaining their timing and attributes. Incomplete trailing turns are also shown when a call ends before the next full turn completes.
+
+### How It Works
+
+No separate LiveKit tracing configuration is required. When `track_session()` or `observe_session()` is called, the SDK:
+
+1. Configures LiveKit's OpenTelemetry provider using your Cekura API key and agent ID
+2. Exports spans to Cekura's OTLP/gRPC endpoint
+3. Captures the agent-session trace ID and sends it with the run or call-log payload
+4. Flushes pending spans when the LiveKit job shuts down
+
+The endpoint can be overridden when using a custom Cekura environment:
+
+```python
+cekura = LiveKitTracer(
+    api_key=os.getenv("CEKURA_API_KEY"),
+    agent_id=123,
+    otel_endpoint="https://otel.cekura.ai",
+)
+```
+
+### Disabling OTel Traces
+
+To disable OTel trace export entirely:
+
+```python
+cekura = LiveKitTracer(
+    api_key=os.getenv("CEKURA_API_KEY"),
+    agent_id=123,
+    enable_otel_traces=False,
+)
+```
+
+When disabled, no OTel provider is configured and no traces are exported. All other SDK features continue to work normally.
 
 ## Automatic Chat Mode Support
 
@@ -549,7 +609,9 @@ cekura = LiveKitTracer(
     api_key="your_api_key",         # Required: Your Cekura API key
     agent_id=123,                   # Required: Agent ID from dashboard
     host="https://api.cekura.ai",   # Optional: Custom API host
-    enabled=True                    # Optional: Enable/disable tracer
+    enabled=True,                   # Optional: Enable/disable tracer
+    otel_endpoint="https://otel.cekura.ai",  # Optional: Custom OTel endpoint
+    enable_otel_traces=True         # Optional: Enable/disable OTel export
 )
 ```
 

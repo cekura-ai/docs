@@ -697,8 +697,8 @@ The `evaluate_llm_judge_metric` function allows you to evaluate LLM Judge metric
 ```python
 def evaluate_llm_judge_metric(
     data: Dict,
-    api_key: str,
-    description: str,
+    api_key: str|None = None,
+    description: str = "",
     eval_type: str|None = None,
     enum_values: List[str]|None = None,
     audio: bool = False,
@@ -713,8 +713,8 @@ def evaluate_llm_judge_metric(
   This is the same `data` object available in your custom Python code with access to transcript, metadata, and other call data.
 </ParamField>
 
-<ParamField path="api_key" type="str" required>
-  Your Cekura API key for authentication.
+<ParamField path="api_key" type="str|None" default="None">
+  **Deprecated.** This parameter is retained for backward compatibility and is ignored. Cekura authenticates the request automatically, so new code should omit it.
 </ParamField>
 
 <ParamField path="description" type="str" required>
@@ -776,8 +776,6 @@ Returns a dictionary with two keys:
 #### Example Usage
 
 ```python
-key = "<your_cekura_api_key>"
-
 def get_not_early_end_call_description():
     return f"""You are an AI quality assurance analyst tasked with evaluating customer service call transcripts. Your primary objective is to determine if a Main Agent terminated a call prematurely without valid reason. This analysis is crucial for maintaining high standards in customer service interactions."""
 
@@ -790,7 +788,11 @@ if "main" not in call_end_reason.lower():
 
 description = get_not_early_end_call_description()
 
-response = evaluate_llm_judge_metric(data, key, description, "binary")
+response = evaluate_llm_judge_metric(
+    data,
+    description=description,
+    eval_type="binary",
+)
 _result = response.get("result")
 _explanation = response.get("explanation")
 ```
@@ -912,8 +914,6 @@ else:
 Use the `audio=True` parameter along with `audio_start_time` / `audio_end_time` to let the LLM judge listen to the actual recording segment rather than reading the transcript:
 
 ```python
-key = "<your_cekura_api_key>"
-
 # Find Main Agent utterances containing the content to evaluate
 target_utterances = [
     entry for entry in data["transcript_json"]
@@ -929,7 +929,6 @@ else:
 
     response = evaluate_llm_judge_metric(
         data,
-        key,
         description="Did the agent deliver this segment clearly, at an appropriate pace, and without unnatural pauses?",
         eval_type="binary",
         audio=True,

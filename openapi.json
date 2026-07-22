@@ -36088,25 +36088,61 @@
         "/test_framework/v1/scenarios/duplicate/": {
             "post": {
                 "operationId": "scenarios-duplicate-create",
-                "description": "Scenarios duplicate",
+                "description": "Create copies of existing evaluators in this project or another project in the same organization. Use this instead of recreating evaluators with `scenarios_create`; same-project copies retain their metrics and test profiles, while cross-project copies use the destination project's predefined metrics. Set `copy_to_project` to the source project for a folder-only copy; `folder_path` is created when needed, and copied evaluators are named `Copy of <original name>`.",
+                "summary": "Duplicate evaluators into a folder",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
                 "tags": [
-                    "test_framework"
+                    "Scenarios"
                 ],
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
+                            },
+                            "examples": {
+                                "CopyEvaluatorsToANewFolder": {
+                                    "value": {
+                                        "project": 123,
+                                        "copy_to_project": 123,
+                                        "scenario_agent": 456,
+                                        "scenarios": [
+                                            101,
+                                            102
+                                        ],
+                                        "folder_path": "SMS agent - Papi Cleaning"
+                                    },
+                                    "summary": "Copy evaluators to a new folder"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
                             }
                         }
                     },
@@ -36118,15 +36154,41 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "201": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
+                                    "$ref": "#/components/schemas/PaginatedScenarioList"
                                 }
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-duplicate-create",
+                        "description": "Create copies of existing evaluators in this project or another project in the same organization. Use this instead of recreating evaluators with `scenarios_create`; same-project copies retain their metrics and test profiles, while cross-project copies use the destination project's predefined metrics. Set `copy_to_project` to the source project for a folder-only copy; `folder_path` is created when needed, and copied evaluators are named `Copy of <original name>`."
                     }
                 }
             }
@@ -63294,6 +63356,39 @@
                         "maxLength": 255
                     }
                 }
+            },
+            "DuplicateScenariosRequest": {
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "integer",
+                        "description": "Project ID containing the source evaluators."
+                    },
+                    "copy_to_project": {
+                        "type": "integer",
+                        "description": "Destination project ID in the same organization."
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "IDs of the evaluators to duplicate."
+                    },
+                    "scenario_agent": {
+                        "type": "integer",
+                        "description": "Optional destination agent ID. It must belong to the destination project."
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "description": "Destination folder path. Created when it does not already exist."
+                    }
+                },
+                "required": [
+                    "copy_to_project",
+                    "project",
+                    "scenarios"
+                ]
             },
             "ElevenLabsConfig": {
                 "type": "object",

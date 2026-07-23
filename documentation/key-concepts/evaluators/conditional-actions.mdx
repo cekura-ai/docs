@@ -333,7 +333,7 @@ The testing agent will say exactly: "My name is John Smith"
     - Compliance testing
     - Reproducible test cases
     - First message (id: 0) — always required
-    - Actions containing XML tags
+    - Actions containing most XML tags
   </Card>
 </CardGroup>
 
@@ -346,7 +346,7 @@ The testing agent will say exactly: "My name is John Smith"
 Conditional Actions supports a variety of special tags in the `action` field to control conversation flow and behavior.
 
 <Warning>
-**Important**: Tags are only supported when `fixed_message` is set to `true`. They will not work with `fixed_message: false` (instruction-based actions).
+**Important**: Most tags are only supported when `fixed_message` is set to `true`. `<function>` is the exception: it can run in a non-first instruction-based action, but `{{function.*}}` placeholders require `fixed_message: true`.
 </Warning>
 
 ### Communication Tags
@@ -518,6 +518,29 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 ### Interaction Tags
 
 <AccordionGroup>
+  <Accordion title="<audio> - Play an Uploaded Clip" icon="music">
+    Play a recorded clip that was attached to the evaluator. In the Conditional Actions editor, attach the clip at the cursor; Cekura inserts its ID as an `<audio>` tag. You can also copy the clip ID and add the tag directly.
+
+    ```json
+    {
+      "id": 2,
+      "type": "standard",
+      "condition": "The agent asks to hear the account message",
+      "action": "Please listen carefully. <audio id=\"account-message-123\" /> Did you catch that?",
+      "fixed_message": true
+    }
+    ```
+
+    You can use one or more clips in the same action. They play in the order written and can be interleaved with text and compatible tags. Each attached clip ID can be used only once in an evaluator.
+
+    <Warning>
+    `<audio>` is available only with `fixed_message: true` and cannot be nested inside `<spell>` or `<background_noise>`.
+    </Warning>
+
+    **Attributes:**
+    - `id`: The ID of an uploaded clip attached to this evaluator (required)
+  </Accordion>
+
   <Accordion title="<dtmf> - Send DTMF Tones" icon="grid">
     Send DTMF (touch-tone) digits.
 
@@ -660,6 +683,53 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
     - `packet_loss`: Packet loss percentage (required) - e.g., `"5"` = 5% loss
   </Accordion>
 </AccordionGroup>
+
+## Functions
+
+Functions let a Conditional Actions evaluator call a configured data source separately from its conditions. Declare functions in the evaluator-level `functions` array, then invoke one from an action with `<function name="..." />`.
+
+```json
+{
+  "role": "You are checking an order status",
+  "functions": [
+    {
+      "name": "lookup_order",
+      "type": "rest_api",
+      "auto_run": false,
+      "config": {
+        "url": "https://example.com/orders/123",
+        "method": "GET",
+        "response_mapping": { "status": "status" }
+      }
+    }
+  ],
+  "conditions": [
+    {
+      "id": 0,
+      "condition": "FIRST_MESSAGE",
+      "action": "I am calling about my order",
+      "type": "standard",
+      "fixed_message": true
+    },
+    {
+      "id": 1,
+      "condition": "The agent asks for the order status",
+      "action": "<function name=\"lookup_order\" /> The current status is {{function.lookup_order.status}}.",
+      "type": "standard",
+      "fixed_message": true
+    }
+  ]
+}
+```
+
+- `<function name="..." />` executes the named function. It can be used in any condition except `id: 0`.
+- Use `{{function.<name>.<output>}}` in a `fixed_message: true` action to insert a mapped result. In the same action, put the function tag before the text that uses its result.
+- Set `auto_run: true` to start a function when the call begins, or `false` to run it only when its tag is reached.
+- The current function type is `rest_api`. Its `config` requires an HTTP(S) `url`; it supports `GET` or `POST`, optional headers, query parameters, body, a 1–30 second timeout, and `response_mapping` entries that expose response fields by name.
+
+<Warning>
+Do not place a function tag or a `{{function.*}}` placeholder in the `FIRST_MESSAGE` action (`id: 0`).
+</Warning>
 
 ## Complete Examples
 
@@ -1120,7 +1190,7 @@ Chain `action_followup` conditions to deliver an exact sequence of messages acro
     **Solutions**:
     - Check tag syntax (spelling, attributes, closing format)
     - Check tag placement (some tags must be at the start or span the entire action)
-    - Confirm `fixed_message: true` is set — tags don't work with instruction-based actions
+    - Confirm `fixed_message: true` is set for non-function tags — they don't work with instruction-based actions
   </Accordion>
 
   <Accordion title="First Message Not Sending" icon="message">

@@ -2166,10 +2166,31 @@
         "/github/checkout-token/": {
             "post": {
                 "operationId": "github-checkout-token-create",
-                "description": "Mint a read-only, single-repo installation token for the sandbox to\nclone with. Token is short-lived (~1h) and scoped to the one repo.",
+                "description": "Create a short-lived, read-only checkout credential for one repository. Requires an authenticated Cekura agent session, and the repository must be available through the organization's active GitHub connection. Repository access is verified for every request.",
+                "summary": "Authorize a connected repository checkout",
                 "tags": [
                     "github"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CheckoutTokenRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CheckoutTokenRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CheckoutTokenRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "api_key": []
@@ -2177,7 +2198,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "No response body"
+                        "description": "Repository checkout details and a short-lived credential."
+                    },
+                    "401": {
+                        "description": "Authentication required."
+                    },
+                    "404": {
+                        "description": "The repository is not available through the active connection."
                     }
                 }
             }
@@ -2240,18 +2267,48 @@
         "/github/open-pr/": {
             "post": {
                 "operationId": "github-open-pr-create",
-                "description": "Open a PR from a ``cekura/*`` branch. The write token is minted and used\nentirely inside the backend — it never leaves this process.",
+                "description": "Create a new branch and open a pull request containing the submitted file changes. Requires an authenticated Cekura agent session, and the repository must be available through the organization's active GitHub connection. Direct writes to the default branch are not permitted, and repository access is verified for every request.",
+                "summary": "Open a pull request in a connected repository",
                 "tags": [
                     "github"
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OpenPRRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OpenPRRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OpenPRRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "api_key": []
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "No response body"
+                    "201": {
+                        "description": "Pull request created on a new branch."
+                    },
+                    "400": {
+                        "description": "The pull request could not be created."
+                    },
+                    "401": {
+                        "description": "Authentication required."
+                    },
+                    "404": {
+                        "description": "The repository is not available through the active connection."
                     }
                 }
             }
@@ -2259,7 +2316,7 @@
         "/github/setup/": {
             "post": {
                 "operationId": "github-setup-create",
-                "description": "Consume the install redirect: validate state, upsert the installation.",
+                "description": "Verify the installer with GitHub, then connect the installation.",
                 "tags": [
                     "github"
                 ],
@@ -7368,6 +7425,33 @@
                         "enabled": true,
                         "name": "metric-failure-mode-insights-categories-fix-metric-create",
                         "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass)."
+                    }
+                }
+            }
+        },
+        "/observability/v1/metric-failure-mode-insights/failure-rates/": {
+            "get": {
+                "operationId": "metric-failure-mode-insights-failure-rates-retrieve",
+                "description": "Return the percentage of evaluated calls that failed each metric during the selected Insights date range.",
+                "summary": "List metric failure rates for the insights window",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricFailureModeInsight"
+                                }
+                            }
+                        },
+                        "description": ""
                     }
                 }
             }
@@ -30945,25 +31029,61 @@
         "/test_framework/v1/scenarios-external/duplicate/": {
             "post": {
                 "operationId": "scenarios-external-duplicate-create",
-                "description": "Scenarios duplicate",
+                "description": "Create copies of existing evaluators in this project or another project in the same organization. Use this instead of recreating evaluators with `scenarios_create`; same-project copies retain their metrics and test profiles, while cross-project copies use the destination project's predefined metrics. Set `copy_to_project` to the source project for a folder-only copy; `folder_path` is created when needed, and copied evaluators are named `Copy of <original name>`.",
+                "summary": "Duplicate evaluators into a folder",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
                 "tags": [
-                    "test_framework"
+                    "Scenarios"
                 ],
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
+                            },
+                            "examples": {
+                                "CopyEvaluatorsToANewFolder": {
+                                    "value": {
+                                        "project": 123,
+                                        "copy_to_project": 123,
+                                        "scenario_agent": 456,
+                                        "scenarios": [
+                                            101,
+                                            102
+                                        ],
+                                        "folder_path": "SMS agent - Papi Cleaning"
+                                    },
+                                    "summary": "Copy evaluators to a new folder"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
                             }
                         }
                     },
@@ -30975,11 +31095,29 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "201": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
+                                    "$ref": "#/components/schemas/PaginatedScenarioList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -34751,7 +34889,7 @@
         "/test_framework/v1/scenarios-external/scenario-agent/": {
             "post": {
                 "operationId": "scenarios-agent-create",
-                "description": "Improve evaluators using AI by providing natural language feedback.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
+                "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
                 ],
@@ -36439,25 +36577,61 @@
         "/test_framework/v1/scenarios/duplicate/": {
             "post": {
                 "operationId": "scenarios-duplicate-create",
-                "description": "Scenarios duplicate",
+                "description": "Create copies of existing evaluators in this project or another project in the same organization. Use this instead of recreating evaluators with `scenarios_create`; same-project copies retain their metrics and test profiles, while cross-project copies use the destination project's predefined metrics. Set `copy_to_project` to the source project for a folder-only copy; `folder_path` is created when needed, and copied evaluators are named `Copy of <original name>`.",
+                "summary": "Duplicate evaluators into a folder",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
                 "tags": [
-                    "test_framework"
+                    "Scenarios"
                 ],
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
+                            },
+                            "examples": {
+                                "CopyEvaluatorsToANewFolder": {
+                                    "value": {
+                                        "project": 123,
+                                        "copy_to_project": 123,
+                                        "scenario_agent": 456,
+                                        "scenarios": [
+                                            101,
+                                            102
+                                        ],
+                                        "folder_path": "SMS agent - Papi Cleaning"
+                                    },
+                                    "summary": "Copy evaluators to a new folder"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/Scenario"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
                             }
                         }
                     },
@@ -36469,15 +36643,41 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "201": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
+                                    "$ref": "#/components/schemas/PaginatedScenarioList"
                                 }
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-duplicate-create",
+                        "description": "Create copies of existing evaluators in this project or another project in the same organization. Use this instead of recreating evaluators with `scenarios_create`; same-project copies retain their metrics and test profiles, while cross-project copies use the destination project's predefined metrics. Set `copy_to_project` to the source project for a folder-only copy; `folder_path` is created when needed, and copied evaluators are named `Copy of <original name>`."
                     }
                 }
             }
@@ -40460,7 +40660,7 @@
         "/test_framework/v1/scenarios/scenario-agent/": {
             "post": {
                 "operationId": "scenarios-agent-create_2",
-                "description": "Improve evaluators using AI by providing natural language feedback.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
+                "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
                 ],
@@ -40523,7 +40723,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-agent-create",
-                        "description": "Improve evaluators using AI by providing natural language feedback.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests."
+                        "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests."
                     }
                 }
             }
@@ -50126,25 +50326,61 @@
         "/test_framework/v2/scenarios/duplicate/": {
             "post": {
                 "operationId": "test-framework-v2-scenarios-duplicate-create",
-                "description": "Scenarios duplicate",
+                "description": "Create copies of existing evaluators in this project or another project in the same organization. Use this instead of recreating evaluators with `scenarios_create`; same-project copies retain their metrics and test profiles, while cross-project copies use the destination project's predefined metrics. Set `copy_to_project` to the source project for a folder-only copy; `folder_path` is created when needed, and copied evaluators are named `Copy of <original name>`.",
+                "summary": "Duplicate evaluators into a folder",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
                 "tags": [
-                    "test_framework"
+                    "Scenarios"
                 ],
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
+                            },
+                            "examples": {
+                                "CopyEvaluatorsToANewFolder": {
+                                    "value": {
+                                        "project": 123,
+                                        "copy_to_project": 123,
+                                        "scenario_agent": 456,
+                                        "scenarios": [
+                                            101,
+                                            102
+                                        ],
+                                        "folder_path": "SMS agent - Papi Cleaning"
+                                    },
+                                    "summary": "Copy evaluators to a new folder"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
+                                "$ref": "#/components/schemas/DuplicateScenariosRequest"
                             }
                         }
                     },
@@ -50156,11 +50392,29 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "201": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ScenarioSerializerV2"
+                                    "$ref": "#/components/schemas/PaginatedScenarioList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -53932,7 +54186,7 @@
         "/test_framework/v2/scenarios/scenario-agent/": {
             "post": {
                 "operationId": "scenarios-agent-create_3",
-                "description": "Improve evaluators using AI by providing natural language feedback.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
+                "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
                 ],
@@ -62194,6 +62448,18 @@
                     }
                 }
             },
+            "CheckoutTokenRequest": {
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Short repository name to check out."
+                    }
+                },
+                "required": [
+                    "repo"
+                ]
+            },
             "CleanMetricDescriptionRequest": {
                 "type": "object",
                 "properties": {
@@ -63496,6 +63762,39 @@
                         "maxLength": 255
                     }
                 }
+            },
+            "DuplicateScenariosRequest": {
+                "type": "object",
+                "properties": {
+                    "project": {
+                        "type": "integer",
+                        "description": "Project ID containing the source evaluators."
+                    },
+                    "copy_to_project": {
+                        "type": "integer",
+                        "description": "Destination project ID in the same organization."
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "IDs of the evaluators to duplicate."
+                    },
+                    "scenario_agent": {
+                        "type": "integer",
+                        "description": "Optional destination agent ID. It must belong to the destination project."
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "description": "Destination folder path. Created when it does not already exist."
+                    }
+                },
+                "required": [
+                    "copy_to_project",
+                    "project",
+                    "scenarios"
+                ]
             },
             "ElevenLabsConfig": {
                 "type": "object",
@@ -67145,6 +67444,39 @@
                     }
                 }
             },
+            "OpenPRRequest": {
+                "type": "object",
+                "properties": {
+                    "repo": {
+                        "type": "string",
+                        "description": "Short repository name to open the PR against."
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Pull request title (also the commit message)."
+                    },
+                    "body": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "base": {
+                        "type": "string",
+                        "description": "Base branch to target; defaults to the repo's default branch."
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/_PRFile"
+                        },
+                        "description": "Files to create, update, or delete."
+                    }
+                },
+                "required": [
+                    "files",
+                    "repo",
+                    "title"
+                ]
+            },
             "Organization": {
                 "type": "object",
                 "description": "",
@@ -68594,6 +68926,37 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/ScenarioHistory"
+                        }
+                    }
+                }
+            },
+            "PaginatedScenarioList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Scenario"
                         }
                     }
                 }
@@ -74068,6 +74431,12 @@
                         "type": "string",
                         "default": "",
                         "description": "Plain-language summary of what the optimized metric does, shown in the review dialog so the user can check intent without reading the code."
+                    },
+                    "old_score": {
+                        "description": "Baseline accuracy before optimization: {num_correct, num_total, score} over the evaluated samples. Shown next to new_score so the user can see the improvement."
+                    },
+                    "new_score": {
+                        "description": "Optimized accuracy after this run: {num_correct, num_total, score} over the same evaluated samples as old_score."
                     }
                 },
                 "required": [
@@ -76263,12 +76632,12 @@
             },
             "ScenarioAgentRequest": {
                 "type": "object",
-                "description": "Improve evaluators using AI by providing natural language feedback.\n\nProvide evaluator IDs and your improvement request, and the AI will suggest changes.",
+                "description": "Create or improve evaluator scenarios using AI by providing natural-language\nfeedback. This endpoint does not improve the target AI agent itself.\n\nProvide evaluator IDs and your improvement request, and the AI will suggest changes.",
                 "properties": {
                     "user_message": {
                         "type": "string",
                         "default": "",
-                        "description": "Your improvement request (e.g., 'Make instructions more detailed')"
+                        "description": "Evaluator-scenario request (e.g., 'Make these scenario instructions more detailed'). Do not use for agent prompt/config improvements."
                     },
                     "agent_id": {
                         "type": [
@@ -81673,6 +82042,25 @@
                     "metadata",
                     "time_period",
                     "widget_id"
+                ]
+            },
+            "_PRFile": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "Repo-relative file path."
+                    },
+                    "content": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "New file contents; null to delete the path."
+                    }
+                },
+                "required": [
+                    "path"
                 ]
             }
         },

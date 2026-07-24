@@ -1525,4 +1525,22 @@ _result = within_tolerance
 _explanation = f"Cekura score {cekura_score} vs manual {manual_score} — {'within' if within_tolerance else 'outside'} tolerance"
 ```
 
+## Why does my simulation stay in "running" status for 5 minutes even after the call ends?
+
+If your evaluation consistently takes 5 minutes to complete after the call has ended, the cause is almost always Cekura waiting for a **post-call webhook** from your infrastructure that never arrives.
+
+### Why the delay happens
+
+Cekura can be configured (via a flag in **Agent Settings**) to wait for a post-call webhook from your agent platform before completing the evaluation. This webhook carries additional metadata — such as custom call recordings or enriched call data — that some metrics depend on. When the webhook is expected but does not arrive, Cekura waits up to **5 minutes** before timing out and proceeding with the evaluation.
+
+This is distinct from priority or queue issues — there is no run prioritisation feature. The 5-minute delay is always a webhook-wait.
+
+### How to resolve it
+
+**Option 1 — Disable the webhook requirement**: If your metrics do not need the additional metadata, disable the post-call webhook flag in your **Agent Settings**. Cekura will then begin evaluation immediately after the call ends, with no timeout wait.
+
+**Option 2 — Fix webhook delivery**: If your metrics do rely on the additional metadata, verify that your CI/CD pipeline or agent platform is correctly sending the post-call webhook to Cekura's endpoint after each call. Check your CI/CD configuration and ensure the webhook is being dispatched.
+
+For more on how call metadata is used in metrics, see [Metadata in Metrics](/documentation/key-concepts/metrics/basic-advanced-metrics#2-metadata).
+
 You can supply the manual score via a [Test Profile](/documentation/key-concepts/evaluators/test-profiles) so it varies per test case without editing the metric code. For the full `data` dictionary reference, see [Metric Results Access](/documentation/key-concepts/metrics/python-metric#metric-results-access).

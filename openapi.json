@@ -2619,7 +2619,7 @@
         "/observability/v1/agent-improvement-sessions/": {
             "get": {
                 "operationId": "agent-improvement-sessions-list",
-                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens a Claude Agent SDK session in the product-chat\nsandbox. Call-log sessions generate evaluators first; run and scenario\nsessions reuse their existing evaluator scenarios directly.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens Claude Agent SDK runs in product chat. Call-log\nsessions generate evaluators in one sandbox and self-improve in another;\nrun and scenario sessions reuse existing evaluators directly.\n\n``retrieve`` / ``list`` are read-only poll surfaces. Runtime checkpoints\nadvance the workflow and persist the status returned to the frontend.",
                 "tags": [
                     "observability"
                 ],
@@ -2646,7 +2646,7 @@
             },
             "post": {
                 "operationId": "agent-improvement-sessions-create",
-                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens a Claude Agent SDK session in the product-chat\nsandbox. Call-log sessions generate evaluators first; run and scenario\nsessions reuse their existing evaluator scenarios directly.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens Claude Agent SDK runs in product chat. Call-log\nsessions generate evaluators in one sandbox and self-improve in another;\nrun and scenario sessions reuse existing evaluators directly.\n\n``retrieve`` / ``list`` are read-only poll surfaces. Runtime checkpoints\nadvance the workflow and persist the status returned to the frontend.",
                 "tags": [
                     "observability"
                 ],
@@ -2691,7 +2691,7 @@
         "/observability/v1/agent-improvement-sessions/{id}/": {
             "get": {
                 "operationId": "agent-improvement-sessions-retrieve",
-                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens a Claude Agent SDK session in the product-chat\nsandbox. Call-log sessions generate evaluators first; run and scenario\nsessions reuse their existing evaluator scenarios directly.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens Claude Agent SDK runs in product chat. Call-log\nsessions generate evaluators in one sandbox and self-improve in another;\nrun and scenario sessions reuse existing evaluators directly.\n\n``retrieve`` / ``list`` are read-only poll surfaces. Runtime checkpoints\nadvance the workflow and persist the status returned to the frontend.",
                 "parameters": [
                     {
                         "in": "path",
@@ -11669,6 +11669,61 @@
                 }
             }
         },
+        "/subscriptions/subscriptions/{id}/select-first-paid-seat-plan/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-select-first-paid-seat-plan-create",
+                "description": "Resolve the one-time choice shown before an org's first paid seat.\n\nSending the current pack code keeps pay-as-you-go. Sending the configured\n``allow_switch_to_plan`` code creates and charges that monthly subscription\nimmediately. Pricing, Stripe IDs, and the customer are always server-owned.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/subscriptions/subscriptions/{id}/setup-payment-method/": {
             "post": {
                 "operationId": "subscriptions-subscriptions-setup-payment-method-create",
@@ -12023,7 +12078,7 @@
         "/test_framework/billing/info/": {
             "get": {
                 "operationId": "billing-info-retrieve",
-                "description": "Returns credits remaining, credits used, balance expiry, and subscription status for an organization. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization.",
+                "description": "Returns credits remaining, current billing-cycle credits used, balance expiry, and subscription status for an organization. Credits used comes from the current billing-cycle aggregate and may lag usage by up to 30 minutes. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization.",
                 "summary": "Get billing information",
                 "tags": [
                     "test_framework"
@@ -12056,7 +12111,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "billing-info-retrieve",
-                        "description": "Returns credits remaining, credits used, balance expiry, and subscription status for an organization. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization."
+                        "description": "Returns credits remaining, current billing-cycle credits used, balance expiry, and subscription status for an organization. Credits used comes from the current billing-cycle aggregate and may lag usage by up to 30 minutes. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization."
                     }
                 },
                 "parameters": [
@@ -23021,6 +23076,35 @@
                 ]
             }
         },
+        "/test_framework/v1/phone-numbers/providers/{id}/": {
+            "delete": {
+                "operationId": "phone-numbers-providers-destroy",
+                "description": "Unified API viewset for BYOP (Bring Your Own Telephony Provider).\n\nHandles importing and managing phone numbers from various providers:\n- Twilio\n- Future: Vonage, Bandwidth, Telnyx, etc.\n\nURL Structure: /v1/phone-numbers/providers/{provider}/{action}\n\nHow to add a new provider:\n1. Add provider to PhoneNumberProviderChoices enum\n2. Create {Provider}Service class (e.g., VonageService)\n3. Create Import{Provider}NumberSerializer\n4. Add action method with @action(url_path=\"{provider}/import\")\n5. Update get_serializer_class() mapping",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/test_framework/v1/phone-numbers/providers/list/": {
             "get": {
                 "operationId": "phone-numbers-providers-list-list",
@@ -29852,7 +29936,7 @@
             },
             "post": {
                 "operationId": "scenarios-external-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. The matched condition's action is rewritten to `<audio id=\"...\"/>`. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -29879,6 +29963,12 @@
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "action_template": {
+                                        "type": "string"
+                                    },
+                                    "replace_audio_id": {
+                                        "type": "string"
                                     }
                                 },
                                 "required": [
@@ -35344,7 +35434,7 @@
             },
             "post": {
                 "operationId": "scenarios-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. The matched condition's action is rewritten to `<audio id=\"...\"/>`. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -35371,6 +35461,12 @@
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "action_template": {
+                                        "type": "string"
+                                    },
+                                    "replace_audio_id": {
+                                        "type": "string"
                                     }
                                 },
                                 "required": [
@@ -49149,7 +49245,7 @@
             },
             "post": {
                 "operationId": "test-framework-v2-scenarios-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. The matched condition's action is rewritten to `<audio id=\"...\"/>`. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -49176,6 +49272,12 @@
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "action_template": {
+                                        "type": "string"
+                                    },
+                                    "replace_audio_id": {
+                                        "type": "string"
                                     }
                                 },
                                 "required": [
@@ -61328,7 +61430,7 @@
                     "credits_used": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "Total credits consumed across all non-refunded transactions on this billing record.\nExample: `36462.14`"
+                        "description": "Credits consumed in the current billing cycle, calculated from that cycle's billing-cycle aggregate (`run_credits + calllog_credits`). Returns `0` until the cycle's aggregate is created and may lag usage by up to 30 minutes.\nExample: `36462.14`"
                     },
                     "initial_balance": {
                         "type": "string",
@@ -62530,6 +62632,12 @@
                 "description": "Read serializer for one Scenario.condition_audio entry (a plain dict).\n\nThe caller passes each entry dict with `audio_id` injected; fields are\ntolerant of missing keys. `words` is intentionally not exposed (runtime-only\nplayback timing data).",
                 "properties": {
                     "audio_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "action": {
                         "type": [
                             "string",
                             "null"
@@ -67980,6 +68088,11 @@
                         "maximum": 2147483647,
                         "minimum": -2147483648
                     },
+                    "max_projects_limit": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648
+                    },
                     "max_concurrent_runs_limit": {
                         "type": "integer",
                         "maximum": 2147483647,
@@ -68074,6 +68187,13 @@
                         "format": "decimal",
                         "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
                         "description": "One-time complimentary credits granted when the pack is provisioned. Added to the never-expiring extra balance; they do not recur."
+                    },
+                    "allow_switch_to_plan": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Plan that can be offered as a one-time switch when this plan reaches its first paid member seat. Leave blank to disable the offer."
                     },
                     "created_at": {
                         "type": "string",
@@ -80848,6 +80968,10 @@
                         "readOnly": true
                     },
                     "has_payment_method": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "first_paid_seat_plan_offer": {
                         "type": "string",
                         "readOnly": true
                     },

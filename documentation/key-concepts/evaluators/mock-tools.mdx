@@ -91,6 +91,10 @@ This visibility helps you understand exactly what mock tool interactions will oc
 
 #### Enabling and Disabling Mock Mode
 
+<Note>
+  This toggle applies to **Auto-Fetch** setup only. If you manually set Cekura mock URLs directly on your provider's tool configuration (Option 2), there is no one-click toggle — see [Disabling manually-configured mock tools](#disabling-manually-configured-mock-tools) for how to restore your original endpoints.
+</Note>
+
 After running Auto-Fetch, use the **Mock** toggle to control whether your provider's tools are redirected to Cekura's mock endpoints.
 
 **Mock toggle is disabled by default** — your provider's tools continue using their original URLs until you explicitly enable it.
@@ -220,6 +224,10 @@ If you prefer to manually configure your mock tools, or need more control over t
 
 </CodeGroup>
 
+<Note>
+  To disable mock mode later and restore your original tool URLs, see [Disabling manually-configured mock tools](#disabling-manually-configured-mock-tools).
+</Note>
+
 ### Step 2: Create New Evaluators
 
 After setting up your mock tools, create evaluators to test your agent:
@@ -302,6 +310,29 @@ And, recommended, the paired result:
 ```
 
 See [Transcript Format](/documentation/advanced/transcript-format) for a full transcript example including function calls.
+
+## Common Issues
+
+### Mock Tool Call Accuracy metric not evaluating for existing evaluators
+
+When evaluators are created after mock tools have been configured on the agent, Cekura automatically populates the expected mock tool calls on each evaluator. If your evaluators were created **before** you added mock tools to the agent, however, the expected mock tool calls list will be empty — the metric has nothing to compare against and will not evaluate correctly.
+
+**Fix:** Open the evaluator in the Cekura dashboard, locate the expected mock tool calls section in the evaluator configuration, and manually add each tool you want the metric to check (tool name, expected input, expected output). Save the evaluator to apply the changes.
+
+### Scoping Mock Tool Call Accuracy to specific tools only
+
+If your agent calls both mocked tools and real API tools in the same conversation, the Mock Tool Call Accuracy metric may flag real-tool calls as unexpected because they are not present in the expected mock calls list. To scope evaluation to only the tools you are mocking:
+
+1. In the evaluator configuration, update the expected mock tool calls list to include only the specific tools you want the metric to evaluate. Remove any tools that call real endpoints.
+2. Review your metric scoring — once those tools are removed from the expected list, real API tool calls in the transcript will not be penalized. If your metric rubric counts all function calls, update it to score only the tools you have listed.
+
+### Disabling manually-configured mock tools
+
+For agents where you manually set tool URLs to Cekura mock endpoints (without using the Auto-Fetch toggle), there is no one-click toggle to disable mock mode. To route tool calls back to your real API:
+
+- In your provider configuration, update each tool's URL from the Cekura mock endpoint back to your original API endpoint. The Cekura mock URL for each tool is visible in the dashboard and returned as `mock_tools[].served_via.url` on the [agent API response](/api-reference/test_framework/get-agent).
+- To re-enable mock mode later, swap the URLs back to the Cekura mock endpoints.
+- When running tests without mock tools active, disable the Mock Tool Call Accuracy metric for those runs to avoid false failures from real API tool calls.
 
 ## API Reference
 

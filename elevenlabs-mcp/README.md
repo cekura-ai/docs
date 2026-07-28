@@ -8,7 +8,7 @@ Streamable HTTP wrapper for the official `elevenlabs-mcp` package. It is safe fo
 - Stateless HTTP endpoint at `/mcp`
 - Per-request authentication through `xi-api-key`
 - Public health checks at `/mcp/health` and `/mcp/healthz`
-- Eight reviewed read-only tools: subscription, agent, voice, model, and phone-number discovery
+- All tools exposed by the pinned official ElevenLabs MCP package
 - No server-side ElevenLabs key
 
 ## Quick Start
@@ -31,7 +31,7 @@ curl http://localhost:8080/mcp/health
 Expected response:
 
 ```json
-{"status":"healthy","service":"elevenlabs-mcp","tools_registered":8}
+{"status":"healthy","service":"elevenlabs-mcp","tools_registered":27}
 ```
 
 ## Connect a Client
@@ -73,7 +73,7 @@ The task needs no ElevenLabs secret. Clients send `xi-api-key` on each request.
 
 ## Security
 
-The server exposes only the reviewed read-only tool allowlist in `server.py`. It does not expose text/audio generation, file upload, voice cloning, agent creation, conversation simulation, or outbound calling.
+The server exposes the complete official ElevenLabs MCP tool set. Place authentication, authorization, and usage controls in the backend or ingress layer that sits in front of this service.
 
 Do not expose port `8080` directly to the internet. Use an ALB or reverse proxy that terminates TLS, applies rate limits, and forwards traffic to the task security group.
 

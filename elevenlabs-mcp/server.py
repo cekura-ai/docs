@@ -12,16 +12,6 @@ from starlette.routing import Route
 from elevenlabs_mcp import server as elevenlabs
 
 _request_key = contextvars.ContextVar("elevenlabs_api_key", default="")
-_ALLOWED_TOOLS = {
-    "check_subscription",
-    "get_agent",
-    "get_voice",
-    "list_agents",
-    "list_models",
-    "list_phone_numbers",
-    "search_voice_library",
-    "search_voices",
-}
 
 
 def _inject_key(request):
@@ -31,11 +21,6 @@ def _inject_key(request):
 
 
 elevenlabs.custom_client.event_hooks = {"request": [_inject_key], "response": []}
-elevenlabs.mcp._tool_manager._tools = {
-    name: tool
-    for name, tool in elevenlabs.mcp._tool_manager._tools.items()
-    if name in _ALLOWED_TOOLS
-}
 elevenlabs.mcp.settings.stateless_http = True
 
 

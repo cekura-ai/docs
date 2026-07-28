@@ -1,0 +1,372 @@
+---
+title: "Tests as Code"
+sidebarTitle: "Tests as Code"
+icon: "file-code"
+iconType: "regular"
+description: "Keep test cases in your own repository as a JSON file and run them from CI, without creating evaluators"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+
+## What is Tests as Code?
+
+Normally you build evaluators in the Cekura dashboard and then run them. Tests as Code lets you skip that: write your test cases in a JSON file, commit it alongside the agent it tests, and run it straight from CI.
+
+Nothing in the file becomes an evaluator in your workspace. Your evaluator list stays exactly as you left it.
+
+## Why Use It?
+
+<CardGroup cols={2}>
+  <Card title="Tests live with the code" icon="code-branch">
+    A change to your agent's prompt and the tests that cover it land in the same pull request, reviewed together.
+  </Card>
+  <Card title="Full history" icon="clock-rotate-left">
+    Your version control shows who changed which test case and why — including on branches, where dashboard evaluators cannot follow.
+  </Card>
+  <Card title="No dashboard setup" icon="wand-magic-sparkles">
+    New environment, new branch, fork of the repo: the tests come with it. Nothing to recreate.
+  </Card>
+  <Card title="Same results" icon="chart-line">
+    Runs appear in Results exactly like any other run, with the same metrics, transcripts, and reports.
+  </Card>
+</CardGroup>
+
+<Note>
+Use dashboard evaluators when non-engineers author or review tests, and when you want them reusable across scheduled jobs. Use Tests as Code when the tests belong to a codebase. They work side by side — one agent can have both.
+</Note>
+
+## Quickstart
+
+### 1. Create a spec file
+
+Save this as `cekura.tests.json` in your repository:
+
+```json
+{
+  "$schema": "https://docs.cekura.ai/schemas/test-suite/v1.json",
+  "version": "1",
+  "agent_id": 12,
+  "suite": { "name": "Checkout regression" },
+  "scenarios": [
+    {
+      "name": "Refund happy path",
+      "instructions": "You are Maria. Order {{test_profile.order_id}} arrived damaged and you want a refund. Be polite but firm.",
+      "expected_outcome": "The agent verifies the order and confirms a refund.",
+      "metrics": ["greeting_by_name", "no_hallucination"],
+      "personality": 3,
+      "test_profile": {
+        "agent_variables": { "order_id": "ORD-4471" },
+        "caller_variables": { "user_name": "Maria" }
+      }
+    }
+  ]
+}
+```
+
+The `$schema` line is optional but gives you autocomplete and inline validation in most editors.
+
+### 2. Check it
+
+Validate without running or spending anything:
+
+```bash
+curl --request POST \
+  --url 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true' \
+  --header 'X-CEKURA-API-KEY: <api-key>' \
+  --header 'Content-Type: application/json' \
+  --data "{\"spec\": $(cat cekura.tests.json)}"
+```
+
+You get back the run that *would* happen — each test case, the total run count, and the estimated cost:
+
+```json
+{
+  "dry_run": true,
+  "valid": true,
+  "plan": {
+    "agent_id": 12,
+    "channel": "voice",
+    "scenario_count": 1,
+    "total_runs": 1,
+    "estimated_cost": 0.35,
+    "scenarios": [
+      {
+        "key": "Refund happy path",
+        "name": "Refund happy path",
+        "frequency": 1,
+        "metric_ids": [412, 413],
+        "personality": { "mode": "existing", "id": 3, "name": "Normal Male" },
+        "test_profile": { "mode": "inline", "sections": ["main_agent_variables", "testing_agent_variables"] }
+      }
+    ]
+  }
+}
+```
+
+### 3. Run it
+
+Drop `?dry_run=true` and the runs start:
+
+```bash
+curl --request POST \
+  --url 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/' \
+  --header 'X-CEKURA-API-KEY: <api-key>' \
+  --header 'Content-Type: application/json' \
+  --data "{\"spec\": $(cat cekura.tests.json)}"
+```
+
+The response is the same shape as any evaluator run, so poll the returned `id` against the Results API for progress and success rate.
+
+## Writing a spec file
+
+### The envelope
+
+| Field | Required | Description |
+|---|---|---|
+| `version` | yes | Spec format version. Currently `"1"`. Pin it — new formats ship as new versions. |
+| `agent_id` | no | The agent to test. Can be supplied in the request instead, which is how one file targets several environments. |
+| `suite.name` | no | Labels the run in Results. |
+| `defaults` | no | Applied to every test case unless the case overrides it. |
+| `scenarios` | yes | Your test cases. Between 1 and 200. |
+
+### A test case
+
+| Field | Required | Description |
+|---|---|---|
+| `name` | yes | Shown in Results. Up to 80 characters. |
+| `key` | no | Stable identifier for this case. Keep it constant across commits so results stay comparable. Defaults to `name`. |
+| `instructions` | yes* | What the simulated caller does. |
+| `expected_outcome` | no | What success looks like, in plain language. |
+| `first_message` | no | The caller's opening line. Defaults to `"Hello"`. |
+| `metrics` | no | Existing metrics, by ID or slug. |
+| `personality` | no | An ID, or an inline definition. |
+| `test_profile` | no | An ID, or inline test data. |
+| `tags` | no | Freeform labels. |
+| `tools` | no | `end_call`, `dtmf`, `receive_dtmf`, `end_call_only_on_transfer`, `send_sms`, `call_hold`. |
+| `language` | no | Language code, e.g. `en`. |
+| `frequency` | no | How many times to run this case. Defaults to 1. |
+| `max_duration` | no | Max call length in seconds. |
+| `type` | no | `instruction` (default) or `conditional_actions`. |
+
+\* `instructions` is required for `instruction` cases; `conditional_actions` cases need `conditional_actions` and `language` instead.
+
+### Metrics must already exist
+
+A spec **references** metrics, it cannot define them. Create them in the dashboard first, then point at them by numeric ID or by slug:
+
+```json
+"metrics": [412, "greeting_by_name"]
+```
+
+Prefer slugs — a file full of slugs can be pointed at a different project without editing, while numeric IDs are project-specific.
+
+<Warning>
+A referenced metric must be **enabled for the agent you are testing**. A metric that isn't would not be evaluated, and the run would pass having checked nothing — so the API rejects it with an error naming the metric instead. Enable it for that agent in the dashboard, or drop it from the spec.
+</Warning>
+
+### Personalities
+
+Three forms, depending on how much control you want:
+
+<Tabs>
+  <Tab title="Use an existing one">
+    ```json
+    "personality": 3
+    ```
+    Any personality in your organization, or any Cekura-provided one.
+  </Tab>
+  <Tab title="Adjust an existing one">
+    ```json
+    "personality": {
+      "base": 3,
+      "speed": 1.15,
+      "interruption_level": "high",
+      "background_noise": "office"
+    }
+    ```
+    Starts from personality 3 and changes only what you list. Anything you leave out is inherited.
+  </Tab>
+  <Tab title="Define one from scratch">
+    ```json
+    "personality": {
+      "prompt": "You interrupt often and speak quickly. You are in a hurry.",
+      "language": "en",
+      "voice_model": "eleven_multilingual_v2",
+      "voice_id": "TX3LPaxmHKxFdv7VOQHJ",
+      "background_noise": "off",
+      "provider": "11labs",
+      "speed": 1.2
+    }
+    ```
+    With no `base`, these five are required: `prompt`, `language`, `voice_model`, `voice_id`, `background_noise`.
+  </Tab>
+</Tabs>
+
+You can set any field the dashboard exposes: `name`, `prompt`, `language`, `accent`, `voice_id`, `voice_model`, `provider`, `speed`, `interruption_level`, `background_noise`, `end_call_enabled`, `generation_config`, `network_simulation`, `message_plan`, `start_speaking_plan`, `stop_speaking_plan`, `background_sound_volume`.
+
+<Note>
+Personalities defined inline are used for that run only and never appear in your personality list. Cekura manages the underlying voice and transport configuration for them, so a spec cannot set those internals.
+</Note>
+
+### Test data
+
+Reference a saved test profile, or supply the data inline:
+
+```json
+"test_profile": {
+  "agent_variables":  { "order_id": "ORD-4471", "account_tier": "gold" },
+  "caller_variables": { "user_name": "Maria" }
+}
+```
+
+- **`agent_variables`** reach the agent under test as dynamic variables at call time.
+- **`caller_variables`** are context for the simulated caller only, and never sent to your agent. Reference them in `instructions` as `{{test_profile.<key>}}`.
+
+Like inline personalities, inline test data is used for that run only and stays out of your test-profile list.
+
+### Defaults
+
+Anything repeated across cases can move up into `defaults`:
+
+```json
+{
+  "version": "1",
+  "agent_id": 12,
+  "defaults": {
+    "channel": "voice",
+    "language": "en",
+    "metrics": ["greeting_by_name"],
+    "personality": 3,
+    "max_duration": 300
+  },
+  "scenarios": [
+    { "name": "Refund", "instructions": "..." },
+    { "name": "Order status", "instructions": "...", "frequency": 3 }
+  ]
+}
+```
+
+A test case overrides `defaults` field by field. `metrics` lists from both are combined.
+
+### Channels
+
+`defaults.channel` selects how the agent is reached: `voice` (default) or `text`. Other execution modes are reserved in the schema but not accepted yet; a spec using one is rejected with a clear message rather than run down an unintended path.
+
+## Reading validation errors
+
+Every problem in a spec is reported at once, keyed by its location in the file, so one round trip tells you everything to fix:
+
+```json
+{
+  "errors": {
+    "scenarios[0].instructions": ["Instructions are required."],
+    "scenarios[1].metrics[0]": [
+      "No metric with slug 'greetng_by_name' in project 742. Check the slug in the dashboard, or reference the metric by its numeric ID."
+    ],
+    "scenarios[2].personality.voice_model": [
+      "'voice_model' is required when no 'base' personality is given."
+    ]
+  }
+}
+```
+
+Run the dry check on every commit and you catch these before anything is spent.
+
+## Using it in CI
+
+<CodeGroup>
+
+```yaml GitHub Actions
+name: Agent tests
+on: [pull_request]
+
+jobs:
+  cekura:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the spec
+        run: |
+          curl --fail-with-body -sS -X POST \
+            'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true' \
+            -H 'X-CEKURA-API-KEY: ${{ secrets.CEKURA_API_KEY }}' \
+            -H 'Content-Type: application/json' \
+            -d "{\"spec\": $(cat cekura.tests.json)}"
+
+      - name: Run the tests
+        run: |
+          curl --fail-with-body -sS -X POST \
+            'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/' \
+            -H 'X-CEKURA-API-KEY: ${{ secrets.CEKURA_API_KEY }}' \
+            -H 'Content-Type: application/json' \
+            -d "{\"spec\": $(cat cekura.tests.json)}" \
+            | tee run.json
+          echo "RESULT_ID=$(python3 -c 'import json;print(json.load(open("run.json"))["id"])')" >> "$GITHUB_ENV"
+```
+
+```yaml GitLab CI
+agent-tests:
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl --fail-with-body -sS -X POST \
+        "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true" \
+        -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "{\"spec\": $(cat cekura.tests.json)}"
+    - |
+      curl --fail-with-body -sS -X POST \
+        "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/" \
+        -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+        -H "Content-Type: application/json" \
+        -d "{\"spec\": $(cat cekura.tests.json)}"
+```
+
+</CodeGroup>
+
+Runs are asynchronous: the call returns once they are queued. To gate a merge on the outcome, poll the returned result until it reaches a terminal status and then check its `success_rate`. The [GitHub Actions Tutorial](/documentation/guides/github-actions-ci-cd) covers the polling and gating pattern in full — the only difference is which endpoint starts the run.
+
+<Tip>
+Split it across two jobs: run the dry check on every push (free, fast, catches a broken file), and the real run only on the branches you actually want tested.
+</Tip>
+
+## Targeting several environments with one file
+
+Leave `agent_id` out of the file and pass it per request, so the same test cases run against staging and production:
+
+```bash
+curl -X POST 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/' \
+  -H 'X-CEKURA-API-KEY: <api-key>' \
+  -H 'Content-Type: application/json' \
+  -d "{\"agent_id\": 42, \"spec\": $(cat cekura.tests.json)}"
+```
+
+Use metric **slugs** rather than IDs for this, since IDs differ between projects.
+
+## Starting from evaluators you already have
+
+If your tests currently live in the dashboard, export them rather than rewriting them by hand: select your evaluators, choose **Export**, and pick **Test suite spec (.json)**. The file it produces is a valid spec you can commit as-is.
+
+## Limits
+
+| | |
+|---|---|
+| Test cases per spec | 200 |
+| Spec file size | 1 MB |
+| Total runs per request | Subject to your plan's run limits |
+
+Test cases from a spec are cleaned up automatically once no recent run needs them. Results keep their test-case names regardless.
+
+## Getting the schema
+
+The machine-readable schema this endpoint accepts:
+
+```bash
+curl 'https://api.cekura.ai/test_framework/v1/scenarios/json_schema/'
+```
+
+Link it from your spec file as `$schema` for editor autocomplete, or feed it to a JSON Schema validator to check specs locally before they reach CI.

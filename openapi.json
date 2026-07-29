@@ -2619,7 +2619,7 @@
         "/observability/v1/agent-improvement-sessions/": {
             "get": {
                 "operationId": "agent-improvement-sessions-list",
-                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens a Claude Agent SDK session in the product-chat\nsandbox. Call-log sessions generate evaluators first; run and scenario\nsessions reuse their existing evaluator scenarios directly.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens Claude Agent SDK runs in product chat. Call-log\nsessions generate evaluators in one sandbox and self-improve in another;\nrun and scenario sessions reuse existing evaluators directly.\n\n``retrieve`` / ``list`` are read-only poll surfaces. Runtime checkpoints\nadvance the workflow and persist the status returned to the frontend.",
                 "tags": [
                     "observability"
                 ],
@@ -2646,7 +2646,7 @@
             },
             "post": {
                 "operationId": "agent-improvement-sessions-create",
-                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens a Claude Agent SDK session in the product-chat\nsandbox. Call-log sessions generate evaluators first; run and scenario\nsessions reuse their existing evaluator scenarios directly.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens Claude Agent SDK runs in product chat. Call-log\nsessions generate evaluators in one sandbox and self-improve in another;\nrun and scenario sessions reuse existing evaluators directly.\n\n``retrieve`` / ``list`` are read-only poll surfaces. Runtime checkpoints\nadvance the workflow and persist the status returned to the frontend.",
                 "tags": [
                     "observability"
                 ],
@@ -2691,7 +2691,44 @@
         "/observability/v1/agent-improvement-sessions/{id}/": {
             "get": {
                 "operationId": "agent-improvement-sessions-retrieve",
-                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens a Claude Agent SDK session in the product-chat\nsandbox. Call-log sessions generate evaluators first; run and scenario\nsessions reuse their existing evaluator scenarios directly.\n\n``retrieve`` / ``list`` are the poll surface: retrieve syncs the row's\ncoarse status from the underlying sandbox run before returning, so the\nfrontend just polls ``GET /agent-improvement-sessions/<id>/?project=<id>``.",
+                "description": "Create + poll \"Improve Agent\" sessions from Insights or evaluators.\n\n``create`` resolves the target agent from Insight call logs, simulation\nruns, or selected evaluator scenarios. It validates a VAPI / ElevenLabs\nprovider key and opens Claude Agent SDK runs in product chat. Call-log\nsessions generate evaluators in one sandbox and self-improve in another;\nrun and scenario sessions reuse existing evaluators directly.\n\n``retrieve`` / ``list`` are read-only poll surfaces. Runtime checkpoints\nadvance the workflow and persist the status returned to the frontend.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this agent improvement session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/observability/v1/agent-improvement-sessions/{id}/stream-token/": {
+            "get": {
+                "operationId": "agent-improvement-sessions-stream-token-retrieve",
+                "description": "Mint a one-run SSE token for the live Cekura chat handoff.\n\nThe improvement worker remains detached from the browser. This\nendpoint only lets an authorized browser attach to the already-running\nproduct-chat stream; it does not start, stop, or otherwise control the\nsandbox. It uses the same in-memory replay behavior as ordinary chat.",
                 "parameters": [
                     {
                         "in": "path",
@@ -11195,7 +11232,7 @@
         "/subscriptions/packs/add_payg_pack/": {
             "post": {
                 "operationId": "subscriptions-packs-add-payg-pack-create",
-                "description": "Start the free pay-as-you-go plan for an organization.\n\nThe plan never expires: the first pack.free_members_count member(s) are free\nand only additional members are billed through Stripe. Eligible signups\n(business email whose domain hasn't used a plan before, org's first plan)\nalso receive the pack's one-time complimentary credits in the never-expiring\nbalance. Orgs whose previous plan expired or was cancelled can activate too,\nwith 0 complimentary credits. Requires a verified phone number.",
+                "description": "Start the free pay-as-you-go plan for an organization.\n\nThe plan never expires: the first pack.free_members_count member(s) are free\nand only additional members are billed through Stripe. Eligible signups\n(business email whose domain hasn't used a plan before, org's first plan)\nalso receive the pack's one-time complimentary credits in the never-expiring\nbalance. Orgs whose previous plan expired or was cancelled can activate too,\nwith 0 complimentary credits. Phone verification is required only when\ncomplimentary credits will be granted.",
                 "tags": [
                     "subscriptions"
                 ],
@@ -11267,7 +11304,7 @@
         "/subscriptions/packs/switch_to_payg/": {
             "post": {
                 "operationId": "subscriptions-packs-switch-to-payg-create",
-                "description": "Switch a legacy Stripe-managed self-serve plan (the old developer plan\nwith recurring monthly credits) to the free first-user-free\npay-as-you-go plan. Admin-only, opt-in from the billing page.\n\nWhat it does: cancels the old Stripe subscription immediately (unpaid\ninvoices voided), moves the Stripe customer/card to the org, keeps the\nremaining credit balance until its normal expiry, and creates a seat\nsubscription for members beyond the free seats that starts billing only\nwhen the already-paid period ends. No complimentary credits.",
+                "description": "Switch an active legacy Stripe-managed self-serve plan, an inactive\nplan, or any other plan whose grace period has elapsed onto the free\nfirst-user-free pay-as-you-go plan. Admin-only, opt-in from billing.\n\nWhat it does: cancels the old Stripe subscription immediately (unpaid\ninvoices voided), moves the Stripe customer/card to the org, clears\nrecurring plan credits, and creates a seat subscription for members\nbeyond the free seats that starts billing only when the already-paid\nperiod ends. Purchased extra credits carry over only from an active,\nnon-overdue plan. No complimentary credits.",
                 "tags": [
                     "subscriptions"
                 ],
@@ -11618,6 +11655,61 @@
             "post": {
                 "operationId": "subscriptions-subscriptions-restart-seat-billing-create",
                 "description": "Recreate the seat subscription of a perpetual (free base) plan after its\npaid seats ended (voluntary cancellation completed, or payment failure\nafter dunning). One click when a card is on file: charges immediately\nfor the current billable seats and lifts the overdue member block —\nno dependency on the setup-checkout webhook.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/subscriptions/subscriptions/{id}/select-first-paid-seat-plan/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-select-first-paid-seat-plan-create",
+                "description": "Resolve the one-time choice shown before an org's first paid seat.\n\nSending the current pack code keeps pay-as-you-go. Sending the configured\n``allow_switch_to_plan`` code creates and charges that monthly subscription\nimmediately. Pricing, Stripe IDs, and the customer are always server-owned.",
                 "parameters": [
                     {
                         "in": "path",
@@ -12023,7 +12115,7 @@
         "/test_framework/billing/info/": {
             "get": {
                 "operationId": "billing-info-retrieve",
-                "description": "Returns credits remaining, credits used, balance expiry, and subscription status for an organization. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization.",
+                "description": "Returns credits remaining, current billing-cycle credits used, balance expiry, and subscription status for an organization. Credits used comes from the current billing-cycle aggregate and may lag usage by up to 30 minutes. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization.",
                 "summary": "Get billing information",
                 "tags": [
                     "test_framework"
@@ -12056,7 +12148,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "billing-info-retrieve",
-                        "description": "Returns credits remaining, credits used, balance expiry, and subscription status for an organization. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization."
+                        "description": "Returns credits remaining, current billing-cycle credits used, balance expiry, and subscription status for an organization. Credits used comes from the current billing-cycle aggregate and may lag usage by up to 30 minutes. When called with an organization-scoped API key, the org is taken from the key. When called with a user session or OAuth bearer, pass `organization_id` as a query parameter — the caller must be an admin of that organization."
                     }
                 },
                 "parameters": [
@@ -14096,7 +14188,7 @@
             },
             "post": {
                 "operationId": "aiagents-v1-create",
-                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (yes — Retell uses this field even for voice).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the serializer exposes fields for some providers (`pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*`) that are NOT currently in the `assistant_provider` enum. Those fields exist for response/config purposes but the matching provider value cannot be selected today.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell only).\n- `auto_sync_prompt_enabled` — auto-sync prompts from the provider every 30s.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
+                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key` AND `chat_assistant_id` (yes — Retell uses this field even for voice).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.api_secret` + `livekit_data.url`.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the serializer exposes fields for some providers (`pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `custom_provider_*`) that are NOT currently in the `assistant_provider` enum. Those fields exist for response/config purposes but the matching provider value cannot be selected today.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell only).\n- `auto_sync_prompt_enabled` — one-way prompt sync from the provider to Cekura on a schedule; Cekura updates its agent description and does not push changes back to the provider. Supported for VAPI, Retell, ElevenLabs, Synthflow, Telnyx, and Bland.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "AI Agents"
@@ -23021,6 +23113,35 @@
                 ]
             }
         },
+        "/test_framework/v1/phone-numbers/providers/{id}/": {
+            "delete": {
+                "operationId": "phone-numbers-providers-destroy",
+                "description": "Unified API viewset for BYOP (Bring Your Own Telephony Provider).\n\nHandles importing and managing phone numbers from various providers:\n- Twilio\n- Future: Vonage, Bandwidth, Telnyx, etc.\n\nURL Structure: /v1/phone-numbers/providers/{provider}/{action}\n\nHow to add a new provider:\n1. Add provider to PhoneNumberProviderChoices enum\n2. Create {Provider}Service class (e.g., VonageService)\n3. Create Import{Provider}NumberSerializer\n4. Add action method with @action(url_path=\"{provider}/import\")\n5. Update get_serializer_class() mapping",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/test_framework/v1/phone-numbers/providers/list/": {
             "get": {
                 "operationId": "phone-numbers-providers-list-list",
@@ -23702,7 +23823,7 @@
         "/test_framework/v1/predefined-metrics-external/copy/": {
             "post": {
                 "operationId": "predefined-metrics-external-copy-create",
-                "description": "Copy one or more predefined metrics (e.g. Voice Tone + Clarity, Latency, CSAT) into a project so they evaluate its calls. Pass `project_id` and `predefined_metric_ids` (get the IDs from the predefined metrics list). Use this to add these built-in metrics — they cannot be created through the metrics create endpoint.",
+                "description": "Copy one or more predefined metrics (e.g. Voice Tone + Clarity, Latency, CSAT) into a project so they evaluate its calls. Pass `project_id` and either `predefined_metric_ids` or `metric_codes` from the predefined metrics list. Use this to add these built-in metrics — they cannot be created through the metrics create endpoint.",
                 "summary": "Attach predefined metrics to a project",
                 "tags": [
                     "test_framework"
@@ -23724,8 +23845,7 @@
                                 "$ref": "#/components/schemas/PredefinedMetricCopyRequest"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -23926,7 +24046,7 @@
         "/test_framework/v1/predefined-metrics/copy/": {
             "post": {
                 "operationId": "predefined-metrics-copy-create",
-                "description": "Copy one or more predefined metrics (e.g. Voice Tone + Clarity, Latency, CSAT) into a project so they evaluate its calls. Pass `project_id` and `predefined_metric_ids` (get the IDs from the predefined metrics list). Use this to add these built-in metrics — they cannot be created through the metrics create endpoint.",
+                "description": "Copy one or more predefined metrics (e.g. Voice Tone + Clarity, Latency, CSAT) into a project so they evaluate its calls. Pass `project_id` and either `predefined_metric_ids` or `metric_codes` from the predefined metrics list. Use this to add these built-in metrics — they cannot be created through the metrics create endpoint.",
                 "summary": "Attach predefined metrics to a project",
                 "tags": [
                     "test_framework"
@@ -23948,8 +24068,7 @@
                                 "$ref": "#/components/schemas/PredefinedMetricCopyRequest"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -23977,7 +24096,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "predefined-metrics-copy-create",
-                        "description": "Copy one or more predefined metrics (e.g. Voice Tone + Clarity, Latency, CSAT) into a project so they evaluate its calls. Pass `project_id` and `predefined_metric_ids` (get the IDs from the predefined metrics list). Use this to add these built-in metrics — they cannot be created through the metrics create endpoint."
+                        "description": "Copy one or more predefined metrics (e.g. Voice Tone + Clarity, Latency, CSAT) into a project so they evaluate its calls. Pass `project_id` and either `predefined_metric_ids` or `metric_codes` from the predefined metrics list. Use this to add these built-in metrics — they cannot be created through the metrics create endpoint."
                     }
                 }
             }
@@ -29852,7 +29971,7 @@
             },
             "post": {
                 "operationId": "scenarios-external-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. The matched condition's action is rewritten to `<audio id=\"...\"/>`. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -29879,6 +29998,12 @@
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "action_template": {
+                                        "type": "string"
+                                    },
+                                    "replace_audio_id": {
+                                        "type": "string"
                                     }
                                 },
                                 "required": [
@@ -35344,7 +35469,7 @@
             },
             "post": {
                 "operationId": "scenarios-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. The matched condition's action is rewritten to `<audio id=\"...\"/>`. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -35371,6 +35496,12 @@
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "action_template": {
+                                        "type": "string"
+                                    },
+                                    "replace_audio_id": {
+                                        "type": "string"
                                     }
                                 },
                                 "required": [
@@ -49149,7 +49280,7 @@
             },
             "post": {
                 "operationId": "test-framework-v2-scenarios-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. The matched condition's action is rewritten to `<audio id=\"...\"/>`. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -49176,6 +49307,12 @@
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "action_template": {
+                                        "type": "string"
+                                    },
+                                    "replace_audio_id": {
+                                        "type": "string"
                                     }
                                 },
                                 "required": [
@@ -56114,6 +56251,44 @@
                 "description": "User organizations overview critical categories"
             }
         },
+        "/user/phone-otp/send/": {
+            "post": {
+                "operationId": "user-phone-otp-send-create",
+                "description": "Send a phone-verification OTP, metered per account rather than per browser.",
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/user/phone-otp/verify/": {
+            "post": {
+                "operationId": "user-phone-otp-verify-create",
+                "description": "Confirm a phone-verification OTP, recording the attempt for the send quota.",
+                "tags": [
+                    "user"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/user/provider-credentials/": {
             "get": {
                 "operationId": "user-provider-credentials-list",
@@ -59207,7 +59382,7 @@
                     },
                     "auto_sync_prompt_enabled": {
                         "type": "boolean",
-                        "description": "Enable automatic syncing of prompts from Retell/VAPI/ElevenLabs API every 30 seconds"
+                        "description": "Enable one-way prompt sync from the provider to Cekura on a schedule. Cekura re-fetches the provider prompt and updates the agent description; it does not push Cekura description changes back to the provider. Supported providers: vapi, retell, elevenlabs, synthflow, telnyx, bland."
                     },
                     "agent_gives_first_message": {
                         "type": [
@@ -60380,7 +60555,7 @@
                             "boolean",
                             "null"
                         ],
-                        "description": "Auto-sync the agent from the provider on a schedule. Supported for: vapi, retell, elevenlabs, synthflow."
+                        "description": "Enable one-way prompt sync from the provider to Cekura on a schedule. Cekura re-fetches the provider prompt and updates the agent description; it does not push Cekura description changes back to the provider. Supported for: vapi, retell, elevenlabs, synthflow, telnyx, bland."
                     },
                     "send_post_conversation_metadata": {
                         "type": [
@@ -61328,7 +61503,7 @@
                     "credits_used": {
                         "type": "string",
                         "readOnly": true,
-                        "description": "Total credits consumed across all non-refunded transactions on this billing record.\nExample: `36462.14`"
+                        "description": "Credits consumed in the current billing cycle, calculated from that cycle's billing-cycle aggregate (`run_credits + calllog_credits`). Returns `0` until the cycle's aggregate is created and may lag usage by up to 30 minutes.\nExample: `36462.14`"
                     },
                     "initial_balance": {
                         "type": "string",
@@ -62530,6 +62705,12 @@
                 "description": "Read serializer for one Scenario.condition_audio entry (a plain dict).\n\nThe caller passes each entry dict with `audio_id` injected; fields are\ntolerant of missing keys. `words` is intentionally not exposed (runtime-only\nplayback timing data).",
                 "properties": {
                     "audio_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "action": {
                         "type": [
                             "string",
                             "null"
@@ -67980,6 +68161,11 @@
                         "maximum": 2147483647,
                         "minimum": -2147483648
                     },
+                    "max_projects_limit": {
+                        "type": "integer",
+                        "maximum": 2147483647,
+                        "minimum": -2147483648
+                    },
                     "max_concurrent_runs_limit": {
                         "type": "integer",
                         "maximum": 2147483647,
@@ -68074,6 +68260,13 @@
                         "format": "decimal",
                         "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
                         "description": "One-time complimentary credits granted when the pack is provisioned. Added to the never-expiring extra balance; they do not recur."
+                    },
+                    "allow_switch_to_plan": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Plan that can be offered as a one-time switch when this plan reaches its first paid member seat. Leave blank to disable the offer."
                     },
                     "created_at": {
                         "type": "string",
@@ -72992,7 +73185,7 @@
                     },
                     "auto_sync_prompt_enabled": {
                         "type": "boolean",
-                        "description": "Enable automatic syncing of prompts from Retell/VAPI/ElevenLabs API every 30 seconds"
+                        "description": "Enable one-way prompt sync from the provider to Cekura on a schedule. Cekura re-fetches the provider prompt and updates the agent description; it does not push Cekura description changes back to the provider. Supported providers: vapi, retell, elevenlabs, synthflow, telnyx, bland."
                     },
                     "agent_gives_first_message": {
                         "type": [
@@ -74283,6 +74476,13 @@
                         },
                         "description": "IDs of the predefined metrics to attach. Get these from the predefined metrics list."
                     },
+                    "metric_codes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Codes of the predefined metrics to attach. Provide this or predefined_metric_ids."
+                    },
                     "project_id": {
                         "type": "integer",
                         "description": "Project to attach the metrics to. Provide either project_id or agent_id, not both."
@@ -74298,10 +74498,7 @@
                         },
                         "description": "Optional scenario IDs to scope the metrics to (max 1000). Omit to apply across the target."
                     }
-                },
-                "required": [
-                    "predefined_metric_ids"
-                ]
+                }
             },
             "ProcessFeedbacksRequest": {
                 "type": "object",
@@ -77901,7 +78098,7 @@
                             "boolean",
                             "null"
                         ],
-                        "description": "Auto-sync the agent from the provider on a schedule. Supported for: vapi, retell, elevenlabs, synthflow."
+                        "description": "Enable one-way prompt sync from the provider to Cekura on a schedule. Cekura re-fetches the provider prompt and updates the agent description; it does not push Cekura description changes back to the provider. Supported for: vapi, retell, elevenlabs, synthflow, telnyx, bland."
                     },
                     "send_post_conversation_metadata": {
                         "type": [
@@ -80577,7 +80774,7 @@
                     },
                     "auto_sync_prompt_enabled": {
                         "type": "boolean",
-                        "description": "Enable automatic syncing of prompts from Retell/VAPI/ElevenLabs API every 30 seconds"
+                        "description": "Enable one-way prompt sync from the provider to Cekura on a schedule. Cekura re-fetches the provider prompt and updates the agent description; it does not push Cekura description changes back to the provider. Supported providers: vapi, retell, elevenlabs, synthflow, telnyx, bland."
                     },
                     "agent_gives_first_message": {
                         "type": [
@@ -80848,6 +81045,14 @@
                         "readOnly": true
                     },
                     "has_payment_method": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "can_switch_to_payg": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "first_paid_seat_plan_offer": {
                         "type": "string",
                         "readOnly": true
                     },

@@ -303,6 +303,47 @@ And, recommended, the paired result:
 
 See [Transcript Format](/documentation/advanced/transcript-format) for a full transcript example including function calls.
 
+## Running with Real Tool Endpoints
+
+Use this when you want specific runs to reach your real external tool endpoints rather than Cekura's mock endpoints.
+
+### Per-run control via `mock_tool_names`
+
+Pass `mock_tool_names` in your `run_scenarios` request to select which tools are mocked for that run:
+
+- **Omit or send `null`** — Cekura mocks every tool configured on the agent (default behavior)
+- **Empty list `[]`** — Mock none; every tool call goes to the original endpoint configured in your provider
+- **Named list** `["tool_a", "tool_b"]` — Mock only those tools; all others use their original endpoints
+
+```json
+{
+  "scenario_ids": [123],
+  "mock_tool_names": []
+}
+```
+
+This parameter is per-run — you can have some runs mocked and others not without changing the agent's persistent configuration.
+
+### "Enable Mock Tools by Default" scope
+
+The **Enable Mock Tools by Default** toggle in Agent Settings sets whether mock tools are pre-selected in the *Configure Run* dialog in the dashboard. It does **not** change the default for direct `run_scenarios` API calls — API calls default to mocking all configured tools unless you pass `mock_tool_names`.
+
+To guarantee real tool endpoints on every API-triggered run, include `"mock_tool_names": []` in every request.
+
+### Why deleted mock tools reappear
+
+If mock tool definitions reappear after you've deleted them, the cause is typically the **Provider Auto-Sync Prompt** feature. When enabled, this periodically syncs your agent's configuration from the provider and can re-import tool definitions as part of that update.
+
+To prevent regeneration: in **Agent Settings**, disable the **Provider auto-sync prompt** toggle.
+
+<Note>
+Auto-Fetch is a separate, manual action that also imports tools — but it only runs when you explicitly click the button. The auto-sync prompt can trigger silently in the background. Disabling it stops the silent re-imports; you can still run Auto-Fetch manually when you need to refresh mock data.
+</Note>
+
+### Mock Tool Call Accuracy metric on real-tools runs
+
+The **Mock Tool Call Accuracy** metric is designed for mock-enabled runs — it validates that the agent called the expected Cekura mock endpoints. When running with real tools (`mock_tool_names: []`), the metric has no expected mock calls to match against and will report "No mock tools were expected but the agent made tool calls" even when tools are working correctly. Remove this metric from evaluators that run in real-tools mode.
+
 ## API Reference
 
 For programmatic access to mock tools — they are managed directly on the agent:

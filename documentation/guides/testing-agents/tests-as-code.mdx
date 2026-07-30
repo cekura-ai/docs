@@ -91,23 +91,32 @@ You get back the run that *would* happen — each test case, the total run count
   "valid": true,
   "plan": {
     "agent_id": 12,
+    "project_id": 742,
     "channel": "voice",
+    "suite_name": "Checkout regression",
     "scenario_count": 1,
     "total_runs": 1,
     "estimated_cost": 0.35,
     "scenarios": [
       {
-        "key": "Refund happy path",
+        "key": "refund_happy_path",
         "name": "Refund happy path",
+        "type": "instruction",
         "frequency": 1,
         "metric_ids": [412, 413],
+        "tags": [],
         "personality": { "mode": "existing", "id": 3, "name": "Normal Male" },
-        "test_profile": { "mode": "inline", "sections": ["main_agent_variables", "testing_agent_variables"] }
+        "test_profile": {
+          "mode": "inline",
+          "sections": ["main_agent_variables", "testing_agent_variables"]
+        }
       }
     ]
   }
 }
 ```
+
+`personality.mode` tells you which form was resolved — `existing` (referenced by ID), `override` (a `base` plus your changes), `inline` (defined from scratch), or `project_default`. Use it to confirm the file did what you meant before spending anything.
 
 ### 3. Run it
 
@@ -123,7 +132,66 @@ curl --request POST \
 
 The response is the same shape as any evaluator run, so poll the returned `id` against the Results API for progress and success rate.
 
+## The request
+
+`POST /test_framework/v1/scenarios/run_scenarios_json/`
+
+Authenticate with `X-CEKURA-API-KEY`. The key's own scope resolves the project, so no `project_id` is needed.
+
+| Field | Required | Description |
+|---|---|---|
+| `agent_id` | yes | The agent to test. |
+| `spec` | yes* | The spec, as a JSON object. |
+| `file` | yes* | A `.json` spec file, as `multipart/form-data`. Use instead of `spec`. |
+| `channel` | no | `voice` (default), `text`, or `elevenlabs`. |
+| `name` | no | Label for this run. Defaults to the spec's `suite.name`. |
+
+\* Send exactly one of `spec` or `file`.
+
+| Query parameter | Description |
+|---|---|
+| `dry_run=true` | Validate and price without creating or charging anything. |
+
+### Uploading the file instead of embedding it
+
+Avoids `$(cat …)` quoting entirely, which is handy in shells where escaping gets awkward:
+
+```bash
+curl --request POST \
+  --url 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/' \
+  --header 'X-CEKURA-API-KEY: <api-key>' \
+  --form 'agent_id=12' \
+  --form 'channel=voice' \
+  --form 'file=@cekura.tests.json'
+```
+
 ## Writing a spec file
+
+### Structure at a glance
+
+```
+{
+  "$schema": "…/schemas/test-suite/v1.json",   optional, for editor autocomplete
+  "version": "1",                             required
+  "suite":    { name, description },           optional
+  "defaults": {                                optional, applied to every case
+    frequency, concurrency_limit, language, max_duration,
+    metrics, personality, test_profile, tags
+  },
+  "scenarios": [                               required, 1–200
+    {
+      key, name,                               name required
+      type,                                    instruction | conditional_actions
+      instructions | conditional_actions,      one, depending on type
+      expected_outcome, first_message,
+      metrics, personality, test_profile,
+      tools, language, frequency, max_duration
+    }
+  ]
+}
+```
+
+Note what is *not* in there: no `agent_id`, no `channel`, no credentials, no provider ids. Those are request parameters or agent configuration — see [Choosing the run target](#choosing-the-run-target). A file containing `agent_id` is rejected, so the split stays honest.
 
 ### The envelope
 
@@ -313,7 +381,7 @@ jobs:
             'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true' \
             -H 'X-CEKURA-API-KEY: ${{ secrets.CEKURA_API_KEY }}' \
             -H 'Content-Type: application/json' \
-            -d "{\"spec\": $(cat cekura.tests.json)}"
+            -d "{\"agent_id\": ${{ vars.CEKURA_AGENT_ID }}, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
 
       - name: Run the tests
         run: |
@@ -321,7 +389,7 @@ jobs:
             'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/' \
             -H 'X-CEKURA-API-KEY: ${{ secrets.CEKURA_API_KEY }}' \
             -H 'Content-Type: application/json' \
-            -d "{\"spec\": $(cat cekura.tests.json)}" \
+            -d "{\"agent_id\": ${{ vars.CEKURA_AGENT_ID }}, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}" \
             | tee run.json
           echo "RESULT_ID=$(python3 -c 'import json;print(json.load(open("run.json"))["id"])')" >> "$GITHUB_ENV"
 ```
@@ -335,13 +403,13 @@ agent-tests:
         "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true" \
         -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
         -H "Content-Type: application/json" \
-        -d "{\"spec\": $(cat cekura.tests.json)}"
+        -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
     - |
       curl --fail-with-body -sS -X POST \
         "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/" \
         -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
         -H "Content-Type: application/json" \
-        -d "{\"spec\": $(cat cekura.tests.json)}"
+        -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
 ```
 
 </CodeGroup>
@@ -374,4 +442,10 @@ The machine-readable schema this endpoint accepts:
 curl 'https://api.cekura.ai/test_framework/v1/scenarios/json_schema/'
 ```
 
-Link it from your spec file as `$schema` for editor autocomplete, or feed it to a JSON Schema validator to check specs locally before they reach CI.
+No API key needed — it is a public contract with no data of yours in it. Link it from your spec file as `$schema` for editor autocomplete, or feed it to a JSON Schema validator to check specs locally before they reach CI.
+
+The same document is published at a stable URL, which is what the `$schema` line in the examples above points at:
+
+```
+https://docs.cekura.ai/schemas/test-suite/v1.json
+```

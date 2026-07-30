@@ -1,79 +1,77 @@
 # ElevenLabs MCP Server
 
-Streamable HTTP wrapper for the official `elevenlabs-mcp` package. It is safe for multi-user hosting: every MCP request must include the caller's own ElevenLabs API key and the server stores no ElevenLabs key.
+Streamable HTTP wrapper for the official `elevenlabs-mcp` package. It authenticates callers with Cekura OAuth and calls ElevenLabs using each caller's own API key.
 
 ## Overview
 
 - Official ElevenLabs MCP tools, pinned to `elevenlabs-mcp==0.11.0`
 - Stateless HTTP endpoint at `/mcp`
-- Per-request authentication through `xi-api-key`
+- Local Cekura OAuth JWT verification on every MCP request
+- Per-request ElevenLabs authentication through `xi-elevenlabs-api-key`
 - Public health checks at `/mcp/health` and `/mcp/healthz`
 - All tools exposed by the pinned official ElevenLabs MCP package
 - No server-side ElevenLabs key
 
-## Quick Start
+## Deployment
+
+1. Build this folder's Docker image and push it to ECR.
+2. Run it as a Fargate task behind an HTTPS ALB on port `8080`.
+3. Set `AWS_SECRET_NAME` on the task. Its task role needs `secretsmanager:GetSecretValue` for that secret.
+4. Store these values in the referenced Secrets Manager JSON:
+
+   ```text
+   OAUTH_TOKEN_SECRET=<same value used by the Cekura backend>
+   MCP_SERVER_URL=https://ELEVENLABS_MCP_HOST/mcp
+   MCP_ISSUER_URL=<backend OAUTH_AUDIENCE>
+   CEKURA_OAUTH_AUDIENCE=<backend OAUTH_AUDIENCE>
+   ```
+
+   Production uses `https://api.cekura.ai` as its OAuth audience. Stage must use its stage backend URL.
+
+5. Route `/mcp`, `/mcp/*`, and `/.well-known/oauth-protected-resource` to the task. Use `GET /mcp/health` as the target-group health check.
+6. Allow inbound traffic to the task only from the ALB security group.
+
+The task stores no ElevenLabs API key.
+
+## How to use
+
+The client authenticates through Cekura OAuth and also sends its own ElevenLabs API key as `xi-elevenlabs-api-key`.
+
+### Codex
 
 ```bash
-cd elevenlabs-mcp
-python3 -m venv venv
-./venv/bin/pip install -r requirements.txt
-./venv/bin/python server.py
+codex mcp add elevenlabs \
+  --url https://ELEVENLABS_MCP_HOST/mcp \
+  --oauth-resource https://ELEVENLABS_MCP_HOST/mcp
 ```
 
-The server listens on `http://0.0.0.0:8080/mcp`.
+Add the ElevenLabs key to `~/.codex/config.toml`:
 
-## Health Check
+```toml
+[mcp_servers.elevenlabs.http_headers]
+xi-elevenlabs-api-key = "YOUR_ELEVENLABS_API_KEY"
+```
+
+Connect the Cekura account, then start a new Codex session:
 
 ```bash
-curl http://localhost:8080/mcp/health
+codex mcp login elevenlabs
 ```
 
-Expected response:
-
-```json
-{"status":"healthy","service":"elevenlabs-mcp","tools_registered":27}
-```
-
-## Connect a Client
-
-Each client supplies its own ElevenLabs key. Do not configure a shared server-side key.
+### Claude Code
 
 ```bash
-claude mcp add --transport http elevenlabs http://SERVER_HOST:8080/mcp \
-  --header "xi-api-key: YOUR_ELEVENLABS_API_KEY"
+claude mcp add --transport http elevenlabs https://ELEVENLABS_MCP_HOST/mcp \
+  --header "xi-elevenlabs-api-key: YOUR_ELEVENLABS_API_KEY"
 ```
 
-For Codex, configure the HTTP MCP server with the same URL and `xi-api-key` header.
-
-## Docker
-
-```bash
-cd elevenlabs-mcp
-docker build -t elevenlabs-mcp .
-docker run --detach --name elevenlabs-mcp --restart unless-stopped \
-  --publish 127.0.0.1:8080:8080 elevenlabs-mcp
-```
-
-Verify the container:
-
-```bash
-curl http://localhost:8080/mcp/health
-```
-
-## ECS Hosting
-
-1. Build this folder's Dockerfile and push the image to ECR.
-2. Run one Fargate task behind an internal or internet-facing ALB.
-3. Forward the ALB target group to container port `8080`.
-4. Configure the target-group health check as `GET /mcp/health` with success code `200`.
-5. Terminate TLS at the ALB and expose only the resulting HTTPS URL to MCP clients.
-6. Allow inbound traffic to the ECS task security group only from the ALB security group.
-
-The task needs no ElevenLabs secret. Clients send `xi-api-key` on each request.
+On the first connection, Claude opens the Cekura OAuth login and consent page. After approval, ask it to use the ElevenLabs MCP tools.
 
 ## Security
 
-The server exposes the complete official ElevenLabs MCP tool set. Place authentication, authorization, and usage controls in the backend or ingress layer that sits in front of this service.
+The server exposes the complete official ElevenLabs MCP tool set. It verifies Cekura OAuth tokens locally with the configured `OAUTH_TOKEN_SECRET`; it does not call the Cekura backend on MCP requests.
+
+OAuth access tokens remain valid until expiry, so disabling a user does not take effect here until the active token expires. Keep the OAuth access-token lifetime short.
 
 Do not expose port `8080` directly to the internet. Use an ALB or reverse proxy that terminates TLS, applies rate limits, and forwards traffic to the task security group.
 

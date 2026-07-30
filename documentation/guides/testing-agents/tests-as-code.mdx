@@ -48,7 +48,6 @@ Save this as `cekura.tests.json` in your repository:
 {
   "$schema": "https://docs.cekura.ai/schemas/test-suite/v1.json",
   "version": "1",
-  "agent_id": 12,
   "suite": { "name": "Checkout regression" },
   "scenarios": [
     {
@@ -68,6 +67,10 @@ Save this as `cekura.tests.json` in your repository:
 
 The `$schema` line is optional but gives you autocomplete and inline validation in most editors.
 
+<Note>
+The file says **what** to test. Which agent to run it against, and how to reach that agent, are supplied by the request — so the same file works unchanged across agents, projects and environments.
+</Note>
+
 ### 2. Check it
 
 Validate without running or spending anything:
@@ -77,7 +80,7 @@ curl --request POST \
   --url 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true' \
   --header 'X-CEKURA-API-KEY: <api-key>' \
   --header 'Content-Type: application/json' \
-  --data "{\"spec\": $(cat cekura.tests.json)}"
+  --data "{\"agent_id\": 12, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
 ```
 
 You get back the run that *would* happen — each test case, the total run count, and the estimated cost:
@@ -115,7 +118,7 @@ curl --request POST \
   --url 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/' \
   --header 'X-CEKURA-API-KEY: <api-key>' \
   --header 'Content-Type: application/json' \
-  --data "{\"spec\": $(cat cekura.tests.json)}"
+  --data "{\"agent_id\": 12, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
 ```
 
 The response is the same shape as any evaluator run, so poll the returned `id` against the Results API for progress and success rate.
@@ -127,7 +130,6 @@ The response is the same shape as any evaluator run, so poll the returned `id` a
 | Field | Required | Description |
 |---|---|---|
 | `version` | yes | Spec format version. Currently `"1"`. Pin it — new formats ship as new versions. |
-| `agent_id` | no | The agent to test. Can be supplied in the request instead, which is how one file targets several environments. |
 | `suite.name` | no | Labels the run in Results. |
 | `defaults` | no | Applied to every test case unless the case overrides it. |
 | `scenarios` | yes | Your test cases. Between 1 and 200. |
@@ -237,9 +239,7 @@ Anything repeated across cases can move up into `defaults`:
 ```json
 {
   "version": "1",
-  "agent_id": 12,
   "defaults": {
-    "channel": "voice",
     "language": "en",
     "metrics": ["greeting_by_name"],
     "personality": 3,
@@ -254,9 +254,24 @@ Anything repeated across cases can move up into `defaults`:
 
 A test case overrides `defaults` field by field. `metrics` lists from both are combined.
 
-### Channels
+### Choosing the run target
 
-`defaults.channel` selects how the agent is reached: `voice` (default) or `text`. Other execution modes are reserved in the schema but not accepted yet; a spec using one is rejected with a clear message rather than run down an unintended path.
+Two request parameters decide where and how a spec runs — neither belongs in the file:
+
+| Parameter | Description |
+|---|---|
+| `agent_id` | **Required.** The agent to test. |
+| `channel` | `voice` for a phone call (the default), `text` for chat, or `elevenlabs` for an ElevenLabs WebRTC session. |
+
+```bash
+--data "{\"agent_id\": 42, \"channel\": \"text\", \"spec\": $(cat cekura.tests.json)}"
+```
+
+Because the target lives in the request, the same committed file runs against staging and production, or across several agents, without edits. Use metric **slugs** rather than numeric IDs to make that fully portable, since IDs are project-specific.
+
+Anything the channel needs beyond that comes from the agent's own configuration: a phone number for voice, a chat provider for text, ElevenLabs credentials and agent id for `elevenlabs`. If the agent isn't configured for the channel you pick, the run is rejected with a message naming what's missing.
+
+Other execution modes exist but are not accepted yet; passing one is rejected rather than run down an unintended path.
 
 ## Reading validation errors
 
@@ -336,19 +351,6 @@ Runs are asynchronous: the call returns once they are queued. To gate a merge on
 <Tip>
 Split it across two jobs: run the dry check on every push (free, fast, catches a broken file), and the real run only on the branches you actually want tested.
 </Tip>
-
-## Targeting several environments with one file
-
-Leave `agent_id` out of the file and pass it per request, so the same test cases run against staging and production:
-
-```bash
-curl -X POST 'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/' \
-  -H 'X-CEKURA-API-KEY: <api-key>' \
-  -H 'Content-Type: application/json' \
-  -d "{\"agent_id\": 42, \"spec\": $(cat cekura.tests.json)}"
-```
-
-Use metric **slugs** rather than IDs for this, since IDs differ between projects.
 
 ## Starting from evaluators you already have
 

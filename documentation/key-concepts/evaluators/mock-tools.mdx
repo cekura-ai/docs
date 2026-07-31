@@ -303,6 +303,38 @@ And, recommended, the paired result:
 
 See [Transcript Format](/documentation/advanced/transcript-format) for a full transcript example including function calls.
 
+## Controlling Mock Tools per API Run
+
+### The `mock_tool_names` field
+
+When calling `run_scenarios` directly, use the `mock_tool_names` field to control mocking at the run level. This takes precedence over agent-level mock settings and the dashboard toggle:
+
+| `mock_tool_names` value | Behaviour |
+|---|---|
+| Omit the field (or `null`) | Mock every tool configured on the agent |
+| `[]` (empty array) | Disable all mocking — every tool uses its original endpoint |
+| `["tool_a", "tool_b"]` | Mock only the named tools; all others use their original endpoints |
+
+To guarantee real-tool execution on every API-triggered run, include `"mock_tool_names": []` in the request body:
+
+```json
+{
+  "mock_tool_names": []
+}
+```
+
+This is the most reliable approach because it is immune to agent configuration changes — even if mock tools are re-added on the agent, the per-run field overrides them.
+
+### "Enable Mock Tools by Default" — dashboard only
+
+The **Enable Mock Tools by Default** toggle in Agent Settings controls only the dashboard *Configure Run* dialog. When it is off, the dialog submits `mock_tool_names: []` so that UI-initiated runs use real tools. It has **no effect on direct API calls** — the API default is to mock every configured tool unless you pass `mock_tool_names` explicitly.
+
+### Why deleted mock tools can reappear
+
+Auto-Fetch and the *Provider Auto-Sync Prompt* feature re-import tool configurations from your provider (Retell, Vapi, ElevenLabs, Bland) whenever an agent reconfigure or sync operation runs. If any of these actions run after you delete mock tools, the tools are re-created from the provider's current configuration.
+
+To prevent this, disable the **Provider Auto-Sync Prompt** toggle in Agent Settings. Deleting the mock tools alone is not sufficient if Auto-Sync Prompt remains enabled — the next sync will regenerate them.
+
 ## API Reference
 
 For programmatic access to mock tools — they are managed directly on the agent:

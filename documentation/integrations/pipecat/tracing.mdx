@@ -720,6 +720,20 @@ Install the pipecat dependencies:
 pip install cekura[pipecat]
 ```
 
+### Traces show a `trace_id` but no turn spans appear (404 on trace retrieval)
+
+**Symptom:** The call log shows a non-empty `trace_id`, but fetching the trace returns 404 and the dashboard shows no per-turn STT/LLM/TTS spans.
+
+**Cause:** This is a known issue in SDK versions before 1.5.3. When another library in the same process — Logfire, Sentry APM, Datadog, Honeycomb, or any bare `opentelemetry-sdk` setup — has already registered the global OpenTelemetry `TracerProvider`, OTel's single-writer semantics silently reject the SDK's attempt to install its own provider. The SDK still reads a `trace_id` from the existing provider's span, so the call record shows a non-empty ID, but the span data was exported to the other library's backend — not to Cekura's OTel collector.
+
+**Fix:** Upgrade to `cekura[pipecat]>=1.5.3`:
+
+```bash
+pip install --upgrade "cekura[pipecat]>=1.5.3"
+```
+
+Version 1.5.3 detects a pre-existing global provider and attaches Cekura's exporter to it rather than trying to replace it, so traces reach Cekura regardless of what other observability libraries are present in the process. This version also handles the multi-tenant case — a host process serving multiple concurrent calls with different agent IDs — routing each call's spans to the correct Cekura agent without cross-tenant data leakage.
+
 ## Next Steps
 
 - [Create custom metrics](/documentation/key-concepts/metrics/custom-metrics) to evaluate your agents

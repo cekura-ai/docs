@@ -1,0 +1,148 @@
+name: Deploy ElevenLabs MCP Server (PROD)
+
+# Builds the ElevenLabs MCP wrapper and deploys one Fargate task in the
+# existing prod us-west-2 ECS cluster. The service is exposed through its
+# dedicated ALB host, elevenlabs-mcp.cekura.ai, so it does not conflict with
+# the existing /mcp rule for the Cekura MCP server.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'elevenlabs-mcp/**'
+      - '.github/workflows/deploy-elevenlabs-mcp.yml'
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: cekura/elevenlabs-mcp
+  ECS_CLUSTER: cet-prd-usw2-cekura-ecs-cluster
+  ECS_SERVICE: cet-prd-usw2-elevenlabs-mcp-ecs-service
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-elevenlabs-mcp-prod
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.construct-tag.outputs.image-tag }}
+      registry: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
+
+      - name: Configure AWS credentials (shared services for ECR push)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_SHARED }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Construct Docker image tag
+        id: construct-tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH_NAME=${GITHUB_REF_NAME//\//-}
+          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+          echo "image-tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./elevenlabs-mcp
+          file: ./elevenlabs-mcp/Dockerfile
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.construct-tag.outputs.image-tag }}
+          cache-from: |
+            type=gha,scope=elevenlabs-mcp-${{ github.ref_name }}
+            type=gha,scope=elevenlabs-mcp-main
+          cache-to: type=gha,mode=max,scope=elevenlabs-mcp-${{ github.ref_name }}
+
+  deploy:
+    name: deploy
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (workload account for ECS deploy)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Render + register task definition
+        id: register
+        run: |
+          sed "s|<IMAGE_TAG>|${{ needs.build.outputs.image-tag }}|g" \
+            elevenlabs-mcp/deployment/ecs/prod-usw2/elevenlabs-mcp-task-def.json \
+            > /tmp/elevenlabs-mcp-task-def.rendered.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/elevenlabs-mcp-task-def.rendered.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task-def-arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "${{ steps.register.outputs.task-def-arn }}" \
+            --desired-count 1 \
+            --force-new-deployment \
+            --query 'service.[serviceName,taskDefinition,desiredCount]' --output text
+
+      - name: Wait for service stable
+        run: |
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          echo "✅ Service stable"
+
+  notify:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Compose message
+        id: collect
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image-tag }}"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "message=*❌ elevenlabs-mcp build failed for prod!* (tag: ${IMAGE_TAG:-n/a})" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "message=*✅ elevenlabs-mcp deployed to prod* (tag: ${IMAGE_TAG})" >> "$GITHUB_OUTPUT"
+          else
+            DD_LINK="https://us5.datadoghq.com/logs?query=env%3Aprod%20version%3A${IMAGE_TAG}%20service%3Aelevenlabs-mcp"
+            echo "message=*❌ elevenlabs-mcp deploy to prod failed* (tag: ${IMAGE_TAG}) - <${DD_LINK}|Datadog logs>" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack
+        if: vars.SLACK_DEPLOYMENTS_CHANNEL != ''
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_BOT_BEARER_TOKEN }}
+          SLACK_CHANNEL: ${{ vars.SLACK_DEPLOYMENTS_CHANNEL }}
+          MESSAGE: ${{ steps.collect.outputs.message }}
+        run: |
+          if [ -z "$SLACK_TOKEN" ] || [ -z "$SLACK_CHANNEL" ]; then
+            echo "(Slack creds missing — skipping notification)"
+            exit 0
+          fi
+          curl -sS -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_TOKEN" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            -d "$(jq -n --arg ch "$SLACK_CHANNEL" --arg msg "$MESSAGE" '{channel:$ch,text:$msg}')" \
+            | jq '{ok,error}'

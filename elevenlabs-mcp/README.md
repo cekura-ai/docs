@@ -14,10 +14,24 @@ Streamable HTTP wrapper for the official `elevenlabs-mcp` package. It authentica
 
 ## Deployment
 
-1. Build this folder's Docker image and push it to ECR.
-2. Run it as a Fargate task behind an HTTPS ALB on port `8080`.
-3. Set `AWS_SECRET_NAME` on the task. Its task role needs `secretsmanager:GetSecretValue` for that secret.
-4. Store these values in the referenced Secrets Manager JSON:
+The production deployment is a separate one-task Fargate service in the existing
+`cet-prd-usw2-cekura-ecs-cluster`:
+
+- ECS family: `elevenlabs-mcp`
+- ECS service: `cet-prd-usw2-elevenlabs-mcp-ecs-service`
+- ECR repository: `cekura/elevenlabs-mcp`
+- Container/target-group port: `8080`
+- Desired count: `1`
+- Task definition: `deployment/ecs/prod-usw2/elevenlabs-mcp-task-def.json`
+
+The `Deploy ElevenLabs MCP Server (PROD)` workflow builds and deploys the
+service whenever `elevenlabs-mcp/**` changes on `main`. Create the ECS service,
+target group, listener rule, DNS record, secret, and IAM permission once before
+the first workflow run.
+
+1. Create the Secrets Manager secret named
+   `cet-prd-usw2-elevenlabs-mcp-secret` in `us-west-2`. Store these values in
+   its JSON value:
 
    ```text
    OAUTH_TOKEN_SECRET=<same value used by the Cekura backend>
@@ -28,8 +42,21 @@ Streamable HTTP wrapper for the official `elevenlabs-mcp` package. It authentica
 
    Production uses `https://api.cekura.ai` as its OAuth audience. Stage must use its stage backend URL.
 
-5. Route `/mcp`, `/mcp/*`, and `/.well-known/oauth-protected-resource` to the task. Use `GET /mcp/health` as the target-group health check.
-6. Allow inbound traffic to the task only from the ALB security group.
+2. Grant the task role
+   `cet-prd-usw2-elevenlabs-mcp-task-iam-role` `secretsmanager:GetSecretValue`
+   on that secret. Use the existing prod ECS execution role and networking
+   configuration used by `mcp-server`.
+3. Create an HTTPS ALB target group for port `8080`, with `GET /mcp/health` as
+   the health check. Allow inbound traffic to the task only from the ALB
+   security group.
+4. Add an ALB host rule for `elevenlabs-mcp.cekura.ai` forwarding these paths
+   to the target group:
+   `/mcp*` and `/.well-known/oauth-protected-resource`.
+   This dedicated host avoids conflicting with the existing `api.cekura.ai/mcp`
+   rule used by the Cekura MCP server. Add an alias record for
+   `elevenlabs-mcp.cekura.ai` to the ALB.
+5. Create the ECS service with the task definition above and desired count
+   `1`; subsequent image updates are handled by the workflow.
 
 The task stores no ElevenLabs API key.
 

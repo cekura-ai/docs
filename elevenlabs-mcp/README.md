@@ -14,22 +14,49 @@ Streamable HTTP wrapper for the official `elevenlabs-mcp` package. It authentica
 
 ## Deployment
 
-1. Build this folder's Docker image and push it to ECR.
-2. Run it as a Fargate task behind an HTTPS ALB on port `8080`.
-3. Set `AWS_SECRET_NAME` on the task. Its task role needs `secretsmanager:GetSecretValue` for that secret.
-4. Store these values in the referenced Secrets Manager JSON:
+The production deployment is a separate one-task Fargate service in the existing
+`cet-prd-usw2-cekura-ecs-cluster`:
+
+- ECS family: `elevenlabs-mcp`
+- ECS service: `cet-prd-usw2-elevenlabs-mcp-ecs-service`
+- ECR repository: `cekura/elevenlabs-mcp`
+- Container/target-group port: `8080`
+- Desired count: `1`
+- Task definition: `deployment/ecs/prod-usw2/elevenlabs-mcp-task-def.json`
+
+The `Deploy ElevenLabs MCP Server (PROD)` workflow builds and deploys the
+service whenever `elevenlabs-mcp/**` changes on `main`. The task reuses the
+existing Cekura MCP task role and secret, so no new secret or IAM role is
+needed.
+
+Add these namespaced values to the existing
+`cet-prd-usw2-mcp-secret` JSON in `us-west-2`:
 
    ```text
-   OAUTH_TOKEN_SECRET=<same value used by the Cekura backend>
-   MCP_SERVER_URL=https://ELEVENLABS_MCP_HOST/mcp
-   MCP_ISSUER_URL=<backend OAUTH_AUDIENCE>
-   CEKURA_OAUTH_AUDIENCE=<backend OAUTH_AUDIENCE>
+   ELEVENLABS_MCP_OAUTH_TOKEN_SECRET=<same value used by the Cekura backend>
+   ELEVENLABS_MCP_SERVER_URL=https://elevenlabs.cekura.ai/mcp
+   ELEVENLABS_MCP_ISSUER_URL=https://api.cekura.ai
+   ELEVENLABS_MCP_CEKURA_OAUTH_AUDIENCE=https://api.cekura.ai
    ```
 
-   Production uses `https://api.cekura.ai` as its OAuth audience. Stage must use its stage backend URL.
+Production uses `https://api.cekura.ai` as its OAuth audience. Stage must use
+its stage backend URL. Keep these names prefixed so they cannot overwrite
+configuration used by the existing Cekura MCP container when both services
+read the same secret.
 
-5. Route `/mcp`, `/mcp/*`, and `/.well-known/oauth-protected-resource` to the task. Use `GET /mcp/health` as the target-group health check.
-6. Allow inbound traffic to the task only from the ALB security group.
+1. Create an HTTPS ALB target group for port `8080`, with `GET /mcp/health` as
+   the health check. Allow inbound traffic to the task only from the ALB
+   security group.
+2. Add an ALB host rule for `elevenlabs.cekura.ai` forwarding traffic to the
+   target group. A host-only rule is sufficient because this uses a dedicated
+   hostname and the service handles `/mcp` and OAuth discovery routes itself.
+   This dedicated host avoids conflicting with the existing `api.cekura.ai/mcp`
+   rule used by the Cekura MCP server. Add an alias record for
+   `elevenlabs.cekura.ai` to the ALB.
+3. Create the ECS service with the task definition above and desired count
+   `1`, using the existing MCP service's cluster, subnets, security groups,
+   execution role, and task role. Subsequent image updates are handled by the
+   workflow.
 
 The task stores no ElevenLabs API key.
 
@@ -41,8 +68,8 @@ The client authenticates through Cekura OAuth and also sends its own ElevenLabs 
 
 ```bash
 codex mcp add elevenlabs \
-  --url https://ELEVENLABS_MCP_HOST/mcp \
-  --oauth-resource https://ELEVENLABS_MCP_HOST/mcp
+  --url https://elevenlabs.cekura.ai/mcp \
+  --oauth-resource https://elevenlabs.cekura.ai/mcp
 ```
 
 Add the ElevenLabs key to `~/.codex/config.toml`:
@@ -61,7 +88,7 @@ codex mcp login elevenlabs
 ### Claude Code
 
 ```bash
-claude mcp add --transport http elevenlabs https://ELEVENLABS_MCP_HOST/mcp \
+claude mcp add --transport http elevenlabs https://elevenlabs.cekura.ai/mcp \
   --header "xi-elevenlabs-api-key: YOUR_ELEVENLABS_API_KEY"
 ```
 
@@ -69,7 +96,7 @@ On the first connection, Claude opens the Cekura OAuth login and consent page. A
 
 ## Security
 
-The server exposes the complete official ElevenLabs MCP tool set. It verifies Cekura OAuth tokens locally with the configured `OAUTH_TOKEN_SECRET`; it does not call the Cekura backend on MCP requests.
+The server exposes the complete official ElevenLabs MCP tool set. It verifies Cekura OAuth tokens locally with the configured `ELEVENLABS_MCP_OAUTH_TOKEN_SECRET`; it does not call the Cekura backend on MCP requests.
 
 OAuth access tokens remain valid until expiry, so disabling a user does not take effect here until the active token expires. Keep the OAuth access-token lifetime short.
 

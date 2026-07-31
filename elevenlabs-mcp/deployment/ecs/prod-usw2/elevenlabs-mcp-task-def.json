@@ -1,0 +1,116 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "elevenlabs-mcp",
+      "image": "212351099297.dkr.ecr.us-west-2.amazonaws.com/cekura/elevenlabs-mcp:<IMAGE_TAG>",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp",
+          "name": "elevenlabs-mcp-8080-port",
+          "appProtocol": "http"
+        }
+      ],
+      "essential": true,
+      "environment": [
+        {
+          "name": "AWS_SECRET_NAME",
+          "value": "arn:aws:secretsmanager:us-west-2:593108103736:secret:cet-prd-usw2-mcp-secret-HnC2v3"
+        }
+      ],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "logConfiguration": {
+        "logDriver": "awsfirelens",
+        "options": {
+          "dd_message_key": "log",
+          "provider": "ecs",
+          "dd_service": "elevenlabs-mcp",
+          "Host": "http-intake.logs.us5.datadoghq.com",
+          "TLS": "on",
+          "dd_source": "elevenlabs-mcp",
+          "dd_tags": "env:prod,version:<IMAGE_TAG>",
+          "Name": "datadog"
+        },
+        "secretOptions": [
+          {
+            "name": "apikey",
+            "valueFrom": "arn:aws:secretsmanager:us-west-2:593108103736:secret:cet-prd-usw2-datadog-api-key-secret-HSzirQ"
+          }
+        ]
+      },
+      "systemControls": []
+    },
+    {
+      "name": "log_router",
+      "image": "public.ecr.aws/aws-observability/aws-for-fluent-bit:stable",
+      "cpu": 0,
+      "memoryReservation": 51,
+      "portMappings": [],
+      "essential": false,
+      "environment": [],
+      "mountPoints": [],
+      "volumesFrom": [],
+      "user": "0",
+      "systemControls": [],
+      "firelensConfiguration": {
+        "type": "fluentbit",
+        "options": {
+          "enable-ecs-log-metadata": "true"
+        }
+      }
+    },
+    {
+      "name": "datadog-agent",
+      "image": "212351099297.dkr.ecr.us-west-2.amazonaws.com/datadog/agent:7.70.0",
+      "cpu": 0,
+      "portMappings": [],
+      "essential": false,
+      "environment": [
+        {
+          "name": "ECS_FARGATE",
+          "value": "true"
+        },
+        {
+          "name": "DD_APM_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "DD_TAGS",
+          "value": "service:elevenlabs-mcp env:prod version:<IMAGE_TAG>"
+        },
+        {
+          "name": "DD_SITE",
+          "value": "us5.datadoghq.com"
+        }
+      ],
+      "environmentFiles": [],
+      "mountPoints": [],
+      "secrets": [
+        {
+          "name": "DD_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-west-2:593108103736:secret:cet-prd-usw2-datadog-api-key-secret-HSzirQ"
+        }
+      ],
+      "systemControls": [],
+      "volumesFrom": []
+    }
+  ],
+  "family": "elevenlabs-mcp",
+  "taskRoleArn": "arn:aws:iam::593108103736:role/cet-prd-usw2-mcp-server-task-iam-role",
+  "executionRoleArn": "arn:aws:iam::593108103736:role/cet-prd-usw2-backend-task-exec-iam-role",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048"
+}

@@ -58,9 +58,6 @@ class CredentialMiddleware(BaseHTTPMiddleware):
         if len(parts) >= 2 and parts[0] in _providers and parts[1] == "mcp":
             provider = parts[0]
             public_path = len(parts) > 2 and parts[2] in {"health", "healthz", ".well-known"}
-        elif parts and parts[0] == "mcp":
-            provider = "elevenlabs"
-            public_path = len(parts) > 1 and parts[1] in {"health", "healthz", ".well-known"}
 
         if provider:
             if public_path:
@@ -106,10 +103,6 @@ async def health(request):
     return JSONResponse({"status": "healthy", "service": "provider-mcp", "provider": provider})
 
 
-async def elevenlabs_health(request):
-    return JSONResponse({"status": "healthy", "service": "provider-mcp", "provider": "elevenlabs"})
-
-
 async def oauth_protected_resource(request: Request):
     provider = request.path_params["provider"]
     if provider not in _providers:
@@ -117,21 +110,13 @@ async def oauth_protected_resource(request: Request):
     return JSONResponse({"resource": _resource_url(provider), "authorization_servers": [_issuer_url]})
 
 
-async def elevenlabs_oauth_protected_resource(request):
-    return JSONResponse({"resource": _resource_url("elevenlabs"), "authorization_servers": [_issuer_url]})
-
-
 app = Starlette(
     routes=[
         Route("/{provider}/mcp/health", health),
         Route("/{provider}/mcp/healthz", health),
         Route("/{provider}/mcp/.well-known/oauth-protected-resource", oauth_protected_resource),
-        Route("/mcp/health", elevenlabs_health),
-        Route("/mcp/healthz", elevenlabs_health),
-        Route("/mcp/.well-known/oauth-protected-resource", elevenlabs_oauth_protected_resource),
         Mount("/elevenlabs", app=elevenlabs.app),
         Mount("/vapi", routes=vapi.routes),
-        Mount("/", app=elevenlabs.app),
     ],
     lifespan=elevenlabs.lifespan,
 )

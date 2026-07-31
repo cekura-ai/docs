@@ -7,6 +7,8 @@ One Streamable HTTP service for provider MCPs. It authenticates clients with Cek
 - `/elevenlabs/mcp` exposes the official ElevenLabs MCP tools.
 - `/vapi/mcp` exposes the official Vapi MCP tools. Its native `get_assistant` tool is backed by Vapi REST so the response includes `model.messages` and the system prompt.
 
+There is no generic `/mcp` endpoint.
+
 ## Deployment
 
 Deploy one Fargate service and route its public hostname to this container on port `8080`.
@@ -20,7 +22,7 @@ PROVIDER_MCP_ISSUER_URL=https://api.cekura.ai
 PROVIDER_MCP_CEKURA_OAUTH_AUDIENCE=https://api.cekura.ai
 ```
 
-Configure the existing ALB and `elevenlabs.cekura.ai` DNS record to forward the shared service. The service has public health checks at `/elevenlabs/mcp/health` and `/vapi/mcp/health`. The existing `/mcp` endpoint remains an ElevenLabs compatibility alias. Do not expose port `8080` directly.
+Configure the existing ALB and `elevenlabs.cekura.ai` DNS record to forward the shared service. The service has public health checks at `/elevenlabs/mcp/health` and `/vapi/mcp/health`. Do not expose port `8080` directly.
 
 ## How to use
 

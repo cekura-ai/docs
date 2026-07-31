@@ -59,6 +59,12 @@ Check if the Main Agent ended the call only after all steps in
 {{metadata.instructions}} were completed by the Testing Agent.
 ```
 
+#### Use Voice Recording
+
+Off by default — the judge reads the transcript. Turn it on only for criteria the
+transcript cannot answer, such as tone, pace, silence, or voicemail detection. It
+costs extra; see [Audio Evaluation](#audio-evaluation).
+
 #### Set Triggers
 
 Define when the metric should run under the **Evaluation Trigger** section.
@@ -91,7 +97,40 @@ Before saving, validate your logic immediately within the builder.
 
 ## Audio Evaluation
 
-When calling LLM Judge metrics from Python code, you can set `audio=True` to have the judge analyze the actual voice recording instead of (or in addition to) the transcript text. This is useful for evaluating speech delivery, pacing, tone, and other audio properties that the transcript alone cannot capture.
+Some things cannot be judged from transcript text at all — tone, pace, empathy,
+talking over the caller, dead air, hold music, voicemail and answering-machine
+detection, pronunciation, or who is actually speaking. For these the judge has to
+listen to the **recording**, not read the transcript.
+
+### Enable voice recording on the metric
+
+Turn on **Use voice recording** — the toggle sits just above the Description on
+the metric form — and the judge analyzes the call's audio alongside the
+transcript. Write the description in terms of what to *listen* for:
+
+```
+Did the Main Agent speak at a steady, unhurried pace, without talking
+over the Testing Agent?
+```
+
+<Warning>
+Audio evaluation is billed **per minute of audio** on top of the standard
+per-call LLM-judge charge, so it costs meaningfully more than a transcript-only
+metric. Enable it only for criteria the transcript genuinely cannot answer. Your
+current rates are on the **Billing** page.
+</Warning>
+
+<Note>
+A metric with voice recording enabled analyzes the **whole call**. To judge only
+part of a call, you need a Python metric — see below. [Build with
+AI](/documentation/key-concepts/metrics/build-with-ai) will also turn this
+setting on by itself when your description names an audio-only phenomenon, and
+tell you it did.
+</Note>
+
+### From Python code
+
+When calling LLM Judge metrics from Python code, set `audio=True` to have the judge analyze the actual voice recording instead of (or in addition to) the transcript text. Python metrics can additionally window the audio to a time range:
 
 ```python
 response = evaluate_llm_judge_metric(
@@ -105,11 +144,14 @@ response = evaluate_llm_judge_metric(
 )
 ```
 
+A time window changes what the judge listens to, not the charge — the full call
+duration is billed either way.
+
 See [Python Metric — Audio-Based Analysis](/documentation/key-concepts/metrics/python-metric#audio-based-analysis) for the full pattern.
 
 ## Related Documentation
 
-- [Build a Metric with AI](/documentation/key-concepts/metrics/build-with-ai) - Refine this description with an AI agent that runs it on your real calls and runs
+- [Build a Metric with AI](/documentation/key-concepts/metrics/build-with-ai) - Refine this description with an AI agent, quickly or against your real calls and runs
 - [Metric Variables](/documentation/key-concepts/metrics/metric-variables) - Variables you can use in metric descriptions
 - [Creating Good Metrics](/documentation/guides/creating-good-metric) - Complete guide for building high-fidelity metrics
 - [Python Metric](/documentation/key-concepts/metrics/python-metric) - Write custom evaluation logic in Python, including audio-based evaluation

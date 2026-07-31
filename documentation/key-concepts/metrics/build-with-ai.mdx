@@ -1,6 +1,6 @@
 ---
 title: "Build a Metric with AI"
-description: "Refine an LLM Judge or Python metric with an AI agent that uses real calls and runs when available, fixes clear edge cases itself, and asks you only when a decision is genuinely ambiguous"
+description: "Refine an LLM Judge or Python metric with an AI agent — quickly from your description, or against your real calls and runs — that fixes clear edge cases itself and asks you only when a decision is genuinely ambiguous"
 sidebarTitle: "Build with AI"
 icon: "wand-magic-sparkles"
 iconType: "solid"
@@ -15,14 +15,43 @@ rounds of trial and error — write a definition, preview it on some calls,
 notice a case it gets wrong, tighten the wording, repeat. **Build with AI**
 collapses that loop into a single conversation.
 
-When you click **Improve** on a metric's definition, an AI agent:
+When you click **Improve** on a metric's definition, you pick a **build mode** and
+an AI agent refines the metric for you.
+
+<Note>
+Build with AI works for both **LLM Judge** metrics (it refines the natural-language
+description) and **Python** metrics (it makes surgical edits to your code — see
+below). You commit the final metric yourself; nothing is saved until you click
+**Use this metric** and then **Create**/**Update**.
+</Note>
+
+### Build modes
+
+<CardGroup cols={2}>
+  <Card title="Quick" icon="bolt">
+    **The default.** Refines the metric straight from your description, the
+    agent's own description, and anything you've told it so far. No sample of
+    calls is run, so there are no evaluation credits to spend and it finishes in
+    **1–2 minutes**. Best for a first draft, or a small wording change.
+  </Card>
+  <Card title="Detailed" icon="magnifying-glass-chart">
+    Runs the draft metric against a sample of your agent's **real calls and
+    runs** first, then refines it against what it actually predicted. Slower
+    (**5–12 minutes**) and it spends evaluation credits, but it is the only mode
+    that can find edge cases you haven't thought of.
+  </Card>
+</CardGroup>
+
+Pick **Detailed** when a metric matters and you want it grounded in real
+transcripts. Pick **Quick** when you want a clean first draft fast, then run a
+Detailed build later once you're happy with the wording.
+
+### What a Detailed build does
 
 1. Cleans up your definition and gives it a quick check. If the intent is
    unclear or the definition has an obvious gap, it asks you a short question
    **up front** — before spending a run on calls it can't yet judge meaningfully.
-2. Runs the definition against a sample of the agent's real **calls and runs**
-   when enough transcript history is available. For a new agent with fewer than
-   10 transcripts, it refines the definition directly instead.
+2. Runs the definition against a sample of the agent's real **calls and runs**.
 3. Reviews the predictions and finds edge cases — early hang-ups, partial
    completions, off-topic calls, caller-vs-agent fault, voicemail, transfers,
    and so on.
@@ -31,11 +60,16 @@ When you click **Improve** on a metric's definition, an AI agent:
    (for example, "should a partial completion count as PASS?").
 5. Proposes a refined definition for you to review and apply.
 
+A Quick build does steps 4 and 5 only — it reasons about the definition itself
+rather than about predictions, and still asks you a question if the metric can't
+be pinned down safely without one.
+
 <Note>
-Build with AI works for both **LLM Judge** metrics (it refines the natural-language
-description) and **Python** metrics (it makes surgical edits to your code — see
-below). You commit the final metric yourself; nothing is saved until you click
-**Use this metric** and then **Create**/**Update**.
+**Not enough history?** A Detailed build needs at least 10 calls or runs to
+sample. A brand-new agent doesn't have them, so the build runs as a Quick one
+instead of stalling on an empty sample — it says so in the chat, and no
+evaluation credits are spent. Your **Detailed** choice is remembered, so a later
+build uses real transcripts once the agent has them.
 </Note>
 
 ### Starting a build
@@ -48,15 +82,15 @@ below). You commit the final metric yourself; nothing is saved until you click
   </Step>
   <Step title="Click Improve">
     The **Improve** button sits next to the Description (LLM Judge) or the Custom
-    Code editor (Python). Pick the agent whose calls and runs the builder should
-    sample from.
+    Code editor (Python). Pick the agent to build against, then choose
+    **Quick** or **Detailed**.
   </Step>
   <Step title="Chat with the builder">
-    The builder works through your calls and runs and either asks a clarifying
-    question or presents a refined definition. Answer questions by selecting an
-    option (the recommended default is marked) or typing your own guidance. You
-    can also message the builder at any time — for example, "make it stricter
-    about confirming the appointment time."
+    The builder either asks a clarifying question or presents a refined
+    definition. Answer questions by selecting an option (the recommended default
+    is marked) or typing your own guidance. You can also message the builder at
+    any time — for example, "make it stricter about confirming the appointment
+    time."
   </Step>
   <Step title="Review and apply">
     When it's done, the builder shows a diff of the proposed definition against
@@ -67,8 +101,9 @@ below). You commit the final metric yourself; nothing is saved until you click
 
 ### Working in the background
 
-A build runs an AI agent over dozens of real calls and runs, so it typically
-takes **a few minutes** (usually 4–6). You don't have to wait on it:
+A Quick build usually takes **1–2 minutes**. A Detailed build runs an AI agent
+over dozens of real calls and runs, so it typically takes **5–12 minutes** —
+longer for a multi-turn Python build. Either way, you don't have to wait on it:
 
 - **Minimize** the chat and it keeps running as a small card in the corner.
 - The card **follows you across the platform** — open another metric, inspect
@@ -77,23 +112,23 @@ takes **a few minutes** (usually 4–6). You don't have to wait on it:
 - Reopen the card any time to see progress, answer a question, or apply the
   result.
 
-The card shows the current step and elapsed time so you always know where the
-build is.
+The card shows the current step, the elapsed time, and the typical range for the
+mode you're running, so you always know where the build is.
 
 ### Python metrics
 
 For a Python metric the builder works in **code**. Before it runs anything, it
 cleans up your starting point — fixing syntax errors and obvious bugs — so a
-rough first draft doesn't stall the build. From there it runs your code on the
-sampled calls and runs and makes the smallest change that fixes each case it
-gets wrong, keeping it valid, runnable Python in the same style as what you
-wrote.
+rough first draft doesn't stall the build. A Detailed build then runs your code
+on the sampled calls and runs and makes the smallest change that fixes each case
+it gets wrong; a Quick build makes the same kind of surgical edits, reasoning
+from the code and the agent's description rather than from predictions. Either
+way it stays valid, runnable Python in the same style as what you wrote.
 
 <Tip>
 You don't have to start from code. Describe the metric in **plain English** in
 the Python editor and the builder turns it into a working Python metric on the
-first pass — then refines it against your real calls and runs like any other
-build.
+first pass — in both modes — then refines it from there.
 </Tip>
 
 Everything the builder produces is the exact code the metric will run in
@@ -101,23 +136,32 @@ production, so what you review is what you ship.
 
 ### Credits
 
-A build runs your metric against the sampled calls and runs, and consumes credits
-for each pass, priced the same way the metric optimizer is. Builds with fewer
-than 10 transcripts skip this evaluation pass and do not consume evaluation credits:
+What a build costs depends entirely on the mode.
+
+**Quick builds** run no evaluation pass, so there is nothing to meter per call.
+They are charged a small **flat amount once per build**, however many
+clarification rounds it takes. A build that fails is not charged.
+
+**Detailed builds** run your metric against the sampled calls and runs and
+consume credits for each pass, priced the same way the metric optimizer is:
 
 - **LLM Judge metrics** — and Python metrics that call `evaluate_llm_judge_metric`
   — are charged at the **LLM-judge** per-evaluation rate.
-- **Python metrics that judge audio** (calling `evaluate_llm_judge_metric` with
-  `audio=True`) are charged at the **audio** per-minute rate times each call's
-  duration. A time window (`audio_start_time`/`audio_end_time`) changes what the
-  judge listens to, not the charge.
+- **LLM Judge metrics with voice recording enabled**, and Python metrics that
+  judge audio (calling `evaluate_llm_judge_metric` with `audio=True`), are
+  charged at the **audio** per-minute rate times each call's duration. A time
+  window (`audio_start_time`/`audio_end_time`) changes what the judge listens to,
+  not the charge.
 - **Pure Python metrics** are charged at the **custom-code** per-evaluation rate.
 
 The cost of a pass is roughly the number of sampled items (≈50) times that rate.
 A pass runs only when the metric definition actually changed, so answering a
 clarifying question or sending a note that doesn't alter the metric won't
-re-charge. Minimizing the chat doesn't stop the build; if you don't want to spend
-more credits, **Stop** it.
+re-charge. A Detailed build that falls back to Quick for lack of history is
+charged as a Quick build.
+
+Minimizing the chat doesn't stop the build; if you don't want to spend more
+credits, **Stop** it. Your current rates are on the **Billing** page.
 
 ## Related Documentation
 

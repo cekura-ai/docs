@@ -34,7 +34,7 @@ Add these namespaced values to the existing
 
    ```text
    ELEVENLABS_MCP_OAUTH_TOKEN_SECRET=<same value used by the Cekura backend>
-   ELEVENLABS_MCP_SERVER_URL=https://ELEVENLABS_MCP_HOST/mcp
+   ELEVENLABS_MCP_SERVER_URL=https://elevenlabs.cekura.ai/mcp
    ELEVENLABS_MCP_ISSUER_URL=https://api.cekura.ai
    ELEVENLABS_MCP_CEKURA_OAUTH_AUDIENCE=https://api.cekura.ai
    ```
@@ -47,12 +47,12 @@ read the same secret.
 1. Create an HTTPS ALB target group for port `8080`, with `GET /mcp/health` as
    the health check. Allow inbound traffic to the task only from the ALB
    security group.
-2. Add an ALB host rule for `elevenlabs-mcp.cekura.ai` forwarding these paths
-   to the target group:
-   `/mcp*` and `/.well-known/oauth-protected-resource`.
+2. Add an ALB host rule for `elevenlabs.cekura.ai` forwarding traffic to the
+   target group. A host-only rule is sufficient because this uses a dedicated
+   hostname and the service handles `/mcp` and OAuth discovery routes itself.
    This dedicated host avoids conflicting with the existing `api.cekura.ai/mcp`
    rule used by the Cekura MCP server. Add an alias record for
-   `elevenlabs-mcp.cekura.ai` to the ALB.
+   `elevenlabs.cekura.ai` to the ALB.
 3. Create the ECS service with the task definition above and desired count
    `1`, using the existing MCP service's cluster, subnets, security groups,
    execution role, and task role. Subsequent image updates are handled by the
@@ -68,8 +68,8 @@ The client authenticates through Cekura OAuth and also sends its own ElevenLabs 
 
 ```bash
 codex mcp add elevenlabs \
-  --url https://ELEVENLABS_MCP_HOST/mcp \
-  --oauth-resource https://ELEVENLABS_MCP_HOST/mcp
+  --url https://elevenlabs.cekura.ai/mcp \
+  --oauth-resource https://elevenlabs.cekura.ai/mcp
 ```
 
 Add the ElevenLabs key to `~/.codex/config.toml`:
@@ -88,7 +88,7 @@ codex mcp login elevenlabs
 ### Claude Code
 
 ```bash
-claude mcp add --transport http elevenlabs https://ELEVENLABS_MCP_HOST/mcp \
+claude mcp add --transport http elevenlabs https://elevenlabs.cekura.ai/mcp \
   --header "xi-elevenlabs-api-key: YOUR_ELEVENLABS_API_KEY"
 ```
 

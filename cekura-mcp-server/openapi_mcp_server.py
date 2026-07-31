@@ -805,9 +805,25 @@ async def cekura_skill_started(
 
 # -- Server-delivered skill playbooks ----------------------------------------
 
-_SKILL_RAW_BASE = os.environ.get(
-    "CEKURA_SKILL_RAW_BASE",
-    "https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/cekura/skills",
+_SKILL_RAW_BASE_DEFAULT = "https://raw.githubusercontent.com/cekura-ai/cekura-skills/main/cekura/skills"
+_SKILL_RAW_ALLOWED_HOSTS = frozenset({"raw.githubusercontent.com"})
+
+
+def _validated_skill_raw_base(candidate: str) -> str:
+    if candidate == _SKILL_RAW_BASE_DEFAULT:
+        return candidate
+    parsed = _urlparse(candidate)
+    if parsed.scheme == "https" and parsed.hostname in _SKILL_RAW_ALLOWED_HOSTS:
+        return candidate
+    logger.warning(
+        "Ignoring CEKURA_SKILL_RAW_BASE=%r: must be https and one of %s. Using default.",
+        candidate, ", ".join(sorted(_SKILL_RAW_ALLOWED_HOSTS)),
+    )
+    return _SKILL_RAW_BASE_DEFAULT
+
+
+_SKILL_RAW_BASE = _validated_skill_raw_base(
+    os.environ.get("CEKURA_SKILL_RAW_BASE", _SKILL_RAW_BASE_DEFAULT)
 )
 _SKILL_CONTENT_TTL_SECONDS = 900
 _skill_content_cache: Dict[str, Tuple[float, str]] = {}
@@ -1335,7 +1351,10 @@ def main():
                 if _ALLOW_BASE_URL_OVERRIDE:
                     base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
                     if base_url_override:
-                        request_base_url.set(base_url_override.rstrip("/"))
+                        reset_tokens.append((
+                            request_base_url,
+                            request_base_url.set(base_url_override.rstrip("/")),
+                        ))
 
                 # Connection-level conversation identifier (e.g. set by the Cekura
                 # sandbox at sandbox start). Per-call ``_meta`` overrides this.

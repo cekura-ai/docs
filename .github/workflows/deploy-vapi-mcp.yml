@@ -1,0 +1,83 @@
+name: Deploy Vapi MCP Server (PROD)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'vapi-mcp/**'
+      - '.github/workflows/deploy-vapi-mcp.yml'
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: cekura/vapi-mcp
+  ECS_CLUSTER: cet-prd-usw2-cekura-ecs-cluster
+  ECS_SERVICE: cet-prd-usw2-vapi-mcp-ecs-service
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-vapi-mcp-prod
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.construct-tag.outputs.image-tag }}
+      registry: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_SHARED }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: login-ecr
+      - id: construct-tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH_NAME=${GITHUB_REF_NAME//\//-}
+          echo "image-tag=${BRANCH_NAME}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./vapi-mcp
+          file: ./vapi-mcp/Dockerfile
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.construct-tag.outputs.image-tag }}
+          cache-from: |
+            type=gha,scope=vapi-mcp-${{ github.ref_name }}
+            type=gha,scope=vapi-mcp-main
+          cache-to: type=gha,mode=max,scope=vapi-mcp-${{ github.ref_name }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+      - id: register
+        run: |
+          sed "s|<IMAGE_TAG>|${{ needs.build.outputs.image-tag }}|g" \
+            vapi-mcp/deployment/ecs/prod-usw2/vapi-mcp-task-def.json \
+            > /tmp/vapi-mcp-task-def.rendered.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/vapi-mcp-task-def.rendered.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task-def-arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+      - run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --task-definition "${{ steps.register.outputs.task-def-arn }}" \
+            --desired-count 1 \
+            --force-new-deployment \
+            --query 'service.[serviceName,taskDefinition,desiredCount]' --output text
+      - run: aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"

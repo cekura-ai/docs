@@ -25,38 +25,38 @@ The production deployment is a separate one-task Fargate service in the existing
 - Task definition: `deployment/ecs/prod-usw2/elevenlabs-mcp-task-def.json`
 
 The `Deploy ElevenLabs MCP Server (PROD)` workflow builds and deploys the
-service whenever `elevenlabs-mcp/**` changes on `main`. Create the ECS service,
-target group, listener rule, DNS record, secret, and IAM permission once before
-the first workflow run.
+service whenever `elevenlabs-mcp/**` changes on `main`. The task reuses the
+existing Cekura MCP task role and secret, so no new secret or IAM role is
+needed.
 
-1. Create the Secrets Manager secret named
-   `cet-prd-usw2-elevenlabs-mcp-secret` in `us-west-2`. Store these values in
-   its JSON value:
+Add these namespaced values to the existing
+`cet-prd-usw2-mcp-secret` JSON in `us-west-2`:
 
    ```text
-   OAUTH_TOKEN_SECRET=<same value used by the Cekura backend>
-   MCP_SERVER_URL=https://ELEVENLABS_MCP_HOST/mcp
-   MCP_ISSUER_URL=<backend OAUTH_AUDIENCE>
-   CEKURA_OAUTH_AUDIENCE=<backend OAUTH_AUDIENCE>
+   ELEVENLABS_MCP_OAUTH_TOKEN_SECRET=<same value used by the Cekura backend>
+   ELEVENLABS_MCP_SERVER_URL=https://ELEVENLABS_MCP_HOST/mcp
+   ELEVENLABS_MCP_ISSUER_URL=https://api.cekura.ai
+   ELEVENLABS_MCP_CEKURA_OAUTH_AUDIENCE=https://api.cekura.ai
    ```
 
-   Production uses `https://api.cekura.ai` as its OAuth audience. Stage must use its stage backend URL.
+Production uses `https://api.cekura.ai` as its OAuth audience. Stage must use
+its stage backend URL. Keep these names prefixed so they cannot overwrite
+configuration used by the existing Cekura MCP container when both services
+read the same secret.
 
-2. Grant the task role
-   `cet-prd-usw2-elevenlabs-mcp-task-iam-role` `secretsmanager:GetSecretValue`
-   on that secret. Use the existing prod ECS execution role and networking
-   configuration used by `mcp-server`.
-3. Create an HTTPS ALB target group for port `8080`, with `GET /mcp/health` as
+1. Create an HTTPS ALB target group for port `8080`, with `GET /mcp/health` as
    the health check. Allow inbound traffic to the task only from the ALB
    security group.
-4. Add an ALB host rule for `elevenlabs-mcp.cekura.ai` forwarding these paths
+2. Add an ALB host rule for `elevenlabs-mcp.cekura.ai` forwarding these paths
    to the target group:
    `/mcp*` and `/.well-known/oauth-protected-resource`.
    This dedicated host avoids conflicting with the existing `api.cekura.ai/mcp`
    rule used by the Cekura MCP server. Add an alias record for
    `elevenlabs-mcp.cekura.ai` to the ALB.
-5. Create the ECS service with the task definition above and desired count
-   `1`; subsequent image updates are handled by the workflow.
+3. Create the ECS service with the task definition above and desired count
+   `1`, using the existing MCP service's cluster, subnets, security groups,
+   execution role, and task role. Subsequent image updates are handled by the
+   workflow.
 
 The task stores no ElevenLabs API key.
 
@@ -96,7 +96,7 @@ On the first connection, Claude opens the Cekura OAuth login and consent page. A
 
 ## Security
 
-The server exposes the complete official ElevenLabs MCP tool set. It verifies Cekura OAuth tokens locally with the configured `OAUTH_TOKEN_SECRET`; it does not call the Cekura backend on MCP requests.
+The server exposes the complete official ElevenLabs MCP tool set. It verifies Cekura OAuth tokens locally with the configured `ELEVENLABS_MCP_OAUTH_TOKEN_SECRET`; it does not call the Cekura backend on MCP requests.
 
 OAuth access tokens remain valid until expiry, so disabling a user does not take effect here until the active token expires. Keep the OAuth access-token lifetime short.
 

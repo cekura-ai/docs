@@ -22,13 +22,19 @@ from starlette.routing import Route
 from elevenlabs_mcp import server as elevenlabs
 
 _request_key = contextvars.ContextVar("elevenlabs_api_key", default="")
-_oauth_secret = os.getenv("OAUTH_TOKEN_SECRET")
-_oauth_audience = os.getenv("CEKURA_OAUTH_AUDIENCE", "https://api.cekura.ai")
-_mcp_server_url = os.getenv("MCP_SERVER_URL", "http://localhost:8080/mcp").rstrip("/")
-_mcp_issuer_url = os.getenv("MCP_ISSUER_URL", "https://api.cekura.ai").rstrip("/")
+_oauth_secret = os.getenv("ELEVENLABS_MCP_OAUTH_TOKEN_SECRET")
+_oauth_audience = os.getenv(
+    "ELEVENLABS_MCP_CEKURA_OAUTH_AUDIENCE", "https://api.cekura.ai"
+)
+_mcp_server_url = os.getenv(
+    "ELEVENLABS_MCP_SERVER_URL", "http://localhost:8080/mcp"
+).rstrip("/")
+_mcp_issuer_url = os.getenv(
+    "ELEVENLABS_MCP_ISSUER_URL", "https://api.cekura.ai"
+).rstrip("/")
 
 if not _oauth_secret:
-    raise RuntimeError("OAUTH_TOKEN_SECRET is required")
+    raise RuntimeError("ELEVENLABS_MCP_OAUTH_TOKEN_SECRET is required")
 
 
 def _inject_key(request):

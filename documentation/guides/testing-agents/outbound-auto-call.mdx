@@ -38,7 +38,7 @@ Auto Outbound Call is an automated testing feature where Cekura automatically in
 ## Prerequisites
 
 - **Outbound mode enabled**: Agent's `inbound` must be set to `false`
-- **Voice provider configured**: Valid credentials and required agent configuration for VAPI, Retell, ElevenLabs, Bland, LiveKit, or Custom (Custom requires a trigger URL instead of provider API credentials)
+- **Voice provider configured**: Valid credentials and required agent configuration for VAPI, Retell, ElevenLabs, Bland, LiveKit, or Custom (Custom requires a trigger URL instead of provider API credentials; enabling auto-dial for Custom needs both the trigger URL and a phone number)
 - **Agent `contact_number` set to your outbound caller ID**: Cekura validates the caller ID (ANI) of every incoming outbound-test call against the agent's `contact_number` field. If the provider dials from `+15551234567`, the agent's `contact_number` must be exactly `+15551234567` in E.164 format. Set this in Agent settings or via the [Update Agent API](/api-reference/test_framework/update-agent-partial).
 - **Evaluators ready**: Created evaluators with valid phone numbers
 
@@ -132,7 +132,7 @@ You can optionally configure a shared secret on your provider credentials. When 
 The secret is write-only — API responses expose only a `trigger_secret_configured` boolean, never the secret value itself.
 
 <Note>
-Your webhook endpoint must be publicly accessible (HTTPS), return a 2xx status code (200–299), and respond within 30 seconds.
+Your webhook endpoint must be publicly accessible (HTTPS), return a 2xx status code (200–299), and respond within 30 seconds. Cekura does not follow redirects, so configure the final URL rather than one that 3xx-redirects to it.
 </Note>
 
 <Info>
@@ -149,6 +149,8 @@ Your webhook should return:
   "call_id": "optional_provider_call_id"
 }
 ```
+
+The body is optional — `204 No Content` or a plain-text body works too. Cekura records `call_id` if the JSON body has one, and proceeds without it otherwise.
 
 ## Troubleshooting
 
@@ -173,6 +175,10 @@ Your webhook should return:
 
   <Accordion title="Custom Provider: Trigger URL Not Configured">
     Custom-hosted agents require a trigger URL to use auto outbound calls. Set `provider.credentials.config.trigger_url` in your agent configuration. Without it, enabling `auto_dial_outbound` is rejected by the API, and dispatch returns a "Trigger URL not configured" error.
+  </Accordion>
+
+  <Accordion title="Trigger URL Rejected">
+    The trigger URL is validated before each request. A "Trigger URL rejected" error means the URL is not usable: it must not embed credentials, and the host must resolve to a public address — private, loopback and link-local targets are refused.
   </Accordion>
 </AccordionGroup>
 

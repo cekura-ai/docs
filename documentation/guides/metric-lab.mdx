@@ -117,6 +117,47 @@ Once the Auto Improve task is complete (indicated by a green checkmark in the pr
 <img src="/images/metriclab/6-view-analyze-save.png" alt="Analyze Diff and Save" className="rounded-md"/>
 
 
+### Review the Proposal in Chat
+
+The proposal opens in a review chat next to the diff, so you can interrogate it before saving. Ask why a particular sample flipped, what the optimized logic does differently, or whether the proposal looks safe to apply.
+
+Your eval set is a small sample, so a proposal that scores perfectly on it can still regress calls it never saw. The chat gives you two ways to check that before you commit.
+
+#### Run a Regression Check
+
+**Run regression check** evaluates the optimized metric against the most recent calls and runs this metric already scored in production — excluding your eval set, whose labels the optimizer has already fitted to. It then compares each new label against what production originally reported.
+
+Only *changed* samples are shown. For each one you decide:
+
+*   **New label correct** — the optimizer fixed a label production previously got wrong. This is an improvement, and nothing is added to your eval set.
+*   **Incorrect** — the original label was right and the optimized metric broke it. This is a regression. Supply the correct label and, optionally, a note explaining why the new label is wrong.
+
+Samples are also flagged as an **applicability flip** when the change is the metric becoming applicable (or not) rather than the score changing — usually a sign the relevance condition moved.
+
+<Note>
+Regression evaluations are billed like ordinary metric runs, since each one actually evaluates a call.
+</Note>
+
+#### Confirm What Enters the Eval Set
+
+After you submit your review, the optimizer groups the regressions you rejected by failure mode and proposes a representative subset to add to the eval set — adding every near-identical case teaches it the same lesson repeatedly and spends eval budget for nothing.
+
+That selection is a **proposal, not an action**. You get a confirmation card listing the optimizer's picks pre-selected, alongside every other regression you marked incorrect. Add the ones it left out, remove the ones you disagree with, then choose:
+
+*   **Add and re-optimize** — writes the selected samples to the eval set and starts a new optimization against the enlarged set.
+*   **Add without re-optimizing** — writes the samples and leaves the current proposal in place.
+
+Nothing is written to your eval set and no optimization starts until you confirm. When a re-optimization finishes, the updated proposal replaces the diff in the same screen and the conversation continues.
+
+Call and run IDs the optimizer cites in chat link straight to the underlying call, so you can open anything it references.
+
+### Answer Questions During Optimization
+
+An optimization can pause and ask you a question when it hits something it cannot decide on its own — two of your labels implying contradictory rules, or a sample whose correct label is genuinely ambiguous. The question appears in the Auto Improve panel with the sample's transcript and context.
+
+The run waits for your answer and resumes as soon as you submit it, so you can leave the page and come back. If it has been waiting a while it checkpoints itself and resumes automatically once you answer, rather than failing.
+
+
 ### Re-run and Observe Improvement
 
 Finally, verify that your new metric is robust.

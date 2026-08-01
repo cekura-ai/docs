@@ -103,10 +103,10 @@ _RAW_TOOLS_THAT_NEED_PREFERENCE_SUFFIX = [
 ]
 
 # AI-assisted tools that need clarifying suffixes so agents pick them up
-# correctly (e.g. `scenarios_agent_create` is misleading without the note that
-# it's the unified clarify+improve endpoint).
+# correctly (e.g. `scenarios_refine` needs the note that it's the unified
+# clarify+improve endpoint).
 _AI_TOOLS_THAT_NEED_CLARIFYING_SUFFIX = [
-    "scenarios_agent_create",
+    "scenarios_refine",
     "scenarios_generate_bg",
     "scenarios_improve_instructions_create",
 ]

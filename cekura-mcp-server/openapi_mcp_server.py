@@ -8,7 +8,7 @@ import sys
 import time
 import uuid
 from contextvars import ContextVar
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import httpx
 import jwt
@@ -35,6 +35,7 @@ from tool_generator import (
     compute_annotations,
     generate_tool_description,
     generate_tool_name,
+    load_tool_aliases,
     maybe_append_org_project_hint,
     should_include_operation,
 )
@@ -226,10 +227,15 @@ async def initialize_server():
                 logger.error(f"Error registering tool for {operation.path}: {e}", exc_info=True)
                 continue
 
+        alias_names = register_tool_aliases(blocked_tools)
+        tools_registered += len(alias_names)
+
         if blocked_hits:
             logger.info(f"Registered {tools_registered} MCP tools (blocked: {sorted(blocked_hits)})")
         else:
             logger.info(f"Registered {tools_registered} MCP tools")
+        if alias_names:
+            logger.info(f"Registered {len(alias_names)} retired tool alias(es): {alias_names}")
 
         # Non-fatal drift check: log a warning for each overlay that has diverged
         # from the live openapi.json + whitelist. Keeps production booting while
@@ -395,6 +401,43 @@ def register_tool(
         'description': description,
         'annotations': annotations,
     }
+
+
+def register_tool_aliases(blocked_tools: Set[str]) -> List[str]:
+    """Register retired tool names against the tools that replaced them.
+
+    Must run after normal registration so alias targets already exist. An alias
+    reuses its target's operation, schema, and annotations; its description is
+    the target's with the alias entry's own prefix/suffix applied, which is
+    where the "this name is retired, use X" notice lives.
+
+    A missing target is skipped with a warning rather than raised: an overlay
+    may declare an alias before the spec rename that creates its target lands.
+    """
+    registered: List[str] = []
+    for alias_name, target in sorted(load_tool_aliases().items()):
+        if alias_name in blocked_tools:
+            continue
+        if alias_name in operations_registry:
+            logger.warning(
+                f"Alias '{alias_name}' collides with a registered tool name — skipping"
+            )
+            continue
+        target_data = operations_registry.get(target)
+        if target_data is None:
+            logger.warning(
+                f"Alias '{alias_name}' targets unregistered tool '{target}' — skipping"
+            )
+            continue
+        register_tool(
+            alias_name,
+            apply_overlay_to_description(alias_name, target_data['description']),
+            target_data['schema'],
+            target_data['operation'],
+            annotations=target_data['annotations'],
+        )
+        registered.append(alias_name)
+    return registered
 
 
 @mcp.tool(

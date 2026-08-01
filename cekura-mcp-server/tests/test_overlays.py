@@ -138,3 +138,47 @@ def test_generate_improve_tools_have_clarifying_suffix(tool):
     )
     suffix = overlays[tool].get("description_suffix", "")
     assert suffix, f"{tool} overlay must define a non-empty description_suffix."
+
+
+# ---------------------------------------------------------------------------
+# Alias entries — retired tool names kept resolving after a rename
+# ---------------------------------------------------------------------------
+
+
+def _categories(findings):
+    return {f.category for f in findings}
+
+
+def _real_tool_name():
+    """Any tool the live spec actually registers, for use as an alias target."""
+    return "scenarios_create"
+
+
+def test_alias_entry_is_not_reported_as_orphan():
+    findings = run_checks(overlays={"retired_name": {"alias_of": _real_tool_name()}})
+    assert "orphan" not in _categories(findings)
+    assert "alias_target_missing" not in _categories(findings)
+
+
+def test_alias_to_unknown_target_is_an_error():
+    findings = run_checks(overlays={"retired_name": {"alias_of": "no_such_tool"}})
+    missing = [f for f in findings if f.category == "alias_target_missing"]
+    assert len(missing) == 1
+    assert missing[0].level == "error"
+
+
+def test_alias_that_shadows_a_real_tool_is_an_error():
+    findings = run_checks(
+        overlays={_real_tool_name(): {"alias_of": "scenarios_list"}}
+    )
+    shadowing = [f for f in findings if f.category == "alias_shadows_tool"]
+    assert len(shadowing) == 1
+    assert shadowing[0].level == "error"
+
+
+def test_plain_orphan_is_still_an_error():
+    # The alias exemption must not weaken the orphan check for normal entries.
+    findings = run_checks(overlays={"totally_made_up_tool": {"description_suffix": "x"}})
+    orphans = [f for f in findings if f.category == "orphan"]
+    assert len(orphans) == 1
+    assert orphans[0].level == "error"

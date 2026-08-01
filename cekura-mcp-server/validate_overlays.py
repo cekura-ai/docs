@@ -78,8 +78,12 @@ def _build_context(
 
 
 def _check_orphans(ctx: _Context) -> None:
-    for tool_name in ctx.overlays:
+    for tool_name, overlay in ctx.overlays.items():
         if tool_name in ctx.operations_by_tool:
+            continue
+        if overlay.get("alias_of"):
+            # Alias entries are *expected* to have no operation of their own —
+            # that is the point. `_check_aliases` validates them instead.
             continue
         ctx.add(
             "error",
@@ -88,6 +92,32 @@ def _check_orphans(ctx: _Context) -> None:
             f"Overlay entry '{tool_name}' does not match any registered tool. "
             "Either the tool was renamed/removed upstream, or the overlay key is a typo.",
         )
+
+
+def _check_aliases(ctx: _Context) -> None:
+    """Validate `alias_of` entries — retired tool names kept alive after a rename."""
+    for alias_name, overlay in ctx.overlays.items():
+        target = overlay.get("alias_of")
+        if not target:
+            continue
+        if alias_name in ctx.operations_by_tool:
+            ctx.add(
+                "error",
+                "alias_shadows_tool",
+                alias_name,
+                f"Overlay declares '{alias_name}' as an alias of '{target}', but a real tool "
+                "registers under that name. The alias would be dropped; remove the "
+                "`alias_of` entry or rename the operation.",
+            )
+        if target not in ctx.operations_by_tool:
+            ctx.add(
+                "error",
+                "alias_target_missing",
+                alias_name,
+                f"Alias '{alias_name}' targets '{target}', which no tool registers under. "
+                "Either the target's operation id has not landed in the spec yet, or the "
+                "target name is a typo — the alias is skipped at registration either way.",
+            )
 
 
 def _check_required_fields(ctx: _Context) -> None:
@@ -197,6 +227,7 @@ def run_checks(
     ctx = _build_context(spec_path=spec_path, overlays=overlays)
 
     _check_orphans(ctx)
+    _check_aliases(ctx)
     _check_required_fields(ctx)
     _check_example_fields(ctx)
     _check_schema_example_fields(ctx)

@@ -70,6 +70,25 @@ def load_tool_overlays() -> Dict[str, Any]:
         return _OVERLAY_CACHE
 
 
+def load_tool_aliases() -> Dict[str, str]:
+    """Map retired tool name -> current tool name.
+
+    An overlay entry carrying `alias_of` is not an enrichment for a registered
+    tool; it declares a name that no longer exists in the spec and must keep
+    resolving to the tool that replaced it. Tool names are derived from the
+    spec's operation ids, so renaming one silently breaks every caller that
+    hardcoded the old name. MCP has no redirect of its own — this is it.
+    """
+    aliases: Dict[str, str] = {}
+    for name, overlay in load_tool_overlays().items():
+        if not isinstance(overlay, dict):
+            continue
+        target = overlay.get('alias_of')
+        if target:
+            aliases[name] = target
+    return aliases
+
+
 def apply_overlay_to_description(tool_name: str, description: str) -> str:
     overlay = load_tool_overlays().get(tool_name)
     if not overlay:

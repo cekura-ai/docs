@@ -1179,6 +1179,14 @@ Voice platforms such as Retell typically report *internal pipeline latency* — 
 
 Because Cekura's measurement is more comprehensive, it reads higher than a provider's own dashboard figure. A gap of 800–1000 ms between the two is typical. A Cekura latency reading of **1500–2000 ms** is generally good for a production voice agent. See the [Latency metric reference](https://docs.cekura.ai/documentation/key-concepts/metrics/pre-defined-metrics) for how per-turn values are computed.
 
+## How does Cekura measure latency across different pipeline architectures (cascade, half-cascade, and speech-to-speech)?
+
+Cekura measures latency at the phone audio level rather than inside the provider pipeline, making the measurement consistent across all architectures. The metric captures the gap between the end of the caller's last utterance and the start of the agent's first audible response, detected by applying VAD to the stereo call recording to identify the caller-to-agent turn boundary.
+
+Because the measurement happens at the recorded audio layer, it is pipeline-agnostic: the same method works for full-cascade (STT→LLM→TTS), half-cascade, and speech-to-speech pipelines (e.g. GPT Realtime, Gemini Live) — even when VAD is collapsed into the LLM provider. Every stage that contributes to the delay — provider endpointing, model inference, TTS rendering, and audio delivery — is captured in the resulting figure. Caller-side silence is not counted; only the gaps where the caller has finished speaking and is waiting for the agent to respond are measured.
+
+See the [Latency metric reference](https://docs.cekura.ai/documentation/key-concepts/metrics/pre-defined-metrics) for the full metric definition, percentile breakdown, and interpretation guidance.
+
 ## Which Speech-to-Text (STT) provider works best for real-time multilingual conversations?
 
 The right STT provider depends on whether your primary concern is multilingual language coverage or raw transcription latency:

@@ -1,0 +1,179 @@
+name: Deploy Provider MCP Server (PROD)
+
+# Builds the shared provider MCP service and deploys it to the existing prod
+# us-west-2 ECS cluster. Providers are exposed below provider-mcp.cekura.ai:
+# /elevenlabs/mcp and /vapi/mcp.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'provider_mcp/**'
+      - '.github/workflows/deploy-provider-mcp.yml'
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: cekura/provider-mcp
+  ECS_CLUSTER: cet-prd-usw2-cekura-ecs-cluster
+  ECS_SERVICE: cet-prd-usw2-provider-mcp-ecs-service
+  ECS_REFERENCE_SERVICE: cet-prd-usw2-mcp-server-ecs-service
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-provider-mcp-prod
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.construct-tag.outputs.image-tag }}
+      registry: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: latest
+
+      - name: Configure AWS credentials (shared services for ECR push)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_SHARED }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Construct Docker image tag
+        id: construct-tag
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH_NAME=${GITHUB_REF_NAME//\//-}
+          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
+          echo "image-tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image to ECR
+        uses: docker/build-push-action@v6
+        with:
+          context: ./provider_mcp
+          file: ./provider_mcp/Dockerfile
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.construct-tag.outputs.image-tag }}
+          cache-from: |
+            type=gha,scope=provider-mcp-${{ github.ref_name }}
+            type=gha,scope=provider-mcp-main
+          cache-to: type=gha,mode=max,scope=provider-mcp-${{ github.ref_name }}
+
+  deploy:
+    name: deploy
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (workload account for ECS deploy)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Render + register task definition
+        id: register
+        run: |
+          sed "s|<IMAGE_TAG>|${{ needs.build.outputs.image-tag }}|g" \
+            provider_mcp/deployment/ecs/prod-usw2/provider-mcp-task-def.json \
+            > /tmp/provider-mcp-task-def.rendered.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json file:///tmp/provider-mcp-task-def.rendered.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task-def-arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update ECS service
+        run: |
+          TASK_DEF_ARN="${{ steps.register.outputs.task-def-arn }}"
+          SERVICE_ARN=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE" \
+            --query 'services[0].serviceArn' \
+            --output text 2>/dev/null || true)
+
+          if [ -n "$SERVICE_ARN" ] && [ "$SERVICE_ARN" != "None" ]; then
+            echo "ECS service exists; updating $ECS_SERVICE"
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$ECS_SERVICE" \
+              --task-definition "$TASK_DEF_ARN" \
+              --desired-count 1 \
+              --force-new-deployment \
+              --query 'service.[serviceName,taskDefinition,desiredCount]' --output text
+          else
+            echo "ECS service does not exist; creating $ECS_SERVICE"
+            NETWORK_CONFIGURATION=$(aws ecs describe-services \
+              --cluster "$ECS_CLUSTER" \
+              --services "$ECS_REFERENCE_SERVICE" \
+              --query 'services[0].networkConfiguration' \
+              --output json)
+
+            if [ -z "$NETWORK_CONFIGURATION" ] || [ "$NETWORK_CONFIGURATION" = "null" ]; then
+              echo "Unable to read network configuration from $ECS_REFERENCE_SERVICE"
+              exit 1
+            fi
+
+            aws ecs create-service \
+              --cluster "$ECS_CLUSTER" \
+              --service-name "$ECS_SERVICE" \
+              --task-definition "$TASK_DEF_ARN" \
+              --desired-count 1 \
+              --launch-type FARGATE \
+              --network-configuration "$NETWORK_CONFIGURATION" \
+              --query 'service.[serviceName,taskDefinition,desiredCount]' --output text
+          fi
+
+      - name: Wait for service stable
+        run: |
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          echo "✅ Service stable"
+
+  notify:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Compose message
+        id: collect
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image-tag }}"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "message=*❌ provider-mcp build failed for prod!* (tag: ${IMAGE_TAG:-n/a})" >> "$GITHUB_OUTPUT"
+          elif [ "${{ needs.deploy.result }}" = "success" ]; then
+            echo "message=*✅ provider-mcp deployed to prod* (tag: ${IMAGE_TAG})" >> "$GITHUB_OUTPUT"
+          else
+            DD_LINK="https://us5.datadoghq.com/logs?query=env%3Aprod%20version%3A${IMAGE_TAG}%20service%3Aprovider-mcp"
+            echo "message=*❌ provider-mcp deploy to prod failed* (tag: ${IMAGE_TAG}) - <${DD_LINK}|Datadog logs>" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Slack
+        if: vars.SLACK_DEPLOYMENTS_CHANNEL != ''
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_BOT_BEARER_TOKEN }}
+          SLACK_CHANNEL: ${{ vars.SLACK_DEPLOYMENTS_CHANNEL }}
+          MESSAGE: ${{ steps.collect.outputs.message }}
+        run: |
+          if [ -z "$SLACK_TOKEN" ] || [ -z "$SLACK_CHANNEL" ]; then
+            echo "(Slack creds missing — skipping notification)"
+            exit 0
+          fi
+          curl -sS -X POST https://slack.com/api/chat.postMessage \
+            -H "Authorization: Bearer $SLACK_TOKEN" \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            -d "$(jq -n --arg ch "$SLACK_CHANNEL" --arg msg "$MESSAGE" '{channel:$ch,text:$msg}')" \
+            | jq '{ok,error}'

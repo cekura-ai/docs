@@ -1,4 +1,12 @@
-# ElevenLabs MCP Server
+# Legacy ElevenLabs MCP Server
+
+> The standalone ElevenLabs MCP deployment has been retired. Use the shared
+> Provider MCP service instead:
+> `https://provider-mcp.cekura.ai/elevenlabs/mcp`.
+
+The legacy ECS workflow and task definition have been removed. The source in
+this directory is retained for historical/reference purposes; production
+deployment is managed from [`provider_mcp`](../provider_mcp/README.md).
 
 Streamable HTTP wrapper for the official `elevenlabs-mcp` package. It authenticates callers with Cekura OAuth and calls ElevenLabs using each caller's own API key.
 
@@ -12,7 +20,10 @@ Streamable HTTP wrapper for the official `elevenlabs-mcp` package. It authentica
 - All tools exposed by the pinned official ElevenLabs MCP package
 - No server-side ElevenLabs key
 
-## Deployment
+## Historical deployment
+
+The following section documents the retired standalone deployment and is not
+an active production deployment procedure.
 
 The production deployment is a separate one-task Fargate service in the existing
 `cet-prd-usw2-cekura-ecs-cluster`:
@@ -22,7 +33,7 @@ The production deployment is a separate one-task Fargate service in the existing
 - ECR repository: `cekura/elevenlabs-mcp`
 - Container/target-group port: `8080`
 - Desired count: `1`
-- Task definition: `deployment/ecs/prod-usw2/elevenlabs-mcp-task-def.json`
+- Task definition: removed; production uses the shared `provider-mcp` task
 
 The `Deploy ElevenLabs MCP Server (PROD)` workflow builds and deploys the
 service whenever `elevenlabs-mcp/**` changes on `main`. The task reuses the

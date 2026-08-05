@@ -223,7 +223,8 @@ async def initialize_server():
                 annotations = compute_annotations(operation)
                 register_tool(
                     tool_name, tool_description, input_schema, operation,
-                    annotations=annotations, title=generate_tool_title(tool_name),
+                    annotations=annotations,
+                    title=generate_tool_title(tool_name, operation),
                 )
                 tools_registered += 1
             except Exception as e:
@@ -400,7 +401,7 @@ def register_tool(
         'schema': input_schema,
         'description': description,
         'annotations': annotations,
-        'title': title or generate_tool_title(name),
+        'title': title or generate_tool_title(name, operation),
     }
 
 

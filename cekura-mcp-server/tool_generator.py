@@ -208,9 +208,10 @@ def generate_tool_name(operation: Operation) -> str:
 
 # Human-readable tool titles (MCP spec 2025-06-18 `Tool.title`). Directory
 # reviewers (e.g. the Anthropic Connectors Directory) require every tool to
-# carry one. Titles derive deterministically from the stable tool name, so a
-# given name always yields the same title across releases; `mcp_tools.json`
-# overlays can pin a hand-written `title` where the derivation reads badly.
+# carry one. Precedence: a `title` overlay in `mcp_tools.json`, then the
+# operation's OpenAPI `summary` (the backend guarantees one on every exposed
+# operation — vocera.backend `add_mcp_configuration`), then derivation from
+# the stable tool name as a fallback for specs predating that guarantee.
 
 # Domain words the naive title-caser would mangle.
 _TITLE_WORD_MAP = {
@@ -269,15 +270,19 @@ def _find_verb(tokens: list) -> Optional[int]:
     return verb_idx
 
 
-def generate_tool_title(tool_name: str) -> str:
-    """Derive a stable human-readable title from an MCP tool name.
+def generate_tool_title(tool_name: str, operation: Optional[Operation] = None) -> str:
+    """Return the human-readable title for an MCP tool.
 
-    Precedence: overlay `title` override, then `..._progress` phrasing, then
-    verb-first phrasing around the action token, then plain title-casing.
+    Precedence: overlay `title` override, then the operation's OpenAPI
+    `summary`, then name derivation (`..._progress` phrasing, verb-first
+    phrasing around the action token, plain title-casing).
     """
     overlay = load_tool_overlays().get(tool_name) or {}
     if overlay.get('title'):
         return overlay['title']
+
+    if operation is not None and (operation.summary or '').strip():
+        return operation.summary.strip()
 
     name = tool_name.replace('partial_update', 'update')
 

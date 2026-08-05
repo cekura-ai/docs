@@ -18,13 +18,27 @@ ROOT = HERE.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from openapi_parser import load_openapi_spec
+from openapi_parser import Operation, load_openapi_spec
 from tool_generator import (
     generate_tool_name,
     generate_tool_title,
     load_tool_overlays,
     should_include_operation,
 )
+
+
+def _operation(summary):
+    return Operation(
+        path="/test_framework/v2/scenarios/",
+        method="GET",
+        operation_id="scenarios-list",
+        summary=summary,
+        description=None,
+        parameters=[],
+        request_body=None,
+        responses={},
+        tags=[],
+    )
 
 
 class TestGenerateToolTitle:
@@ -110,6 +124,25 @@ class TestGenerateToolTitle:
     def test_overlay_title_overrides_derivation(self):
         # Pinned in mcp_tools.json; the derived form would be "Create Observe".
         assert generate_tool_title("observe_create") == "Send Observability Data"
+
+    def test_operation_summary_beats_derivation(self):
+        # The backend guarantees a summary on every exposed operation; it is
+        # the preferred title source.
+        op = _operation("List scenarios in a project")
+        assert generate_tool_title("scenarios_list", op) == (
+            "List scenarios in a project"
+        )
+
+    def test_blank_summary_falls_back_to_derivation(self):
+        assert generate_tool_title("scenarios_list", _operation("  ")) == (
+            "List Scenarios"
+        )
+
+    def test_overlay_title_beats_operation_summary(self):
+        op = _operation("Record an observability event")
+        assert generate_tool_title("observe_create", op) == (
+            "Send Observability Data"
+        )
 
     def test_no_verb_falls_back_to_title_case(self):
         assert generate_tool_title("scenarios_json_schema") == (

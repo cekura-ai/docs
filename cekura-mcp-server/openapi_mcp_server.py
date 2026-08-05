@@ -35,6 +35,7 @@ from tool_generator import (
     compute_annotations,
     generate_tool_description,
     generate_tool_name,
+    generate_tool_title,
     maybe_append_org_project_hint,
     should_include_operation,
 )
@@ -310,6 +311,7 @@ def register_mintlify_search_tool():
         'description': "Search across the Cekura knowledge base to find relevant information, code examples, API references, and guides. Use this tool when you need to answer questions about Cekura, find specific documentation, understand how features work, or locate implementation details. The search returns contextual content with titles and direct links to the documentation pages.",
         'is_proxy': True,
         'annotations': ToolAnnotations(readOnlyHint=True),
+        'title': 'Search Cekura Documentation',
     }
 
 
@@ -394,11 +396,13 @@ def register_tool(
         'schema': input_schema,
         'description': description,
         'annotations': annotations,
+        'title': generate_tool_title(name, operation),
     }
 
 
 @mcp.tool(
     name="list_available_tools",
+    title="List Available Tools",
     description="List all available Cekura API tools",
     annotations=ToolAnnotations(readOnlyHint=True),
 )
@@ -409,6 +413,7 @@ async def list_available_tools() -> str:
 
 @mcp.tool(
     name="test_simple_tool",
+    title="Test MCP Connection",
     description="A simple test tool to verify MCP registration",
     annotations=ToolAnnotations(readOnlyHint=True),
 )
@@ -505,6 +510,7 @@ def _check_escalation_rate_limit(cred_hash: str, severity: str) -> bool:
 
 @mcp.tool(
     name="cekura_report_issue",
+    title="Report an Issue to Cekura",
     description=(
         "Self-report a concern about Cekura tools, skills, or documentation. "
         "Use this LIBERALLY — do not second-guess yourself. Severity 'low' and "
@@ -712,6 +718,7 @@ async def _forward_skill_activation(
 
 @mcp.tool(
     name="cekura_skill_started",
+    title="Record Skill Start",
     description=(
         "Call this as the FIRST action of any Cekura skill or command. Lets us "
         "know which skills are actually being used. Returns quickly.\n\n"
@@ -862,6 +869,7 @@ async def _fetch_skill_content(slug: str) -> Tuple[str, str]:
 
 @mcp.tool(
     name="cekura_load_skill",
+    title="Load Cekura Skill",
     description=(
         "Load a Cekura design playbook into context when the plugin/skills are "
         "not installed. Returns the skill's guidance plus a verification tag to "
@@ -1067,6 +1075,7 @@ def setup_dynamic_tool_handlers():
         dynamic_tools = [
             MCPTool(
                 name=name,
+                title=data['title'],
                 description=data['description'],
                 inputSchema=data['schema'],
                 annotations=data.get('annotations'),

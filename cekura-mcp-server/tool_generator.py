@@ -206,6 +206,117 @@ def generate_tool_name(operation: Operation) -> str:
     return name
 
 
+# Human-readable tool titles (MCP spec 2025-06-18 `Tool.title`). Directory
+# reviewers (e.g. the Anthropic Connectors Directory) require every tool to
+# carry one. Precedence: the operation's OpenAPI `summary` (the backend is
+# authoritative — vocera.backend `add_mcp_configuration` guarantees one on
+# every exposed operation), then a `title` overlay in `mcp_tools.json`, then
+# derivation from the tool name. Overlay and derivation exist only for specs
+# predating the backend guarantee — overlay `title` entries should be removed
+# once the regenerated spec carries the summary.
+
+# Domain words the naive title-caser would mangle.
+_TITLE_WORD_MAP = {
+    'aiagents': 'AI Agents', 'ai': 'AI', 'api': 'API', 'csv': 'CSV',
+    'json': 'JSON', 'sip': 'SIP', 'vapi': 'VAPI', 'webrtc': 'WebRTC',
+    'livekit': 'LiveKit', 'elevenlabs': 'ElevenLabs', 'pipecat': 'Pipecat',
+    'retell': 'Retell', 'agora': 'Agora', 'dtmf': 'DTMF', 'url': 'URL',
+    'id': 'ID', 'ids': 'IDs', 'mcp': 'MCP', 'ivr': 'IVR', 'cekura': 'Cekura',
+    'slack': 'Slack', 'v1': 'v1', 'v2': 'v2', 'bg': 'in Background',
+}
+
+# Leading verb for title phrasing, keyed by the name token that implies it.
+_TITLE_VERB_MAP = {
+    'list': 'List', 'create': 'Create', 'retrieve': 'Get', 'update': 'Update',
+    'destroy': 'Delete', 'delete': 'Delete', 'run': 'Run',
+    'generate': 'Generate', 'duplicate': 'Duplicate', 'upload': 'Upload',
+    'evaluate': 'Evaluate', 'rerun': 'Rerun', 'copy': 'Copy',
+    'preview': 'Preview', 'improve': 'Improve', 'simplify': 'Simplify',
+    'dismiss': 'Dismiss', 'reproduce': 'Reproduce', 'end': 'End',
+    'move': 'Move', 'rename': 'Rename', 'search': 'Search',
+    'enable': 'Enable', 'disable': 'Disable', 'fix': 'Fix', 'mark': 'Mark',
+    'process': 'Process',
+}
+
+# REST-suffix verbs from generic CRUD routes. When one of these is the final
+# token but the name carries a more specific verb earlier (`scenarios_
+# duplicate_create`), the earlier verb names the action better.
+_GENERIC_SUFFIX_VERBS = {'create', 'update', 'destroy', 'retrieve', 'list', 'delete'}
+
+
+def _title_words(tokens: list) -> str:
+    # Collapse adjacent duplicates (`slack_slack_workspaces_list`).
+    deduped = [t for i, t in enumerate(tokens) if t and (i == 0 or t != tokens[i - 1])]
+    return " ".join(_TITLE_WORD_MAP.get(t, t.capitalize()) for t in deduped)
+
+
+def _find_verb(tokens: list) -> Optional[int]:
+    """Index of the action token, scanning right-to-left.
+
+    A verb token directly after `from` is a noun (`test_sets_create_from_run`).
+    A generic REST suffix yields to a more specific verb earlier in the name,
+    provided that verb still has an object before it.
+    """
+    verb_idx = None
+    for i in range(len(tokens) - 1, -1, -1):
+        if tokens[i] in _TITLE_VERB_MAP and (i == 0 or tokens[i - 1] != 'from'):
+            verb_idx = i
+            break
+    if (
+        verb_idx == len(tokens) - 1
+        and tokens[verb_idx] in _GENERIC_SUFFIX_VERBS
+    ):
+        for i in range(verb_idx - 1, 0, -1):
+            if tokens[i] in _TITLE_VERB_MAP and tokens[i - 1] != 'from':
+                return i
+    return verb_idx
+
+
+def generate_tool_title(tool_name: str, operation: Optional[Operation] = None) -> str:
+    """Return the human-readable title for an MCP tool.
+
+    Precedence: the operation's OpenAPI `summary`, then overlay `title`
+    (bridge for specs predating the backend summary guarantee), then name
+    derivation (`..._progress` phrasing, verb-first phrasing around the
+    action token, plain title-casing).
+    """
+    if operation is not None and (operation.summary or '').strip():
+        return operation.summary.strip()
+
+    overlay = load_tool_overlays().get(tool_name) or {}
+    if overlay.get('title'):
+        return overlay['title']
+
+    name = tool_name.replace('partial_update', 'update')
+
+    # Progress pollers: "<thing>_progress[_retrieve]" → "Get <Thing> Progress".
+    m = re.match(r'^(.*?)_progress(?:_retrieve)?$', name)
+    if m:
+        return f"Get {_title_words(m.group(1).split('_'))} Progress"
+
+    tokens = name.split('_')
+    verb_idx = _find_verb(tokens)
+    if verb_idx is None:
+        return _title_words(tokens)
+
+    verb = _TITLE_VERB_MAP[tokens[verb_idx]]
+    obj = tokens[:verb_idx]
+    # Qualifiers between the verb and a displaced trailing REST suffix.
+    qualifiers = tokens[verb_idx + 1:]
+    if qualifiers and qualifiers[-1] in _GENERIC_SUFFIX_VERBS:
+        qualifiers = qualifiers[:-1]
+    if obj and obj[-1] == 'bulk':
+        verb = f"Bulk {verb}"
+        obj = obj[:-1]
+    if not obj:
+        # Verb-first names like `end_calls` or `delete_runs`.
+        return f"{verb} {_title_words(qualifiers)}".strip()
+    title = f"{verb} {_title_words(obj)}"
+    if qualifiers:
+        title += f" ({_title_words(qualifiers)})"
+    return title
+
+
 MAX_DESCRIPTION_LENGTH = 2000
 
 

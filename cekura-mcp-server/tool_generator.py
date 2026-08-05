@@ -208,10 +208,12 @@ def generate_tool_name(operation: Operation) -> str:
 
 # Human-readable tool titles (MCP spec 2025-06-18 `Tool.title`). Directory
 # reviewers (e.g. the Anthropic Connectors Directory) require every tool to
-# carry one. Precedence: a `title` overlay in `mcp_tools.json`, then the
-# operation's OpenAPI `summary` (the backend guarantees one on every exposed
-# operation — vocera.backend `add_mcp_configuration`), then derivation from
-# the stable tool name as a fallback for specs predating that guarantee.
+# carry one. Precedence: the operation's OpenAPI `summary` (the backend is
+# authoritative — vocera.backend `add_mcp_configuration` guarantees one on
+# every exposed operation), then a `title` overlay in `mcp_tools.json`, then
+# derivation from the tool name. Overlay and derivation exist only for specs
+# predating the backend guarantee — overlay `title` entries should be removed
+# once the regenerated spec carries the summary.
 
 # Domain words the naive title-caser would mangle.
 _TITLE_WORD_MAP = {
@@ -273,16 +275,17 @@ def _find_verb(tokens: list) -> Optional[int]:
 def generate_tool_title(tool_name: str, operation: Optional[Operation] = None) -> str:
     """Return the human-readable title for an MCP tool.
 
-    Precedence: overlay `title` override, then the operation's OpenAPI
-    `summary`, then name derivation (`..._progress` phrasing, verb-first
-    phrasing around the action token, plain title-casing).
+    Precedence: the operation's OpenAPI `summary`, then overlay `title`
+    (bridge for specs predating the backend summary guarantee), then name
+    derivation (`..._progress` phrasing, verb-first phrasing around the
+    action token, plain title-casing).
     """
+    if operation is not None and (operation.summary or '').strip():
+        return operation.summary.strip()
+
     overlay = load_tool_overlays().get(tool_name) or {}
     if overlay.get('title'):
         return overlay['title']
-
-    if operation is not None and (operation.summary or '').strip():
-        return operation.summary.strip()
 
     name = tool_name.replace('partial_update', 'update')
 
@@ -300,7 +303,7 @@ def generate_tool_title(tool_name: str, operation: Optional[Operation] = None) -
     obj = tokens[:verb_idx]
     # Qualifiers between the verb and a displaced trailing REST suffix.
     qualifiers = tokens[verb_idx + 1:]
-    if qualifiers and qualifiers[-1] in _GENERIC_SUFFIX_VERBS and verb_idx < len(tokens) - 1:
+    if qualifiers and qualifiers[-1] in _GENERIC_SUFFIX_VERBS:
         qualifiers = qualifiers[:-1]
     if obj and obj[-1] == 'bulk':
         verb = f"Bulk {verb}"

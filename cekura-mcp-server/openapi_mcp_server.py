@@ -221,11 +221,7 @@ async def initialize_server():
                 )
 
                 annotations = compute_annotations(operation)
-                register_tool(
-                    tool_name, tool_description, input_schema, operation,
-                    annotations=annotations,
-                    title=generate_tool_title(tool_name, operation),
-                )
+                register_tool(tool_name, tool_description, input_schema, operation, annotations=annotations)
                 tools_registered += 1
             except Exception as e:
                 logger.error(f"Error registering tool for {operation.path}: {e}", exc_info=True)
@@ -394,14 +390,13 @@ def register_tool(
     input_schema: Dict[str, Any],
     operation,
     annotations: ToolAnnotations = None,
-    title: str = None,
 ):
     operations_registry[name] = {
         'operation': operation,
         'schema': input_schema,
         'description': description,
         'annotations': annotations,
-        'title': title or generate_tool_title(name, operation),
+        'title': generate_tool_title(name, operation),
     }
 
 
@@ -1080,7 +1075,7 @@ def setup_dynamic_tool_handlers():
         dynamic_tools = [
             MCPTool(
                 name=name,
-                title=data.get('title') or generate_tool_title(name),
+                title=data['title'],
                 description=data['description'],
                 inputSchema=data['schema'],
                 annotations=data.get('annotations'),

@@ -123,7 +123,7 @@ class TestGenerateToolTitle:
 
     def test_overlay_title_overrides_derivation(self):
         # Pinned in mcp_tools.json; the derived form would be "Create Observe".
-        assert generate_tool_title("observe_create") == "Send Observability Data"
+        assert generate_tool_title("observe_create") == "Send observability data"
 
     def test_operation_summary_beats_derivation(self):
         # The backend guarantees a summary on every exposed operation; it is
@@ -138,10 +138,12 @@ class TestGenerateToolTitle:
             "List Scenarios"
         )
 
-    def test_overlay_title_beats_operation_summary(self):
+    def test_operation_summary_beats_overlay_title(self):
+        # The backend spec is authoritative; overlay titles are only a bridge
+        # for specs that predate the summary guarantee.
         op = _operation("Record an observability event")
         assert generate_tool_title("observe_create", op) == (
-            "Send Observability Data"
+            "Record an observability event"
         )
 
     def test_no_verb_falls_back_to_title_case(self):

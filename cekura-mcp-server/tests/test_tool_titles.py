@@ -18,6 +18,7 @@ ROOT = HERE.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import tool_generator
 from openapi_parser import Operation, load_openapi_spec
 from tool_generator import (
     generate_tool_name,
@@ -121,9 +122,18 @@ class TestGenerateToolTitle:
             "List Slack Workspaces"
         )
 
-    def test_overlay_title_overrides_derivation(self):
-        # Pinned in mcp_tools.json; the derived form would be "Create Observe".
-        assert generate_tool_title("observe_create") == "Send observability data"
+    def test_overlay_title_overrides_derivation(self, monkeypatch):
+        # No live mcp_tools.json entry carries `title` anymore — the backend
+        # now guarantees a summary for every real tool, so the bridge these
+        # overlays existed for has already closed. Inject a synthetic entry
+        # to exercise the overlay branch itself.
+        monkeypatch.setattr(
+            tool_generator, "_OVERLAY_CACHE",
+            {"scenarios_json_schema": {"title": "Synthetic Overlay Title"}},
+        )
+        assert generate_tool_title("scenarios_json_schema") == (
+            "Synthetic Overlay Title"
+        )
 
     def test_operation_summary_beats_derivation(self):
         # The backend guarantees a summary on every exposed operation; it is
@@ -138,12 +148,16 @@ class TestGenerateToolTitle:
             "List Scenarios"
         )
 
-    def test_operation_summary_beats_overlay_title(self):
+    def test_operation_summary_beats_overlay_title(self, monkeypatch):
         # The backend spec is authoritative; overlay titles are only a bridge
         # for specs that predate the summary guarantee.
-        op = _operation("Record an observability event")
-        assert generate_tool_title("observe_create", op) == (
-            "Record an observability event"
+        monkeypatch.setattr(
+            tool_generator, "_OVERLAY_CACHE",
+            {"scenarios_json_schema": {"title": "Synthetic Overlay Title"}},
+        )
+        op = _operation("Real backend summary")
+        assert generate_tool_title("scenarios_json_schema", op) == (
+            "Real backend summary"
         )
 
     def test_no_verb_falls_back_to_title_case(self):

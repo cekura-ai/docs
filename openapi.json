@@ -3731,7 +3731,7 @@
         "/observability/v1/call-logs/": {
             "get": {
                 "operationId": "call-logs-list",
-                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
+                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **31 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
                 "summary": "List call logs",
                 "parameters": [
                     {
@@ -3902,7 +3902,7 @@
         "/observability/v1/call-logs-external/": {
             "get": {
                 "operationId": "call-logs-external-list",
-                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
+                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **31 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
                 "summary": "List call logs",
                 "parameters": [
                     {
@@ -4942,6 +4942,41 @@
                                                         "is_simulating": {
                                                             "type": "boolean",
                                                             "description": "Whether this scenario was created by simulation"
+                                                        },
+                                                        "test_profile_data": {
+                                                            "type": "object",
+                                                            "description": "The test profile generated for this scenario, including its sectioned `information` (main_agent_variables / testing_agent_variables)"
+                                                        },
+                                                        "generated_mock_tool_entries": {
+                                                            "type": "array",
+                                                            "description": "Expected mock tool calls generated for this scenario when the agent has mock tools attached. Empty when the agent has no mock tools.",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "tool_id": {
+                                                                        "type": "integer",
+                                                                        "description": "ID of the mock tool on the agent"
+                                                                    },
+                                                                    "tool_name": {
+                                                                        "type": "string",
+                                                                        "description": "Name of the tool being mocked"
+                                                                    },
+                                                                    "new_entry": {
+                                                                        "type": "object",
+                                                                        "description": "The expected tool call for this scenario",
+                                                                        "properties": {
+                                                                            "input": {
+                                                                                "type": "object",
+                                                                                "description": "Input parameters the tool call is expected to receive"
+                                                                            },
+                                                                            "output": {
+                                                                                "type": "object",
+                                                                                "description": "Response the mock tool will return"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -6391,6 +6426,41 @@
                                                         "is_simulating": {
                                                             "type": "boolean",
                                                             "description": "Whether this scenario was created by simulation"
+                                                        },
+                                                        "test_profile_data": {
+                                                            "type": "object",
+                                                            "description": "The test profile generated for this scenario, including its sectioned `information` (main_agent_variables / testing_agent_variables)"
+                                                        },
+                                                        "generated_mock_tool_entries": {
+                                                            "type": "array",
+                                                            "description": "Expected mock tool calls generated for this scenario when the agent has mock tools attached. Empty when the agent has no mock tools.",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "tool_id": {
+                                                                        "type": "integer",
+                                                                        "description": "ID of the mock tool on the agent"
+                                                                    },
+                                                                    "tool_name": {
+                                                                        "type": "string",
+                                                                        "description": "Name of the tool being mocked"
+                                                                    },
+                                                                    "new_entry": {
+                                                                        "type": "object",
+                                                                        "description": "The expected tool call for this scenario",
+                                                                        "properties": {
+                                                                            "input": {
+                                                                                "type": "object",
+                                                                                "description": "Input parameters the tool call is expected to receive"
+                                                                            },
+                                                                            "output": {
+                                                                                "type": "object",
+                                                                                "description": "Response the mock tool will return"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -8259,8 +8329,27 @@
         "/observability/v1/metric-failure-mode-insights/categories/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-categories-retrieve",
-                "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range; results are sorted by count descending.",
+                "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) to count only calls handled by those agents; results are sorted by count descending.",
                 "summary": "List accumulating failure categories for a metric",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "agent_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent ids; only calls handled by these agents are counted."
+                    },
+                    {
+                        "name": "project",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ],
                 "tags": [
                     "observability"
                 ],
@@ -8295,20 +8384,9 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metric-failure-mode-insights-categories-retrieve",
-                        "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range; results are sorted by count descending."
+                        "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) to count only calls handled by those agents; results are sorted by count descending."
                     }
-                },
-                "parameters": [
-                    {
-                        "name": "project",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Tenant scope. Supply one of `project` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
-                    }
-                ]
+                }
             }
         },
         "/observability/v1/metric-failure-mode-insights/categories/{category_slug}/calls/": {
@@ -8357,6 +8435,14 @@
                             "type": "string",
                             "format": "date-time"
                         }
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent ids; only calls handled by these agents are returned."
                     }
                 ],
                 "tags": [
@@ -8518,8 +8604,18 @@
         "/observability/v1/metric-failure-mode-insights/failure-rates/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-failure-rates-retrieve",
-                "description": "Return the percentage of evaluated calls that failed each metric during the selected Insights date range.",
+                "description": "Return the percentage of evaluated calls that failed each metric during the selected Insights date range. Optionally scope to `agent_ids` (comma-separated agent ids).",
                 "summary": "List metric failure rates for the insights window",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "agent_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent ids; only calls handled by these agents are counted."
+                    }
+                ],
                 "tags": [
                     "observability"
                 ],
@@ -9229,7 +9325,7 @@
         "/observability/v2/call-logs/": {
             "get": {
                 "operationId": "observability-v2-call-logs-list",
-                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
+                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **31 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
                 "summary": "List call logs",
                 "parameters": [
                     {
@@ -9346,7 +9442,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "observability-v2-call-logs-list",
-                        "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`."
+                        "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **31 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`."
                     }
                 }
             },
@@ -10325,6 +10421,41 @@
                                                         "is_simulating": {
                                                             "type": "boolean",
                                                             "description": "Whether this scenario was created by simulation"
+                                                        },
+                                                        "test_profile_data": {
+                                                            "type": "object",
+                                                            "description": "The test profile generated for this scenario, including its sectioned `information` (main_agent_variables / testing_agent_variables)"
+                                                        },
+                                                        "generated_mock_tool_entries": {
+                                                            "type": "array",
+                                                            "description": "Expected mock tool calls generated for this scenario when the agent has mock tools attached. Empty when the agent has no mock tools.",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "tool_id": {
+                                                                        "type": "integer",
+                                                                        "description": "ID of the mock tool on the agent"
+                                                                    },
+                                                                    "tool_name": {
+                                                                        "type": "string",
+                                                                        "description": "Name of the tool being mocked"
+                                                                    },
+                                                                    "new_entry": {
+                                                                        "type": "object",
+                                                                        "description": "The expected tool call for this scenario",
+                                                                        "properties": {
+                                                                            "input": {
+                                                                                "type": "object",
+                                                                                "description": "Input parameters the tool call is expected to receive"
+                                                                            },
+                                                                            "output": {
+                                                                                "type": "object",
+                                                                                "description": "Response the mock tool will return"
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -13212,7 +13343,7 @@
         "/subscriptions/subscriptions/{id}/setup-payment-method/": {
             "post": {
                 "operationId": "subscriptions-subscriptions-setup-payment-method-create",
-                "description": "Start a Stripe setup-mode checkout to save a payment method for the\norganization. Used by plans without a Stripe subscription (e.g. the free\npay-as-you-go plan) before top-ups, auto-refill, or adding paid members.\nThe checkout.session.completed webhook makes the card the customer default.",
+                "description": "Start a Stripe setup-mode checkout to save a payment method for the\norganization. Used by plans without a Stripe subscription (e.g. the free\npay-as-you-go plan) before top-ups, auto-refill, or adding paid members.\nThe checkout.session.completed webhook makes the card the customer default.\n\nOptional body field `return_path` (relative path, e.g. \"/onboarding/ui\")\nsends the user back to the page they started from after Stripe; invalid\nor missing paths fall back to the global STRIPE_SUCCESS_URL/CANCEL_URL.",
                 "parameters": [
                     {
                         "in": "path",
@@ -35086,7 +35217,7 @@
         "/test_framework/v1/scenarios-external/generate-bg/": {
             "post": {
                 "operationId": "scenarios-generate-bg",
-                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
+                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- When the agent has mock tools attached, each generated scenario also gets `generated_mock_tool_entries` — the expected mock tool calls for that scenario, shaped `[{tool_id, tool_name, new_entry: {input, output}}]`. These are returned on scenario reads and can be edited later via `scenarios_partial_update`.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
                 "tags": [
                     "test_framework"
                 ],
@@ -35430,6 +35561,41 @@
                                                     "is_simulating": {
                                                         "type": "boolean",
                                                         "description": "Whether this scenario was created by simulation"
+                                                    },
+                                                    "test_profile_data": {
+                                                        "type": "object",
+                                                        "description": "The test profile generated for this scenario, including its sectioned `information` (main_agent_variables / testing_agent_variables)"
+                                                    },
+                                                    "generated_mock_tool_entries": {
+                                                        "type": "array",
+                                                        "description": "Expected mock tool calls generated for this scenario when the agent has mock tools attached. Empty when the agent has no mock tools.",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "tool_id": {
+                                                                    "type": "integer",
+                                                                    "description": "ID of the mock tool on the agent"
+                                                                },
+                                                                "tool_name": {
+                                                                    "type": "string",
+                                                                    "description": "Name of the tool being mocked"
+                                                                },
+                                                                "new_entry": {
+                                                                    "type": "object",
+                                                                    "description": "The expected tool call for this scenario",
+                                                                    "properties": {
+                                                                        "input": {
+                                                                            "type": "object",
+                                                                            "description": "Input parameters the tool call is expected to receive"
+                                                                        },
+                                                                        "output": {
+                                                                            "type": "object",
+                                                                            "description": "Response the mock tool will return"
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -41296,7 +41462,7 @@
         "/test_framework/v1/scenarios/generate-bg/": {
             "post": {
                 "operationId": "scenarios-generate-bg_2",
-                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
+                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- When the agent has mock tools attached, each generated scenario also gets `generated_mock_tool_entries` — the expected mock tool calls for that scenario, shaped `[{tool_id, tool_name, new_entry: {input, output}}]`. These are returned on scenario reads and can be edited later via `scenarios_partial_update`.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
                 "tags": [
                     "test_framework"
                 ],
@@ -41371,7 +41537,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-generate-bg",
-                        "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null."
+                        "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- When the agent has mock tools attached, each generated scenario also gets `generated_mock_tool_entries` — the expected mock tool calls for that scenario, shaped `[{tool_id, tool_name, new_entry: {input, output}}]`. These are returned on scenario reads and can be edited later via `scenarios_partial_update`.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null."
                     }
                 }
             }
@@ -41656,6 +41822,41 @@
                                                     "is_simulating": {
                                                         "type": "boolean",
                                                         "description": "Whether this scenario was created by simulation"
+                                                    },
+                                                    "test_profile_data": {
+                                                        "type": "object",
+                                                        "description": "The test profile generated for this scenario, including its sectioned `information` (main_agent_variables / testing_agent_variables)"
+                                                    },
+                                                    "generated_mock_tool_entries": {
+                                                        "type": "array",
+                                                        "description": "Expected mock tool calls generated for this scenario when the agent has mock tools attached. Empty when the agent has no mock tools.",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "tool_id": {
+                                                                    "type": "integer",
+                                                                    "description": "ID of the mock tool on the agent"
+                                                                },
+                                                                "tool_name": {
+                                                                    "type": "string",
+                                                                    "description": "Name of the tool being mocked"
+                                                                },
+                                                                "new_entry": {
+                                                                    "type": "object",
+                                                                    "description": "The expected tool call for this scenario",
+                                                                    "properties": {
+                                                                        "input": {
+                                                                            "type": "object",
+                                                                            "description": "Input parameters the tool call is expected to receive"
+                                                                        },
+                                                                        "output": {
+                                                                            "type": "object",
+                                                                            "description": "Response the mock tool will return"
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -56643,7 +56844,7 @@
         "/test_framework/v2/scenarios/generate-bg/": {
             "post": {
                 "operationId": "scenarios-generate-bg_3",
-                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
+                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- When the agent has mock tools attached, each generated scenario also gets `generated_mock_tool_entries` — the expected mock tool calls for that scenario, shaped `[{tool_id, tool_name, new_entry: {input, output}}]`. These are returned on scenario reads and can be edited later via `scenarios_partial_update`.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
                 "tags": [
                     "test_framework"
                 ],
@@ -56987,6 +57188,41 @@
                                                     "is_simulating": {
                                                         "type": "boolean",
                                                         "description": "Whether this scenario was created by simulation"
+                                                    },
+                                                    "test_profile_data": {
+                                                        "type": "object",
+                                                        "description": "The test profile generated for this scenario, including its sectioned `information` (main_agent_variables / testing_agent_variables)"
+                                                    },
+                                                    "generated_mock_tool_entries": {
+                                                        "type": "array",
+                                                        "description": "Expected mock tool calls generated for this scenario when the agent has mock tools attached. Empty when the agent has no mock tools.",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "tool_id": {
+                                                                    "type": "integer",
+                                                                    "description": "ID of the mock tool on the agent"
+                                                                },
+                                                                "tool_name": {
+                                                                    "type": "string",
+                                                                    "description": "Name of the tool being mocked"
+                                                                },
+                                                                "new_entry": {
+                                                                    "type": "object",
+                                                                    "description": "The expected tool call for this scenario",
+                                                                    "properties": {
+                                                                        "input": {
+                                                                            "type": "object",
+                                                                            "description": "Input parameters the tool call is expected to receive"
+                                                                        },
+                                                                        "output": {
+                                                                            "type": "object",
+                                                                            "description": "Response the mock tool will return"
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -67050,16 +67286,28 @@
                     "scenario_ids": {
                         "readOnly": true
                     },
+                    "clone_assistant_id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "scenario_validation_result_ids": {
+                        "readOnly": true
+                    },
+                    "current_phase": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "status": {
                         "enum": [
                             "pending",
                             "running",
                             "succeeded",
-                            "failed"
+                            "failed",
+                            "cancelled"
                         ],
                         "type": "string",
-                        "description": "* `pending` - Pending\n* `running` - Running\n* `succeeded` - Succeeded\n* `failed` - Failed",
-                        "x-spec-enum-id": "7a7ee2ea425ee5c6",
+                        "description": "* `pending` - Pending\n* `running` - Running\n* `succeeded` - Succeeded\n* `failed` - Failed\n* `cancelled` - Cancelled",
+                        "x-spec-enum-id": "ea8144caab6e77c3",
                         "readOnly": true
                     },
                     "conversation_id": {
@@ -67080,6 +67328,9 @@
                     },
                     "error_message": {
                         "type": "string",
+                        "readOnly": true
+                    },
+                    "reproduction_summary": {
                         "readOnly": true
                     },
                     "summary_json": {
@@ -79618,6 +79869,15 @@
                             "null"
                         ],
                         "description": "Dot-separated path of the folder to assign this evaluator to (e.g. \"Sales.Inbound\"). Folders must be created before use — they are not auto-created. Use `scenarios_create_folder_create` to create each level before assigning evaluators. Example: to use \"Sales.Inbound\", first create \"Sales\", then create \"Inbound\" inside it."
+                    },
+                    "generated_mock_tool_entries": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Expected mock tool calls for this evaluator. Each entry has shape {tool_id, tool_name, new_entry: {input, output}}. Auto-generated during scenario generation when the agent has mock tools attached; can also be set or edited manually."
                     }
                 }
             },
@@ -82813,7 +83073,10 @@
                         "readOnly": true
                     },
                     "expected_outcome": {
-                        "description": "\nExpected outcome of the run\nExample:\n```json\n{\n    \"score\": 100,\n    \"explanation\": [\n        \"❌ The main agent did not provide the standard greeting, emergency disclaimer, or ask how they can help (00:21).\",\n    ],\n    \"outcome_alignments\": [\n        {\n            \"aligned\": false,\n            \"outcome\": \"The main agent did not provide the standard greeting, emergency disclaimer, or ask how they can help (00:21).\",\n            \"prompt_part\": \"The main agent should provide the standard greeting and emergency disclaimer, asking how they can help.\"\n        },\n        {\n            \"aligned\": false,\n            \"outcome\": \"The main agent did not explain the distinction between Nacogdoches Health Partners and FastTrack Express Clinic (entire call).\",\n            \"prompt_part\": \"The main agent should explain the distinction between Nacogdoches Health Partners (focused on comprehensive primary care and chronic conditions) and FastTrack Express Clinic (focused on acute or urgent matters).\"\n        }\n    ]\n}\n```\n"
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Expected-outcome evaluation. Supports key selection — `?ql={expected_outcome{score}}` omits the explanation and alignment arrays.",
+                        "readOnly": true
                     },
                     "success": {
                         "type": "boolean",
@@ -82831,7 +83094,12 @@
                         ],
                         "format": "date-time"
                     },
-                    "metadata": {},
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Provider call metadata. Supports key selection — `?ql={metadata{ended_reason,ringing_duration}}` returns only those keys instead of the full provider payload.",
+                        "readOnly": true
+                    },
                     "outbound_number": {
                         "type": "string",
                         "readOnly": true
@@ -86843,6 +87111,15 @@
                             "null"
                         ],
                         "description": "Dot-separated path of the folder to assign this evaluator to (e.g. \"Sales.Inbound\"). Folders must be created before use — they are not auto-created. Use `scenarios_create_folder_create` to create each level before assigning evaluators. Example: to use \"Sales.Inbound\", first create \"Sales\", then create \"Inbound\" inside it."
+                    },
+                    "generated_mock_tool_entries": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Expected mock tool calls for this evaluator. Each entry has shape {tool_id, tool_name, new_entry: {input, output}}. Auto-generated during scenario generation when the agent has mock tools attached; can also be set or edited manually."
                     }
                 },
                 "required": [

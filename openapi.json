@@ -35068,8 +35068,8 @@
         "/test_framework/v1/scenarios-external/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios",
-                "description": "Export scenarios to CSV/Excel",
-                "summary": "Export scenarios to CSV/Excel",
+                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
+                "summary": "Export scenarios to CSV/Excel/JSON",
                 "parameters": [
                     {
                         "in": "query",
@@ -35103,10 +35103,11 @@
                             "type": "string",
                             "enum": [
                                 "csv",
+                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
+                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -39322,7 +39323,7 @@
         },
         "/test_framework/v1/scenarios-external/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-agent-create",
+                "operationId": "scenarios-refine",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -39391,7 +39392,7 @@
         },
         "/test_framework/v1/scenarios-external/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-agent-progress",
+                "operationId": "scenarios-refine-progress",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -41292,8 +41293,8 @@
         "/test_framework/v1/scenarios/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios_2",
-                "description": "Export scenarios to CSV/Excel",
-                "summary": "Export scenarios to CSV/Excel",
+                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
+                "summary": "Export scenarios to CSV/Excel/JSON",
                 "parameters": [
                     {
                         "in": "query",
@@ -41327,10 +41328,11 @@
                             "type": "string",
                             "enum": [
                                 "csv",
+                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
+                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -45786,7 +45788,7 @@
         },
         "/test_framework/v1/scenarios/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-agent-create_2",
+                "operationId": "scenarios-refine_2",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -45852,11 +45854,11 @@
                     }
                 },
                 "x-mcp-expose": true,
-                "summary": "Create or improve scenarios via agent",
+                "summary": "Refine or clarify evaluator scenarios",
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "scenarios-agent-create",
+                        "name": "scenarios-refine",
                         "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests."
                     }
                 }
@@ -45864,7 +45866,7 @@
         },
         "/test_framework/v1/scenarios/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-agent-progress_2",
+                "operationId": "scenarios-refine-progress_2",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -45922,11 +45924,11 @@
                     }
                 },
                 "x-mcp-expose": true,
-                "summary": "Get scenario-agent progress",
+                "summary": "Get scenario-refinement progress",
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "scenarios-agent-progress",
+                        "name": "scenarios-refine-progress",
                         "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them"
                     }
                 }
@@ -47331,7 +47333,7 @@
             },
             "post": {
                 "operationId": "aiagents-create",
-                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
+                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "test_framework"
@@ -47358,7 +47360,7 @@
                                     "summary": "Cloud auto-import (configure_from_provider)",
                                     "description": "Fetch & configure everything from the provider; returns 202 + progress_id."
                                 },
-                                "Self-hosted(observation-only,MostCommon)": {
+                                "Custom-hosted(observation-only,MostCommon)": {
                                     "value": {
                                         "name": "Support Bot",
                                         "description": "Handles inbound support calls",
@@ -47366,10 +47368,10 @@
                                         "inbound": true,
                                         "phone_number": "+14155551234",
                                         "provider": {
-                                            "type": "self_hosted"
+                                            "type": "custom"
                                         }
                                     },
-                                    "summary": "Self-hosted (observation-only, most common)"
+                                    "summary": "Custom-hosted (observation-only, most common)"
                                 },
                                 "Self-hostedViaWebSocket(text-modeTesting)": {
                                     "value": {
@@ -47378,7 +47380,7 @@
                                         "project": 42,
                                         "inbound": false,
                                         "provider": {
-                                            "type": "self_hosted",
+                                            "type": "custom",
                                             "chat_agent_details": {
                                                 "type": "self_hosted",
                                                 "config": {
@@ -47501,7 +47503,7 @@
                                         "project": 42,
                                         "inbound": true,
                                         "provider": {
-                                            "type": "self_hosted"
+                                            "type": "custom"
                                         },
                                         "mock_tools": [
                                             {
@@ -47594,7 +47596,7 @@
                                                 "sip_uri": null
                                             },
                                             "provider": {
-                                                "type": "self_hosted"
+                                                "type": "custom"
                                             },
                                             "agent_speaks_first": null,
                                             "knowledge_base_files": [],
@@ -47684,7 +47686,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "aiagents-create",
-                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self_hosted: credentials.config.{url (wss://), headers}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
+                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
                     }
                 }
             }
@@ -56729,8 +56731,8 @@
         "/test_framework/v2/scenarios/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios_3",
-                "description": "Export scenarios to CSV/Excel",
-                "summary": "Export scenarios to CSV/Excel",
+                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
+                "summary": "Export scenarios to CSV/Excel/JSON",
                 "parameters": [
                     {
                         "in": "query",
@@ -56764,10 +56766,11 @@
                             "type": "string",
                             "enum": [
                                 "csv",
+                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
+                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -60983,7 +60986,7 @@
         },
         "/test_framework/v2/scenarios/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-agent-create_3",
+                "operationId": "scenarios-refine_3",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -61052,7 +61055,7 @@
         },
         "/test_framework/v2/scenarios/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-agent-progress_3",
+                "operationId": "scenarios-refine-progress_3",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -67651,7 +67654,6 @@
                             "vapi",
                             "retell",
                             "elevenlabs",
-                            "self_hosted",
                             "cisco",
                             "bland",
                             "livekit",
@@ -67666,15 +67668,15 @@
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "4bbea9038bd498ab",
-                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, synthflow, koreai, genesys, amazon_connect, self_hosted, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `self_hosted` - Self Hosted\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `custom` - Custom (chat-only, no voice provider)"
+                        "x-spec-enum-id": "3f5fcc0e5ae82793",
+                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `custom` - Custom (chat-only, no voice provider)"
                     },
                     "agent_id": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, self_hosted, synthflow, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
+                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
                     },
                     "credentials": {
                         "oneOf": [
@@ -85281,7 +85283,6 @@
                             "vapi",
                             "retell",
                             "elevenlabs",
-                            "self_hosted",
                             "cisco",
                             "bland",
                             "livekit",
@@ -85296,15 +85297,15 @@
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "4bbea9038bd498ab",
-                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, synthflow, koreai, genesys, amazon_connect, self_hosted, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `self_hosted` - Self Hosted\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `custom` - Custom (chat-only, no voice provider)"
+                        "x-spec-enum-id": "3f5fcc0e5ae82793",
+                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `custom` - Custom (chat-only, no voice provider)"
                     },
                     "agent_id": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, self_hosted, synthflow, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
+                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
                     },
                     "credentials": {
                         "oneOf": [

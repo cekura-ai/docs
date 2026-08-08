@@ -503,19 +503,31 @@ cekura.set_custom_metadata({"bot_version": "1.0", "environment": "staging"})
 
 ## Deferred Upload (Compliance)
 
-For compliance scenarios where you need user consent before sending any data to the backend, use `defer_upload=True`. All audio is buffered locally and no data (audio, transcript, logs) is sent until you explicitly grant consent.
+For compliance scenarios where audio must not be uploaded before consent, use `defer_upload=True`. The SDK records audio into an in-memory buffer while continuing to collect transcript, tool-call, log, and trace data.
 
 ```python
 pipeline = cekura.observe_pipeline(pipeline, context, runner_args=runner_args, defer_upload=True)
 
-# Grant consent — flushes buffered audio and enables upload:
+# Grant consent — uploads audio buffered since the start of the call and
+# streams future audio normally:
 await cekura.start_audio_upload()
 
-# Or abort mid-call to discard everything immediately:
-await cekura.abort()
+# If consent is denied, stop recording and discard buffered audio while
+# keeping transcript, tool-call, log, and trace observability active:
+await cekura.abort_recording()
 ```
 
-If neither method is called before the session ends, all data is automatically discarded. Nothing is sent to the backend.
+If neither method is called before the session ends, the SDK automatically discards the buffered audio and sends text-only observability data. Transcript timing remains available because it is captured independently from the audio recording.
+
+Use `await cekura.abort()` only when you need to discard the entire session, including its transcript, tool calls, logs, traces, and audio.
+
+<Note>
+  Deferred mode controls audio upload, not when audio capture begins. Calling `start_audio_upload()` uploads the audio buffered from the beginning of the call. Calling `abort_recording()` or allowing the call to finalize without consent permanently discards that buffered audio.
+</Note>
+
+<Note>
+  Calls created with `defer_upload=True` include `audio_consent_granted` in their observability metadata. Calls that do not use deferred upload omit this field. Audio-dependent metrics are unavailable when audio is discarded, while transcript- and trace-based analysis continues normally.
+</Note>
 
 Also works with the single-step API:
 
@@ -573,7 +585,7 @@ pipeline = tracer.observe_pipeline(
     runner_args=None,      # Optional: RunnerArguments (session_id extracted if present)
     session_id=None,       # Optional: Takes precedence over runner_args.session_id
     custom_metadata=None,  # Optional: Dict of custom metadata
-    defer_upload=False     # Optional: Hold all data until start_audio_upload() is called
+    defer_upload=False     # Optional: Buffer audio until start_audio_upload() is called
 )
 ```
 
@@ -605,7 +617,7 @@ task = tracer.observe_and_create_task(
     transport=None,        # Optional: Transport for cleanup on disconnect
     session_id=None,       # Optional: Custom session identifier
     custom_metadata=None,  # Optional: Dict of custom metadata
-    defer_upload=False,    # Optional: Hold all data until start_audio_upload() is called
+    defer_upload=False,    # Optional: Buffer audio until start_audio_upload() is called
     **pipeline_task_kwargs # Optional: Additional args forwarded to PipelineTask
 )
 ```
@@ -639,15 +651,23 @@ task = tracer.register_task_handlers(
 
 ### start_audio_upload()
 
-Grants consent and begins uploading session data when `defer_upload=True`. Flushes any buffered audio to S3 and enables normal upload for the rest of the session. No-op if `defer_upload` was not set.
+Grants consent and begins uploading audio when `defer_upload=True`. Flushes audio buffered since the start of the call and enables normal upload for the rest of the session. Transcript, tool-call, log, and trace collection is not gated by this method. No-op if `defer_upload` was not set.
 
 ```python
 await tracer.start_audio_upload()
 ```
 
+### abort_recording()
+
+Stops the SDK audio recording and permanently discards buffered audio for the current session. Transcript, tool-call, log, and trace observability remains active and is submitted when the session ends. This operation is irreversible for the session.
+
+```python
+await tracer.abort_recording()
+```
+
 ### abort()
 
-Stops all capture mid-call and prevents data from being sent to the Cekura backend. Clears any deferred audio buffer and aborts in-progress S3 uploads.
+Stops all capture mid-call and prevents any session data from being sent to Cekura. Use this only for full-session discard; use `abort_recording()` to discard audio while retaining non-audio observability.
 
 ```python
 await tracer.abort()

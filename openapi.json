@@ -4142,9 +4142,10 @@
                 },
                 "deprecated": true
             },
-            "put": {
-                "operationId": "call-logs-external-update",
-                "description": "Update a call log",
+            "patch": {
+                "operationId": "observability-v2-call-logs-partial-update",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, review state, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "summary": "Update call log source data",
                 "parameters": [
                     {
                         "in": "path",
@@ -4163,21 +4164,61 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
+                            },
+                            "examples": {
+                                "Append-twilio-insights": {
+                                    "value": {
+                                        "metadata": {
+                                            "twilio_insights": {
+                                                "call_sid": "CA123",
+                                                "answered_by": "human"
+                                            }
+                                        }
+                                    },
+                                    "summary": "Append Twilio Insights metadata"
+                                },
+                                "Correct-source-call-data": {
+                                    "value": {
+                                        "call_id": "provider-call-123",
+                                        "duration": 1.5,
+                                        "call_ended_reason": "customer-ended-call"
+                                    },
+                                    "summary": "Correct provider-supplied call data"
+                                },
+                                "Update-structured-transcript": {
+                                    "value": {
+                                        "transcript_type": "cekura",
+                                        "transcript_json": [
+                                            {
+                                                "role": "Testing Agent",
+                                                "content": "Hello.",
+                                                "start_time": 0.0,
+                                                "end_time": 1.0
+                                            },
+                                            {
+                                                "role": "Main Agent",
+                                                "content": "How can I help?",
+                                                "start_time": 1.0,
+                                                "end_time": 2.5
+                                            }
+                                        ]
+                                    },
+                                    "summary": "Update a structured transcript"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -4203,65 +4244,35 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            },
-            "patch": {
-                "operationId": "call-logs-external-partial-update",
-                "description": "Update a call log",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this call log.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "observability"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "oauth2": []
                     },
-                    {
-                        "supabase_session": []
-                    },
-                    {
-                        "embedded_session": []
-                    },
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
+                    "400": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -5570,9 +5581,10 @@
                 },
                 "deprecated": true
             },
-            "put": {
-                "operationId": "call-logs-update",
-                "description": "Update a call log",
+            "patch": {
+                "operationId": "observability-v2-call-logs-partial-update_2",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, review state, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "summary": "Update call log source data",
                 "parameters": [
                     {
                         "in": "path",
@@ -5591,21 +5603,61 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
+                            },
+                            "examples": {
+                                "Append-twilio-insights": {
+                                    "value": {
+                                        "metadata": {
+                                            "twilio_insights": {
+                                                "call_sid": "CA123",
+                                                "answered_by": "human"
+                                            }
+                                        }
+                                    },
+                                    "summary": "Append Twilio Insights metadata"
+                                },
+                                "Correct-source-call-data": {
+                                    "value": {
+                                        "call_id": "provider-call-123",
+                                        "duration": 1.5,
+                                        "call_ended_reason": "customer-ended-call"
+                                    },
+                                    "summary": "Correct provider-supplied call data"
+                                },
+                                "Update-structured-transcript": {
+                                    "value": {
+                                        "transcript_type": "cekura",
+                                        "transcript_json": [
+                                            {
+                                                "role": "Testing Agent",
+                                                "content": "Hello.",
+                                                "start_time": 0.0,
+                                                "end_time": 1.0
+                                            },
+                                            {
+                                                "role": "Main Agent",
+                                                "content": "How can I help?",
+                                                "start_time": 1.0,
+                                                "end_time": 2.5
+                                            }
+                                        ]
+                                    },
+                                    "summary": "Update a structured transcript"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -5631,65 +5683,35 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            },
-            "patch": {
-                "operationId": "call-logs-partial-update",
-                "description": "Update a call log",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this call log.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "observability"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "oauth2": []
                     },
-                    {
-                        "supabase_session": []
-                    },
-                    {
-                        "embedded_session": []
-                    },
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
+                    "400": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -9581,73 +9603,10 @@
                     }
                 }
             },
-            "put": {
-                "operationId": "observability-v2-call-logs-update",
-                "description": "Update a Call logs with the canonical binary wire format (eval_type `binary`,",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this call log.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "observability"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/CallLogDetail"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "oauth2": []
-                    },
-                    {
-                        "supabase_session": []
-                    },
-                    {
-                        "embedded_session": []
-                    },
-                    {
-                        "api_key": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/CallLogDetail"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            },
             "patch": {
-                "operationId": "observability-v2-call-logs-partial-update",
-                "description": "Update a Call logs with the canonical binary wire format (eval_type `binary`,",
+                "operationId": "observability-v2-call-logs-partial-update_3",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, review state, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "summary": "Update call log source data",
                 "parameters": [
                     {
                         "in": "path",
@@ -9666,17 +9625,58 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
+                            },
+                            "examples": {
+                                "Append-twilio-insights": {
+                                    "value": {
+                                        "metadata": {
+                                            "twilio_insights": {
+                                                "call_sid": "CA123",
+                                                "answered_by": "human"
+                                            }
+                                        }
+                                    },
+                                    "summary": "Append Twilio Insights metadata"
+                                },
+                                "Correct-source-call-data": {
+                                    "value": {
+                                        "call_id": "provider-call-123",
+                                        "duration": 1.5,
+                                        "call_ended_reason": "customer-ended-call"
+                                    },
+                                    "summary": "Correct provider-supplied call data"
+                                },
+                                "Update-structured-transcript": {
+                                    "value": {
+                                        "transcript_type": "cekura",
+                                        "transcript_json": [
+                                            {
+                                                "role": "Testing Agent",
+                                                "content": "Hello.",
+                                                "start_time": 0.0,
+                                                "end_time": 1.0
+                                            },
+                                            {
+                                                "role": "Main Agent",
+                                                "content": "How can I help?",
+                                                "start_time": 1.0,
+                                                "end_time": 2.5
+                                            }
+                                        ]
+                                    },
+                                    "summary": "Update a structured transcript"
+                                }
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/PatchedCallLogDetail"
+                                "$ref": "#/components/schemas/PatchedUpdateCallLog"
                             }
                         }
                     }
@@ -9705,6 +9705,47 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "observability-v2-call-logs-partial-update",
+                        "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, review state, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request."
                     }
                 }
             },
@@ -35068,8 +35109,8 @@
         "/test_framework/v1/scenarios-external/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios",
-                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
-                "summary": "Export scenarios to CSV/Excel/JSON",
+                "description": "Export scenarios to CSV/Excel",
+                "summary": "Export scenarios to CSV/Excel",
                 "parameters": [
                     {
                         "in": "query",
@@ -35103,11 +35144,10 @@
                             "type": "string",
                             "enum": [
                                 "csv",
-                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
+                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -39323,7 +39363,7 @@
         },
         "/test_framework/v1/scenarios-external/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-refine",
+                "operationId": "scenarios-agent-create",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -39392,7 +39432,7 @@
         },
         "/test_framework/v1/scenarios-external/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-refine-progress",
+                "operationId": "scenarios-agent-progress",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -41293,8 +41333,8 @@
         "/test_framework/v1/scenarios/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios_2",
-                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
-                "summary": "Export scenarios to CSV/Excel/JSON",
+                "description": "Export scenarios to CSV/Excel",
+                "summary": "Export scenarios to CSV/Excel",
                 "parameters": [
                     {
                         "in": "query",
@@ -41328,11 +41368,10 @@
                             "type": "string",
                             "enum": [
                                 "csv",
-                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
+                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -45788,7 +45827,7 @@
         },
         "/test_framework/v1/scenarios/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-refine_2",
+                "operationId": "scenarios-agent-create_2",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -45854,11 +45893,11 @@
                     }
                 },
                 "x-mcp-expose": true,
-                "summary": "Refine or clarify evaluator scenarios",
+                "summary": "Create or improve scenarios via agent",
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "scenarios-refine",
+                        "name": "scenarios-agent-create",
                         "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests."
                     }
                 }
@@ -45866,7 +45905,7 @@
         },
         "/test_framework/v1/scenarios/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-refine-progress_2",
+                "operationId": "scenarios-agent-progress_2",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -45924,11 +45963,11 @@
                     }
                 },
                 "x-mcp-expose": true,
-                "summary": "Get scenario-refinement progress",
+                "summary": "Get scenario-agent progress",
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "scenarios-refine-progress",
+                        "name": "scenarios-agent-progress",
                         "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them"
                     }
                 }
@@ -56731,8 +56770,8 @@
         "/test_framework/v2/scenarios/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios_3",
-                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
-                "summary": "Export scenarios to CSV/Excel/JSON",
+                "description": "Export scenarios to CSV/Excel",
+                "summary": "Export scenarios to CSV/Excel",
                 "parameters": [
                     {
                         "in": "query",
@@ -56766,11 +56805,10 @@
                             "type": "string",
                             "enum": [
                                 "csv",
-                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
+                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -60986,7 +61024,7 @@
         },
         "/test_framework/v2/scenarios/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-refine_3",
+                "operationId": "scenarios-agent-create_3",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -61055,7 +61093,7 @@
         },
         "/test_framework/v2/scenarios/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-refine-progress_3",
+                "operationId": "scenarios-agent-progress_3",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -69131,7 +69169,6 @@
             },
             "CallLogDetail": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69323,7 +69360,6 @@
             },
             "CallLogList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -70591,7 +70627,6 @@
             },
             "Dashboard": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -70723,7 +70758,6 @@
             },
             "DashboardList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73640,7 +73674,6 @@
             },
             "MetricList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73899,7 +73932,6 @@
             },
             "MetricListSerializerV2": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -76723,195 +76755,6 @@
                     }
                 }
             },
-            "PatchedCallLogDetail": {
-                "type": "object",
-                "description": "",
-                "properties": {
-                    "id": {
-                        "type": "integer",
-                        "readOnly": true
-                    },
-                    "duration": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "Call duration in minutes in MM:SS format.\nExample: `01:10`"
-                    },
-                    "voice_recording_url": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "URL to access the voice recording.\nExample: `\"https://storage.example.com/recordings/call_123_20240315.mp3\"`"
-                    },
-                    "critical_categories": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/CallLogCriticalCategories"
-                        },
-                        "readOnly": true,
-                        "description": "Critical categories from call evaluation"
-                    },
-                    "transcript_object": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/components/schemas/CallLogTranscriptObject"
-                        },
-                        "readOnly": true,
-                        "description": "Structured transcript data with timestamps.\nExample: \n```json\n[\n    {\n        \"role\": \"Testing Agent\",\n        \"content\": \"Hello\",\n        \"start_time\": 1.2,\n        \"end_time\": 1.8\n    },\n    {\n        \"role\": \"Main Agent\",\n        \"content\": \"Hello, how can I help you today?\",\n        \"start_time\": 1.8,\n        \"end_time\": 2.5\n    }\n]`"
-                    },
-                    "status": {
-                        "enum": [
-                            "success",
-                            "failure",
-                            "reviewed_success",
-                            "reviewed_failure"
-                        ],
-                        "type": "string",
-                        "description": "* `success` - Success\n* `failure` - Failure\n* `reviewed_success` - Reviewed Success\n* `reviewed_failure` - Reviewed Failure",
-                        "x-spec-enum-id": "a5dfbbcee6f2a6ce"
-                    },
-                    "agent_id": {
-                        "type": "string",
-                        "description": "Agent ID.\nExample: `2142`"
-                    },
-                    "agent_name": {
-                        "type": "string",
-                        "readOnly": true,
-                        "description": "Agent name"
-                    },
-                    "evaluation": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/Evaluation"
-                            }
-                        ],
-                        "readOnly": true,
-                        "description": "Evaluation results for the call.\nExample: \n```json\n{\n    \"metrics\": [\n        {\n            \"id\": 35,\n            \"name\": \"Instruction Follow\",\n            \"type\": \"binary\",\n            \"score\": 0,\n            \"explanation\": [\"Agent failed to follow the opening script\", \"Missed key product information\"],\n            \"vocera_defined_metric_code\": \"5dedc41b\",\n            \"function_name\": \"check_critical_deviations\",\n            \"extra\": {\n                \"categories\": [\n                    {\n                        \"category_id\": 5,\n                        \"category\": \"Script Adherence Issue\",\n                        \"deviation\": \"Agent deviated from required script\",\n                        \"priority\": \"critical\"\n                    }\n                ]\n            }\n        },\n        {\n            \"id\": 18,\n            \"name\": \"Customer Satisfaction\",\n            \"type\": \"binary\",\n            \"score\": 5,\n            \"explanation\": [\"Customer expressed satisfaction with service\"]\n        }\n    ]\n}\n```"
-                    },
-                    "metadata": {
-                        "type": "object",
-                        "additionalProperties": {},
-                        "readOnly": true,
-                        "description": "Additional call metadata.\nExample: \n```json\n{\n    \"ended_reason\": \"customer-ended-call\",\n    \"ringing_duration\": 3.941,\n    \"call_type\": \"inbound\"\n}\n```"
-                    },
-                    "dynamic_variables": {
-                        "type": "object",
-                        "additionalProperties": {},
-                        "readOnly": true,
-                        "description": "Dynamic Variables used in the call.\nExample: \n```json\n{\n    \"customer_name\": \"John Doe\",\n    \"order_id\": \"ORD-12345\",\n    \"product_type\": \"premium\"\n}\n```"
-                    },
-                    "testing_channel_index": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "readOnly": true,
-                        "description": "The channel index of the testing agent in the audio recording"
-                    },
-                    "timestamp": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "When the call occurred.\nExample: `2024-03-15T10:15:45Z`"
-                    },
-                    "success": {
-                        "type": [
-                            "boolean",
-                            "null"
-                        ],
-                        "description": "Whether the call was successful.\nExample: `true` or `false`"
-                    },
-                    "is_reviewed": {
-                        "type": "boolean",
-                        "description": "Whether the call has been reviewed.\nExample: `true` or `false`"
-                    },
-                    "feedback": {
-                        "type": "string",
-                        "description": "Feedback about the call.\nExample: `\"Great Call\"`"
-                    },
-                    "rubric": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "description": "\nDetailed rubric evaluation data\nExample:\n```json\n[\n    {\n        \"metric_id\": 100,\n        \"metric_name\": \"Call Quality\",\n        \"value\": 5,\n        \"explanation\": [\"The response was accurate\"],\n        \"passed\": true,\n        \"conditions\": \"score gte 5\",\n        \"expected_conditions\": {\"operator\": \"and\", \"conditions\": [{\"field\": \"score\", \"op\": \"gte\", \"value\": 5}]}\n    }\n]\n```\n"
-                    },
-                    "transcript": {
-                        "type": "string",
-                        "description": "Full text transcript of the call.\nExample: \n```text\n[00:01] Testing Agent: Hello. \n[00:02] Main Agent: Hello, how can I help you today?\n[00:03] Testing Agent: Well, I mean, sure. What time exactly are we talking about here\n[00:04] Main Agent: 6 PM.\n[00:05] Testing Agent: Great. I'll book that for you. Just a sec.\n[00:06] Main Agent: Okay.\n```\n"
-                    },
-                    "call_ended_reason": {
-                        "type": "string",
-                        "description": "Reason why the call ended.\nExample: \n- `\"customer-ended-call\"`\n- `\"agent-ended-call\"`\n",
-                        "maxLength": 100
-                    },
-                    "dropoff_point": {
-                        "type": "string",
-                        "description": "Point in conversation where user disengaged.\nExample: `\"end of conversation as no queries remaining\"`",
-                        "maxLength": 1000
-                    },
-                    "topic": {
-                        "type": "string",
-                        "description": "Topic of the call.\nExample: \n- `\"product_inquiry\"`\n- `\"technical_support\"`\n",
-                        "maxLength": 1000
-                    },
-                    "customer_number": {
-                        "type": "string",
-                        "description": "Customer's phone number or identifier.\nExample: \n- `\"+1234567890\"`\n- `\"customer_abc123\"`\n",
-                        "maxLength": 100
-                    },
-                    "user_generated_transcript": {
-                        "oneOf": [
-                            {},
-                            {
-                                "type": "null"
-                            }
-                        ],
-                        "description": "Manually created or corrected transcript data.\nExample: \n```json\n[\n    {\n        \"role\": \"Testing Agent\",\n        \"content\": \"I need help with my order\",\n        \"timestamp\": \"00:15\"\n    }\n]`"
-                    },
-                    "error_message": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "description": "When this record was created.\nExample: `2024-03-15T10:30:45Z`"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time",
-                        "readOnly": true,
-                        "description": "When this record was last updated.\nExample: `2024-03-15T10:35:11Z`"
-                    },
-                    "call_id": {
-                        "type": "string",
-                        "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
-                        "maxLength": 100
-                    },
-                    "trace_id": {
-                        "type": "string",
-                        "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
-                        "maxLength": 32
-                    },
-                    "agent": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "description": "Agent ID"
-                    },
-                    "project": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "description": "Project ID (denormalized from agent for query performance)"
-                    }
-                }
-            },
             "PatchedChatSessionDetail": {
                 "type": "object",
                 "description": "",
@@ -77158,7 +77001,6 @@
             },
             "PatchedDashboard": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -79903,7 +79745,6 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -80620,6 +80461,66 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "MCP server this tool was fetched from, as `{'name', 'key'}`. Null for standalone (non-MCP) tools. Server-managed — ignored on writes."
+                    }
+                }
+            },
+            "PatchedUpdateCallLog": {
+                "type": "object",
+                "properties": {
+                    "call_id": {
+                        "type": "string",
+                        "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
+                        "maxLength": 100
+                    },
+                    "transcript_type": {
+                        "enum": [
+                            "cekura",
+                            "vocera",
+                            "vapi",
+                            "retell",
+                            "deepgram",
+                            "pipecat",
+                            "livekit",
+                            "elevenlabs"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "c6022e3df55b8e81",
+                        "writeOnly": true,
+                        "description": "Format of the `transcript_json` payload. Tells Cekura how to parse roles and timestamps.\n\n- `vapi` — Vapi webhook format: `[{\"role\": \"bot\"|\"user\", \"message\": \"...\", \"time\": 0.0}]`\n- `retell` — Retell webhook format\n- `elevenlabs` — ElevenLabs format\n- `livekit` — LiveKit format\n- `pipecat` — Pipecat format\n- `deepgram` — Deepgram format\n- `cekura` (default) — `[{\"role\": \"Testing Agent\"|\"Main Agent\", \"content\": \"...\", \"start_time\": 0.0, \"end_time\": 2.5}]`. **Valid roles are `\"Testing Agent\"` and `\"Main Agent\"` only** — using `\"agent\"` or `\"user\"` will return a validation error.\n\nOmit this field to detect the supported format automatically.\n\n* `cekura` - cekura\n* `vocera` - vocera\n* `vapi` - vapi\n* `retell` - retell\n* `deepgram` - deepgram\n* `pipecat` - pipecat\n* `livekit` - livekit\n* `elevenlabs` - elevenlabs"
+                    },
+                    "transcript_json": {
+                        "description": "\nCall transcript in supported format (Vapi, Retell, Deepgram, ElevenLabs, Cekura)\n\nCheck the [Transcript Format](/documentation/advanced/transcript-format) documentation for more details.\n\nCekura Transcript Format Example:\n```json\n[\n   {\n      \"role\": \"Testing Agent\",\n      \"content\": \"Hello.\",\n      \"end_time\": 1.9399999,\n      \"start_time\": 1.4399999\n   },\n   {\n      \"role\": \"Main Agent\",\n      \"content\": \"Hello. I want to book appointment today. My name is John.\",\n      \"end_time\": 7.539999511718751,\n      \"start_time\": 3.1\n   },\n   {\n      \"role\": \"Testing Agent\",\n      \"content\": \"Well, I mean, sure. What time exactly are we talking about here\",\n      \"end_time\": 15.71,\n      \"start_time\": 12.01\n   },\n   {\n      \"role\": \"Main Agent\",\n      \"content\": \"6 PM.\",\n      \"end_time\": 18.269999,\n      \"start_time\": 17.609999\n   }\n]\n```\n"
+                    },
+                    "timestamp": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When the call occurred.\nExample: `2024-03-15T10:15:45Z`"
+                    },
+                    "duration": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0,
+                        "description": "Call duration in minutes as a non-negative number. For example, use `1.5` for one minute and 30 seconds."
+                    },
+                    "call_ended_reason": {
+                        "type": "string",
+                        "description": "\nReason why the call ended\nExample:\n- `\"customer-ended-call\"`\n- `\"agent-ended-call\"`\n",
+                        "maxLength": 100
+                    },
+                    "customer_number": {
+                        "type": "string",
+                        "description": "\nCustomer's phone number or identifier\nExample:\n- `\"+1234567890\"`\n- `\"customer_abc123\"`\n",
+                        "maxLength": 100
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "\nAdditional call metadata. Supplied top-level keys are merged with existing metadata; supplied keys overwrite matching keys and omitted keys are preserved.\nExample:\n```json\n{\n    \"customer_id\": \"123\",\n    \"order_id\": \"ORD-12345\",\n    \"name\": \"John Doe\"\n}\n```\n"
+                    },
+                    "dynamic_variables": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "\nDynamic variables used to replace {{variables}} in agent description. Supplied top-level keys are merged with existing variables; supplied keys overwrite matching keys and omitted keys are preserved.\nExample:\n```json\n{\n    \"subscription_id\": \"SUB-12345\",\n    \"product_type\": \"premium\"\n}\n```\n"
                     }
                 }
             },
@@ -83127,7 +83028,6 @@
             },
             "RunList": {
                 "type": "object",
-                "description": "Adds outbound dial-window fields read from cekura_metadata.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -83803,7 +83703,6 @@
             },
             "Scenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -84700,7 +84599,6 @@
             },
             "ScenarioList": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -84920,7 +84818,6 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -86394,7 +86291,6 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -87149,7 +87045,6 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -87308,7 +87203,6 @@
             },
             "SchemaScenario": {
                 "type": "object",
-                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",

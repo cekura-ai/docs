@@ -174,7 +174,7 @@
         "/app/v1/product-chat/sessions/": {
             "get": {
                 "operationId": "app-v1-product-chat-sessions-retrieve",
-                "description": "List the user's product-chat sessions (legacy v1).\n\nReturns each non-deleted conversation as\n`{session_id, name, messages, updated_at}`, ordered by most-recent update.",
+                "description": "List the user's product-chat sessions (legacy v1).\n\nReturns each non-deleted conversation as\n`{session_id, name, messages, updated_at, improvement_session_id}`,\nordered by most-recent update.\n\nQuery params:\n  * `lean=1` — omit message bodies (`messages` comes back empty, with\n    `lean: true` and a short `message_preview`). This is what the sidebar\n    wants: it renders a title per row and fetches the history from\n    `GET /v1/product-chat/sessions/<id>/` when a chat is opened.\n  * `limit` — how many conversations to return (default 50, max 200).\n\n`lean` is opt-in so a browser still running an older bundle keeps getting\nthe shape it hydrates from; only the row cap applies to both.",
                 "tags": [
                     "app"
                 ],
@@ -3095,6 +3095,187 @@
                 }
             }
         },
+        "/observability/v1/agent-improvement-sessions/{id}/cancel/": {
+            "post": {
+                "operationId": "agent-improvement-sessions-cancel-create",
+                "description": "Cancel an in-flight staged improvement session.\n\nTerminal statuses are left untouched (409). In-flight simulation runs\nfinish on their own but are ignored; the active sandbox run (if any)\nreceives a cancel signal.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this agent improvement session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/agent-improvement-sessions/{id}/discard-copy/": {
+            "post": {
+                "operationId": "agent-improvement-sessions-discard-copy-create",
+                "description": "Delete the private copy an improvement run made of your agent, on both Cekura and your provider account, without applying its changes. Use this when you have decided not to apply a finished run: the copy is otherwise kept for a few days so you can still apply it, and removed automatically after that. Calling it twice is a no-op. ⚠ Irreversible — once the copy is gone the run can no longer be applied to your live agent, though your live agent itself is never touched by this.",
+                "summary": "Discard a finished session's private copy of your agent",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this agent improvement session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/agent-improvement-sessions/{id}/promote/": {
+            "post": {
+                "operationId": "agent-improvement-sessions-promote-create",
+                "description": "Copy the improved configuration from a finished session's private copy onto the live agent the session targeted. Only sessions that succeeded and actually changed something can be applied; only editable settings are written (credentials, webhooks, phone numbers, transfer destinations, and voice wiring never are, and anything skipped is listed in the response). If the live agent has been edited since the run finished, the request is refused with the conflicting fields — pass `force` to apply anyway. Applying twice is a no-op and returns the first result. ⚠ This changes the agent that is taking your calls.",
+                "summary": "Apply an improvement session's changes to your live agent",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this agent improvement session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementPromoteRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementPromoteRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementPromoteRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/observability/v1/agent-improvement-sessions/{id}/stream-token/": {
             "get": {
                 "operationId": "agent-improvement-sessions-stream-token-retrieve",
@@ -3138,7 +3319,8 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/observability/v1/alerts/": {
@@ -4144,7 +4326,7 @@
             },
             "patch": {
                 "operationId": "observability-v2-call-logs-partial-update",
-                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, review state, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
                 "summary": "Update call log source data",
                 "parameters": [
                     {
@@ -5583,7 +5765,7 @@
             },
             "patch": {
                 "operationId": "observability-v2-call-logs-partial-update_2",
-                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, review state, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
                 "summary": "Update call log source data",
                 "parameters": [
                     {
@@ -9605,7 +9787,7 @@
             },
             "patch": {
                 "operationId": "observability-v2-call-logs-partial-update_3",
-                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, review state, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
                 "summary": "Update call log source data",
                 "parameters": [
                     {
@@ -9745,7 +9927,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "observability-v2-call-logs-partial-update",
-                        "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, review state, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request."
+                        "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request."
                     }
                 }
             },
@@ -13513,6 +13695,64 @@
                     }
                 },
                 "description": "Subscriptions subscriptions update payment method"
+            }
+        },
+        "/subscriptions/subscriptions/{id}/upgrade-plan/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-upgrade-plan-create",
+                "description": "Move a paid subscription onto its pack's configured upgrade plan.\n\nOffered when a subscription-billed pack sets ``allow_switch_to_plan``\n(e.g. legacy Startup plans pointing at the current Startup Plan).\nEntitlements apply immediately; Stripe billing moves to the new prices\nfrom the next cycle with no proration and no immediate charge. The\nclient must echo the target ``pack_code`` so a stale offer can never\nswitch to the wrong plan.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
             }
         },
         "/subscriptions/subscriptions/create_portal_session/": {
@@ -35109,8 +35349,8 @@
         "/test_framework/v1/scenarios-external/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios",
-                "description": "Export scenarios to CSV/Excel",
-                "summary": "Export scenarios to CSV/Excel",
+                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
+                "summary": "Export scenarios to CSV/Excel/JSON",
                 "parameters": [
                     {
                         "in": "query",
@@ -35144,10 +35384,11 @@
                             "type": "string",
                             "enum": [
                                 "csv",
+                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
+                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -39363,7 +39604,7 @@
         },
         "/test_framework/v1/scenarios-external/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-agent-create",
+                "operationId": "scenarios-refine",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -39432,7 +39673,7 @@
         },
         "/test_framework/v1/scenarios-external/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-agent-progress",
+                "operationId": "scenarios-refine-progress",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -41333,8 +41574,8 @@
         "/test_framework/v1/scenarios/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios_2",
-                "description": "Export scenarios to CSV/Excel",
-                "summary": "Export scenarios to CSV/Excel",
+                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
+                "summary": "Export scenarios to CSV/Excel/JSON",
                 "parameters": [
                     {
                         "in": "query",
@@ -41368,10 +41609,11 @@
                             "type": "string",
                             "enum": [
                                 "csv",
+                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
+                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -45827,7 +46069,7 @@
         },
         "/test_framework/v1/scenarios/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-agent-create_2",
+                "operationId": "scenarios-refine_2",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -45893,11 +46135,11 @@
                     }
                 },
                 "x-mcp-expose": true,
-                "summary": "Create or improve scenarios via agent",
+                "summary": "Refine or clarify evaluator scenarios",
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "scenarios-agent-create",
+                        "name": "scenarios-refine",
                         "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests."
                     }
                 }
@@ -45905,7 +46147,7 @@
         },
         "/test_framework/v1/scenarios/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-agent-progress_2",
+                "operationId": "scenarios-refine-progress_2",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -45963,11 +46205,11 @@
                     }
                 },
                 "x-mcp-expose": true,
-                "summary": "Get scenario-agent progress",
+                "summary": "Get scenario-refinement progress",
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
-                        "name": "scenarios-agent-progress",
+                        "name": "scenarios-refine-progress",
                         "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them"
                     }
                 }
@@ -56770,8 +57012,8 @@
         "/test_framework/v2/scenarios/export_scenarios/": {
             "get": {
                 "operationId": "export-scenarios_3",
-                "description": "Export scenarios to CSV/Excel",
-                "summary": "Export scenarios to CSV/Excel",
+                "description": "Export selected scenarios as a spreadsheet or as a test-suite spec file. Supports filtering by scenario IDs, agent, and project. Use `export_type=json` to get a spec you can keep in your repository and run from CI via `scenarios_run_json`.",
+                "summary": "Export scenarios to CSV/Excel/JSON",
                 "parameters": [
                     {
                         "in": "query",
@@ -56805,10 +57047,11 @@
                             "type": "string",
                             "enum": [
                                 "csv",
+                                "json",
                                 "xlsx"
                             ]
                         },
-                        "description": "Export format: 'csv' or 'xlsx'. Default: 'csv'"
+                        "description": "Export format. 'csv' and 'xlsx' produce spreadsheets; 'json' produces a test-suite spec file you can commit to a repository and run from CI. Default: 'csv'"
                     }
                 ],
                 "tags": [
@@ -61024,7 +61267,7 @@
         },
         "/test_framework/v2/scenarios/scenario-agent/": {
             "post": {
-                "operationId": "scenarios-agent-create_3",
+                "operationId": "scenarios-refine_3",
                 "description": "Create or improve evaluator scenarios using AI by providing natural-language feedback. This tool changes evaluator scenarios only; it does not change an AI agent's prompt, configuration, tools, or provider settings. For a request such as `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill instead.\n\n**How it works:**\n1. Send evaluator IDs and your improvement request\n2. AI analyzes and suggests improvements\n3. Review suggestions and apply with `apply_changes=true`\n\n**`scenarios` field:** pass a list of integer IDs `[101, 102]`, a single integer `101`, or the string `\"all\"` to improve all scenarios for the agent. Do not pass IDs as a JSON-stringified list — pass them as a native array.\n\n**Applying large change sets:** when using `apply_changes: true` with many scenarios, the `updated_scenarios` payload may be large. If you receive an unexpected error, split the apply into smaller batches of 3–5 scenarios at a time.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Multi-turn improvements:** Use the `context` field to maintain conversation history across requests.",
                 "tags": [
                     "test_framework"
@@ -61093,7 +61336,7 @@
         },
         "/test_framework/v2/scenarios/scenario-agent-progress/": {
             "get": {
-                "operationId": "scenarios-agent-progress_3",
+                "operationId": "scenarios-refine-progress_3",
                 "description": "Check the progress of an evaluator improvement request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is analyzing and generating improvements (keep polling)\n- `completed` - AI finished; review suggestions in the `result` field\n- `needs_agent_clarification` - AI needs you to select an agent for some evaluators\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, review the suggested changes\n4. POST /scenario-agent/ again with `apply_changes=true` to apply them",
                 "parameters": [
                     {
@@ -67399,9 +67642,20 @@
                     "name"
                 ]
             },
+            "AgentImprovementPromoteRequest": {
+                "type": "object",
+                "description": "Body of the promote-to-live-agent request.",
+                "properties": {
+                    "force": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Apply the changes even though the live agent has been edited since the improvement run finished. Overwrites those edits."
+                    }
+                }
+            },
             "AgentImprovementSession": {
                 "type": "object",
-                "description": "Read view of an Improve-Agent session — what the frontend polls to\ntrack progress. `provider_key` and other secrets are never serialized.",
+                "description": "Read view of an Improve-Agent session — what the frontend polls to\ntrack progress. `provider_key` and other secrets are never serialized.\nThe raw `proposal` (full prompt bodies + applied diff values) stays\nserver-side; the API exposes a trimmed `proposal_summary` instead.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67417,6 +67671,11 @@
                             "null"
                         ],
                         "readOnly": true
+                    },
+                    "agent_name": {
+                        "type": "string",
+                        "readOnly": true,
+                        "default": ""
                     },
                     "provider": {
                         "type": "string",
@@ -67445,28 +67704,159 @@
                     "scenario_ids": {
                         "readOnly": true
                     },
-                    "clone_assistant_id": {
-                        "type": "string",
-                        "readOnly": true
-                    },
-                    "scenario_validation_result_ids": {
-                        "readOnly": true
-                    },
-                    "current_phase": {
-                        "type": "string",
-                        "readOnly": true
-                    },
                     "status": {
                         "enum": [
                             "pending",
                             "running",
                             "succeeded",
                             "failed",
+                            "no_improvement",
                             "cancelled"
                         ],
                         "type": "string",
-                        "description": "* `pending` - Pending\n* `running` - Running\n* `succeeded` - Succeeded\n* `failed` - Failed\n* `cancelled` - Cancelled",
-                        "x-spec-enum-id": "ea8144caab6e77c3",
+                        "description": "* `pending` - Pending\n* `running` - Running\n* `succeeded` - Succeeded\n* `failed` - Failed\n* `no_improvement` - No Improvement\n* `cancelled` - Cancelled",
+                        "x-spec-enum-id": "c381800a059557a1",
+                        "readOnly": true
+                    },
+                    "stage": {
+                        "enum": [
+                            "setup",
+                            "scenario_generation",
+                            "baseline_run",
+                            "propose",
+                            "apply",
+                            "verify_run",
+                            "finalize",
+                            null
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "* `setup` - Setup\n* `scenario_generation` - Scenario Generation\n* `baseline_run` - Baseline Run\n* `propose` - Propose\n* `apply` - Apply\n* `verify_run` - Verify Run\n* `finalize` - Finalize",
+                        "x-spec-enum-id": "4289dee5a1618abe",
+                        "readOnly": true
+                    },
+                    "stage_status": {
+                        "enum": [
+                            "running",
+                            "waiting",
+                            "waiting_input",
+                            "done",
+                            "failed",
+                            null
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "* `running` - Running\n* `waiting` - Waiting\n* `waiting_input` - Waiting Input\n* `done` - Done\n* `failed` - Failed",
+                        "x-spec-enum-id": "8a59077dd595b0eb",
+                        "readOnly": true
+                    },
+                    "stage_started_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "stage_history": {
+                        "readOnly": true
+                    },
+                    "baseline_result": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "baseline_source_result": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "verify_result": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "metric_delta": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "proposal_summary": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {},
+                        "readOnly": true
+                    },
+                    "iteration": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "iteration_history": {
+                        "readOnly": true
+                    },
+                    "failing_scenario_ids": {
+                        "readOnly": true
+                    },
+                    "rounds_since_improvement": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "best_iteration": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "best_score": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "readOnly": true
+                    },
+                    "pending_question": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "question_answers": {
+                        "readOnly": true
+                    },
+                    "user_guidance": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "readOnly": true
+                    },
+                    "parent_session": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
                         "readOnly": true
                     },
                     "conversation_id": {
@@ -67487,9 +67877,6 @@
                     },
                     "error_message": {
                         "type": "string",
-                        "readOnly": true
-                    },
-                    "reproduction_summary": {
                         "readOnly": true
                     },
                     "summary_json": {
@@ -67526,6 +67913,39 @@
                     },
                     "slack_error": {
                         "type": "string",
+                        "readOnly": true
+                    },
+                    "promoted_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "promoted_by": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "promoted_by_email": {
+                        "type": "string",
+                        "readOnly": true,
+                        "default": ""
+                    },
+                    "promotion_summary": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {},
+                        "readOnly": true
+                    },
+                    "clone_state": {
+                        "type": "object",
+                        "additionalProperties": {},
                         "readOnly": true
                     },
                     "created_at": {
@@ -67736,6 +68156,11 @@
                             }
                         ],
                         "description": "Optional chat/text-mode configuration. Defines which provider handles text-mode test runs. The allowed chat type depends on the voice provider.type."
+                    },
+                    "chat_provider": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Read-only. The provider that runs this agent's text-mode conversations. Mirrors chat_agent_details.type when that block is present, and is also reported for chat-only agents whose chat runtime is a voice platform, where chat_agent_details is omitted. Set the chat provider via chat_agent_details."
                     },
                     "auto_dial_outbound": {
                         "type": [
@@ -69169,6 +69594,7 @@
             },
             "CallLogDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69360,6 +69786,7 @@
             },
             "CallLogList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -70627,6 +71054,7 @@
             },
             "Dashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -70758,6 +71186,7 @@
             },
             "DashboardList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73674,6 +74103,7 @@
             },
             "MetricList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73932,6 +74362,7 @@
             },
             "MetricListSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -77001,6 +77432,7 @@
             },
             "PatchedDashboard": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -79745,6 +80177,7 @@
             },
             "PatchedSchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -80467,6 +80900,21 @@
             "PatchedUpdateCallLog": {
                 "type": "object",
                 "properties": {
+                    "status": {
+                        "enum": [
+                            "success",
+                            "failure",
+                            "reviewed_success",
+                            "reviewed_failure"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "a5dfbbcee6f2a6ce",
+                        "description": "Human-reviewed call outcome. Use `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n* `success` - Success\n* `failure` - Failure\n* `reviewed_success` - Reviewed Success\n* `reviewed_failure` - Reviewed Failure"
+                    },
+                    "feedback": {
+                        "type": "string",
+                        "description": "Human feedback about the call."
+                    },
                     "call_id": {
                         "type": "string",
                         "description": "Unique identifier for the call.\nExample: \n- `\"call_abc123xyz\"`\n- `\"stereo_audio_session_456\"`",
@@ -83028,6 +83476,7 @@
             },
             "RunList": {
                 "type": "object",
+                "description": "Adds outbound dial-window fields read from cekura_metadata.",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -83703,6 +84152,7 @@
             },
             "Scenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -84599,6 +85049,7 @@
             },
             "ScenarioList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -84818,6 +85269,7 @@
             },
             "ScenarioSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -85224,6 +85676,11 @@
                             }
                         ],
                         "description": "Optional chat/text-mode configuration. Defines which provider handles text-mode test runs. The allowed chat type depends on the voice provider.type."
+                    },
+                    "chat_provider": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Read-only. The provider that runs this agent's text-mode conversations. Mirrors chat_agent_details.type when that block is present, and is also reported for chat-only agents whose chat runtime is a voice platform, where chat_agent_details is omitted. Set the chat provider via chat_agent_details."
                     },
                     "auto_dial_outbound": {
                         "type": [
@@ -86291,6 +86748,7 @@
             },
             "SchemaPostRunScenarios": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -87045,6 +87503,7 @@
             },
             "SchemaPostScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent": {
                         "type": [
@@ -87203,6 +87662,7 @@
             },
             "SchemaScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -88222,6 +88682,10 @@
                         "readOnly": true
                     },
                     "first_paid_seat_plan_offer": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "plan_upgrade_offer": {
                         "type": "string",
                         "readOnly": true
                     },

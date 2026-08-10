@@ -1282,11 +1282,15 @@ The Pipecat SDK offers several recording control options depending on your requi
 
 **No recording — use `track_pipeline()` (or `track_and_create_task()`)**: These methods capture transcripts, tool calls, logs, and OTel traces but perform no audio recording. Use this for simulation testing environments or any case where audio recording is not permitted.
 
-**Stop recording mid-call — use `abort()`**: Calling `await tracer.abort()` halts all capture immediately and prevents any data from being sent to the Cekura backend. This is useful if consent is withdrawn partway through a call and you want to ensure nothing is stored.
+**Defer audio until consent is known**: Pass `defer_upload=True` to `observe_pipeline()` or `observe_and_create_task()`. The SDK buffers audio in memory while transcript, tool-call, log, and trace collection continues. Calling `await tracer.start_audio_upload()` uploads audio buffered since the beginning of the call and streams future audio normally. If the call ends without consent, buffered audio is discarded and text-only observability is submitted.
+
+**Stop and discard only the audio — use `abort_recording()`**: Calling `await tracer.abort_recording()` stops the SDK recording and permanently discards its buffered audio. Transcript, tool-call, log, and trace observability remains active.
+
+**Discard the entire session — use `abort()`**: Calling `await tracer.abort()` halts all capture and prevents transcript, tool-call, log, trace, and audio data from being sent to Cekura.
 
 **Disable the tracer entirely**: Set the environment variable `CEKURA_TRACER_ENABLED="false"`. When set, the tracer is a no-op — no data is captured and nothing is sent to Cekura.
 
-**Per-call selective recording (starting without recording and enabling it mid-call)**: This is not currently supported. There is no built-in mechanism to start a call without recording and then begin recording once consent is confirmed mid-conversation. If your workflow requires starting audio capture at a specific point in the conversation, the recommended approach is to use `track_pipeline()` for calls where consent has not yet been obtained, and `observe_pipeline()` for sessions where consent is established upfront. If you need a more fine-grained per-call recording toggle, reach out via your support channel.
+Deferred upload does not begin audio capture at the consent timestamp. Audio is captured in memory from the beginning of the call so that, if consent is granted, the resulting recording remains aligned with transcript and trace timestamps. If consent is denied or never resolved, that audio is discarded.
 
 ## What can I do on the sandbox plan — does it allow real pre-production testing?
 

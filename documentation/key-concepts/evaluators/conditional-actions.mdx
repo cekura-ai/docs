@@ -349,7 +349,7 @@ Conditional Actions supports a variety of special tags in the `action` field to 
 **Important**: Tags are only supported when `fixed_message` is set to `true`. They will not work with `fixed_message: false` (instruction-based actions).
 </Warning>
 
-Tags can be combined with text and other sibling tags. They run from left to right; do not nest tags inside one another. `<ivr>` and `<voicemail>` remain whole-action tags.
+Tags can be combined with text and other sibling tags. They run from left to right; do not nest tags inside one another, except inside a regional `<voice ...>...</voice>` block. `<ivr>` and `<voicemail>` remain whole-action tags.
 
 ### Communication Tags
 
@@ -546,8 +546,9 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
   </Accordion>
 
   <Accordion title="<voice> - Switch the Testing Agent's Voice" icon="user-group">
-    Switch the testing agent's TTS voice mid-call. Everything spoken after the tag — including
-    later conditions — uses the new voice until another `<voice>` tag changes it.
+    Switch the testing agent's TTS voice mid-call. A self-closing tag without `text` changes
+    every later utterance — including later conditions — until another persistent `<voice>` tag
+    changes it. This is the **persistent** form.
 
     This is how you put more than one speaker in a single simulated call: a caller handing the
     phone to a family member, a supervisor taking over, or a different person picking up.
@@ -568,6 +569,29 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     The switch applies between utterances, so any text before the tag is spoken fully in the
     previous voice.
+
+    **Regional voice:** Add `text` to speak only that text in the selected voice; the previous
+    voice resumes immediately afterward.
+
+    ```json
+    {
+      "action": "<voice provider=\"cartesia\" id=\"b7d50908-b17c-442d-ad8d-810c63997ed9\" text=\"Hi, this is the manager.\" /> How can I help?",
+      "fixed_message": true
+    }
+    ```
+
+    When regional speech contains inline tags such as `<silence>`, use an opening and closing
+    block instead. Nested inline tags are allowed only inside this regional voice block.
+
+    ```json
+    {
+      "action": "<voice provider=\"cartesia\" id=\"b7d50908-b17c-442d-ad8d-810c63997ed9\">Hi, this is the manager. <silence time=\"1s\" /> How can I help?</voice>",
+      "fixed_message": true
+    }
+    ```
+
+    Do not combine `text` with the opening/closing form. All `<voice>` tags require
+    `fixed_message: true`.
 
     **Attributes:**
     - `provider`: Voice provider (required) - `cartesia` or `11labs`. Must be the **same provider

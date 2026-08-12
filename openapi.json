@@ -24423,7 +24423,8 @@
             },
             "patch": {
                 "operationId": "personalities-external-partial-update",
-                "description": "Update a caller personality",
+                "description": "Update an existing personality. Send only the fields you want to change.\n\nUse this to change how the simulated caller behaves at the voice layer — `message_plan` (how long it waits in silence before prompting, and how many times it prompts), `interruption_level`, `speed`, `background_noise`, `network_simulation`. Evaluator instructions cannot override these; they must be set here.\n\nOnly personalities owned by your organization can be updated. To change a globally available personality, fork it into your project first, then update the fork.",
+                "summary": "Update a personality",
                 "parameters": [
                     {
                         "in": "path",
@@ -24645,7 +24646,8 @@
         "/test_framework/v1/personalities-external/{id}/fork/": {
             "post": {
                 "operationId": "personalities-external-fork-create",
-                "description": "Personalities fork",
+                "description": "Copy an existing personality — including a globally available one — into one of your projects so it can be customised. Voice, accent, language and interruption settings are inherited from the source; pass `prompt` or `message_plan` to override them on the copy.\n\nUse this when no available personality has the behavior a test needs: fork the closest match, then set `message_plan.idle_timeout_seconds` (seconds of silence before the caller prompts, default 10) or `message_plan.idle_message_max_spoken_count` (how many times it prompts before giving up, default 3). The fork is enabled for the project automatically.",
+                "summary": "Fork a personality into a project",
                 "parameters": [
                     {
                         "in": "path",
@@ -24664,21 +24666,20 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -24906,7 +24907,8 @@
             },
             "patch": {
                 "operationId": "personalities-partial-update",
-                "description": "Update a caller personality",
+                "description": "Update an existing personality. Send only the fields you want to change.\n\nUse this to change how the simulated caller behaves at the voice layer — `message_plan` (how long it waits in silence before prompting, and how many times it prompts), `interruption_level`, `speed`, `background_noise`, `network_simulation`. Evaluator instructions cannot override these; they must be set here.\n\nOnly personalities owned by your organization can be updated. To change a globally available personality, fork it into your project first, then update the fork.",
+                "summary": "Update a personality",
                 "parameters": [
                     {
                         "in": "path",
@@ -24961,6 +24963,14 @@
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "personalities-partial-update",
+                        "description": "Update an existing personality. Send only the fields you want to change.\n\nUse this to change how the simulated caller behaves at the voice layer — `message_plan` (how long it waits in silence before prompting, and how many times it prompts), `interruption_level`, `speed`, `background_noise`, `network_simulation`. Evaluator instructions cannot override these; they must be set here.\n\nOnly personalities owned by your organization can be updated. To change a globally available personality, fork it into your project first, then update the fork."
                     }
                 }
             },
@@ -25128,7 +25138,8 @@
         "/test_framework/v1/personalities/{id}/fork/": {
             "post": {
                 "operationId": "personalities-fork-create",
-                "description": "Personalities fork",
+                "description": "Copy an existing personality — including a globally available one — into one of your projects so it can be customised. Voice, accent, language and interruption settings are inherited from the source; pass `prompt` or `message_plan` to override them on the copy.\n\nUse this when no available personality has the behavior a test needs: fork the closest match, then set `message_plan.idle_timeout_seconds` (seconds of silence before the caller prompts, default 10) or `message_plan.idle_message_max_spoken_count` (how many times it prompts before giving up, default 3). The fork is enabled for the project automatically.",
+                "summary": "Fork a personality into a project",
                 "parameters": [
                     {
                         "in": "path",
@@ -25147,21 +25158,20 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -25184,6 +25194,14 @@
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "personalities-fork-create",
+                        "description": "Copy an existing personality — including a globally available one — into one of your projects so it can be customised. Voice, accent, language and interruption settings are inherited from the source; pass `prompt` or `message_plan` to override them on the copy.\n\nUse this when no available personality has the behavior a test needs: fork the closest match, then set `message_plan.idle_timeout_seconds` (seconds of silence before the caller prompts, default 10) or `message_plan.idle_message_max_spoken_count` (how many times it prompts before giving up, default 3). The fork is enabled for the project automatically."
                     }
                 }
             }
@@ -71391,6 +71409,24 @@
                     "call_log_ids",
                     "count"
                 ]
+            },
+            "ForkPersonality": {
+                "type": "object",
+                "description": "Fields that can be overridden on a forked personality. Anything omitted is\ninherited from the source personality.",
+                "properties": {
+                    "project_id": {
+                        "type": "integer",
+                        "description": "Project the fork is created in. Inferred from a project-scoped API key when omitted."
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Replaces the source personality's prompt on the fork. Inherited when omitted."
+                    },
+                    "message_plan": {
+                        "type": "string",
+                        "description": "\nIdle behavior overrides for the fork, applied on top of the inherited settings.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 45}\n"
+                    }
+                }
             },
             "GenerateClarifyAnswer": {
                 "type": "object",

@@ -144,8 +144,8 @@ Authenticate with `X-CEKURA-API-KEY`. The key's own scope resolves the project, 
 | `spec` | yes* | The spec, as a JSON object. |
 | `file` | yes* | A `.json` spec file, as `multipart/form-data`. Use instead of `spec`. |
 | `channel` | no | `voice` (default), `text`, `elevenlabs`, `livekit_v2`, or `pipecat_v2`. |
-| `livekit_data` | no | LiveKit connection overrides (object). Only valid when `channel` is `livekit_v2`. Accepts `agent_name`, `config`, and `url`. |
-| `pipecat_data` | no | Pipecat Cloud connection overrides (object). Only valid when `channel` is `pipecat_v2`. Accepts `pipecat_agent_name`, `config`, and `room_properties`. |
+| `livekit_data` | no | LiveKit connection overrides for this run. Only valid when `channel` is `livekit_v2`. Accepted keys: `agent_name`, `config`, `url`. |
+| `pipecat_data` | no | Pipecat Cloud connection overrides for this run. Only valid when `channel` is `pipecat_v2`. Accepted keys: `pipecat_agent_name`, `config`, `room_properties`. |
 | `name` | no | Label for this run. Defaults to the spec's `suite.name`. |
 
 \* Send exactly one of `spec` or `file`.
@@ -331,9 +331,7 @@ Two request parameters decide where and how a spec runs — neither belongs in t
 | Parameter | Description |
 |---|---|
 | `agent_id` | **Required.** The agent to test. |
-| `channel` | `voice` for a phone call (the default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for a WebRTC session through the respective provider. |
-| `livekit_data` | LiveKit connection overrides for this run only. Valid keys: `agent_name`, `config`, `url`. Requires `channel: livekit_v2`. |
-| `pipecat_data` | Pipecat Cloud connection overrides for this run only. Valid keys: `pipecat_agent_name`, `config`, `room_properties`. Requires `channel: pipecat_v2`. |
+| `channel` | `voice` for a phone call (the default), `text` for chat, `elevenlabs` for an ElevenLabs WebRTC session, `livekit_v2` for a LiveKit WebRTC session, or `pipecat_v2` for a Pipecat Cloud WebRTC session. |
 
 ```bash
 --data "{\"agent_id\": 42, \"channel\": \"text\", \"spec\": $(cat cekura.tests.json)}"
@@ -341,9 +339,9 @@ Two request parameters decide where and how a spec runs — neither belongs in t
 
 Because the target lives in the request, the same committed file runs against staging and production, or across several agents, without edits. Use metric **slugs** rather than numeric IDs to make that fully portable, since IDs are project-specific.
 
-Anything the channel needs beyond that comes from the agent's own configuration: a phone number for voice, a chat provider for text, ElevenLabs credentials for `elevenlabs`, or LiveKit/Pipecat Cloud credentials for `livekit_v2`/`pipecat_v2`. If the agent isn't configured for the channel you pick, the run is rejected with a message naming what's missing.
+Anything the channel needs beyond that comes from the agent's own configuration: a phone number for voice, a chat provider for text, ElevenLabs credentials and agent id for `elevenlabs`, LiveKit credentials for `livekit_v2`, or Pipecat Cloud credentials for `pipecat_v2`. If the agent isn't configured for the channel you pick, the run is rejected with a message naming what's missing.
 
-Connection overrides for WebRTC channels (`livekit_data`, `pipecat_data`) apply to a single run and are never stored in the spec, keeping committed files portable.
+For the WebRTC channels (`livekit_v2` and `pipecat_v2`), you can pass connection overrides in the request via `livekit_data` or `pipecat_data` respectively. These overrides apply only to the current run and are not part of the portable spec — keeping the committed file environment-agnostic while letting you target a specific agent deployment at request time.
 
 ## Reading validation errors
 

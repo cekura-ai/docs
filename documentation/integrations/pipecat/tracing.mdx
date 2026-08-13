@@ -35,7 +35,7 @@ export const pipecatPrompt = [
   "- Use cekura.track_pipeline() or cekura.track_and_create_task() — these capture transcripts only, no audio. This is what Cekura simulation calls use.",
   "",
   "Common setup for both:",
-  "1. Install the SDK: pip install \"cekura[pipecat]>=1.6.1\"",
+  "1. Install the SDK: pip install \"cekura[pipecat]>=1.6.2\"",
   "2. Import PipecatTracer: from cekura.pipecat import PipecatTracer",
   "3. Initialize the tracer:",
   "   cekura = PipecatTracer(",
@@ -51,6 +51,7 @@ export const pipecatPrompt = [
   "- Production: task = cekura.observe_and_create_task(pipeline, context, runner_args=runner_args, transport=transport)",
   "- UAT: task = cekura.track_and_create_task(pipeline, context, runner_args=runner_args, transport=transport)",
   "These combine pipeline wrapping, task creation (with OTel tracing), and handler registration in one call.",
+  "- If production metadata is finalized after the call, pass defer_evaluation=True. Artifacts upload normally, but metrics wait for a final call-log PATCH with reevaluate_metrics=true.",
   "",
   "Multi-step API (when you need more control over PipelineTask):",
   "- Production: pipeline = cekura.observe_pipeline(pipeline, context, runner_args=runner_args)",
@@ -164,7 +165,7 @@ Use this setup in your test agents while running simulation calls from the Cekur
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install "cekura[pipecat]>=1.6.1"
+pip install "cekura[pipecat]>=1.6.2"
 ```
 
 </Step>
@@ -292,7 +293,7 @@ Use this setup in your production agents for monitoring live calls with audio re
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install "cekura[pipecat]>=1.6.1"
+pip install "cekura[pipecat]>=1.6.2"
 ```
 
 </Step>
@@ -499,7 +500,65 @@ task = cekura.observe_and_create_task(
 cekura.set_custom_metadata({"bot_version": "1.0", "environment": "staging"})
 ```
 
-`set_custom_metadata()` can be called at any point before the pipeline session finalizes — including in cleanup or post-processing handlers that execute before the session tears down. Once the session has ended and data has been submitted to Cekura, the record is immutable and metadata cannot be updated.
+`set_custom_metadata()` can be called at any point before the pipeline session finalizes — including in cleanup or post-processing handlers that execute before the session tears down. After submission, update the call log through the API instead.
+
+## Deferred Evaluation for Post-Call Metadata
+
+Use `defer_evaluation=True` when another service enriches metadata after the call. The SDK still uploads the audio, transcript, tool calls, logs, traces, and initial metadata at session end, but Cekura does not start metric evaluation immediately.
+
+```python
+task = cekura.observe_and_create_task(
+    pipeline,
+    context,
+    runner_args=runner_args,
+    transport=transport,
+    session_id=your_stable_session_id,
+    custom_metadata={"bot_version": "1.0"},
+    defer_evaluation=True,
+)
+```
+
+`defer_evaluation` is independent of `defer_upload`. It delays metric evaluation only; it does not delay artifact capture or upload and does not add latency to the live call.
+
+After post-call processing finishes:
+
+1. Find the call log using the same stable `session_id` passed to the tracer. The call log's `call_id` field contains that session ID.
+2. PATCH the call log with the enriched metadata and `reevaluate_metrics: true` in the same request. Cekura applies the metadata before dispatching evaluation.
+
+```bash
+# Find the call log. The response's integer `id` is used in the PATCH URL.
+curl --get 'https://api.cekura.ai/observability/v1/call-logs/' \
+  --header "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+  --data-urlencode "agent_id=$CEKURA_AGENT_ID" \
+  --data-urlencode "search=$SESSION_ID"
+
+# Apply final metadata and release evaluation atomically.
+curl --request PATCH \
+  'https://api.cekura.ai/observability/v1/call-logs/<id>/' \
+  --header "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "reevaluate_metrics": true,
+    "metadata": {
+      "customer_tier": "enterprise",
+      "post_call_status": "complete"
+    }
+  }'
+```
+
+Metadata uses top-level merge semantics: supplied keys overwrite matching keys, while omitted keys—including metadata originally uploaded by the SDK—are preserved. You do not need to GET and resend the complete metadata object.
+
+Organization-scoped API keys must include either `agent_id` or `project_id` in the lookup request. Project-scoped keys can omit that extra scope.
+
+See the [Update Call Log API reference](/api-reference/observability/update-call-log) for the complete request schema.
+
+<Note>
+  Deferred evaluation has a five-minute fallback. Complete the metadata PATCH within five minutes of ingestion to guarantee that metrics use the enriched metadata. If no release arrives, Cekura starts evaluation automatically.
+</Note>
+
+<Note>
+  Keep ordinary metadata retries separate from the release signal. Send `reevaluate_metrics: true` only with the final enrichment update. Repeated release requests are ignored while evaluation is running, but sending the flag again after evaluation completes intentionally starts another evaluation.
+</Note>
 
 ## Deferred Upload (Compliance)
 
@@ -585,7 +644,8 @@ pipeline = tracer.observe_pipeline(
     runner_args=None,      # Optional: RunnerArguments (session_id extracted if present)
     session_id=None,       # Optional: Takes precedence over runner_args.session_id
     custom_metadata=None,  # Optional: Dict of custom metadata
-    defer_upload=False     # Optional: Buffer audio until start_audio_upload() is called
+    defer_upload=False,    # Optional: Buffer audio until start_audio_upload() is called
+    defer_evaluation=False # Optional: Upload artifacts now; evaluate after API release
 )
 ```
 
@@ -618,6 +678,7 @@ task = tracer.observe_and_create_task(
     session_id=None,       # Optional: Custom session identifier
     custom_metadata=None,  # Optional: Dict of custom metadata
     defer_upload=False,    # Optional: Buffer audio until start_audio_upload() is called
+    defer_evaluation=False, # Optional: Upload artifacts now; evaluate after API release
     **pipeline_task_kwargs # Optional: Additional args forwarded to PipelineTask
 )
 ```

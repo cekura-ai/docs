@@ -349,7 +349,7 @@ Conditional Actions supports a variety of special tags in the `action` field to 
 **Important**: Tags are only supported when `fixed_message` is set to `true`. They will not work with `fixed_message: false` (instruction-based actions).
 </Warning>
 
-Tags can be combined with text and other sibling tags. They run from left to right; do not nest tags inside one another. `<ivr>` and `<voicemail>` remain whole-action tags.
+Tags can be combined with text and other sibling tags. They run from left to right; do not nest tags inside one another, except inside a regional `<voice ...>...</voice>` block. `<ivr>` and `<voicemail>` remain whole-action tags.
 
 ### Communication Tags
 
@@ -458,6 +458,7 @@ Tags can be combined with text and other sibling tags. They run from left to rig
 | Interruptible | ✅ Yes — main agent can interrupt | ❌ No — testing agent won’t be interrupted |
 | After interruption | Condition matching restarts after main agent stops speaking | N/A |
 | Background noise | Continues to play during the pause | Does **not** play during the pause |
+| [Idle prompt](/documentation/key-concepts/evaluators/personality) | Fires if the pause outlasts the personality's idle timeout | Suppressed — the idle timer is paused for the hold |
 
 Use `<silence>` when you want the conversation to feel natural and allow the main agent to jump in. Use `<hold>` when you need a guaranteed delay before the next message.
 </Note>
@@ -481,7 +482,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
   </Accordion>
 
   <Accordion title="<hold> - Hold Between Messages (not interruptible)" icon="pause">
-    Wait before sending the next message. **Not interruptible** — the testing agent will not be interrupted during a hold, regardless of what the main agent says. Background noise does not play during a hold.
+    Wait before sending the next message. **Not interruptible** — the testing agent will not be interrupted during a hold, regardless of what the main agent says. Background noise does not play during a hold, and the idle prompt ("Are you still there?") is suppressed for its duration — so a hold can safely be longer than the personality's idle timeout.
 
     ```json
     {
@@ -546,8 +547,9 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
   </Accordion>
 
   <Accordion title="<voice> - Switch the Testing Agent's Voice" icon="user-group">
-    Switch the testing agent's TTS voice mid-call. Everything spoken after the tag — including
-    later conditions — uses the new voice until another `<voice>` tag changes it.
+    Switch the testing agent's TTS voice mid-call. A self-closing tag without `text` changes
+    every later utterance — including later conditions — until another persistent `<voice>` tag
+    changes it. This is the **persistent** form.
 
     This is how you put more than one speaker in a single simulated call: a caller handing the
     phone to a family member, a supervisor taking over, or a different person picking up.
@@ -568,6 +570,29 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     The switch applies between utterances, so any text before the tag is spoken fully in the
     previous voice.
+
+    **Regional voice:** Add `text` to speak only that text in the selected voice; the previous
+    voice resumes immediately afterward.
+
+    ```json
+    {
+      "action": "<voice provider=\"cartesia\" id=\"b7d50908-b17c-442d-ad8d-810c63997ed9\" text=\"Hi, this is the manager.\" /> How can I help?",
+      "fixed_message": true
+    }
+    ```
+
+    When regional speech contains inline tags such as `<silence>`, use an opening and closing
+    block instead. Nested inline tags are allowed only inside this regional voice block.
+
+    ```json
+    {
+      "action": "<voice provider=\"cartesia\" id=\"b7d50908-b17c-442d-ad8d-810c63997ed9\">Hi, this is the manager. <silence time=\"1s\" /> How can I help?</voice>",
+      "fixed_message": true
+    }
+    ```
+
+    Do not combine `text` with the opening/closing form. All `<voice>` tags require
+    `fixed_message: true`.
 
     **Attributes:**
     - `provider`: Voice provider (required) - `cartesia` or `11labs`. Must be the **same provider
@@ -611,6 +636,11 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     **Attributes:**
     - `digits`: DTMF digits to send (required) - e.g., "123", "456#", "*9"
+
+    For caller data such as an account number or PIN, reference the test profile
+    instead of hardcoding the digits — `<dtmf digits="{{test_profile.customer_number}}#" />`.
+    The value is resolved per run and any formatting in it is stripped before the
+    tones are sent. See [DTMF testing](/documentation/guides/testing-agents/dtmf-testing).
   </Accordion>
 
   <Accordion title="<send_sms> - Send SMS" icon="message">

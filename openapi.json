@@ -8520,6 +8520,98 @@
                 }
             }
         },
+        "/observability/v1/metric-failure-mode-insights/metric-config/": {
+            "get": {
+                "operationId": "metric-failure-mode-insights-metric-config-retrieve",
+                "description": "GET returns every metric in the project that can have insights, with its current on/off state and failure criteria. POST turns one metric on or off; when turning on, send `pass_conditions` to define what counts as a passing call, or omit it to accept the metric's default threshold. ⚠ An enabled metric consumes up to its daily credit budget — see the pricing endpoint.",
+                "summary": "Read or change which metrics have insights enabled",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InsightMetricConfig"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            },
+            "post": {
+                "operationId": "metric-failure-mode-insights-metric-config-create",
+                "description": "GET returns every metric in the project that can have insights, with its current on/off state and failure criteria. POST turns one metric on or off; when turning on, send `pass_conditions` to define what counts as a passing call, or omit it to accept the metric's default threshold. ⚠ An enabled metric consumes up to its daily credit budget — see the pricing endpoint.",
+                "summary": "Read or change which metrics have insights enabled",
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightMetricConfig"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightMetricConfig"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightMetricConfig"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InsightMetricConfig"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/observability/v1/metric-failure-mode-insights/pricing/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-pricing-retrieve",
@@ -12909,6 +13001,46 @@
                 "description": "Subscriptions subscriptions mandate setup intent"
             }
         },
+        "/subscriptions/subscriptions/{id}/plan-switch-offer/": {
+            "get": {
+                "operationId": "subscriptions-subscriptions-plan-switch-offer-retrieve",
+                "description": "Resolve a shared plan-switch link into a displayable offer.\n\nThe dashboard calls this when a customer opens a switch link, including\nafter they declined the automatic first-paid-seat prompt. ``pack_code``\nis the plan the link advertises and is only ever a guard: the offered\nplan always comes from the organization's own pack configuration, so a\ntampered link cannot buy a different plan. Returns ``offer: null``\nrather than an error when the organization cannot use the link.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/subscriptions/subscriptions/{id}/reactivate/": {
             "post": {
                 "operationId": "subscriptions-subscriptions-reactivate-create",
@@ -13087,7 +13219,7 @@
         "/subscriptions/subscriptions/{id}/select-first-paid-seat-plan/": {
             "post": {
                 "operationId": "subscriptions-subscriptions-select-first-paid-seat-plan-create",
-                "description": "Resolve a one-time paid-plan choice.\n\nPAYG organizations see it before their first paid seat; developer-trial\norganizations can use it from Manage Plan. Sending the current pack code\nkeeps pay-as-you-go. Sending the configured ``allow_switch_to_plan`` code\ncreates and charges that monthly subscription immediately. Pricing, Stripe\nIDs, and the customer are always server-owned.",
+                "description": "Resolve a one-time paid-plan choice.\n\nPAYG organizations see it before their first paid seat; developer-trial\norganizations can use it from Manage Plan. Sending the current pack code\nkeeps pay-as-you-go. Sending the configured ``allow_switch_to_plan`` code\ncreates and charges that monthly subscription immediately. Pricing, Stripe\nIDs, and the customer are always server-owned.\n\n``via_link: true`` marks the shared switch-link flow (see\n``plan_switch_offer``), which reopens the target for organizations that\nalready declined the prompt. Only the target plan is selectable there.",
                 "parameters": [
                     {
                         "in": "path",
@@ -19498,7 +19630,7 @@
                                         "name": "Was the caller greeted by name",
                                         "description": "Score TRUE if the agent addressed the caller by their name within the first 3 turns, FALSE otherwise.",
                                         "type": "llm_judge",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "simulation_enabled": true,
                                         "observability_enabled": true
                                     },
@@ -19525,7 +19657,7 @@
                                         "project": 1376,
                                         "name": "Agent asked for order ID before refund",
                                         "type": "custom_code",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "custom_code": "def score(transcript, context):\n    text = transcript.lower()\n    return 'order id' in text[:text.find('refund')] if 'refund' in text else True\n",
                                         "simulation_enabled": true
                                     },
@@ -19798,7 +19930,7 @@
                                         "name": "Was the caller greeted by name",
                                         "description": "Score TRUE if the agent addressed the caller by their name within the first 3 turns, FALSE otherwise.",
                                         "type": "llm_judge",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "simulation_enabled": true,
                                         "observability_enabled": true
                                     },
@@ -19825,7 +19957,7 @@
                                         "project": 1376,
                                         "name": "Agent asked for order ID before refund",
                                         "type": "custom_code",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "custom_code": "def score(transcript, context):\n    text = transcript.lower()\n    return 'order id' in text[:text.find('refund')] if 'refund' in text else True\n",
                                         "simulation_enabled": true
                                     },
@@ -49439,7 +49571,7 @@
                                         "name": "Was the caller greeted by name",
                                         "description": "Score TRUE if the agent addressed the caller by their name within the first 3 turns, FALSE otherwise.",
                                         "type": "llm_judge",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "simulation_enabled": true,
                                         "observability_enabled": true
                                     },
@@ -49466,7 +49598,7 @@
                                         "project": 1376,
                                         "name": "Agent asked for order ID before refund",
                                         "type": "custom_code",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "custom_code": "def score(transcript, context):\n    text = transcript.lower()\n    return 'order id' in text[:text.find('refund')] if 'refund' in text else True\n",
                                         "simulation_enabled": true
                                     },
@@ -71769,6 +71901,38 @@
                     "project_id"
                 ]
             },
+            "InsightMetricConfig": {
+                "type": "object",
+                "description": "Request body for ``POST /metric-failure-mode-insights/metric-config/``.",
+                "properties": {
+                    "project": {
+                        "type": "integer",
+                        "description": "Project the metric belongs to."
+                    },
+                    "metric": {
+                        "type": "integer",
+                        "description": "Metric to enable or disable insights for."
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Turn insights on or off for this metric. While on, each analysed failure consumes credits."
+                    },
+                    "pass_conditions": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "What counts as a passing call, as {\"operator\": \"and\", \"conditions\": [{\"field\", \"op\", \"value\"}]}. Calls that don't satisfy it are the failures insights investigate. Omit when enabling to accept the metric's default threshold."
+                    }
+                },
+                "required": [
+                    "enabled",
+                    "metric",
+                    "project"
+                ]
+            },
             "InsightReproductionRequest": {
                 "type": "object",
                 "description": "Request body for\n``POST /metric-failure-mode-insights/<id>/reproduce/``.\n\nKicks off the full reproduction loop for one failure mode: draft a\nscenario, then run it against the agent — on the same channel the cited\ncall logs used — until a run fails the insight's metric or the attempt\nbudget is spent. Returns a ``reproduction_session_id`` to poll.",
@@ -73379,7 +73543,7 @@
                     },
                     "is_triage": {
                         "type": "boolean",
-                        "description": "Derived live from the metric's current `triage_enabled` + rubric\nmembership (not persisted) — the FE renders the triage section only\nwhen this is true.",
+                        "description": "Derived live from the metric's current Insights opt-in + failure\ncriteria (not persisted) — the FE renders a metric's insight card only\nwhen this is true.",
                         "readOnly": true
                     },
                     "window_start": {
@@ -79940,7 +80104,7 @@
                         "type": "string",
                         "x-spec-enum-id": "97f8e4b948b4e205",
                         "default": "instruction",
-                        "description": "\nType of scenario to create:\n- `instruction`: Standard instruction-based scenario where the instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where the instructions field contains a JSON structure\n\nDefault: `instruction`\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario to create:\n- `instruction`: Standard instruction-based scenario where the instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where the instructions field contains a JSON structure\n\nDefault: `instruction`. Must be sent as `conditional_actions` when the request includes the\n`conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
                     },
                     "instructions": {
                         "type": "string",
@@ -83989,7 +84153,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -84062,7 +84226,7 @@
                         "type": "string",
                         "x-spec-enum-id": "db62e37bb530b602",
                         "default": "instruction",
-                        "description": "\nType of scenario (instruction, real_world_smart, or real_world_fixed)\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario. Defaults to `instruction`. Must be sent as `conditional_actions` when the\nrequest includes the `conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
                     },
                     "suite_type": {
                         "enum": [
@@ -85109,7 +85273,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -85182,7 +85346,7 @@
                         "type": "string",
                         "x-spec-enum-id": "db62e37bb530b602",
                         "default": "instruction",
-                        "description": "\nType of scenario (instruction, real_world_smart, or real_world_fixed)\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario. Defaults to `instruction`. Must be sent as `conditional_actions` when the\nrequest includes the `conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
                     },
                     "suite_type": {
                         "enum": [
@@ -87301,7 +87465,7 @@
                         "type": "string",
                         "x-spec-enum-id": "97f8e4b948b4e205",
                         "default": "instruction",
-                        "description": "\nType of scenario to create:\n- `instruction`: Standard instruction-based scenario where the instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where the instructions field contains a JSON structure\n\nDefault: `instruction`\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario to create:\n- `instruction`: Standard instruction-based scenario where the instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where the instructions field contains a JSON structure\n\nDefault: `instruction`. Must be sent as `conditional_actions` when the request includes the\n`conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
                     },
                     "instructions": {
                         "type": "string",
@@ -87523,7 +87687,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",

@@ -66,19 +66,51 @@ PII redaction automatically detects and removes sensitive information from both 
 
 ## Using Redaction
 
-Add the `redact_fields` parameter when sending calls to the [observe API endpoint](/api-reference/observability/send-calls):
+Redaction can be configured at two levels:
 
-```json
-{
-  "agent": "your_agent_id",
-  "transcript_json": [...],
-  "voice_recording_url": "https://...",
-  "redact_fields": ["phone_number", "email_address", "ssn"]
-}
-```
+<Tabs>
+  <Tab title="Agent-Level (Default)">
+    Configure `redact_fields` on your agent via the [agent API](/api-reference/agents/update-agent). Once set, redaction applies automatically to every call ingested for that agent — including auto-imported and webhook calls — without any per-call parameters.
+
+    Set `redact_fields` inside the `provider` block when creating or updating an agent:
+
+    ```json
+    {
+      "provider": {
+        "redact_fields": ["phone_number", "email_address", "ssn"]
+      }
+    }
+    ```
+
+    To disable agent-level redaction, set the field to an empty array:
+
+    ```json
+    {
+      "provider": {
+        "redact_fields": []
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="Per-Call Override">
+    Override the agent default by passing `redact_fields` when sending a call to the [observe API endpoint](/api-reference/observability/send-calls):
+
+    ```json
+    {
+      "agent": "your_agent_id",
+      "transcript_json": [...],
+      "voice_recording_url": "https://...",
+      "redact_fields": ["phone_number", "email_address", "ssn"]
+    }
+    ```
+
+    Per-call fields take precedence over the agent's configuration for that call only.
+  </Tab>
+</Tabs>
 
 <Note>
-  If `redact_fields` is not provided or is an empty array, no redaction will occur.
+  When `redact_fields` is omitted from a per-call request, the agent's configured redaction fields apply. If the agent has no redaction fields configured either, no redaction occurs.
 </Note>
 
 ## Available Fields

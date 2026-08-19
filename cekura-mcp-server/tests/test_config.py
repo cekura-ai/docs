@@ -16,20 +16,22 @@ class TestConfig:
         spec_file.write_text('{"openapi": "3.0.0"}')
 
         monkeypatch.setenv("CEKURA_BASE_URL", "https://api.test.com")
-        monkeypatch.setenv("CEKURA_OPENAPI_SPEC", str(spec_file))
+        monkeypatch.setenv("CEKURA_OPENAPI_SPEC_PATH", str(spec_file))
 
         config = load_config()
         assert config.base_url == "https://api.test.com"
         assert config.openapi_spec_path == str(spec_file)
 
-    def test_load_config_missing_base_url(self, monkeypatch):
-        """Test that missing base URL raises error"""
-        from pydantic import ValidationError
-        monkeypatch.delenv("CEKURA_BASE_URL", raising=False)
-        monkeypatch.delenv("CEKURA_OPENAPI_SPEC", raising=False)
+    def test_load_config_missing_base_url_uses_default(self, monkeypatch, tmp_path):
+        """An absent CEKURA_BASE_URL falls back to the public API host."""
+        spec_file = tmp_path / "test_openapi.json"
+        spec_file.write_text('{"openapi": "3.0.0"}')
 
-        with pytest.raises((RuntimeError, ValidationError)):
-            load_config()
+        monkeypatch.delenv("CEKURA_BASE_URL", raising=False)
+        monkeypatch.setenv("CEKURA_OPENAPI_SPEC_PATH", str(spec_file))
+
+        config = load_config()
+        assert config.base_url == "https://api.cekura.ai"
 
     def test_load_config_invalid_url_format(self, monkeypatch, tmp_path):
         """Test that invalid URL format raises error"""
@@ -39,10 +41,10 @@ class TestConfig:
 
         # Clear any existing env vars first
         monkeypatch.delenv("CEKURA_BASE_URL", raising=False)
-        monkeypatch.delenv("CEKURA_OPENAPI_SPEC", raising=False)
+        monkeypatch.delenv("CEKURA_OPENAPI_SPEC_PATH", raising=False)
 
         monkeypatch.setenv("CEKURA_BASE_URL", "invalid-url")
-        monkeypatch.setenv("CEKURA_OPENAPI_SPEC", str(spec_file))
+        monkeypatch.setenv("CEKURA_OPENAPI_SPEC_PATH", str(spec_file))
 
         with pytest.raises((RuntimeError, ValidationError)):
             load_config()
@@ -53,10 +55,10 @@ class TestConfig:
 
         # Clear any existing env vars first
         monkeypatch.delenv("CEKURA_BASE_URL", raising=False)
-        monkeypatch.delenv("CEKURA_OPENAPI_SPEC", raising=False)
+        monkeypatch.delenv("CEKURA_OPENAPI_SPEC_PATH", raising=False)
 
         monkeypatch.setenv("CEKURA_BASE_URL", "https://api.test.com")
-        monkeypatch.setenv("CEKURA_OPENAPI_SPEC", "/nonexistent/spec.json")
+        monkeypatch.setenv("CEKURA_OPENAPI_SPEC_PATH", "/nonexistent/spec.json")
 
         with pytest.raises((RuntimeError, ValidationError)):
             load_config()
@@ -67,7 +69,7 @@ class TestConfig:
         spec_file.write_text('{"openapi": "3.0.0"}')
 
         monkeypatch.setenv("CEKURA_BASE_URL", "https://api.test.com")
-        monkeypatch.setenv("CEKURA_OPENAPI_SPEC", str(spec_file))
+        monkeypatch.setenv("CEKURA_OPENAPI_SPEC_PATH", str(spec_file))
         monkeypatch.setenv("CEKURA_MAX_TOOLS", "50")
 
         config = load_config()
@@ -103,7 +105,7 @@ class TestConfig:
         spec_file.write_text('{"openapi": "3.0.0"}')
 
         monkeypatch.setenv("CEKURA_BASE_URL", "https://api.test.com/")
-        monkeypatch.setenv("CEKURA_OPENAPI_SPEC", str(spec_file))
+        monkeypatch.setenv("CEKURA_OPENAPI_SPEC_PATH", str(spec_file))
 
         config = load_config()
         assert config.base_url == "https://api.test.com"

@@ -53,7 +53,7 @@ pip install -r requirements.txt
 **Default Configuration:**
 ```bash
 CEKURA_BASE_URL=https://api.cekura.ai (production)
-CEKURA_OPENAPI_SPEC=../openapi.json (from docs root)
+CEKURA_OPENAPI_SPEC_PATH=../openapi.json (relative to cekura-mcp-server/)
 ```
 
 **Optional:** Override defaults for staging/dev environments:
@@ -265,7 +265,7 @@ The server provides 84 tools across two main groups:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `CEKURA_BASE_URL` | No | `https://api.cekura.ai` | Cekura API base URL (override for staging/dev) |
-| `CEKURA_OPENAPI_SPEC` | No | `../openapi.json` | Path to OpenAPI spec (from docs root) |
+| `CEKURA_OPENAPI_SPEC_PATH` | No | `../openapi.json` | Path to OpenAPI spec (relative to `cekura-mcp-server/`) |
 | `CEKURA_MAX_TOOLS` | No | - | Max tools to register (for testing) |
 
 **Note:** All configuration is optional. The set of registered tools is determined by the `x-mcp-expose: true` marker on each operation in `openapi.json`.

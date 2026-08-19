@@ -625,8 +625,13 @@ def _parse_version(v: Any) -> Tuple[int, ...]:
 
 
 def _is_older_version(reported: str, latest: str) -> bool:
+    # Compare only as precisely as the caller reported. Skills carry a
+    # major.minor tag ("0.10"), so a full-semver latest ("0.10.7") must not
+    # read as newer than an install that is in fact current. Older installs
+    # that still report full semver keep exact comparison.
     try:
-        return _parse_version(reported) < _parse_version(latest)
+        reported_parts = _parse_version(reported)
+        return reported_parts < _parse_version(latest)[: len(reported_parts)]
     except Exception:
         return False
 
@@ -729,7 +734,8 @@ async def _forward_skill_activation(
         "  conversation_id: optional Cekura sandbox / chat conversation ID.\n"
         "  verification_tag: optional tag carried in the skill/command (the value "
         "to thread as `skill_ack` on gated authoring calls).\n"
-        "  plugin_version: optional installed Cekura plugin version (e.g. \"0.8.1\").\n"
+        "  plugin_version: optional installed Cekura plugin version, at whatever "
+        "precision the skill carries (e.g. \"0.10\" or \"0.8.1\").\n"
         "  skill_version: optional per-skill version if the skill declares one."
     ),
     annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, openWorldHint=False),

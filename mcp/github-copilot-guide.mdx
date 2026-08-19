@@ -1,0 +1,119 @@
+---
+title: "Using Cekura with GitHub Copilot"
+sidebarTitle: "GitHub Copilot"
+description: "Install the Cekura plugin in Copilot CLI for Skills + MCP, or add Cekura Skills to a repository for the Copilot coding agent, code review, and the IDE extensions."
+icon: "github"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+Copilot has two extension surfaces, and they install Cekura differently. Pick the one you're setting up:
+
+| Surface | Install | What you get |
+|---|---|---|
+| **Copilot CLI** | Marketplace plugin | Skills **+** MCP server, OAuth sign-in |
+| **Coding agent, code review, IDE extensions** | Skills committed to `.github/skills/` | Skills; MCP configured per repository |
+
+## Copilot CLI
+
+<Steps>
+  <Step title="Install the CLI and sign in">
+    ```bash
+    npm install -g @github/copilot
+    ```
+
+    Run `copilot` once and complete the sign-in prompt. Requires a Copilot licence (Pro, Pro+, Business, or Enterprise).
+  </Step>
+
+  <Step title="Add the Cekura marketplace">
+    ```bash
+    copilot plugin marketplace add cekura-ai/cekura-skills
+    copilot plugin marketplace browse cekura-skills
+    ```
+
+    `browse` should list one plugin, `cekura`. If it doesn't, the marketplace isn't registered — nothing below will work.
+  </Step>
+
+  <Step title="Install the plugin">
+    ```bash
+    copilot plugin install cekura@cekura-skills
+    ```
+
+    In an interactive session, use `/plugin marketplace add cekura-ai/cekura-skills` then `/plugin install cekura@cekura-skills`.
+  </Step>
+
+  <Step title="Confirm Skills and MCP loaded">
+    ```bash
+    copilot plugin list
+    copilot mcp list
+    ```
+
+    `mcp list` should show `cekura` with `Source: Plugin` and the installed plugin version — that's the plugin's MCP config being picked up, not a hand-written one.
+  </Step>
+
+  <Step title="Sign in to MCP">
+    Nothing to configure. The first Cekura tool call opens a browser for OAuth; no API key is stored.
+  </Step>
+</Steps>
+
+<Note>
+Copilot plugins carry no slash commands, and Copilot only discovers subagents named `*.agent.md` — so the plugin gives you Skills and MCP. The Skills cover the same workflows and activate by context.
+</Note>
+
+## Repository surfaces
+
+The coding agent, code review, and the IDE extensions ignore CLI plugins. They read Skills from `.github/skills/` in the repository they're working in:
+
+```bash
+npx skills add cekura-ai/cekura-skills --all --agent github-copilot --output .github/skills
+```
+
+Commit the result and everyone working in that repo gets the Cekura playbook, including code review on pull requests.
+
+<Warning>
+These surfaces don't support OAuth-authenticated remote MCP. For live Cekura tools, register `https://api.cekura.ai/mcp` in the repository's [Copilot MCP configuration](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/configure-mcp-servers) with an `X-CEKURA-API-KEY` header — see [API-key setup](/mcp/mcp-only#api-key-setup). Copilot CLI needs no key.
+</Warning>
+
+## Verify setup
+
+Start Copilot from your agent repo and ask:
+
+```plaintext
+Use the Cekura skills and MCP. List my Cekura agents, pick one, and propose 3 evaluators I should create first. Do not create anything until I approve.
+```
+
+Copilot should name real agents from your workspace and reason in Cekura terms — evaluators, metrics, test profiles, run results. Generic voice-testing advice means the Skills or MCP aren't loaded.
+
+## Keep it updated
+
+```bash
+copilot plugin update cekura
+```
+
+Copilot has no auto-update hook, so run this when you want the latest version; `copilot plugin list` shows what's installed. When a release adds a brand-new Skill, re-add the marketplace first to refresh the snapshot, then update. For `.github/skills/`, re-run the `npx skills add` command above.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Marketplace or plugin not found">
+    `copilot plugin marketplace list` should include `cekura-skills`, and `copilot plugin marketplace browse cekura-skills` should list `cekura`. Re-add with `copilot plugin marketplace add cekura-ai/cekura-skills`.
+  </Accordion>
+
+  <Accordion title="Skills don't activate">
+    Confirm the plugin is installed (`copilot plugin list`), then ask something explicitly Cekura-shaped — Skills load by matching your request against their descriptions, so a generic prompt may not trigger one.
+  </Accordion>
+
+  <Accordion title="MCP tools missing, or OAuth never opens">
+    Check `copilot mcp list` shows `cekura`, then update the CLI (`npm install -g @github/copilot`) — plugin-provided MCP servers and their OAuth flow need a current release. Fallback: add the server yourself in `~/.copilot/mcp-config.json`, or use [API-key auth](/mcp/mcp-only#api-key-setup).
+  </Accordion>
+
+  <Accordion title="Coding agent or code review can't reach Cekura">
+    Those surfaces need the API-key credential, not OAuth — see the warning above.
+  </Accordion>
+</AccordionGroup>
+
+## No plugin?
+
+Set up [Skills + MCP manually](/mcp/mcp-only), or use the [behavior preset](/mcp/other-agents) fallback.

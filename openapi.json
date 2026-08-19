@@ -16383,6 +16383,52 @@
                 }
             }
         },
+        "/test_framework/v1/aiagents/{agent_id}/tool/{tool_name}/fork/": {
+            "post": {
+                "operationId": "aiagents-tool-fork-create",
+                "description": "Copy-on-write for shared tools: detach this agent from the shared row and\nsubscribe it to a private copy carrying the same content.",
+                "summary": "Fork a shared tool into a private copy for this agent",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "agent_id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "tool_name",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/test_framework/v1/aiagents/{agent_id}/tools/": {
             "get": {
                 "operationId": "aiagents-tools-list",
@@ -47157,6 +47203,145 @@
                 }
             }
         },
+        "/test_framework/v1/tools/": {
+            "get": {
+                "operationId": "tools-list",
+                "description": "Return the project's mock tools with their input/output pairs and the agents using each one. Scope with `project_id` for the whole catalogue, or with `agent_id` to get only the tools that agent could newly adopt (its own are excluded). `search` matches the tool name, with or without the `c_` prefix. Results are paginated, most-shared first.",
+                "summary": "List the mock tools in a project",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "search",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Filter by tool name; matches with or without the `c_` prefix."
+                    },
+                    {
+                        "name": "project_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project_id`, `agent_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    },
+                    {
+                        "name": "agent_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project_id`, `agent_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedToolList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "tools-list",
+                        "description": "Return the project's mock tools with their input/output pairs and the agents using each one. Scope with `project_id` for the whole catalogue, or with `agent_id` to get only the tools that agent could newly adopt (its own are excluded). `search` matches the tool name, with or without the `c_` prefix. Results are paginated, most-shared first."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/tools/{id}/": {
+            "get": {
+                "operationId": "tools-retrieve",
+                "description": "Return a single mock tool with its input/output pairs and the agents using it.",
+                "summary": "Get one mock tool",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this tool.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Tool"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "tools-retrieve",
+                        "description": "Return a single mock tool with its input/output pairs and the agents using it."
+                    }
+                }
+            }
+        },
         "/test_framework/v1/views/": {
             "get": {
                 "operationId": "views-list",
@@ -68019,6 +68204,14 @@
                             }
                         ],
                         "description": "MCP server this tool was fetched from, as {name, key}. Null for standalone tools. Server-managed — ignored on writes."
+                    },
+                    "subscriber_count": {
+                        "type": "integer",
+                        "description": "Number of agents in the project using this tool."
+                    },
+                    "is_shared": {
+                        "type": "boolean",
+                        "description": "True when more than one agent uses this tool, so an edit affects all of them."
                     }
                 },
                 "required": [
@@ -76956,6 +77149,37 @@
                     }
                 }
             },
+            "PaginatedToolList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Tool"
+                        }
+                    }
+                }
+            },
             "PaginatedUserConfigurationList": {
                 "type": "object",
                 "required": [
@@ -80838,6 +81062,25 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "MCP server this tool was fetched from, as `{'name', 'key'}`. Null for standalone (non-MCP) tools. Server-managed — ignored on writes."
+                    },
+                    "subscriber_count": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Number of agents in the project sharing this tool."
+                    },
+                    "is_shared": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "True when more than one agent shares this tool. Edits and deletes affect every subscriber."
+                    },
+                    "subscribers": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "readOnly": true,
+                        "description": "Agents using this tool, so a caller can see who an edit would affect."
                     }
                 }
             },
@@ -89163,6 +89406,25 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "MCP server this tool was fetched from, as `{'name', 'key'}`. Null for standalone (non-MCP) tools. Server-managed — ignored on writes."
+                    },
+                    "subscriber_count": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Number of agents in the project sharing this tool."
+                    },
+                    "is_shared": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "True when more than one agent shares this tool. Edits and deletes affect every subscriber."
+                    },
+                    "subscribers": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "readOnly": true,
+                        "description": "Agents using this tool, so a caller can see who an edit would affect."
                     }
                 },
                 "required": [

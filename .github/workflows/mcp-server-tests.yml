@@ -1,0 +1,62 @@
+name: MCP Server Tests
+
+# The suite and the overlay validator existed but nothing ran them, so drift
+# accumulated silently: by the time this workflow was added, 8 tests were failing
+# and `validate_overlays.py` reported 7 errors on main. Runs on pull requests so
+# the gate is visible before merge, not after deploy.
+
+on:
+  pull_request:
+    paths:
+      - 'openapi.json'
+      - 'cekura-mcp-server/**'
+      - '.github/workflows/mcp-server-tests.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'openapi.json'
+      - 'cekura-mcp-server/**'
+      - '.github/workflows/mcp-server-tests.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-server-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Matches the runtime in cekura-mcp-server/Dockerfile.
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: cekura-mcp-server/requirements.txt
+
+      - name: Install dependencies
+        working-directory: cekura-mcp-server
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Guards against the failure that an unpinned `mcp` reintroduces: 2.x drops
+      # `mcp.server.fastmcp`, so the server module stops importing at all.
+      - name: Check the server module imports
+        working-directory: cekura-mcp-server
+        run: python -c "import openapi_mcp_server"
+
+      - name: Validate overlays against openapi.json
+        working-directory: cekura-mcp-server
+        run: python validate_overlays.py
+
+      - name: Run tests
+        working-directory: cekura-mcp-server
+        run: python -m pytest

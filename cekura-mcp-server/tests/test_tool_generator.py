@@ -5,6 +5,7 @@ from tool_generator import (
     generate_tool_description,
     should_include_operation,
     maybe_append_org_project_hint,
+    MAX_DESCRIPTION_LENGTH,
     ORG_PROJECT_HINT,
 )
 from openapi_parser import Operation
@@ -121,7 +122,7 @@ class TestGenerateToolDescription:
 
     def test_generate_description_truncation(self):
         """Test that long descriptions are truncated"""
-        long_desc = "A" * 300
+        long_desc = "A" * (MAX_DESCRIPTION_LENGTH + 100)
         operation = Operation(
             path="/api/v1/test",
             method="GET",
@@ -135,7 +136,7 @@ class TestGenerateToolDescription:
         )
 
         result = generate_tool_description(operation)
-        assert len(result) <= 200
+        assert len(result) <= MAX_DESCRIPTION_LENGTH
         assert result.endswith("...")
 
 

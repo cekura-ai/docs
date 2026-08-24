@@ -61,7 +61,6 @@ _FAMILIES = (
             "scenarios_create",
             "scenarios_bulk_update",
             "scenarios_partial_update",
-            "scenarios_create_from_transcript",
             "scenarios_create_from_transcript_bg",
             "scenarios_update_scenario_with_transcript_create",
             "test_profiles_create",

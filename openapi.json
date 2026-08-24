@@ -258,7 +258,7 @@
         "/app/v2/product-chat/conversations/": {
             "get": {
                 "operationId": "app-v2-product-chat-conversations-retrieve",
-                "description": "List the user's product-chat conversations or create a new one.\n\n`GET` returns non-deleted conversations ordered by most-recent update.\n`POST` creates an empty conversation (optionally seeded with a name).",
+                "description": "List the user's product-chat conversations or create a new one.\n\n`GET` returns the user's non-deleted conversations, newest first, each\ncarrying the status of its latest assistant turn so the dock can show which\nsessions are working. `POST` creates an empty conversation (optionally\nseeded with a name and an attached page).",
                 "tags": [
                     "app"
                 ],
@@ -278,7 +278,7 @@
             },
             "post": {
                 "operationId": "app-v2-product-chat-conversations-create",
-                "description": "List the user's product-chat conversations or create a new one.\n\n`GET` returns non-deleted conversations ordered by most-recent update.\n`POST` creates an empty conversation (optionally seeded with a name).",
+                "description": "List the user's product-chat conversations or create a new one.\n\n`GET` returns the user's non-deleted conversations, newest first, each\ncarrying the status of its latest assistant turn so the dock can show which\nsessions are working. `POST` creates an empty conversation (optionally\nseeded with a name and an attached page).",
                 "tags": [
                     "app"
                 ],
@@ -300,7 +300,7 @@
         "/app/v2/product-chat/conversations/{conversation_id}/": {
             "get": {
                 "operationId": "app-v2-product-chat-conversations-retrieve_2",
-                "description": "Retrieve a product-chat conversation (with its messages) or soft-delete it.\n\n`GET` returns the conversation plus its ordered messages.\n`DELETE` soft-deletes it (sets `is_deleted=True`).",
+                "description": "Retrieve a product-chat conversation (with its messages), rename it,\nchange the page it is attached to, or soft-delete it.\n\n`GET` returns the conversation plus its ordered messages.\n`PATCH` renames it and/or re-attaches it to a different dashboard page.\n`DELETE` soft-deletes it (sets `is_deleted=True`).",
                 "parameters": [
                     {
                         "in": "path",
@@ -329,9 +329,41 @@
                     }
                 }
             },
+            "patch": {
+                "operationId": "app-v2-product-chat-conversations-partial-update",
+                "description": "Retrieve a product-chat conversation (with its messages), rename it,\nchange the page it is attached to, or soft-delete it.\n\n`GET` returns the conversation plus its ordered messages.\n`PATCH` renames it and/or re-attaches it to a different dashboard page.\n`DELETE` soft-deletes it (sets `is_deleted=True`).",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "conversation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            },
             "delete": {
                 "operationId": "app-v2-product-chat-conversations-destroy",
-                "description": "Retrieve a product-chat conversation (with its messages) or soft-delete it.\n\n`GET` returns the conversation plus its ordered messages.\n`DELETE` soft-deletes it (sets `is_deleted=True`).",
+                "description": "Retrieve a product-chat conversation (with its messages), rename it,\nchange the page it is attached to, or soft-delete it.\n\n`GET` returns the conversation plus its ordered messages.\n`PATCH` renames it and/or re-attaches it to a different dashboard page.\n`DELETE` soft-deletes it (sets `is_deleted=True`).",
                 "parameters": [
                     {
                         "in": "path",
@@ -2530,7 +2562,8 @@
                     "404": {
                         "description": "The repository is not available through the active connection."
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/github/connection/": {
@@ -2549,7 +2582,8 @@
                     "200": {
                         "description": "No response body"
                     }
-                }
+                },
+                "x-docs-exclude": true
             },
             "delete": {
                 "operationId": "github-connection-destroy",
@@ -2566,7 +2600,8 @@
                     "204": {
                         "description": "No response body"
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/github/install-url/": {
@@ -2585,7 +2620,8 @@
                     "200": {
                         "description": "No response body"
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/github/open-pr/": {
@@ -2634,7 +2670,8 @@
                     "404": {
                         "description": "The repository is not available through the active connection."
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/github/setup/": {
@@ -2653,7 +2690,8 @@
                     "200": {
                         "description": "No response body"
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/github/webhook/": {
@@ -3243,6 +3281,72 @@
                         "multipart/form-data": {
                             "schema": {
                                 "$ref": "#/components/schemas/AgentImprovementPromoteRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/agent-improvement-sessions/{id}/scenario-edits/": {
+            "post": {
+                "operationId": "agent-improvement-sessions-scenario-edits-create",
+                "description": "Approve or reject the test-setup changes a session proposed.\n\nA scenario is the customer's own definition of what a correct call\nlooks like, so the pipeline parks these and never applies one itself;\nthis is the only path that writes them. Approving is idempotent — a\nproposal that has already been ruled on is reported as `already_decided`\nrather than applied a second time.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this agent improvement session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
                             }
                         }
                     }
@@ -3924,7 +4028,7 @@
         "/observability/v1/call-logs/": {
             "get": {
                 "operationId": "call-logs-list",
-                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **31 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
+                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **33 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
                 "summary": "List call logs",
                 "parameters": [
                     {
@@ -4095,7 +4199,7 @@
         "/observability/v1/call-logs-external/": {
             "get": {
                 "operationId": "call-logs-external-list",
-                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **31 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
+                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **33 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
                 "summary": "List call logs",
                 "parameters": [
                     {
@@ -4326,7 +4430,7 @@
             },
             "patch": {
                 "operationId": "observability-v2-call-logs-partial-update",
-                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n- `reevaluate_metrics` — when `true`, evaluate metrics on the call log after applying this update. Defaults to `false`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nMetrics are not recomputed unless `reevaluate_metrics` is `true`. For a call ingested with deferred evaluation, this releases its first evaluation; otherwise it re-evaluates an already evaluated call. Calls whose evaluation is still running are left untouched. To evaluate several call logs at once, use `rerun_evaluation` instead.",
                 "summary": "Update call log source data",
                 "parameters": [
                     {
@@ -5730,7 +5834,7 @@
             },
             "patch": {
                 "operationId": "observability-v2-call-logs-partial-update_2",
-                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n- `reevaluate_metrics` — when `true`, evaluate metrics on the call log after applying this update. Defaults to `false`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nMetrics are not recomputed unless `reevaluate_metrics` is `true`. For a call ingested with deferred evaluation, this releases its first evaluation; otherwise it re-evaluates an already evaluated call. Calls whose evaluation is still running are left untouched. To evaluate several call logs at once, use `rerun_evaluation` instead.",
                 "summary": "Update call log source data",
                 "parameters": [
                     {
@@ -7434,6 +7538,343 @@
                 ]
             }
         },
+        "/observability/v1/first-insights/": {
+            "get": {
+                "operationId": "first-insights-list",
+                "description": "Read a project's First Insights report and act on it.\n\nEvery newly-onboarded project gets exactly one of these, generated\nautomatically once it has enough calls to say something about. The\nfrontend lists by ``?project=<id>`` (0 or 1 rows), shows a banner on\nthe Calls page until it is acknowledged, and posts back to the three\nactions the report offers: enable a suggested metric, create the alert\nthat watches it, and draft a simulation scenario from the worst call.",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/FirstInsightsReport"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/first-insights/{id}/": {
+            "get": {
+                "operationId": "first-insights-retrieve",
+                "description": "Read a project's First Insights report and act on it.\n\nEvery newly-onboarded project gets exactly one of these, generated\nautomatically once it has enough calls to say something about. The\nfrontend lists by ``?project=<id>`` (0 or 1 rows), shows a banner on\nthe Calls page until it is acknowledged, and posts back to the three\nactions the report offers: enable a suggested metric, create the alert\nthat watches it, and draft a simulation scenario from the worst call.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this first insights report.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FirstInsightsReport"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/first-insights/{id}/acknowledge/": {
+            "post": {
+                "operationId": "first-insights-acknowledge-create",
+                "description": "Record that the customer has seen the report, which retires the banner on the Calls page. Send `dismissed: true` when they dismissed the banner instead of opening the report.",
+                "summary": "Acknowledge a First Insights report",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this first insights report.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsAcknowledge"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsAcknowledge"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsAcknowledge"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FirstInsightsReport"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/first-insights/{id}/create-alert/": {
+            "post": {
+                "operationId": "first-insights-create-alert-create",
+                "description": "Start notifying the project whenever the suggested metric at `index` fails a call. The metric must already be enabled — enable it first. Creating the same alert twice returns the existing one.",
+                "summary": "Create the alert a First Insights report drafted",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this first insights report.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsSuggestedMetric"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsSuggestedMetric"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsSuggestedMetric"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FirstInsightsReport"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/first-insights/{id}/draft-scenario/": {
+            "post": {
+                "operationId": "first-insights-draft-scenario-create",
+                "description": "Turn the report's worst call into simulation scenario(s) on the given agent, so the failure can be re-run after a prompt change. Drafting happens in the background: poll the returned `progress_id` for the new scenario ids. Optionally target a specific `agent_id` in this project; otherwise the agent the report is about is used.",
+                "summary": "Draft a simulation scenario from a First Insights report",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this first insights report.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FirstInsightsReport"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/first-insights/{id}/enable-metric/": {
+            "post": {
+                "operationId": "first-insights-enable-metric-create",
+                "description": "Create the suggested metric on the project and score the calls the report analysed with it, so the pass rate shown in the report becomes real data on the Calls table. Identify the suggestion by its `index` in `suggested_metrics`. Enabling the same suggestion twice returns the metric created the first time and does not re-score. ⚠ Scoring past calls consumes credits, one evaluation per analysed call.",
+                "summary": "Enable a metric suggested by a First Insights report",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this first insights report.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsSuggestedMetric"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsSuggestedMetric"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FirstInsightsSuggestedMetric"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FirstInsightsReport"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/observability/v1/insight-reproduction-sessions/": {
             "get": {
                 "operationId": "insight-reproduction-sessions-list",
@@ -7784,7 +8225,7 @@
         "/observability/v1/metric-failure-mode-insights/{id}/fix-metric/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-fix-metric-create",
-                "description": "Sample a few of one failure mode's example calls and add them to Labs as metric reviews for the insight's metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass). Select the failure mode with `failure_mode_index`. Overwrites any existing review for the same calls on this metric.",
+                "description": "Sample a few of one failure mode's example calls and add them to Labs as metric reviews for the insight's metric, with an optional `feedback` note and an optional corrected `expected_value` label (defaults to a pass). Select the failure mode with `failure_mode_index`. Overwrites any existing review for the same calls on this metric.",
                 "summary": "Add a failure mode's example calls to Labs",
                 "parameters": [
                     {
@@ -7852,7 +8293,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metric-failure-mode-insights-fix-metric-create",
-                        "description": "Sample a few of one failure mode's example calls and add them to Labs as metric reviews for the insight's metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass). Select the failure mode with `failure_mode_index`. Overwrites any existing review for the same calls on this metric."
+                        "description": "Sample a few of one failure mode's example calls and add them to Labs as metric reviews for the insight's metric, with an optional `feedback` note and an optional corrected `expected_value` label (defaults to a pass). Select the failure mode with `failure_mode_index`. Overwrites any existing review for the same calls on this metric."
                     }
                 }
             }
@@ -8330,7 +8771,7 @@
         "/observability/v1/metric-failure-mode-insights/categories/{category_slug}/fix-metric/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-categories-fix-metric-create",
-                "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass).",
+                "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with an optional `feedback` note and an optional corrected `expected_value` label (defaults to a pass).",
                 "summary": "Add an accumulating failure category's example calls to Labs",
                 "parameters": [
                     {
@@ -8398,7 +8839,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metric-failure-mode-insights-categories-fix-metric-create",
-                        "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with `feedback` as the note and an optional corrected `expected_value` label (defaults to a pass)."
+                        "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with an optional `feedback` note and an optional corrected `expected_value` label (defaults to a pass)."
                     }
                 }
             }
@@ -8512,6 +8953,98 @@
                         "description": "Queue a failure-mode audit of one metric's recent failing calls and return the new insight row in `pending`. Identify the metric with `metric_name` plus either `metric` (custom) or `predefined_metric`. Poll the returned row's `status` until it reaches `succeeded`. ⚠ Consumes credits per generated insight — see the pricing endpoint."
                     }
                 }
+            }
+        },
+        "/observability/v1/metric-failure-mode-insights/metric-config/": {
+            "get": {
+                "operationId": "metric-failure-mode-insights-metric-config-retrieve",
+                "description": "GET returns every metric in the project that can have insights, with its current on/off state and failure criteria. POST turns one metric on or off; when turning on, send `pass_conditions` to define what counts as a passing call, or omit it to accept the metric's default threshold. Set `triage_failure_limit` to cap daily analyses, or send null to analyse every failure.",
+                "summary": "Read or change which metrics have insights enabled",
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InsightMetricConfig"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            },
+            "post": {
+                "operationId": "metric-failure-mode-insights-metric-config-create",
+                "description": "GET returns every metric in the project that can have insights, with its current on/off state and failure criteria. POST turns one metric on or off; when turning on, send `pass_conditions` to define what counts as a passing call, or omit it to accept the metric's default threshold. Set `triage_failure_limit` to cap daily analyses, or send null to analyse every failure.",
+                "summary": "Read or change which metrics have insights enabled",
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightMetricConfig"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightMetricConfig"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InsightMetricConfig"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InsightMetricConfig"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
             }
         },
         "/observability/v1/metric-failure-mode-insights/pricing/": {
@@ -9127,7 +9660,7 @@
         "/observability/v2/call-logs/": {
             "get": {
                 "operationId": "observability-v2-call-logs-list",
-                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **31 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
+                "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **33 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`.",
                 "summary": "List call logs",
                 "parameters": [
                     {
@@ -9244,7 +9777,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "observability-v2-call-logs-list",
-                        "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **31 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`."
+                        "description": "List **production** call logs for an agent or project. Production-only — test/simulation runs triggered via `run_scenarios_*` do NOT create call logs; use `results_list` + `runs_bulk_retrieve` for simulation data instead.\n\nAlways pass `agent_id` or `project_id` to scope results — without one, the response may be very large. **`project_id` is required when using an organization-level API key.**\n\n**Time window:** results default to the **last 30 days** when no timestamp range is given. A supplied range must not exceed **33 days** (wider ranges return `400`); pass `timestamp_from`/`timestamp_to` (ISO 8601) to select a window within that limit.\n\n**Filtering:**\n- `timestamp_from` / `timestamp_to` — ISO 8601 date range filter\n- `call_ids` — comma-separated **CallLog IDs** (integer DB IDs of call logs in this list response), e.g. `\"123,456\"`. Distinct from simulation `run_id`s and from each call log's own `call_id` field (which holds the provider's call identifier string).\n- `filters_v2` — structured JSON filter (same format as dashboard filters). Simple: `{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`. Compound: `{\"operator\": \"and\", \"conditions\": [{...}, {...}]}`. Supported operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `startswith`, `in`, `isnull`."
                     }
                 }
             },
@@ -9373,7 +9906,7 @@
             },
             "patch": {
                 "operationId": "observability-v2-call-logs-partial-update_3",
-                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request.",
+                "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n- `reevaluate_metrics` — when `true`, evaluate metrics on the call log after applying this update. Defaults to `false`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nMetrics are not recomputed unless `reevaluate_metrics` is `true`. For a call ingested with deferred evaluation, this releases its first evaluation; otherwise it re-evaluates an already evaluated call. Calls whose evaluation is still running are left untouched. To evaluate several call logs at once, use `rerun_evaluation` instead.",
                 "summary": "Update call log source data",
                 "parameters": [
                     {
@@ -9509,11 +10042,12 @@
                     }
                 },
                 "x-mcp-expose": true,
+                "x-mcp-destructive": true,
                 "x-mint": {
                     "mcp": {
                         "enabled": true,
                         "name": "observability-v2-call-logs-partial-update",
-                        "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nThis operation does not recompute metrics. To evaluate the updated call data, invoke `rerun_evaluation` in a separate request."
+                        "description": "Updates source data for an existing production call log.\n\n**Supported fields**\n- `call_id` — Provider call identifier. Subject to the organization's duplicate-call-ID policy.\n- `transcript_json` — Structured transcript in a supported provider or Cekura format. Use `transcript_type` to specify the format, or omit it for automatic detection. This replaces both transcript representations.\n- `timestamp` — Call start time in ISO 8601 format.\n- `duration` — Call duration in minutes.\n- `call_ended_reason` and `customer_number` — Provider-supplied call attributes.\n- `metadata` and `dynamic_variables` — JSON objects merged at the top level with the existing values. Supplied keys overwrite matching keys; omitted keys are preserved.\n\n- `status` and `feedback` — Human review data. `status` accepts `success`, `failure`, `reviewed_success`, or `reviewed_failure`.\n- `reevaluate_metrics` — when `true`, evaluate metrics on the call log after applying this update. Defaults to `false`.\n\n**Restrictions**\nOnly the fields listed above are accepted. System-managed fields, including agent and project ownership, metric evaluations, topic, and dropoff point, cannot be updated.\n\n**Metric evaluation**\nMetrics are not recomputed unless `reevaluate_metrics` is `true`. For a call ingested with deferred evaluation, this releases its first evaluation; otherwise it re-evaluates an already evaluated call. Calls whose evaluation is still running are left untouched. To evaluate several call logs at once, use `rerun_evaluation` instead."
                     }
                 }
             },
@@ -12584,7 +13118,7 @@
         "/subscriptions/packs/add_payg_pack/": {
             "post": {
                 "operationId": "subscriptions-packs-add-payg-pack-create",
-                "description": "Start the free pay-as-you-go plan for an organization.\n\nThe plan never expires: the first pack.free_members_count member(s) are free\nand only additional members are billed through Stripe. Eligible signups\n(business email whose domain hasn't used a plan before, org's first plan)\nalso receive the pack's one-time complimentary credits in the never-expiring\nbalance. Orgs whose previous plan expired or was cancelled can activate too,\nwith 0 complimentary credits. Phone verification is required only when\ncomplimentary credits will be granted.",
+                "description": "Start the free pay-as-you-go plan for an organization.\n\nThe plan never expires: the first pack.free_members_count member(s) are free\nand only additional members are billed through Stripe. Eligible signups\n(business email, org's first plan, domain within its rolling grant quota)\nalso receive the pack's one-time complimentary credits in the never-expiring\nbalance. Orgs whose previous plan expired or was cancelled can activate too,\nwith 0 complimentary credits. Phone verification is required only when\ncomplimentary credits will be granted, and every grant is recorded per\ndomain so the quota can be enforced.",
                 "tags": [
                     "subscriptions"
                 ],
@@ -12624,7 +13158,8 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/subscriptions/packs/check-trial-eligibility/": {
@@ -12696,7 +13231,8 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/subscriptions/stripe/webhook/": {
@@ -12900,6 +13436,46 @@
                 "description": "Subscriptions subscriptions mandate setup intent"
             }
         },
+        "/subscriptions/subscriptions/{id}/plan-switch-offer/": {
+            "get": {
+                "operationId": "subscriptions-subscriptions-plan-switch-offer-retrieve",
+                "description": "Resolve a shared plan-switch link into a displayable offer.\n\nThe dashboard calls this when a customer opens a switch link, including\nafter they declined the automatic first-paid-seat prompt. ``pack_code``\nis the plan the link advertises and is only ever a guard: the offered\nplan always comes from the organization's own pack configuration, so a\ntampered link cannot buy a different plan. Returns ``offer: null``\nrather than an error when the organization cannot use the link.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/subscriptions/subscriptions/{id}/reactivate/": {
             "post": {
                 "operationId": "subscriptions-subscriptions-reactivate-create",
@@ -13071,13 +13647,14 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/subscriptions/subscriptions/{id}/select-first-paid-seat-plan/": {
             "post": {
                 "operationId": "subscriptions-subscriptions-select-first-paid-seat-plan-create",
-                "description": "Resolve a one-time paid-plan choice.\n\nPAYG organizations see it before their first paid seat; developer-trial\norganizations can use it from Manage Plan. Sending the current pack code\nkeeps pay-as-you-go. Sending the configured ``allow_switch_to_plan`` code\ncreates and charges that monthly subscription immediately. Pricing, Stripe\nIDs, and the customer are always server-owned.",
+                "description": "Resolve a one-time paid-plan choice.\n\nPAYG organizations see it before their first paid seat; developer-trial\norganizations can use it from Manage Plan. Sending the current pack code\nkeeps pay-as-you-go. Sending the configured ``allow_switch_to_plan`` code\ncreates and charges that monthly subscription immediately. Pricing, Stripe\nIDs, and the customer are always server-owned.\n\n``via_link: true`` marks the shared switch-link flow (see\n``plan_switch_offer``), which reopens the target for organizations that\nalready declined the prompt. Only the target plan is selectable there.",
                 "parameters": [
                     {
                         "in": "path",
@@ -13187,7 +13764,8 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/subscriptions/subscriptions/{id}/update_payment_method/": {
@@ -13303,7 +13881,8 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "x-docs-exclude": true
             }
         },
         "/subscriptions/subscriptions/create_portal_session/": {
@@ -16237,6 +16816,52 @@
                         "description": ""
                     }
                 }
+            }
+        },
+        "/test_framework/v1/aiagents/{agent_id}/tool/{tool_name}/fork/": {
+            "post": {
+                "operationId": "aiagents-tool-fork-create",
+                "description": "Copy-on-write for shared tools: detach this agent from the shared row and\nsubscribe it to a private copy carrying the same content.",
+                "summary": "Fork a shared tool into a private copy for this agent",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "agent_id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "tool_name",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
             }
         },
         "/test_framework/v1/aiagents/{agent_id}/tools/": {
@@ -19486,7 +20111,7 @@
                                         "name": "Was the caller greeted by name",
                                         "description": "Score TRUE if the agent addressed the caller by their name within the first 3 turns, FALSE otherwise.",
                                         "type": "llm_judge",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "simulation_enabled": true,
                                         "observability_enabled": true
                                     },
@@ -19513,7 +20138,7 @@
                                         "project": 1376,
                                         "name": "Agent asked for order ID before refund",
                                         "type": "custom_code",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "custom_code": "def score(transcript, context):\n    text = transcript.lower()\n    return 'order id' in text[:text.find('refund')] if 'refund' in text else True\n",
                                         "simulation_enabled": true
                                     },
@@ -19786,7 +20411,7 @@
                                         "name": "Was the caller greeted by name",
                                         "description": "Score TRUE if the agent addressed the caller by their name within the first 3 turns, FALSE otherwise.",
                                         "type": "llm_judge",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "simulation_enabled": true,
                                         "observability_enabled": true
                                     },
@@ -19813,7 +20438,7 @@
                                         "project": 1376,
                                         "name": "Agent asked for order ID before refund",
                                         "type": "custom_code",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "custom_code": "def score(transcript, context):\n    text = transcript.lower()\n    return 'order id' in text[:text.find('refund')] if 'refund' in text else True\n",
                                         "simulation_enabled": true
                                     },
@@ -24051,7 +24676,7 @@
         "/test_framework/v1/personalities/": {
             "get": {
                 "operationId": "personalities-list",
-                "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters.",
+                "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities available to a specific project (its own plus the globally available ones)\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters.",
                 "parameters": [
                     {
                         "in": "query",
@@ -24067,7 +24692,7 @@
                         "schema": {
                             "type": "integer"
                         },
-                        "description": "Filter by project ID"
+                        "description": "Filter to personalities available to this project (its own plus globally available ones)"
                     }
                 ],
                 "tags": [
@@ -24106,7 +24731,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "personalities-list",
-                        "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters."
+                        "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities available to a specific project (its own plus the globally available ones)\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters."
                     }
                 }
             },
@@ -24173,7 +24798,7 @@
         "/test_framework/v1/personalities-external/": {
             "get": {
                 "operationId": "personalities-external-list",
-                "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities owned by a specific project\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters.",
+                "description": "List personalities available for use in your evaluators.\n\nReturns personalities owned by your organization plus globally available personalities.\n\n**Filters:**\n- `language` — filter by language code (e.g. `en`, `es`)\n- `project_id` — filter to personalities available to a specific project (its own plus the globally available ones)\n\n**Using personality IDs in evaluators:** globally available personalities (those with no project or organization owner) work across all projects. Organization-specific personalities are only usable within their own organization.\n\nPerformance tip: this endpoint can return large payloads. When you know the language of the agent in scope, try passing `language` (e.g. `en`, `es`) to narrow the result. Passing `project_id` from your workspace context also helps when you only need scoped personalities. If you genuinely need every personality, you can omit filters.",
                 "parameters": [
                     {
                         "in": "query",
@@ -24189,7 +24814,7 @@
                         "schema": {
                             "type": "integer"
                         },
-                        "description": "Filter by project ID"
+                        "description": "Filter to personalities available to this project (its own plus globally available ones)"
                     }
                 ],
                 "tags": [
@@ -24276,7 +24901,8 @@
         "/test_framework/v1/personalities-external/{id}/": {
             "get": {
                 "operationId": "personalities-external-retrieve",
-                "description": "Retrieve a caller personality by ID",
+                "description": "Retrieve one personality by id, including its voice-layer behavior and the language it speaks.\n\nPrefer this over listing whenever you already know which personality you mean: the list endpoint returns every personality available to the caller, globally available ones included, and is documented as capable of large payloads.",
+                "summary": "Retrieve a personality",
                 "parameters": [
                     {
                         "in": "path",
@@ -24378,7 +25004,8 @@
             },
             "patch": {
                 "operationId": "personalities-external-partial-update",
-                "description": "Update a caller personality",
+                "description": "Update an existing personality, sending only the fields you want to change. This is the only place the simulated caller's voice-layer behavior can be set — evaluator instructions cannot override it. Globally available personalities are shared and cannot be updated; fork one into your project first, then update the fork.",
+                "summary": "Update a personality",
                 "parameters": [
                     {
                         "in": "path",
@@ -24600,7 +25227,8 @@
         "/test_framework/v1/personalities-external/{id}/fork/": {
             "post": {
                 "operationId": "personalities-external-fork-create",
-                "description": "Personalities fork",
+                "description": "Copy a personality into one of your projects, inheriting all of its settings. Use this to customise a globally available personality, which is shared and cannot be edited in place — the copy is yours to change by updating it. The copy is enabled for the project automatically.",
+                "summary": "Fork a personality into a project",
                 "parameters": [
                     {
                         "in": "path",
@@ -24619,21 +25247,20 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -24759,7 +25386,8 @@
         "/test_framework/v1/personalities/{id}/": {
             "get": {
                 "operationId": "personalities-retrieve",
-                "description": "Retrieve a caller personality by ID",
+                "description": "Retrieve one personality by id, including its voice-layer behavior and the language it speaks.\n\nPrefer this over listing whenever you already know which personality you mean: the list endpoint returns every personality available to the caller, globally available ones included, and is documented as capable of large payloads.",
+                "summary": "Retrieve a personality",
                 "parameters": [
                     {
                         "in": "path",
@@ -24795,6 +25423,14 @@
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "personalities-retrieve",
+                        "description": "Retrieve one personality by id, including its voice-layer behavior and the language it speaks.\n\nPrefer this over listing whenever you already know which personality you mean: the list endpoint returns every personality available to the caller, globally available ones included, and is documented as capable of large payloads."
                     }
                 }
             },
@@ -24861,7 +25497,8 @@
             },
             "patch": {
                 "operationId": "personalities-partial-update",
-                "description": "Update a caller personality",
+                "description": "Update an existing personality, sending only the fields you want to change. This is the only place the simulated caller's voice-layer behavior can be set — evaluator instructions cannot override it. Globally available personalities are shared and cannot be updated; fork one into your project first, then update the fork.",
+                "summary": "Update a personality",
                 "parameters": [
                     {
                         "in": "path",
@@ -24916,6 +25553,14 @@
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "personalities-partial-update",
+                        "description": "Update an existing personality, sending only the fields you want to change. This is the only place the simulated caller's voice-layer behavior can be set — evaluator instructions cannot override it. Globally available personalities are shared and cannot be updated; fork one into your project first, then update the fork."
                     }
                 }
             },
@@ -25083,7 +25728,8 @@
         "/test_framework/v1/personalities/{id}/fork/": {
             "post": {
                 "operationId": "personalities-fork-create",
-                "description": "Personalities fork",
+                "description": "Copy a personality into one of your projects, inheriting all of its settings. Use this to customise a globally available personality, which is shared and cannot be edited in place — the copy is yours to change by updating it. The copy is enabled for the project automatically.",
+                "summary": "Fork a personality into a project",
                 "parameters": [
                     {
                         "in": "path",
@@ -25102,21 +25748,20 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/CreatePersonality"
+                                "$ref": "#/components/schemas/ForkPersonality"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -25139,6 +25784,14 @@
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "personalities-fork-create",
+                        "description": "Copy a personality into one of your projects, inheriting all of its settings. Use this to customise a globally available personality, which is shared and cannot be edited in place — the copy is yours to change by updating it. The copy is enabled for the project automatically."
                     }
                 }
             }
@@ -30489,7 +31142,8 @@
         "/test_framework/v1/runs-external/{id}/": {
             "get": {
                 "operationId": "runs-v1-external-retrieve",
-                "description": "Retrieve a test run by ID",
+                "description": "Retrieve one run by `run_id` (the integer path parameter), including its transcript, metric evaluations and error message.\n\nPrefer this over `bulk` whenever you want a single run: `bulk` takes a comma-separated `run_ids` plus a scope parameter, so it is easy to widen by accident into every run of a result. The `call_id` field on the response is the provider's call identifier (a string) — do NOT pass it where `run_id` is expected.",
+                "summary": "Retrieve a test run",
                 "parameters": [
                     {
                         "in": "path",
@@ -31487,7 +32141,8 @@
         "/test_framework/v1/runs/{id}/": {
             "get": {
                 "operationId": "runs-v1-retrieve",
-                "description": "Retrieve a test run by ID",
+                "description": "Retrieve one run by `run_id` (the integer path parameter), including its transcript, metric evaluations and error message.\n\nPrefer this over `bulk` whenever you want a single run: `bulk` takes a comma-separated `run_ids` plus a scope parameter, so it is easy to widen by accident into every run of a result. The `call_id` field on the response is the provider's call identifier (a string) — do NOT pass it where `run_id` is expected.",
+                "summary": "Retrieve a test run",
                 "parameters": [
                     {
                         "in": "path",
@@ -32345,6 +33000,9 @@
                         "oauth2": []
                     },
                     {
+                        "shareable_link": []
+                    },
+                    {
                         "supabase_session": []
                     },
                     {
@@ -32871,7 +33529,7 @@
             "get": {
                 "operationId": "scenarios-list",
                 "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first.",
-                "summary": "List evaluators (scenarios)",
+                "summary": "List evaluators",
                 "parameters": [
                     {
                         "name": "page",
@@ -32988,7 +33646,7 @@
             "post": {
                 "operationId": "scenarios-create",
                 "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
-                "summary": "Create an evaluator (scenario)",
+                "summary": "Create an evaluator",
                 "tags": [
                     "Scenarios"
                 ],
@@ -33126,7 +33784,7 @@
             "get": {
                 "operationId": "scenarios-external-list",
                 "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first.",
-                "summary": "List evaluators (scenarios)",
+                "summary": "List evaluators",
                 "parameters": [
                     {
                         "name": "page",
@@ -33235,7 +33893,7 @@
             "post": {
                 "operationId": "scenarios-external-create",
                 "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
-                "summary": "Create an evaluator (scenario)",
+                "summary": "Create an evaluator",
                 "tags": [
                     "Scenarios"
                 ],
@@ -33365,7 +34023,7 @@
             "get": {
                 "operationId": "scenarios-external-retrieve",
                 "description": "Fetch a single evaluator by id. Returns full configuration including instructions, expected outcome, metrics, test profile, and — when the agent has mock tools attached and the scenario was auto-generated — the expected mock tool calls (`generated_mock_tool_entries`) with their inputs and outputs.",
-                "summary": "Retrieve an evaluator (scenario)",
+                "summary": "Retrieve an evaluator",
                 "parameters": [
                     {
                         "in": "path",
@@ -33483,7 +34141,7 @@
             "patch": {
                 "operationId": "scenarios-external-partial-update",
                 "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
-                "summary": "Update an evaluator (scenario)",
+                "summary": "Update an evaluator",
                 "parameters": [
                     {
                         "in": "path",
@@ -39497,7 +40155,7 @@
             "get": {
                 "operationId": "scenarios-retrieve",
                 "description": "Fetch a single evaluator by id. Returns full configuration including instructions, expected outcome, metrics, test profile, and — when the agent has mock tools attached and the scenario was auto-generated — the expected mock tool calls (`generated_mock_tool_entries`) with their inputs and outputs.",
-                "summary": "Retrieve an evaluator (scenario)",
+                "summary": "Retrieve an evaluator",
                 "parameters": [
                     {
                         "in": "path",
@@ -39623,7 +40281,7 @@
             "patch": {
                 "operationId": "scenarios-partial-update",
                 "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
-                "summary": "Update an evaluator (scenario)",
+                "summary": "Update an evaluator",
                 "parameters": [
                     {
                         "in": "path",
@@ -46992,6 +47650,145 @@
                 }
             }
         },
+        "/test_framework/v1/tools/": {
+            "get": {
+                "operationId": "tools-list",
+                "description": "Return the project's mock tools with their input/output pairs and the agents using each one. Scope with `project_id` for the whole catalogue, or with `agent_id` to get only the tools that agent could newly adopt (its own are excluded). `search` matches the tool name, with or without the `c_` prefix. Results are paginated, most-shared first.",
+                "summary": "List the mock tools in a project",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": false,
+                        "in": "query",
+                        "description": "A page number within the paginated result set.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page_size",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "search",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Filter by tool name; matches with or without the `c_` prefix."
+                    },
+                    {
+                        "name": "project_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project_id`, `agent_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    },
+                    {
+                        "name": "agent_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `project_id`, `agent_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedToolList"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "tools-list",
+                        "description": "Return the project's mock tools with their input/output pairs and the agents using each one. Scope with `project_id` for the whole catalogue, or with `agent_id` to get only the tools that agent could newly adopt (its own are excluded). `search` matches the tool name, with or without the `c_` prefix. Results are paginated, most-shared first."
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/tools/{id}/": {
+            "get": {
+                "operationId": "tools-retrieve",
+                "description": "Return a single mock tool with its input/output pairs and the agents using it.",
+                "summary": "Get one mock tool",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this tool.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Tool"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "tools-retrieve",
+                        "description": "Return a single mock tool with its input/output pairs and the agents using it."
+                    }
+                }
+            }
+        },
         "/test_framework/v1/views/": {
             "get": {
                 "operationId": "views-list",
@@ -49409,7 +50206,7 @@
                                         "name": "Was the caller greeted by name",
                                         "description": "Score TRUE if the agent addressed the caller by their name within the first 3 turns, FALSE otherwise.",
                                         "type": "llm_judge",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "simulation_enabled": true,
                                         "observability_enabled": true
                                     },
@@ -49436,7 +50233,7 @@
                                         "project": 1376,
                                         "name": "Agent asked for order ID before refund",
                                         "type": "custom_code",
-                                        "eval_type": "bool",
+                                        "eval_type": "binary",
                                         "custom_code": "def score(transcript, context):\n    text = transcript.lower()\n    return 'order id' in text[:text.find('refund')] if 'refund' in text else True\n",
                                         "simulation_enabled": true
                                     },
@@ -53856,7 +54653,8 @@
         "/test_framework/v2/runs/{id}/": {
             "get": {
                 "operationId": "runs-retrieve",
-                "description": "Retrieve a Runs with the canonical binary wire format (eval_type `binary`, by ID",
+                "description": "Retrieve one run by `run_id` (the integer path parameter), including its transcript, metric evaluations and error message.\n\nPrefer this over `bulk` whenever you want a single run: `bulk` takes a comma-separated `run_ids` plus a scope parameter, so it is easy to widen by accident into every run of a result. The `call_id` field on the response is the provider's call identifier (a string) — do NOT pass it where `run_id` is expected.",
+                "summary": "Retrieve a test run",
                 "parameters": [
                     {
                         "in": "path",
@@ -53898,6 +54696,14 @@
                             }
                         },
                         "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "runs-retrieve",
+                        "description": "Retrieve one run by `run_id` (the integer path parameter), including its transcript, metric evaluations and error message.\n\nPrefer this over `bulk` whenever you want a single run: `bulk` takes a comma-separated `run_ids` plus a scope parameter, so it is easy to widen by accident into every run of a result. The `call_id` field on the response is the provider's call identifier (a string) — do NOT pass it where `run_id` is expected."
                     }
                 }
             },
@@ -54905,7 +55711,7 @@
             "get": {
                 "operationId": "test-framework-v2-scenarios-list",
                 "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first.",
-                "summary": "List evaluators (scenarios)",
+                "summary": "List evaluators",
                 "parameters": [
                     {
                         "name": "page",
@@ -55014,7 +55820,7 @@
             "post": {
                 "operationId": "test-framework-v2-scenarios-create",
                 "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
-                "summary": "Create an evaluator (scenario)",
+                "summary": "Create an evaluator",
                 "tags": [
                     "Scenarios"
                 ],
@@ -55144,7 +55950,7 @@
             "get": {
                 "operationId": "test-framework-v2-scenarios-retrieve",
                 "description": "Fetch a single evaluator by id. Returns full configuration including instructions, expected outcome, metrics, test profile, and — when the agent has mock tools attached and the scenario was auto-generated — the expected mock tool calls (`generated_mock_tool_entries`) with their inputs and outputs.",
-                "summary": "Retrieve an evaluator (scenario)",
+                "summary": "Retrieve an evaluator",
                 "parameters": [
                     {
                         "in": "path",
@@ -55262,7 +56068,7 @@
             "patch": {
                 "operationId": "test-framework-v2-scenarios-partial-update",
                 "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
-                "summary": "Update an evaluator (scenario)",
+                "summary": "Update an evaluator",
                 "parameters": [
                     {
                         "in": "path",
@@ -67689,6 +68495,9 @@
                     "question_answers": {
                         "readOnly": true
                     },
+                    "scenario_edit_proposals": {
+                        "readOnly": true
+                    },
                     "user_guidance": {
                         "type": "array",
                         "items": {
@@ -67854,6 +68663,14 @@
                             }
                         ],
                         "description": "MCP server this tool was fetched from, as {name, key}. Null for standalone tools. Server-managed — ignored on writes."
+                    },
+                    "subscriber_count": {
+                        "type": "integer",
+                        "description": "Number of agents in the project using this tool."
+                    },
+                    "is_shared": {
+                        "type": "boolean",
+                        "description": "True when more than one agent uses this tool, so an edit affects all of them."
                     }
                 },
                 "required": [
@@ -68034,6 +68851,49 @@
                             "null"
                         ],
                         "description": "Enable Cekura to accept call transcripts pushed by your agent via POST /custom-provider-webhook/. Only for self-hosted (custom) providers."
+                    },
+                    "redact_fields": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "enum": [
+                                "person_name",
+                                "age",
+                                "phone_number",
+                                "email_address",
+                                "date",
+                                "time",
+                                "location",
+                                "origin",
+                                "gender_sexuality",
+                                "physical_attribute",
+                                "occupation",
+                                "username",
+                                "password",
+                                "ip_address",
+                                "url",
+                                "filename",
+                                "event",
+                                "vehicle_id",
+                                "dob",
+                                "healthcare_number",
+                                "medical_professional",
+                                "credit_card",
+                                "account_number",
+                                "bank_account",
+                                "money",
+                                "ssn",
+                                "passport_number",
+                                "driver_license",
+                                "numerical_pii"
+                            ],
+                            "type": "string",
+                            "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
+                            "x-spec-enum-id": "99d2b7efd95189c4"
+                        },
+                        "description": "Sensitive fields removed from the transcript and audio of every call ingested for this agent, including auto-imported and webhook calls. Empty list disables redaction. Billed at 0.1 credits per call minute by default whenever any field is set."
                     }
                 }
             },
@@ -70299,7 +71159,7 @@
                             "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
                             "x-spec-enum-id": "99d2b7efd95189c4"
                         },
-                        "description": "\nOptional list of sensitive fields to redact from the transcript and audio. If not provided, no redaction will occur.\nAvailable fields include: phone_number, email_address, credit_card, ssn, dob, healthcare_number, etc.\nNote: Redacting any fields incurs a cost of 0.4 credits per minute, regardless of how many fields are selected.\nExample: `[\"phone_number\", \"email_address\", \"credit_card\"]`\n"
+                        "description": "\nOptional list of sensitive fields to redact from the transcript and audio. Overrides the agent's configured redaction fields for this call; when omitted, the agent's configuration applies.\nAvailable fields include: phone_number, email_address, credit_card, ssn, dob, healthcare_number, etc.\nNote: Redacting any fields incurs a cost of 0.1 credits per minute by default, regardless of how many fields are selected.\nExample: `[\"phone_number\", \"email_address\", \"credit_card\"]`\n"
                     },
                     "metric_ids": {
                         "type": "string",
@@ -71537,6 +72397,153 @@
                     "count"
                 ]
             },
+            "FirstInsightsAcknowledge": {
+                "type": "object",
+                "description": "Request body for ``POST /first-insights/<id>/acknowledge/``.",
+                "properties": {
+                    "dismissed": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "True when the customer dismissed the banner outright rather than opening the report."
+                    }
+                }
+            },
+            "FirstInsightsReport": {
+                "type": "object",
+                "description": "The onboarding report exposed to the Calls banner and Insights tab.\n\n``hidden_failure_count`` is served alongside the id list because every\nsurface that shows this report leads with the count and only the panel\nneeds the ids.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "project": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "status": {
+                        "enum": [
+                            "pending",
+                            "running",
+                            "succeeded",
+                            "failed",
+                            "skipped_not_enough_data"
+                        ],
+                        "type": "string",
+                        "description": "* `pending` - Pending\n* `running` - Running\n* `succeeded` - Succeeded\n* `failed` - Failed\n* `skipped_not_enough_data` - Skipped Not Enough Data",
+                        "x-spec-enum-id": "128862fca689ae44",
+                        "readOnly": true
+                    },
+                    "window_start": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "window_end": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "num_calls_analyzed": {
+                        "type": "integer",
+                        "readOnly": true
+                    },
+                    "agent_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "hidden_failure_call_ids": {
+                        "readOnly": true
+                    },
+                    "hidden_failure_count": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "failure_patterns": {
+                        "readOnly": true
+                    },
+                    "suggested_metrics": {
+                        "readOnly": true
+                    },
+                    "worst_call": {
+                        "readOnly": true
+                    },
+                    "enabled_metric_ids": {
+                        "readOnly": true
+                    },
+                    "alert_ids": {
+                        "readOnly": true
+                    },
+                    "scenario_ids": {
+                        "readOnly": true
+                    },
+                    "viewed_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "dismissed_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "error_message": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "duration_seconds": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                }
+            },
+            "FirstInsightsSuggestedMetric": {
+                "type": "object",
+                "description": "Request body for the report's per-suggestion actions.",
+                "properties": {
+                    "index": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Position of the suggested metric in `suggested_metrics`."
+                    }
+                },
+                "required": [
+                    "index"
+                ]
+            },
+            "ForkPersonality": {
+                "type": "object",
+                "description": "Request body for forking a personality. A fork inherits every setting from its\nsource, so this deliberately does not advertise the voice fields that creating a\npersonality from scratch requires.",
+                "properties": {
+                    "project_id": {
+                        "type": "integer",
+                        "description": "Project the fork is created in. Inferred from a project-scoped API key when omitted."
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Replaces the source personality's prompt on the fork."
+                    }
+                }
+            },
             "GenerateClarifyAnswer": {
                 "type": "object",
                 "description": "Body for POST /scenarios/generate-clarify-answer/.",
@@ -71723,6 +72730,46 @@
                 "required": [
                     "progress_id",
                     "project_id"
+                ]
+            },
+            "InsightMetricConfig": {
+                "type": "object",
+                "description": "Request body for ``POST /metric-failure-mode-insights/metric-config/``.",
+                "properties": {
+                    "project": {
+                        "type": "integer",
+                        "description": "Project the metric belongs to."
+                    },
+                    "metric": {
+                        "type": "integer",
+                        "description": "Metric to enable or disable insights for."
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Turn insights on or off for this metric. While on, each analysed failure consumes credits."
+                    },
+                    "pass_conditions": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "What counts as a passing call, as {\"operator\": \"and\", \"conditions\": [{\"field\", \"op\", \"value\"}]}. Calls that don't satisfy it are the failures insights investigate. Omit when enabling to accept the metric's default threshold."
+                    },
+                    "triage_failure_limit": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "description": "Maximum failed calls Insights analyses for this metric each day. Omit to keep the current limit; send null to analyse every failure."
+                    }
+                },
+                "required": [
+                    "enabled",
+                    "metric",
+                    "project"
                 ]
             },
             "InsightReproductionRequest": {
@@ -73286,7 +74333,8 @@
                     },
                     "feedback": {
                         "type": "string",
-                        "description": "Human note attached to each sampled call's metric review in Labs."
+                        "default": "",
+                        "description": "Optional human note attached to each sampled call's metric review in Labs. The corrected label alone is enough to iterate on the metric, so a blank note is accepted."
                     },
                     "expected_value": {
                         "oneOf": [
@@ -73299,8 +74347,7 @@
                     }
                 },
                 "required": [
-                    "failure_mode_index",
-                    "feedback"
+                    "failure_mode_index"
                 ]
             },
             "MetricFailureModeInsight": {
@@ -73335,7 +74382,7 @@
                     },
                     "is_triage": {
                         "type": "boolean",
-                        "description": "Derived live from the metric's current `triage_enabled` + rubric\nmembership (not persisted) — the FE renders the triage section only\nwhen this is true.",
+                        "description": "Derived live from the metric's current Insights opt-in + failure\ncriteria (not persisted) — the FE renders a metric's insight card only\nwhen this is true.",
                         "readOnly": true
                     },
                     "window_start": {
@@ -76694,6 +77741,37 @@
                     }
                 }
             },
+            "PaginatedToolList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/Tool"
+                        }
+                    }
+                }
+            },
             "PaginatedUserConfigurationList": {
                 "type": "object",
                 "required": [
@@ -79896,7 +80974,7 @@
                         "type": "string",
                         "x-spec-enum-id": "97f8e4b948b4e205",
                         "default": "instruction",
-                        "description": "\nType of scenario to create:\n- `instruction`: Standard instruction-based scenario where the instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where the instructions field contains a JSON structure\n\nDefault: `instruction`\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario to create:\n- `instruction`: Standard instruction-based scenario where the instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where the instructions field contains a JSON structure\n\nDefault: `instruction`. Must be sent as `conditional_actions` when the request includes the\n`conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
                     },
                     "instructions": {
                         "type": "string",
@@ -80576,6 +81654,25 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "MCP server this tool was fetched from, as `{'name', 'key'}`. Null for standalone (non-MCP) tools. Server-managed — ignored on writes."
+                    },
+                    "subscriber_count": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Number of agents in the project sharing this tool."
+                    },
+                    "is_shared": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "True when more than one agent shares this tool. Edits and deletes affect every subscriber."
+                    },
+                    "subscribers": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "readOnly": true,
+                        "description": "Agents using this tool, so a caller can see who an edit would affect."
                     }
                 }
             },
@@ -80651,6 +81748,11 @@
                         "type": "object",
                         "additionalProperties": {},
                         "description": "\nDynamic variables used to replace {{variables}} in agent description. Supplied top-level keys are merged with existing variables; supplied keys overwrite matching keys and omitted keys are preserved.\nExample:\n```json\n{\n    \"subscription_id\": \"SUB-12345\",\n    \"product_type\": \"premium\"\n}\n```\n"
+                    },
+                    "reevaluate_metrics": {
+                        "type": "boolean",
+                        "writeOnly": true,
+                        "description": "Run metric evaluation on the call log after applying this update. Releases a call that was ingested with deferred evaluation, otherwise re-evaluates an already evaluated call. Calls whose evaluation is still running are left untouched."
                     }
                 }
             },
@@ -83940,7 +85042,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -84013,7 +85115,7 @@
                         "type": "string",
                         "x-spec-enum-id": "db62e37bb530b602",
                         "default": "instruction",
-                        "description": "\nType of scenario (instruction, real_world_smart, or real_world_fixed)\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario. Defaults to `instruction`. Must be sent as `conditional_actions` when the\nrequest includes the `conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
                     },
                     "suite_type": {
                         "enum": [
@@ -85060,7 +86162,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -85133,7 +86235,7 @@
                         "type": "string",
                         "x-spec-enum-id": "db62e37bb530b602",
                         "default": "instruction",
-                        "description": "\nType of scenario (instruction, real_world_smart, or real_world_fixed)\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario. Defaults to `instruction`. Must be sent as `conditional_actions` when the\nrequest includes the `conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
                     },
                     "suite_type": {
                         "enum": [
@@ -85403,6 +86505,49 @@
                             "null"
                         ],
                         "description": "Enable Cekura to accept call transcripts pushed by your agent via POST /custom-provider-webhook/. Only for self-hosted (custom) providers."
+                    },
+                    "redact_fields": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "enum": [
+                                "person_name",
+                                "age",
+                                "phone_number",
+                                "email_address",
+                                "date",
+                                "time",
+                                "location",
+                                "origin",
+                                "gender_sexuality",
+                                "physical_attribute",
+                                "occupation",
+                                "username",
+                                "password",
+                                "ip_address",
+                                "url",
+                                "filename",
+                                "event",
+                                "vehicle_id",
+                                "dob",
+                                "healthcare_number",
+                                "medical_professional",
+                                "credit_card",
+                                "account_number",
+                                "bank_account",
+                                "money",
+                                "ssn",
+                                "passport_number",
+                                "driver_license",
+                                "numerical_pii"
+                            ],
+                            "type": "string",
+                            "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
+                            "x-spec-enum-id": "99d2b7efd95189c4"
+                        },
+                        "description": "Sensitive fields removed from the transcript and audio of every call ingested for this agent, including auto-imported and webhook calls. Empty list disables redaction. Billed at 0.1 credits per call minute by default whenever any field is set."
                     },
                     "configure_from_provider": {
                         "type": "boolean",
@@ -87252,7 +88397,7 @@
                         "type": "string",
                         "x-spec-enum-id": "97f8e4b948b4e205",
                         "default": "instruction",
-                        "description": "\nType of scenario to create:\n- `instruction`: Standard instruction-based scenario where the instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where the instructions field contains a JSON structure\n\nDefault: `instruction`\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario to create:\n- `instruction`: Standard instruction-based scenario where the instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where the instructions field contains a JSON structure\n\nDefault: `instruction`. Must be sent as `conditional_actions` when the request includes the\n`conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
                     },
                     "instructions": {
                         "type": "string",
@@ -87474,7 +88619,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -88853,6 +89998,25 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "MCP server this tool was fetched from, as `{'name', 'key'}`. Null for standalone (non-MCP) tools. Server-managed — ignored on writes."
+                    },
+                    "subscriber_count": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Number of agents in the project sharing this tool."
+                    },
+                    "is_shared": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "True when more than one agent shares this tool. Edits and deletes affect every subscriber."
+                    },
+                    "subscribers": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
+                        "readOnly": true,
+                        "description": "Agents using this tool, so a caller can see who an edit would affect."
                     }
                 },
                 "required": [

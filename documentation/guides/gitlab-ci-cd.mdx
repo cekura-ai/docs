@@ -1,0 +1,304 @@
+---
+title: 'GitLab CI/CD Tutorial'
+sidebarTitle: "GitLab CI/CD Tutorial"
+icon: "gitlab"
+iconType: "brands"
+description: 'Learn how to automatically test your agents in GitLab pipelines with the Cekura CI/CD component'
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+Automate your agent testing with the [Cekura GitLab CI/CD component](https://gitlab.com/cekura/cicd). This guide shows you how to run Cekura scenarios on every code change, merge request, or scheduled pipeline.
+
+The component starts a Cekura test, waits for it to finish, and reports the result through GitLab job logs, the **Tests** tab, job annotations, and downloadable artifacts.
+
+## Before You Get Started
+
+You need:
+
+- A Cekura API key
+- An agent and scenarios configured in the [Cekura dashboard](https://dashboard.cekura.ai)
+- A project ID only when selecting scenarios by evaluator folder
+
+The agent ID is optional. If you omit it, Cekura infers the agent from the selected scenarios.
+
+Add the configuration to the pipeline file that GitLab actually loads. This is usually `.gitlab-ci.yml`, but it can be a [global pipeline](#global-pipelines-and-custom-stages). For GitLab Self-Managed, first follow [GitLab Self-Managed](#gitlab-self-managed).
+
+## Choose Which Scenarios to Run
+
+Choose a selector: scenario IDs, tags, or an evaluator folder. IDs and tags can be combined; a folder cannot be combined with either.
+
+<Tabs>
+  <Tab title="Scenario IDs">
+    Run an exact set of scenarios using comma-separated IDs:
+
+    ```yaml
+    include:
+      - component: gitlab.com/cekura/cicd/run@1.0.0
+        inputs:
+          api_key: $CEKURA_API_KEY
+          scenario_ids: "101,202"
+    ```
+  </Tab>
+
+  <Tab title="Tags">
+    Run scenarios selected by one or more supplied tags:
+
+    ```yaml
+    include:
+      - component: gitlab.com/cekura/cicd/run@1.0.0
+        inputs:
+          api_key: $CEKURA_API_KEY
+          tags: "smoke,release"
+    ```
+  </Tab>
+
+  <Tab title="Evaluator Folder">
+    Run every scenario in a folder. `project_id` is required even when you provide `agent_id`:
+
+    ```yaml
+    include:
+      - component: gitlab.com/cekura/cicd/run@1.0.0
+        inputs:
+          api_key: $CEKURA_API_KEY
+          folder_path: "Release checks"
+          project_id: "1875"
+    ```
+  </Tab>
+</Tabs>
+
+These examples use GitLab.com. On GitLab Self-Managed, replace the `component` include with the mirrored or remote include described below; the selector inputs stay the same.
+
+## Run the Pipeline
+
+<Steps>
+  <Step title="Add Your API Key">
+    In your GitLab project, go to **Settings → CI/CD → Variables**, expand **Variables**, and select **Add variable**.
+
+    Set the key to `CEKURA_API_KEY`, paste your Cekura API key as the value, and enable **Masked**.
+
+    Enable **Protected** only when the Cekura job runs exclusively on protected branches or tags. Protected variables are not available to pipelines on unprotected refs.
+
+    <Warning>
+    Never put your API key directly in `.gitlab-ci.yml`.
+    </Warning>
+  </Step>
+
+  <Step title="Add the Pipeline Configuration">
+    Copy one configuration from [Choose Which Scenarios to Run](#choose-which-scenarios-to-run) into the active pipeline file.
+  </Step>
+
+  <Step title="Start a Test Run">
+    Commit and push the pipeline configuration. By default, the generated `cekura-run` job runs whenever the pipeline is triggered.
+
+    You can also go to **Build → Pipelines**, select **New pipeline**, choose a branch, and select **New pipeline** again to test it manually.
+  </Step>
+
+  <Step title="Review the Results">
+    Open the `cekura-run` job to see the result summary, failed-run details, and a shareable link to the full result in Cekura.
+
+    GitLab also displays each scenario run in the pipeline's **Tests** tab. The job publishes Markdown and JSON summaries as artifacts and adds a direct Cekura result link to the job page.
+  </Step>
+</Steps>
+
+## GitLab Self-Managed
+
+GitLab components can only be referenced from the same GitLab instance as the consuming project. A self-managed project therefore cannot use this GitLab.com reference directly:
+
+```yaml
+component: gitlab.com/cekura/cicd/run@1.0.0
+```
+
+The configurations below require GitLab 17.0 or later because the Cekura template uses CI/CD inputs. Choose one of the following approaches.
+
+### Production: Mirror the Component
+
+GitLab recommends mirroring GitLab.com components into your self-managed instance:
+
+1. Allow outbound access from the self-managed instance to `gitlab.com`.
+2. Create a project on the self-managed instance and configure it as a pull mirror of [`gitlab.com/cekura/cicd`](https://gitlab.com/cekura/cicd). If pull mirroring is not available with your GitLab subscription, import the repository and repeat the import when upgrading the component.
+3. Set the mirrored project as a CI/CD Catalog resource.
+4. Publish a release for the mirrored `1.0.0` tag. Git repository mirroring copies the tag, but not the GitLab release or Catalog metadata.
+5. Reference the mirrored component using the self-managed GitLab hostname and mirrored project path:
+
+```yaml
+include:
+  - component: gitlab.example.com/components/cekura-cicd/run@1.0.0
+    inputs:
+      api_key: $CEKURA_API_KEY
+      scenario_ids: "101,202"
+```
+
+Replace `gitlab.example.com/components/cekura-cicd` with the actual hostname and project path of the mirror. See GitLab's guide to [using a GitLab.com component on GitLab Self-Managed](https://docs.gitlab.com/ci/components/#use-a-gitlabcom-component-on-gitlab-self-managed).
+
+### Proof of Concept: Use a Remote Include
+
+On GitLab 17.0 or later, you can include the public component template directly for a proof of concept:
+
+```yaml
+include:
+  - remote: "https://gitlab.com/cekura/cicd/-/raw/1.0.0/templates/run.yml"
+    inputs:
+      api_key: $CEKURA_API_KEY
+      scenario_ids: "101,202"
+```
+
+The self-managed GitLab server must be able to make outbound HTTPS requests to `gitlab.com`. Remote includes are fetched without authentication, so this approach only works while the source file remains public.
+
+<Warning>
+For production, mirror the component into your self-managed GitLab instance. This keeps the dependency under your instance's access controls and release-management process.
+</Warning>
+
+## Global Pipelines and Custom Stages
+
+Global pipelines work with both GitLab.com and GitLab Self-Managed. Add the Cekura include to the active global configuration; changes to a repository-level `.gitlab-ci.yml` have no effect when GitLab is configured to load a different file.
+
+The examples below use GitLab.com. On GitLab Self-Managed, use the mirrored component or remote include from the previous section.
+
+The component creates a job named `cekura-run` and uses the `test` stage by default. The component cannot add a new stage to a global pipeline. Either pass the name of an existing stage:
+
+```yaml
+include:
+  - component: gitlab.com/cekura/cicd/run@1.0.0
+    inputs:
+      api_key: $CEKURA_API_KEY
+      scenario_ids: "101,202"
+      stage: validation
+```
+
+Or have the global pipeline owner add a dedicated stage and select it:
+
+```yaml
+stages:
+  - build
+  - test
+  - cekura
+  - deploy
+
+include:
+  - component: gitlab.com/cekura/cicd/run@1.0.0
+    inputs:
+      api_key: $CEKURA_API_KEY
+      scenario_ids: "101,202"
+      stage: cekura
+```
+
+The value of `stage` must exactly match a stage defined by the active pipeline configuration.
+
+## Configure Pipeline Triggers
+
+The component creates a job named `cekura-run`. After the include, define only the job's GitLab [`rules`](https://docs.gitlab.com/ci/yaml/#rules); GitLab merges them with the component job.
+
+<AccordionGroup>
+  <Accordion title="Run on Merge Requests and the Default Branch">
+    ```yaml
+    cekura-run:
+      rules:
+        - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    ```
+  </Accordion>
+
+  <Accordion title="Run Only When Started Manually">
+    ```yaml
+    cekura-run:
+      rules:
+        - when: manual
+    ```
+  </Accordion>
+
+  <Accordion title="Run in Scheduled Pipelines">
+    ```yaml
+    cekura-run:
+      rules:
+        - if: $CI_PIPELINE_SOURCE == "schedule"
+    ```
+
+    Create the schedule under **Build → Pipeline schedules** in your GitLab project.
+  </Accordion>
+</AccordionGroup>
+
+## Component Inputs
+
+Only `api_key` and a scenario selector are needed for a typical run. Empty optional inputs are not sent to Cekura, so the API applies its defaults.
+
+| Input | Description | Required | Default |
+| --- | --- | --- | --- |
+| `api_key` | Cekura API key. Pass a masked CI/CD variable. | Yes | - |
+| `scenario_ids` | Comma-separated scenario IDs. | No* | - |
+| `tags` | Comma-separated scenario tags. | No* | - |
+| `folder_path` | Evaluator folder path. Requires `project_id`, even when `agent_id` is provided. | No* | - |
+| `project_id` | Cekura project ID used with `folder_path`. | With folder | - |
+| `agent_id` | Agent ID override. Otherwise inferred from the selected scenarios. | No | - |
+| `phone_number` | Outbound phone number used for testing. | No | - |
+| `agent_number` | Number on which the agent under test receives calls. | No | - |
+| `name` | Name for the Cekura test result. | No | - |
+| `api_url` | Cekura API base URL. | No | `https://api.cekura.ai` |
+| `frequency` | Number of times to run each scenario. | No | `1` |
+| `personality_ids` | Comma-separated personality ID overrides. | No | - |
+| `test_profile_ids` | Comma-separated test profile ID overrides. | No | - |
+| `mode` | `same_number` or `different_numbers`. | No | API default |
+| `concurrency_limit` | Maximum number of parallel calls. | No | API default |
+| `mock_tool_names` | Comma-separated tools to mock. Use `[]` to mock none; omit to mock all configured tools. | No | API default |
+| `timeout` | Maximum time to wait for completion, in seconds. | No | `3600` |
+| `stage` | Pipeline stage for the generated job. | No | `test` |
+
+*Provide at least one of `scenario_ids`, `tags`, or `folder_path`. A folder cannot be combined with IDs or tags.
+
+## Use the Result in Another Job
+
+The component publishes `RESULT_ID` and `RESULT_URL` in a GitLab dotenv report. A downstream job can use them by downloading the `cekura-run` artifacts:
+
+```yaml
+publish-cekura-result:
+  stage: deploy
+  needs:
+    - job: cekura-run
+      artifacts: true
+  script:
+    - echo "Cekura result: ${RESULT_URL} (${RESULT_ID})"
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The cekura-run Job Does Not Appear">
+    Open **Build → Pipeline editor → Full configuration** and search for `cekura-run`.
+
+    If the job is absent:
+
+    - Check **Settings → CI/CD → General pipelines → CI/CD configuration file** to confirm which pipeline configuration GitLab loads.
+    - On GitLab Self-Managed, do not reference the component on `gitlab.com` with `include:component`. Mirror it locally or use the remote-include proof of concept above.
+    - If a global pipeline is active, add the include to that configuration or use an extension mechanism provided by its owner.
+  </Accordion>
+
+  <Accordion title="The Pipeline Uses Custom Stages">
+    The component uses `test` by default. If the active pipeline defines its own `stages:` list without `test`, pass an existing stage through the `stage` input or ask the global pipeline owner to add a dedicated stage.
+
+    A component can select a stage, but it cannot add that stage to the consuming pipeline.
+  </Accordion>
+
+  <Accordion title="The API Key Is Not Available">
+    Check that `CEKURA_API_KEY` is defined under **Settings → CI/CD → Variables** and is spelled exactly the same in `.gitlab-ci.yml`.
+
+    If the variable is protected, the pipeline must run on a protected branch or tag. Otherwise, clear the **Protected** option or change where the job runs.
+  </Accordion>
+
+  <Accordion title="The Pipeline Configuration Is Invalid">
+    On GitLab.com, confirm that the component reference is exactly `gitlab.com/cekura/cicd/run@1.0.0` and that `inputs` is nested under the component entry.
+
+    On GitLab Self-Managed, confirm that the component reference uses the self-managed hostname and mirrored project path. For a remote include, confirm that the instance runs GitLab 17.0 or later and can access `gitlab.com`.
+
+    Use **Build → Pipeline editor → Validate** in GitLab to validate the complete configuration.
+  </Accordion>
+
+  <Accordion title="No Scenarios Were Selected">
+    Provide `scenario_ids`, `tags`, or `folder_path`. When using a folder, also provide `project_id`, and do not combine the folder with IDs or tags.
+  </Accordion>
+
+  <Accordion title="The Cekura Tests Fail">
+    Open the `cekura-run` log for failure reasons and individual failed-run details. Follow the **View full results in Cekura** link for transcripts, evaluations, and the AI-generated analysis.
+  </Accordion>
+</AccordionGroup>

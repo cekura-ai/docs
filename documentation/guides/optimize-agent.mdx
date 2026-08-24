@@ -1,0 +1,160 @@
+---
+title: "Optimize Agent"
+sidebarTitle: "Optimize Agent"
+icon: "wand-magic-sparkles"
+iconType: "regular"
+description: "Close the loop on agent quality. Improve Agent turns failing calls and evaluators into a measured before/after: it works on a private copy of your agent, changes the instructions, re-tests, and hands you the result to accept or discard."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+**Improve Agent** takes a set of failures — production calls, a simulation run, or evaluators you pick — and runs a measure → change → re-measure loop until your agent passes or it runs out of road. It never edits your live agent. Everything happens on a private copy, and you decide at the end whether to keep the changes.
+
+<Note>
+**Improve Agent is BETA.** It supports agents on **VAPI, Retell, ElevenLabs and Bland**. The loop reads and edits the agent's configuration through your provider credentials, so the agent must already be connected to Cekura.
+</Note>
+
+## Where to start it
+
+Four places in the dashboard launch the same loop. What differs is where the failures come from.
+
+<Steps>
+  <Step title="Insights — a failure category">
+    Each failure category on the **Insights** page has its own action. Click **Improve agent** on the category you care about. If that category's calls span more than one agent, you'll be asked which agent to improve first. The loop writes fresh evaluator scenarios from the production calls behind that category, then works from those.
+  </Step>
+  <Step title="A run or call detail page">
+    Open a run and click **Improve Agent** on the results card. It uses every metric on that run — the failing ones are what it tries to fix, and the passing ones become guardrails it must not break. You don't pick metrics.
+  </Step>
+  <Step title="A result's failure breakdown">
+    On a finished result, launch straight from the failure breakdown. The scores you're already looking at are reused as the starting measurement instead of paying to re-run the same conversations.
+  </Step>
+  <Step title="Evaluators list — bulk action">
+    Select one or more evaluators and use the **Improve Agent** bulk action. Those evaluators become the validation set.
+  </Step>
+</Steps>
+
+Each run gets its own thread where the loop narrates what it is doing, and a progress panel you can leave and come back to.
+
+## Before you start
+
+<Steps>
+  <Step title="The agent is connected to Cekura">
+    The loop reads your agent's live configuration to know what it can change. See [Cekura Agent](/documentation/guides/cekura-agent).
+  </Step>
+  <Step title="There is something to measure against">
+    Your project needs either a rubric rule or at least one metric enabled for simulations. Without one, there is no way to score a before and after, and the run is refused up front rather than burning credits.
+  </Step>
+  <Step title="There is a real failure">
+    The loop's input is failures. If everything already passes, it stops and tells you so instead of changing things for their own sake.
+  </Step>
+</Steps>
+
+## What the loop does
+
+<Steps>
+  <Step title="Makes a private copy">
+    Your agent is copied at your provider. Every change and every test conversation from here on happens against that copy. **Your live agent is untouched for the entire run.**
+  </Step>
+  <Step title="Writes scenarios (production-call runs only)">
+    When the failures come from real calls, the loop reads those transcripts and writes evaluator scenarios that reproduce them. When you started from a run or from evaluators, the scenarios already exist and this step is skipped.
+  </Step>
+  <Step title="Reproduces the failure (production-call runs only)">
+    Before changing anything, the loop proves it can make the problem happen on demand. See [Reproducing the failure](#reproducing-the-failure).
+  </Step>
+  <Step title="Measures a baseline">
+    Runs the scenarios against the copy and records the starting score for every metric. This is the "before" side of everything you're shown later.
+  </Step>
+  <Step title="Proposes a change">
+    Reads the failing transcripts and the current instructions, and proposes the smallest set of edits that would fix what actually went wrong. If the answer depends on a business rule it can't infer — which of two policies is correct, what the agent may promise — it stops and asks you rather than guessing.
+  </Step>
+  <Step title="Applies and re-tests">
+    Lands the edits on the copy and re-runs the scenarios that were failing. If they all pass, it re-runs the rest to check nothing regressed.
+  </Step>
+  <Step title="Repeats, then reports">
+    Loops until everything passes or it stops making progress, then shows you the before/after per metric, the exact changes, and a **Promote** button.
+  </Step>
+</Steps>
+
+### What it is allowed to change
+
+The loop edits the agent's instructions and closely related configuration on the copy. Some things are permanently off-limits and are rejected before they reach your provider:
+
+- credentials and API keys
+- webhook and server URLs
+- phone numbers
+- transfer and handoff destinations
+- voice and account wiring
+
+If a proposed change targets one of those, it is dropped and the run says so.
+
+## Reproducing the failure
+
+A failure that happened in production doesn't always happen in a test. When you start from production calls, the loop treats reproducing the problem as a precondition — not as an optional first attempt.
+
+It writes scenarios from the failing calls and runs each of them several times. The failure counts as reproduced when the metric that flagged those calls in production fails on a meaningful share of those conversations. That check is arithmetic, not a judgement call: conversations that were never scored — a timed-out call, a scoring error — count as neither evidence for nor against.
+
+If the failure doesn't show up, the loop doesn't give up on the first try. It:
+
+1. **Tries again with sharper scenarios.** It's told what it already tried and that it didn't reproduce, then re-reads the transcripts to find what the real calls had that its tests didn't.
+2. **Tries to force the failure.** If repeated attempts still can't provoke it, the loop may deliberately weaken a safeguard *on the private copy* to make the latent problem surface every time. This is a testing device, never a suggestion.
+
+<Note>
+**A change made only to force the failure is never offered to you and can never be promoted.** Before the run finishes, the loop puts the safeguard back and re-runs your whole scenario set on the result — so the version you're offered is the one that was actually tested. If the fix only worked while the safeguard was removed, you're told exactly that, and nothing is offered.
+</Note>
+
+If it still can't reproduce the problem, the run ends without changing anything and says so plainly. That is a different answer from "your agent already passes everything", and it is reported differently. The scenarios it wrote stay in your evaluators list — if you can tell it what those calls had in common that the tests are missing, that's the fastest way forward.
+
+## Accepting the changes
+
+Nothing reaches your live agent until you click **Promote**.
+
+- **Promote** applies the offered changes to your live agent. It re-checks first that the copy still matches what was measured and that your live agent hasn't drifted since the run started; if either has changed, it refuses rather than overwriting work you did in the meantime.
+- **Discard copy** deletes the private copy at your provider.
+- Copies are cleaned up automatically after about a week, and immediately when a run ends with nothing to offer.
+
+You're also sent a summary to Slack when the run finishes, if your workspace is connected.
+
+## While it's running
+
+- **Answer its questions.** When the loop pauses on a business-rule question, reply in the thread and it picks up where it left off.
+- **Steer it.** You can send guidance mid-run — context about your product, a constraint, a direction to try — and it's folded into the next round.
+- **Stop it.** Cancel at any point. The copy is cleaned up.
+
+## How it ends
+
+| Outcome | What it means |
+|---|---|
+| **Everything passes** | Every scenario passed on the changed copy, confirmed across the whole set. You're offered the change. |
+| **Already passing** | Nothing was failing at the start, so nothing was changed. |
+| **Could not reproduce** | The reported failure never surfaced in testing, so no change was made. |
+| **Fix depended on forcing** | A change helped only while a safeguard was removed. Not offered — but worth knowing, because it means the behaviour is being suppressed rather than prevented. |
+| **No improvement** | The loop ran out of rounds or stopped getting better. You're shown the measured delta rather than a green tick. |
+| **Nothing further to propose** | No further honest change was found. |
+| **Out of questions** | The loop needed more answers than it's allowed to ask in one run. |
+
+Defaults: up to **15 rounds**, stopping early after **5 rounds without improvement**, and at most **5 clarifying questions** per run.
+
+## Troubleshooting
+
+**The action doesn't appear on an insight.** That insight's calls belong to an agent on a provider the loop can't edit. Use **Create scenario** instead — it still turns those calls into evaluators you can run and fix by hand.
+
+**It says my agent already passes everything.** The scenarios it ran didn't fail. If the failure is real but intermittent, that's the reproduction problem described above; starting from the Insights category rather than a single call gives it more transcripts to work from.
+
+**Most failures cluster on one metric whose explanations look subjective.** The metric is probably miscalibrated, and improving the agent against a noisy metric chases noise. Hand off to the [Metric Lab](/documentation/guides/metric-lab) improvement flow first.
+
+**Promote was refused.** Either your live agent changed since the run started, or the copy no longer matches what was measured. Both mean the offered before/after no longer describes reality. Re-run rather than forcing it.
+
+**The run is refused before it starts.** Your project has no rubric rule and no metric enabled for simulations, so there's nothing to score against. See [Metrics](/documentation/key-concepts/metrics/overview).
+
+## Self-hosted and custom agents
+
+Agents that Cekura can't edit through a provider API — self-hosted, websocket and custom integrations — aren't supported by the loop above, because it depends on being able to copy the agent and change it. For those, ask the **AI Assistant** to improve your agent from a set of evaluators: it runs the same diagnose-and-retest reasoning and hands you the instruction changes to deploy yourself, then re-tests once you've deployed.
+
+## Related
+
+- [Cekura Agent](/documentation/guides/cekura-agent) — connect an agent before optimizing it.
+- [Insights](/documentation/guides/observability/insights) — where production failures get grouped into categories.
+- [Metric Lab](/documentation/guides/metric-lab) — improve evaluator quality when failures cluster on a noisy metric.
+- [Auto-optimise Metrics](/mcp/auto-optimize-metrics) — the equivalent recurring workflow for metric prompts.

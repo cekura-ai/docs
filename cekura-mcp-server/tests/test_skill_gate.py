@@ -8,12 +8,16 @@ reaches the backend.
 import json
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pytest
 
 import skill_gate
 from openapi_mcp_server import _dispatch_args, _upgrade_skills_reliable, MCP_INSTRUCTIONS
+
+HERE = Path(__file__).parent
+ROOT = HERE.parent
 
 
 # ── fixtures / helpers ───────────────────────────────────────────────────────
@@ -47,12 +51,31 @@ JSON_ARRAY_BODY = {"content": {"application/json": {"schema": {"type": "array", 
 # ── family / tool table ──────────────────────────────────────────────────────
 
 class TestFamilyTable:
-    def test_exactly_eleven_gated_tools(self):
-        assert len(skill_gate.GATED_TOOLS) == 11
+    def test_exactly_ten_gated_tools(self):
+        assert len(skill_gate.GATED_TOOLS) == 10
 
     def test_every_gated_tool_maps_to_a_family(self):
         for tool in skill_gate.GATED_TOOLS:
             assert skill_gate._family_for_tool(tool) is not None
+
+    def test_every_gated_tool_is_a_registered_tool(self):
+        """A gated name that no tool answers to gates nothing — catch the drift.
+
+        `scenarios_create_from_transcript` sat here long after the synchronous
+        operation was replaced by the `_bg` variant, silently gating nothing.
+        """
+        from openapi_parser import load_openapi_spec
+        from tool_generator import generate_tool_name, should_include_operation
+
+        parser = load_openapi_spec(str(ROOT.parent / "openapi.json"))
+        registered = {
+            generate_tool_name(op)
+            for op in parser.extract_operations()
+            if should_include_operation(op)
+        }
+
+        dead = sorted(t for t in skill_gate.GATED_TOOLS if t not in registered)
+        assert not dead, f"gated tools that no longer exist upstream: {dead}"
 
     def test_generation_and_read_tools_are_not_gated(self):
         for tool in (

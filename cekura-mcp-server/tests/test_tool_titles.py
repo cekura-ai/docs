@@ -111,7 +111,7 @@ class TestGenerateToolTitle:
             ("aiagents_list", "List AI Agents"),
             ("scenarios_run_vapi_webrtc", "Run Scenarios (VAPI WebRTC)"),
             ("scenarios_run_livekit_v2", "Run Scenarios (LiveKit v2)"),
-            ("call_logs_list", "List Call Logs"),
+            ("observability_v2_call_logs_list", "List Observability v2 Call Logs"),
         ],
     )
     def test_domain_word_map(self, name, title):

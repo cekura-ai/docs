@@ -1,0 +1,658 @@
+---
+title: 'Client-Side Redaction'
+sidebarTitle: "Client-Side Redaction"
+icon: "eraser"
+iconType: "regular"
+description: 'Scrub PII out of observability payloads before they leave your infrastructure'
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## When to use this
+
+[PII Redaction](/documentation/guides/observability/pii-redaction) runs **after** ingestion: you send the call to Cekura with `redact_fields`, and Cekura detects and removes the entities from the stored transcript and recording.
+
+Client-side redaction runs **before** ingestion: you scrub the payload in your own process, so the sensitive values never reach Cekura at all. Use it when:
+
+- Your compliance posture requires that raw PII never leaves your network.
+- You need to scrub fields that server-side redaction does not cover. `redact_fields` applies to the transcript and the audio recording. `metadata`, `dynamic_variables` and `customer_number` are stored as you send them, so anything sensitive in those has to be removed by you.
+- You already know the sensitive values (customer name, address, account number from your CRM) and want an exact, deterministic scrub rather than a model-based one.
+
+<Note>
+  The two are complementary, not exclusive. A common setup is client-side scrubbing for the values you already hold plus `redact_fields` for the audio recording. See [Combining both](#combining-both).
+</Note>
+
+## What the script does
+
+The script below walks an observe payload and replaces sensitive spans with the same placeholder tokens Cekura's server-side redaction emits (`<PERSON>`, `<EMAIL>`, `<PHONE>`, …), so a transcript scrubbed on your side reads identically to one scrubbed by Cekura and evaluates the same way.
+
+It has two kinds of rules:
+
+<CardGroup cols={2}>
+  <Card title="Known values" icon="key">
+    Literal strings you pass in (`known_values`) — the caller's name, address, or account number from your own system. Matched case-insensitively on word boundaries. This is the highest-signal rule available client-side.
+  </Card>
+  <Card title="Patterns" icon="code">
+    Built-in patterns for emails, phone numbers, SSNs, credit cards (Luhn-checked), IPs, URLs, dates of birth, monetary amounts, and long digit runs.
+  </Card>
+</CardGroup>
+
+It preserves everything else: roles, timings, tool-call IDs, and any key that is not spoken content are passed through untouched, so the payload still parses as a valid transcript in every [supported format](/documentation/advanced/transcript-format).
+
+<Warning>
+  A regex cannot find a person's name or a street address in free text — that is what `known_values` is for. If you need model-based detection of names, locations, occupations or other open-vocabulary entities, use server-side [`redact_fields`](/documentation/guides/observability/pii-redaction) instead of, or in addition to, this script.
+</Warning>
+
+## The script
+
+<CodeGroup>
+```python cekura_redact.py
+"""
+Client-side PII redaction for Cekura observability payloads.
+
+Scrubs sensitive values out of an /observability/v1/observe/ payload *before*
+it leaves your infrastructure. Pure standard library, no network calls.
+
+    from cekura_redact import redact_payload
+
+    payload = redact_payload(
+        payload,
+        fields=["email_address", "phone_number", "ssn", "credit_card"],
+        known_values={"person_name": ["Jane Doe"], "location": ["3753 Conifer Drive"]},
+    )
+    requests.post(CEKURA_OBSERVE_URL, json=payload, headers=headers)
+"""
+
+from __future__ import annotations
+
+import re
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+
+# Placeholder tokens match the ones Cekura's server-side redaction emits, so a
+# transcript scrubbed here reads the same as one scrubbed with `redact_fields`.
+ENTITY_TO_TOKEN: Dict[str, str] = {
+    "person_name": "<PERSON>",
+    "age": "<AGE>",
+    "phone_number": "<PHONE>",
+    "email_address": "<EMAIL>",
+    "date": "<DATE>",
+    "time": "<TIME>",
+    "location": "<LOCATION>",
+    "origin": "<ORIGIN>",
+    "gender_sexuality": "<GENDER>",
+    "physical_attribute": "<ATTRIBUTE>",
+    "occupation": "<OCCUPATION>",
+    "username": "<USERNAME>",
+    "password": "<PASSWORD>",
+    "ip_address": "<IP_ADDRESS>",
+    "url": "<URL>",
+    "filename": "<FILENAME>",
+    "event": "<EVENT>",
+    "vehicle_id": "<VEHICLE_ID>",
+    "dob": "<DOB>",
+    "healthcare_number": "<HEALTHCARE_NUMBER>",
+    "medical_professional": "<MEDICAL_PROFESSIONAL>",
+    "credit_card": "<CREDIT_CARD>",
+    "account_number": "<ACCOUNT_NUMBER>",
+    "bank_account": "<BANK_ACCOUNT>",
+    "money": "<MONEY>",
+    "ssn": "<SSN>",
+    "passport_number": "<PASSPORT>",
+    "driver_license": "<DRIVER_LICENSE>",
+    "numerical_pii": "<NUMERICAL_PII>",
+}
+
+# Ordered: the first pattern to claim a span wins, so specific formats
+# (credit card, SSN) are tried before the greedy ones (phone, numerical_pii).
+_PATTERNS: List[tuple] = [
+    ("email_address", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]{2,}\b", re.I), None),
+    ("url", re.compile(r"\bhttps?://[^\s<>\"']+|\bwww\.[^\s<>\"']+", re.I), None),
+    ("ip_address", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"), None),
+    ("credit_card", re.compile(r"(?<![\d-])(?:\d[ -]*?){13,19}(?![\d-])"), "luhn"),
+    ("ssn", re.compile(r"(?<!\d)\d{3}[- ]\d{2}[- ]\d{4}(?!\d)|(?<![\d-])\d{9}(?![\d-])"), None),
+    ("phone_number", re.compile(
+        r"(?<![\d-])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?![\d-])"), None),
+    ("dob", re.compile(
+        r"\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)\d{2}\b"), None),
+    ("date", re.compile(
+        r"\b(?:January|February|March|April|May|June|July|August|September|October"
+        r"|November|December)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+(?:19|20)\d{2})?\b", re.I), None),
+    ("money", re.compile(r"[$£€]\s?\d[\d,]*(?:\.\d{2})?\b"), None),
+    ("numerical_pii", re.compile(r"\b\d{6,}\b"), None),
+]
+
+# Keys whose string values carry spoken content in the supported transcript
+# formats (Cekura, Vapi, Retell, Deepgram, ElevenLabs, Pipecat, LiveKit).
+_TRANSCRIPT_TEXT_KEYS = frozenset({
+    "content", "message", "text", "transcript", "word", "punctuated_word",
+    "original_message", "arguments", "result", "result_value", "params_as_json",
+    "summary",
+})
+
+# Top-level payload keys that are scrubbed key-and-value recursively. Cekura's
+# server-side `redact_fields` covers the transcript and the audio only, so these
+# are the fields client-side scrubbing exists for.
+_FREEFORM_PAYLOAD_KEYS = ("metadata", "dynamic_variables")
+
+
+def _luhn(digits: str) -> bool:
+    total, parity = 0, len(digits) % 2
+    for i, ch in enumerate(digits):
+        d = int(ch)
+        if i % 2 == parity:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
+
+
+def _validate(entity: str, match: str, rule: Optional[str]) -> bool:
+    if rule == "luhn":
+        digits = re.sub(r"\D", "", match)
+        return 13 <= len(digits) <= 19 and _luhn(digits)
+    if entity == "ip_address":
+        return all(int(p) <= 255 for p in match.split("."))
+    return True
+
+
+def _known_value_patterns(
+    known_values: Optional[Mapping[str, Sequence[str]]],
+) -> List[tuple]:
+    """Literal values you already hold (CRM name, address, account number).
+
+    These are the highest-signal rules available client-side: regex cannot spot a
+    person's name in a transcript, but you already know it before the call starts.
+    """
+    patterns: List[tuple] = []
+    for entity, values in (known_values or {}).items():
+        for value in values:
+            value = (value or "").strip()
+            if len(value) < 3:  # too short to match safely
+                continue
+            patterns.append((entity, re.compile(
+                r"(?<!\w)" + re.escape(value) + r"(?!\w)", re.I), None))
+    return patterns
+
+
+def redact_text(
+    text: str,
+    fields: Iterable[str],
+    known_values: Optional[Mapping[str, Sequence[str]]] = None,
+) -> str:
+    """Replace every requested entity in `text` with its Cekura placeholder token."""
+    requested = {f for f in fields if f in ENTITY_TO_TOKEN}
+    rules = [r for r in _known_value_patterns(known_values) if r[0] in requested]
+    rules += [r for r in _PATTERNS if r[0] in requested]
+
+    # Claim spans first, apply once, so a token is never re-matched by a later rule.
+    claimed: List[tuple] = []
+    for entity, pattern, rule in rules:
+        for m in pattern.finditer(text):
+            if not m.group().strip() or not _validate(entity, m.group(), rule):
+                continue
+            if any(m.start() < end and start < m.end() for start, end, _ in claimed):
+                continue
+            claimed.append((m.start(), m.end(), ENTITY_TO_TOKEN[entity]))
+
+    out = text
+    for start, end, token in sorted(claimed, reverse=True):
+        out = out[:start] + token + out[end:]
+    return out
+
+
+def _walk(node: Any, fields, known_values, text_keys: Optional[frozenset]) -> Any:
+    """Rewrite string leaves. `text_keys=None` means scrub every string found."""
+    if isinstance(node, str):
+        return redact_text(node, fields, known_values)
+    if isinstance(node, list):
+        return [_walk(v, fields, known_values, text_keys) for v in node]
+    if isinstance(node, dict):
+        out = {}
+        for key, value in node.items():
+            if isinstance(value, str) and text_keys is not None:
+                out[key] = (redact_text(value, fields, known_values)
+                            if key in text_keys else value)
+            else:
+                out[key] = _walk(value, fields, known_values, text_keys)
+        return out
+    return node
+
+
+def redact_transcript(
+    transcript_json: Any,
+    fields: Iterable[str],
+    known_values: Optional[Mapping[str, Sequence[str]]] = None,
+) -> Any:
+    """Scrub a `transcript_json` value, leaving timings, roles and IDs intact."""
+    return _walk(transcript_json, fields, known_values, _TRANSCRIPT_TEXT_KEYS)
+
+
+def redact_payload(
+    payload: Mapping[str, Any],
+    fields: Iterable[str],
+    known_values: Optional[Mapping[str, Sequence[str]]] = None,
+    redact_customer_number: bool = True,
+) -> Dict[str, Any]:
+    """Return a copy of an observe payload with PII replaced by placeholder tokens.
+
+    Args:
+        payload: the body you would POST to /observability/v1/observe/.
+        fields: entity names to scrub, using the same vocabulary as `redact_fields`.
+        known_values: {entity: [literal values]} you already know for this call.
+        redact_customer_number: also tokenize the top-level `customer_number`.
+    """
+    fields = list(fields)
+    out = dict(payload)
+
+    if out.get("transcript_json") is not None:
+        out["transcript_json"] = redact_transcript(
+            out["transcript_json"], fields, known_values)
+
+    if isinstance(out.get("transcript"), str):
+        out["transcript"] = redact_text(out["transcript"], fields, known_values)
+
+    for key in _FREEFORM_PAYLOAD_KEYS:
+        if out.get(key) is not None:
+            out[key] = _walk(out[key], fields, known_values, None)
+
+    if redact_customer_number and isinstance(out.get("customer_number"), str):
+        out["customer_number"] = redact_text(
+            out["customer_number"], list(fields) + ["phone_number"], known_values)
+
+    return out
+```
+```typescript cekuraRedact.ts
+/**
+ * Client-side PII redaction for Cekura observability payloads.
+ *
+ * Scrubs sensitive values out of an /observability/v1/observe/ payload *before*
+ * it leaves your infrastructure. No dependencies, no network calls.
+ *
+ *   import { redactPayload } from "./cekuraRedact";
+ *
+ *   const body = redactPayload(payload, {
+ *     fields: ["email_address", "phone_number", "ssn", "credit_card"],
+ *     knownValues: { person_name: ["Jane Doe"], location: ["3753 Conifer Drive"] },
+ *   });
+ *   await fetch(CEKURA_OBSERVE_URL, { method: "POST", headers, body: JSON.stringify(body) });
+ */
+
+// Placeholder tokens match the ones Cekura's server-side redaction emits, so a
+// transcript scrubbed here reads the same as one scrubbed with `redact_fields`.
+export const ENTITY_TO_TOKEN: Record<string, string> = {
+  person_name: "<PERSON>",
+  age: "<AGE>",
+  phone_number: "<PHONE>",
+  email_address: "<EMAIL>",
+  date: "<DATE>",
+  time: "<TIME>",
+  location: "<LOCATION>",
+  origin: "<ORIGIN>",
+  gender_sexuality: "<GENDER>",
+  physical_attribute: "<ATTRIBUTE>",
+  occupation: "<OCCUPATION>",
+  username: "<USERNAME>",
+  password: "<PASSWORD>",
+  ip_address: "<IP_ADDRESS>",
+  url: "<URL>",
+  filename: "<FILENAME>",
+  event: "<EVENT>",
+  vehicle_id: "<VEHICLE_ID>",
+  dob: "<DOB>",
+  healthcare_number: "<HEALTHCARE_NUMBER>",
+  medical_professional: "<MEDICAL_PROFESSIONAL>",
+  credit_card: "<CREDIT_CARD>",
+  account_number: "<ACCOUNT_NUMBER>",
+  bank_account: "<BANK_ACCOUNT>",
+  money: "<MONEY>",
+  ssn: "<SSN>",
+  passport_number: "<PASSPORT>",
+  driver_license: "<DRIVER_LICENSE>",
+  numerical_pii: "<NUMERICAL_PII>",
+};
+
+type Rule = { entity: string; pattern: RegExp; check?: "luhn" };
+
+// Ordered: the first rule to claim a span wins, so specific formats
+// (credit card, SSN) are tried before the greedy ones (phone, numerical_pii).
+const PATTERNS: Rule[] = [
+  { entity: "email_address", pattern: /\b[\w.+-]+@[\w-]+\.[\w.-]{2,}\b/gi },
+  { entity: "url", pattern: /\bhttps?:\/\/[^\s<>"']+|\bwww\.[^\s<>"']+/gi },
+  { entity: "ip_address", pattern: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g },
+  { entity: "credit_card", pattern: /(?<![\d-])(?:\d[ -]*?){13,19}(?![\d-])/g, check: "luhn" },
+  { entity: "ssn", pattern: /(?<!\d)\d{3}[- ]\d{2}[- ]\d{4}(?!\d)|(?<![\d-])\d{9}(?![\d-])/g },
+  {
+    entity: "phone_number",
+    pattern: /(?<![\d-])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?![\d-])/g,
+  },
+  {
+    entity: "dob",
+    pattern: /\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)\d{2}\b/g,
+  },
+  {
+    entity: "date",
+    pattern:
+      /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+(?:19|20)\d{2})?\b/gi,
+  },
+  { entity: "money", pattern: /[$£€]\s?\d[\d,]*(?:\.\d{2})?\b/g },
+  { entity: "numerical_pii", pattern: /\b\d{6,}\b/g },
+];
+
+// Keys whose string values carry spoken content in the supported transcript
+// formats (Cekura, Vapi, Retell, Deepgram, ElevenLabs, Pipecat, LiveKit).
+const TRANSCRIPT_TEXT_KEYS = new Set([
+  "content", "message", "text", "transcript", "word", "punctuated_word",
+  "original_message", "arguments", "result", "result_value", "params_as_json",
+  "summary",
+]);
+
+// Top-level payload keys that are scrubbed key-and-value recursively. Cekura's
+// server-side `redact_fields` covers the transcript and the audio only, so these
+// are the fields client-side scrubbing exists for.
+const FREEFORM_PAYLOAD_KEYS = ["metadata", "dynamic_variables"];
+
+export interface RedactOptions {
+  /** Entity names to scrub, using the same vocabulary as `redact_fields`. */
+  fields: string[];
+  /** { entity: [literal values] } you already know for this call. */
+  knownValues?: Record<string, string[]>;
+  /** Also tokenize the top-level `customer_number`. Defaults to true. */
+  redactCustomerNumber?: boolean;
+}
+
+function luhn(digits: string): boolean {
+  let total = 0;
+  const parity = digits.length % 2;
+  for (let i = 0; i < digits.length; i++) {
+    let d = Number(digits[i]);
+    if (i % 2 === parity) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    total += d;
+  }
+  return total % 10 === 0;
+}
+
+function validate(entity: string, match: string, check?: "luhn"): boolean {
+  if (check === "luhn") {
+    const digits = match.replace(/\D/g, "");
+    return digits.length >= 13 && digits.length <= 19 && luhn(digits);
+  }
+  if (entity === "ip_address") {
+    return match.split(".").every((p) => Number(p) <= 255);
+  }
+  return true;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Literal values you already hold (CRM name, address, account number).
+ * These are the highest-signal rules available client-side: a regex cannot spot a
+ * person's name in a transcript, but you already know it before the call starts.
+ */
+function knownValueRules(knownValues?: Record<string, string[]>): Rule[] {
+  const rules: Rule[] = [];
+  for (const [entity, values] of Object.entries(knownValues ?? {})) {
+    for (const raw of values) {
+      const value = (raw ?? "").trim();
+      if (value.length < 3) continue; // too short to match safely
+      rules.push({
+        entity,
+        pattern: new RegExp(`(?<!\\w)${escapeRegExp(value)}(?!\\w)`, "gi"),
+      });
+    }
+  }
+  return rules;
+}
+
+/** Replace every requested entity in `text` with its Cekura placeholder token. */
+export function redactText(text: string, opts: RedactOptions): string {
+  const requested = new Set(opts.fields.filter((f) => f in ENTITY_TO_TOKEN));
+  const rules = [...knownValueRules(opts.knownValues), ...PATTERNS].filter((r) =>
+    requested.has(r.entity)
+  );
+
+  // Claim spans first, apply once, so a token is never re-matched by a later rule.
+  const claimed: Array<[number, number, string]> = [];
+  for (const rule of rules) {
+    for (const m of text.matchAll(rule.pattern)) {
+      const start = m.index ?? 0;
+      const end = start + m[0].length;
+      if (!m[0].trim() || !validate(rule.entity, m[0], rule.check)) continue;
+      if (claimed.some(([s, e]) => start < e && s < end)) continue;
+      claimed.push([start, end, ENTITY_TO_TOKEN[rule.entity]]);
+    }
+  }
+
+  let out = text;
+  for (const [start, end, token] of claimed.sort((a, b) => b[0] - a[0])) {
+    out = out.slice(0, start) + token + out.slice(end);
+  }
+  return out;
+}
+
+/** Rewrite string leaves. `textKeys === null` means scrub every string found. */
+function walk(node: unknown, opts: RedactOptions, textKeys: Set<string> | null): unknown {
+  if (typeof node === "string") return redactText(node, opts);
+  if (Array.isArray(node)) return node.map((v) => walk(v, opts, textKeys));
+  if (node && typeof node === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+      if (typeof value === "string" && textKeys !== null) {
+        out[key] = textKeys.has(key) ? redactText(value, opts) : value;
+      } else {
+        out[key] = walk(value, opts, textKeys);
+      }
+    }
+    return out;
+  }
+  return node;
+}
+
+/** Scrub a `transcript_json` value, leaving timings, roles and IDs intact. */
+export function redactTranscript(transcriptJson: unknown, opts: RedactOptions): unknown {
+  return walk(transcriptJson, opts, TRANSCRIPT_TEXT_KEYS);
+}
+
+/** Return a copy of an observe payload with PII replaced by placeholder tokens. */
+export function redactPayload(
+  payload: Record<string, unknown>,
+  opts: RedactOptions
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...payload };
+
+  if (out.transcript_json != null) {
+    out.transcript_json = redactTranscript(out.transcript_json, opts);
+  }
+
+  if (typeof out.transcript === "string") {
+    out.transcript = redactText(out.transcript, opts);
+  }
+
+  for (const key of FREEFORM_PAYLOAD_KEYS) {
+    if (out[key] != null) out[key] = walk(out[key], opts, null);
+  }
+
+  if ((opts.redactCustomerNumber ?? true) && typeof out.customer_number === "string") {
+    out.customer_number = redactText(out.customer_number, {
+      ...opts,
+      fields: [...opts.fields, "phone_number"],
+    });
+  }
+
+  return out;
+}
+```
+</CodeGroup>
+
+<Note>
+  The TypeScript version uses regex lookbehind and `String.prototype.matchAll`, so it needs Node 14 or newer (or any modern browser runtime).
+</Note>
+
+## Using it
+
+Scrub the payload immediately before the POST, so nothing unredacted is ever serialized onto the wire.
+
+<CodeGroup>
+```python Python
+import os
+import requests
+from cekura_redact import redact_payload
+
+payload = {
+    "call_id": call.id,
+    "agent": AGENT_ID,
+    "transcript_type": "vapi",
+    "transcript_json": call.transcript,
+    "customer_number": call.from_number,
+    "metadata": {"customer_id": customer.id, "name": customer.full_name},
+}
+
+# Values you already hold beat any regex — pass them in.
+clean = redact_payload(
+    payload,
+    fields=[
+        "person_name", "email_address", "phone_number",
+        "ssn", "credit_card", "location", "dob",
+    ],
+    known_values={
+        "person_name": [customer.full_name, customer.first_name],
+        "location": [customer.street_address],
+        "account_number": [customer.account_number],
+    },
+)
+
+requests.post(
+    "https://api.cekura.ai/observability/v1/observe/",
+    json=clean,
+    headers={"X-CEKURA-API-KEY": os.environ["CEKURA_API_KEY"]},
+    timeout=30,
+)
+```
+
+```typescript TypeScript
+import { redactPayload } from "./cekuraRedact";
+
+const payload = {
+  call_id: call.id,
+  agent: AGENT_ID,
+  transcript_type: "vapi",
+  transcript_json: call.transcript,
+  customer_number: call.fromNumber,
+  metadata: { customer_id: customer.id, name: customer.fullName },
+};
+
+// Values you already hold beat any regex — pass them in.
+const clean = redactPayload(payload, {
+  fields: [
+    "person_name", "email_address", "phone_number",
+    "ssn", "credit_card", "location", "dob",
+  ],
+  knownValues: {
+    person_name: [customer.fullName, customer.firstName],
+    location: [customer.streetAddress],
+    account_number: [customer.accountNumber],
+  },
+});
+
+await fetch("https://api.cekura.ai/observability/v1/observe/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "X-CEKURA-API-KEY": process.env.CEKURA_API_KEY!,
+  },
+  body: JSON.stringify(clean),
+});
+```
+</CodeGroup>
+
+**Before:**
+
+```json
+{
+  "role": "user",
+  "message": "Hi, this is Jane Doe, my email is jane.doe@example.com and my number is (415) 555-0123.",
+  "secondsFromStart": 2.32
+}
+```
+
+**After:**
+
+```json
+{
+  "role": "user",
+  "message": "Hi, this is <PERSON>, my email is <EMAIL> and my number is <PHONE>.",
+  "secondsFromStart": 2.32
+}
+```
+
+## Combining both
+
+Client-side scrubbing only touches the JSON you send. If you also send `voice_recording_url` or `voice_recording`, the spoken PII is still in the audio.
+
+<Steps>
+  <Step title="Scrub the payload client-side">
+    Removes PII from `transcript_json`, `metadata`, `dynamic_variables` and `customer_number` before they leave your network.
+  </Step>
+  <Step title="Decide what to do about the recording">
+    Either omit the recording entirely, upload a recording you have already redacted yourself, or send `redact_fields` so Cekura redacts the audio on ingest.
+  </Step>
+</Steps>
+
+```json Client-side scrub + server-side audio redaction
+{
+  "call_id": "call_12345678",
+  "agent": 1,
+  "transcript_json": "[ ...already scrubbed on your side... ]",
+  "voice_recording_url": "https://recordings.example.com/call_12345678.mp3",
+  "redact_fields": ["person_name", "phone_number", "email_address"]
+}
+```
+
+<Info>
+  Client-side scrubbing is free — it runs in your process. Sending `redact_fields` still costs **0.4 credits per minute**, so if you are not sending audio and your client-side rules already cover you, omit `redact_fields` entirely.
+</Info>
+
+## Coverage and limits
+
+| Entity | Client-side | Notes |
+|---|---|---|
+| `email_address`, `url`, `ip_address` | Pattern | Reliable — these have unambiguous formats. |
+| `phone_number`, `ssn`, `credit_card` | Pattern | Digit formats only. Credit cards are Luhn-checked to avoid tokenizing ordinary long numbers. |
+| `dob`, `date`, `money` | Pattern | Common written formats (`03/04/1990`, `March 3rd, 1990`, `$1,204.50`). |
+| `numerical_pii` | Pattern | Any run of 6+ digits. Broad by design — the last line of defence for account and reference numbers. |
+| `person_name`, `location`, `occupation`, and other open-vocabulary entities | Known values only | Supply them via `known_values`, or use server-side `redact_fields`. |
+
+Known limitations to plan around:
+
+- **Spelled-out digits.** A caller who says "four one five, five five five" produces no digit run for the patterns to match. Server-side redaction handles spoken numbers; client-side patterns do not.
+- **Misspellings and transcription noise.** `known_values` matches literal strings, so "Jane Do" from an imperfect transcription will not match "Jane Doe". Pass common variants (first name alone, nickname) as extra values.
+- **Broad rules cost context.** Turning on `numerical_pii` tokenizes order numbers and confirmation codes too, which can make metrics about those flows harder to evaluate. Enable the narrowest set of fields that satisfies your policy.
+- **Redaction is not reversible.** Cekura only ever sees the tokens, so a redacted value cannot be recovered later for debugging. Keep your own mapping if you need one.
+
+## Verifying before you roll out
+
+Run the script over a batch of real payloads and diff, rather than trusting it on the first live call:
+
+```python
+import json
+from cekura_redact import redact_payload
+
+FIELDS = ["email_address", "phone_number", "ssn", "credit_card", "numerical_pii"]
+
+with open("sample_payloads.jsonl") as fh:
+    for line in fh:
+        raw = json.loads(line)
+        clean = redact_payload(raw, fields=FIELDS)
+        if json.dumps(raw) != json.dumps(clean):
+            print(raw["call_id"], "->", json.dumps(clean["transcript_json"])[:200])
+```
+
+Send a handful of scrubbed calls to a throwaway agent first and confirm in the dashboard that the transcripts read the way you expect and that your metrics still evaluate against them.

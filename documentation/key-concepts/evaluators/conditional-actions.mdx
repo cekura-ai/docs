@@ -955,7 +955,7 @@ For a full scenario showing both flows — a fixed-message placeholder and a non
 
 ## Attached Audio
 
-Attach a pre-recorded audio clip to a condition and the testing agent **plays the recording instead of speaking the text with TTS** when that condition fires. Use it when the exact voice, accent, tone, or non-speech sound matters — reproducing a real caller's recording, a specific IVR prompt, background audio a synthetic voice can't recreate, or a regression case captured from a live call.
+Attach a pre-recorded audio clip to a scenario and the testing agent **plays the recording instead of speaking the text with TTS** when a referencing condition fires. A single clip can be referenced from any number of conditions and even multiple times within one action. Use it when the exact voice, accent, tone, or non-speech sound matters — reproducing a real caller's recording, a specific IVR prompt, background audio a synthetic voice can't recreate, or a regression case captured from a live call.
 
 <Note>
 Audio can only be attached to a **fixed-message** condition (`fixed_message: true`). It is not available on instruction-based (`fixed_message: false`) conditions — those are meant to vary, and a recording is fixed by definition.
@@ -967,11 +967,10 @@ If you only need a **second speaker** rather than a specific recording, use the 
 
 ### How it works
 
-1. You upload an audio file to the scenario — optionally targeting a specific condition, or leaving it unattached for later reference.
+1. You upload an audio file to the scenario, optionally attaching it to a condition (from the editor UI or the API). Each clip gets a human-readable **name** that becomes its id — for example, `greeting` or `hold-music`.
 2. Cekura **transcribes it automatically** in the background — this is why a clip is briefly *processing* before it's ready to use.
-3. Each clip gets a human-readable **name** (its `audio_id`). The name defaults to a slug of the filename (e.g. `greeting.mp3` → `greeting`) and must be unique per scenario, case-insensitively.
-4. Reference a clip from any number of fixed-message actions by pasting its `<audio id="…"/>` tag — the same clip can play in several conditions.
-5. When the condition fires, text, recordings, and tags run from left to right.
+3. Reference the clip from any number of fixed-message actions by pasting its tag: `<audio id="greeting"/>`. You can write this tag by hand, or let the upload endpoint insert it for you when you pass `condition_id`.
+4. When the condition fires, text, recordings, and tags run from left to right. The same clip plays wherever it is referenced.
 
 <Warning>
 The transcript is **derived from the recording** and is read-only.
@@ -991,8 +990,8 @@ Four endpoints on the scenario manage attached audio. Clips are uploaded as `mul
 
 <CodeGroup>
 
-```bash Upload
-# Attach a clip named "greeting" to condition 2
+```bash Upload (with condition)
+# Attach a clip named "greeting" to condition 2 of scenario 39001
 curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
   -H "Authorization: Bearer $CEKURA_API_KEY" \
   -F "name=greeting" \
@@ -1002,33 +1001,34 @@ curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-
 # 202 Accepted — transcription runs in the background
 ```
 
-```bash Upload (unattached)
-# Add a clip to the scenario without targeting a condition
+```bash Upload (without condition)
+# Add a clip to the scenario without touching any action
 curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
   -H "Authorization: Bearer $CEKURA_API_KEY" \
   -F "name=hold-music" \
-  -F "file=@hold-music.mp3"
-# Reference it later from any action with <audio id="hold-music"/>
+  -F "file=@hold-music.wav"
+# Then reference it from any action: <audio id="hold-music"/>
 ```
 
 ```bash List
-# List every clip on the scenario and which conditions reference each one
+# List every clip on the scenario with its current status and references
 curl "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
   -H "Authorization: Bearer $CEKURA_API_KEY"
 ```
 
 ```bash Replace
-# Swap the audio file for an existing clip (every reference picks it up)
+# Replace a clip's audio (every reference plays the new recording)
 curl -X PUT "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
   -H "Authorization: Bearer $CEKURA_API_KEY" \
   -F "file=@greeting-v2.mp3"
-# Optionally rename: -F "name=greeting-v2"
+# Pass name=new-name to rename the clip at the same time
 ```
 
 ```bash Delete
-# Remove a clip and all its references from every action
+# Delete a clip and remove every <audio> reference to it
 curl -X DELETE "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
   -H "Authorization: Bearer $CEKURA_API_KEY"
+# Returns 409 if deleting would leave a non-opening action empty
 ```
 
 </CodeGroup>
@@ -1038,9 +1038,8 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
 ```json
 {
   "audio_id": "greeting",
-  "tag": "<audio id=\"greeting\"/>",
-  "condition_id": 2,
   "condition_ids": [2, 5],
+  "tag": "<audio id=\"greeting\"/>",
   "status": "ready",
   "transcript": "Hello, thanks for calling.",
   "duration": 1.78,
@@ -1049,12 +1048,14 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
 }
 ```
 
+The scenario's GET response also includes a read-only `condition_audio` summary with every clip's tag and referencing conditions, so an author editing `instructions` directly can discover which clip ids exist.
+
 <ParamField path="name" type="string">
-  The clip's id — used in its `<audio>` tag and as its stored object name. Letters, digits, underscores and hyphens, max 64 characters; must be unique within the scenario, case-insensitively. Defaults to a readable slug derived from the filename (e.g. `greeting.mp3` → `greeting`).
+  The clip's id, used in its `<audio>` tag and as its stored object name. Letters, digits, underscores and hyphens, max 64 characters; must be unique within the scenario (case-insensitive). Omit to derive a readable name from the filename (lowercased, hyphenated, trimmed to 32 characters).
 </ParamField>
 
 <ParamField path="condition_id" type="integer">
-  The `id` of the condition to attach the clip to. The condition must already exist and have `fixed_message: true`. Omit to add the clip to the scenario without touching any action — then reference it yourself with `<audio id="…"/>` from as many actions as needed.
+  The `id` of the condition to attach the clip to. The condition must already exist and have `fixed_message: true`. Omit to add the clip to the scenario without touching any action — then reference it yourself with `<audio id="..."/>` from as many actions as needed.
 </ParamField>
 
 <ParamField path="file" type="file" required>
@@ -1062,11 +1063,11 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
 </ParamField>
 
 <ParamField path="action_template" type="string">
-  Requires `condition_id`. The complete action with one `<audio />` marker where the new recording should be inserted.
+  Requires `condition_id`. The complete action with one `<audio />` marker where the new recording should be inserted. Existing managed audio tags must remain in the template.
 </ParamField>
 
 <ParamField path="replace_audio_id" type="string">
-  Requires `condition_id`. Points that condition's existing tag at the new clip. To swap a clip's audio while keeping every reference to it, use `PUT condition-audio/{audio_id}/` instead.
+  Requires `condition_id`. Points that condition's existing tag at the new clip. To swap a clip's audio while keeping every reference to it, PUT to `condition-audio/{audio_id}/` instead.
 </ParamField>
 
 ### Statuses & run gating
@@ -1080,7 +1081,7 @@ Each attached clip moves through these statuses:
 | `ready` | Transcript available; the clip will play on runs. |
 | `failed` | Transcription failed. Retry (re-upload) or remove the clip. |
 
-A scenario **cannot be run while any referenced clip is not `ready`** — the run is rejected with a clear message (`"still transcribing — wait for it to finish"` for pending/processing, `"failed to transcribe — retry or remove it"` for failed, or `"does not exist"` for a tag referencing a clip that hasn't been uploaded yet). This gate applies to interactive runs, scheduled (cron) runs, and email-triggered runs alike.
+A scenario **cannot be run while any attached clip is not `ready`** — the run is rejected with a clear message (`"still transcribing — wait for it to finish"` for pending/processing, `"failed to transcribe — retry or remove it"` for failed).
 
 ## Complete Examples
 

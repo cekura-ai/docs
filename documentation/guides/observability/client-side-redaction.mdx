@@ -3,7 +3,7 @@ title: 'Client-Side Redaction'
 sidebarTitle: "Client-Side Redaction"
 icon: "eraser"
 iconType: "regular"
-description: 'Scrub PII out of observability payloads before they leave your infrastructure'
+description: 'Detect and remove PII from transcripts and recordings with your own AI providers, before anything reaches Cekura'
 ---
 
 import { CopyPageButton } from "/snippets/copy-page-button.mdx";
@@ -12,38 +12,45 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 ## When to use this
 
-[PII Redaction](/documentation/guides/observability/pii-redaction) runs **after** ingestion: you send the call to Cekura with `redact_fields`, and Cekura detects and removes the entities from the stored transcript and recording.
+[PII Redaction](/documentation/guides/observability/pii-redaction) runs **after** ingestion: you send the call with `redact_fields`, and Cekura detects and removes the entities from the stored transcript and recording.
 
-Client-side redaction runs **before** ingestion: you scrub the payload in your own process, so the sensitive values never reach Cekura at all. Use it when:
+Client-side redaction runs **before** ingestion: detection and removal happen in your own process, on your own LLM and speech-to-text providers, with your own API keys. The sensitive values never reach Cekura at all. Use it when:
 
 - Your compliance posture requires that raw PII never leaves your network.
-- You need to scrub fields that server-side redaction does not cover. `redact_fields` applies to the transcript and the audio recording. `metadata`, `dynamic_variables` and `customer_number` are stored as you send them, so anything sensitive in those has to be removed by you.
-- You already know the sensitive values (customer name, address, account number from your CRM) and want an exact, deterministic scrub rather than a model-based one.
+- Your organization is required to use specific model providers or regions for any system that processes customer data.
+- You need to scrub fields that server-side redaction does not cover. `redact_fields` applies to the transcript and the audio recording; `metadata`, `dynamic_variables` and `customer_number` are stored as you send them.
 
 <Note>
-  The two are complementary, not exclusive. A common setup is client-side scrubbing for the values you already hold plus `redact_fields` for the audio recording. See [Combining both](#combining-both).
+  The two are complementary. Client-side redaction costs you nothing in Cekura credits but requires you to run the detection; server-side redaction is one parameter and costs 0.4 credits per minute. See [Combining both](#combining-both).
 </Note>
 
-## What the script does
+## How it works
 
-The script below walks an observe payload and replaces sensitive spans with the same placeholder tokens Cekura's server-side redaction emits (`<PERSON>`, `<EMAIL>`, `<PHONE>`, …), so a transcript scrubbed on your side reads identically to one scrubbed by Cekura and evaluates the same way.
+The script covers the transcript **and** the recording, and detects entities automatically — you do not have to know the sensitive values in advance.
 
-It has two kinds of rules:
-
-<CardGroup cols={2}>
-  <Card title="Known values" icon="key">
-    Literal strings you pass in (`known_values`) — the caller's name, address, or account number from your own system. Matched case-insensitively on word boundaries. This is the highest-signal rule available client-side.
-  </Card>
-  <Card title="Patterns" icon="code">
-    Built-in patterns for emails, phone numbers, SSNs, credit cards (Luhn-checked), IPs, URLs, dates of birth, monetary amounts, and long digit runs.
-  </Card>
-</CardGroup>
-
-It preserves everything else: roles, timings, tool-call IDs, and any key that is not spoken content are passed through untouched, so the payload still parses as a valid transcript in every [supported format](/documentation/advanced/transcript-format).
+<Steps>
+  <Step title="Detect">
+    The transcript is sent to **your** LLM with a detection prompt, which returns every PII span it found as `{original_text, replacement_token}`. Detection is context-driven rather than pattern-driven, so it catches what a regex cannot: dictated digits (`"four one five, five five five"`), spelled-out names (`"is that spelled b e n?"`), and spoken emails (`"a at gmail dot com"`).
+  </Step>
+  <Step title="Scrub the transcript">
+    Each span is replaced with the same placeholder token Cekura's server-side redaction emits (`<PERSON>`, `<EMAIL>`, `<PHONE>`, …), applied per JSON string leaf so roles, timings and tool-call IDs survive intact.
+  </Step>
+  <Step title="Beep the recording">
+    The audio is transcribed with word-level timestamps by **your** STT provider, PII is detected on that transcription, each span is mapped back to its time range in the waveform, and those ranges are replaced with a tone.
+  </Step>
+</Steps>
 
 <Warning>
-  A regex cannot find a person's name or a street address in free text — that is what `known_values` is for. If you need model-based detection of names, locations, occupations or other open-vocabulary entities, use server-side [`redact_fields`](/documentation/guides/observability/pii-redaction) instead of, or in addition to, this script.
+  **Redaction fails closed.** If detection fails, or a detected span cannot be aligned to the audio, the script raises `RedactionError` instead of returning content. Never catch that error and upload the original — that is the one mistake in this whole flow that silently ships raw PII.
 </Warning>
+
+## What you need
+
+| | Requirement | Notes |
+|---|---|---|
+| **LLM** | An endpoint that supports tool calling | Any OpenAI-compatible `/chat/completions` API works out of the box — OpenAI, Azure OpenAI, or a self-hosted or gateway deployment. Other providers plug in with a small adapter. |
+| **STT** | Word-level timestamps | Required only for audio. Without word timings there is nothing to align a detected span to. |
+| **Python** | `pydub` + `ffmpeg` | Required only for audio. The transcript path is standard library only. |
 
 ## The script
 
@@ -52,26 +59,37 @@ It preserves everything else: roles, timings, tool-call IDs, and any key that is
 """
 Client-side PII redaction for Cekura observability payloads.
 
-Scrubs sensitive values out of an /observability/v1/observe/ payload *before*
-it leaves your infrastructure. Pure standard library, no network calls.
+Detects and removes PII from the transcript *and* the audio recording before
+either leaves your infrastructure, using your own LLM and speech-to-text
+providers and your own API keys. Nothing is sent to Cekura until it is scrubbed.
 
-    from cekura_redact import redact_payload
+    from cekura_redact import openai_compatible_detector, openai_compatible_transcriber
+    from cekura_redact import redact_payload, redact_audio
 
-    payload = redact_payload(
-        payload,
-        fields=["email_address", "phone_number", "ssn", "credit_card"],
-        known_values={"person_name": ["Jane Doe"], "location": ["3753 Conifer Drive"]},
-    )
-    requests.post(CEKURA_OBSERVE_URL, json=payload, headers=headers)
+    detect = openai_compatible_detector(
+        base_url="https://api.openai.com/v1", api_key=OPENAI_KEY, model="gpt-4.1-mini")
+    transcribe = openai_compatible_transcriber(
+        base_url="https://api.openai.com/v1", api_key=OPENAI_KEY, model="whisper-1")
+
+    FIELDS = ["person_name", "phone_number", "email_address", "location", "ssn"]
+    payload = redact_payload(payload, FIELDS, detector=detect)
+    clean_audio = redact_audio(raw_audio_bytes, FIELDS, detector=detect, transcriber=transcribe)
+
+Dependencies: none for the transcript path (standard library only).
+The audio path needs `pydub` and `ffmpeg` for any format other than WAV.
 """
 
 from __future__ import annotations
 
+import io
+import json
 import re
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+import urllib.request
+import uuid
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 # Placeholder tokens match the ones Cekura's server-side redaction emits, so a
-# transcript scrubbed here reads the same as one scrubbed with `redact_fields`.
+# call scrubbed here reads the same as one scrubbed with `redact_fields`.
 ENTITY_TO_TOKEN: Dict[str, str] = {
     "person_name": "<PERSON>",
     "age": "<AGE>",
@@ -104,407 +122,654 @@ ENTITY_TO_TOKEN: Dict[str, str] = {
     "numerical_pii": "<NUMERICAL_PII>",
 }
 
-# Ordered: the first pattern to claim a span wins, so specific formats
-# (credit card, SSN) are tried before the greedy ones (phone, numerical_pii).
-_PATTERNS: List[tuple] = [
-    ("email_address", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]{2,}\b", re.I), None),
-    ("url", re.compile(r"\bhttps?://[^\s<>\"']+|\bwww\.[^\s<>\"']+", re.I), None),
-    ("ip_address", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"), None),
-    ("credit_card", re.compile(r"(?<![\d-])(?:\d[ -]*?){13,19}(?![\d-])"), "luhn"),
-    ("ssn", re.compile(r"(?<!\d)\d{3}[- ]\d{2}[- ]\d{4}(?!\d)|(?<![\d-])\d{9}(?![\d-])"), None),
+# What each token covers. Spoken transcripts render PII in ways a regex never
+# catches — dictated digits, spelled-out names, "at gmail dot com" — so the
+# descriptions call those forms out explicitly.
+ENTITY_DESCRIPTIONS: Dict[str, str] = {
+    "<PERSON>": "Names: first, last, full names, agent names in the intro (\"I'm Kate\"), spelled formats (\"b e n j a m i n\")",
+    "<AGE>": "Age: numeric ages (\"65\", \"25 years old\"), age thresholds in questions (\"65 or older\")",
+    "<PHONE>": "Phone numbers in any format, including dictated (\"4 1 6 9 1 2 0 8 5 9\") and partial (\"ending in 5 1 4 2\")",
+    "<EMAIL>": "Email addresses: standard, dictated (\"a at gmail dot com\"), spelled (\"g m a i l\"), partial domains",
+    "<DATE>": "Dates: full (\"September eighteenth 2025\"), partial (\"September eighteenth\"), standalone months, years. A date is PII even when it describes a policy or account rather than the person",
+    "<TIME>": "Clock times",
+    "<LOCATION>": "Addresses, cities, states, counties, ZIP codes (including dictated \"2 5 8 3 6\"), locations inside titles (\"Guernsey County Sheriff\")",
+    "<ORIGIN>": "Nationality, ethnicity",
+    "<GENDER>": "Gender, sexuality",
+    "<ATTRIBUTE>": "Physical attributes",
+    "<OCCUPATION>": "Job titles",
+    "<USERNAME>": "Usernames",
+    "<PASSWORD>": "Passwords",
+    "<IP_ADDRESS>": "IP addresses",
+    "<URL>": "URLs",
+    "<FILENAME>": "File names",
+    "<EVENT>": "Events",
+    "<VEHICLE_ID>": "Vehicle IDs",
+    "<DOB>": "Date of birth",
+    "<HEALTHCARE_NUMBER>": "Healthcare and insurance member numbers",
+    "<MEDICAL_PROFESSIONAL>": "Medical professional names",
+    "<CREDIT_CARD>": "Credit card numbers, expiry dates, CVV",
+    "<ACCOUNT_NUMBER>": "Account numbers",
+    "<BANK_ACCOUNT>": "Bank account and routing numbers",
+    "<MONEY>": "Monetary amounts with or without a symbol, numeric or spoken (\"$50\", \"1,200 dollars\", \"five thousand\"), in any context",
+    "<SSN>": "SSN, ITIN, and numerical PII such as appointment or reference IDs (\"4 8 2 1 9\")",
+    "<PASSPORT>": "Passport numbers",
+    "<DRIVER_LICENSE>": "Driver's license numbers",
+    "<NUMERICAL_PII>": "Any other numerical PII",
+}
+
+
+class RedactionError(Exception):
+    """Redaction could not be completed. Callers MUST fail closed on this — never
+    send the payload or the recording to Cekura when redaction did not run."""
+
+
+# ---------------------------------------------------------------------------
+# Detection
+# ---------------------------------------------------------------------------
+
+Span = Dict[str, str]          # {"original_text": ..., "replacement_token": ...}
+Detector = Callable[[str], Optional[List[Span]]]
+
+SUBMIT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "submit_redactions",
+        "description": "Submit every PII span found in the transcript.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "redactions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "original_text": {
+                                "type": "string",
+                                "description": "Exact PII text found in the transcript, copied verbatim.",
+                            },
+                            "replacement_token": {
+                                "type": "string",
+                                "description": "The token to replace it with (e.g. <PERSON>, <EMAIL>).",
+                            },
+                        },
+                        "required": ["original_text", "replacement_token"],
+                    },
+                }
+            },
+            "required": ["redactions"],
+        },
+    },
+}
+
+
+def build_detection_prompt(fields: Iterable[str], text: str) -> str:
+    """Build the PII-detection prompt for `text`, given the entities to redact.
+
+    Entities you did not enable are listed explicitly as must-not-redact, which
+    keeps the model from over-redacting and destroying conversational context.
+    """
+    enabled_tokens = {ENTITY_TO_TOKEN[f] for f in fields if f in ENTITY_TO_TOKEN}
+    enabled, disabled = [], []
+    for token in sorted(ENTITY_DESCRIPTIONS):
+        line = f"{token}: {ENTITY_DESCRIPTIONS[token]}"
+        (enabled if token in enabled_tokens else disabled).append(line)
+
+    return f"""You are identifying personally identifiable information (PII) in a conversation transcript so it can be redacted.
+
+<transcript>
+{text}
+</transcript>
+
+PII entity types you MUST redact:
+<entities_to_redact>
+{chr(10).join(enabled)}
+</entities_to_redact>
+
+PII entity types you MUST NOT redact:
+<entities_to_ignore>
+{chr(10).join(disabled) if disabled else "None"}
+</entities_to_ignore>
+
+## Rules
+
+1. **Use context, not format.** Spoken transcripts render PII in many shapes. When
+   someone spells something out letter by letter or digit by digit — often after
+   "is that spelled..." — the spelled text is PII. "B-E-N", "B. E. N" and "b e n"
+   are all the same name; "2 5 8 3 6" may be a ZIP code; "a at g m a i l dot com"
+   is an email address.
+2. **Redact every occurrence.** If a value is PII, catch every instance of it —
+   confirmations, repetitions and echoes included.
+3. **Do not redact generic references.** "What date would you prefer?" and "Can I
+   get your email address?" are generic. "My email is john@example.com" is not.
+4. **`original_text` must be verbatim.** Each span must be an exact, contiguous,
+   character-for-character copy of text in the transcript. Never paraphrase,
+   normalize, shorten, or abbreviate with an ellipsis — a span that does not
+   appear verbatim cannot be replaced, and the PII leaks.
+5. **Stay inside one utterance.** The transcript may be JSON. Each span must lie
+   entirely within a single quoted message: never include quotes, braces or field
+   names, and never span two messages. Emit one entry per message instead.
+6. **Emit standalone fragments too.** If part of a redacted value also appears on
+   its own elsewhere — the month of a redacted date, the last digits of a redacted
+   number, a single letter confirming a spelled name — give that occurrence its
+   own entry.
+
+## Examples
+
+- "I'm Kate, an AI assistant" -> {{"original_text": "Kate", "replacement_token": "<PERSON>"}}
+- "Is that spelled b e n j a m i n?" -> {{"original_text": "b e n j a m i n", "replacement_token": "<PERSON>"}}
+- "ZIP code is 2 5 8 3 6" -> {{"original_text": "2 5 8 3 6", "replacement_token": "<LOCATION>"}}
+- "a at g m a i l dot com" -> {{"original_text": "a at g m a i l dot com", "replacement_token": "<EMAIL>"}}
+- "the number ending in 5 1 4 2" -> {{"original_text": "5 1 4 2", "replacement_token": "<PHONE>"}}
+
+## Before you answer
+
+Sweep the transcript once more for (a) any remaining digit or currency symbol and
+(b) any remaining full or partial occurrence of a value you already mapped. Add an
+entry for each hit, or confirm it falls outside the enabled entity types. Do not
+finish while an enabled entity remains unmapped.
+
+Call `submit_redactions` with every span. An empty list is the correct answer when
+the transcript contains no PII of the enabled types.
+"""
+
+
+def openai_compatible_detector(
+    base_url: str,
+    api_key: str,
+    model: str,
+    timeout: int = 180,
+    extra_headers: Optional[Mapping[str, str]] = None,
+) -> Detector:
+    """Detector backed by any OpenAI-compatible `/chat/completions` endpoint.
+
+    Works with OpenAI, Azure OpenAI, and self-hosted or gateway deployments
+    (vLLM, Ollama, Bedrock/Vertex via a compatible proxy) — anything that accepts
+    tool calls. Returns None on failure so the caller fails closed.
+    """
+    def detect(prompt: str) -> Optional[List[Span]]:
+        body = json.dumps({
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "tools": [SUBMIT_TOOL],
+            "tool_choice": {"type": "function", "function": {"name": "submit_redactions"}},
+            "temperature": 0,
+        }).encode()
+        headers = {"Content-Type": "application/json",
+                   "Authorization": f"Bearer {api_key}", **(extra_headers or {})}
+        request = urllib.request.Request(
+            base_url.rstrip("/") + "/chat/completions", data=body, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                payload = json.loads(response.read())
+            calls = payload["choices"][0]["message"].get("tool_calls") or []
+            if not calls:
+                return None
+            spans = json.loads(calls[0]["function"]["arguments"] or "{}").get("redactions")
+            # An empty list is a valid "no PII" verdict; anything else is a failure.
+            return spans if isinstance(spans, list) else None
+        except Exception:  # noqa: BLE001 — None means "failed", caller fails closed
+            return None
+
+    return detect
+
+
+# A number attached to a currency symbol is a monetary amount by definition, so a
+# deterministic sweep can back the model up: an amount it misread as a code is
+# still caught. Same rationale for a month followed by a day or a year.
+_CURRENCY_AMOUNT = re.compile(
+    r"[$€£₹]\s?\d[\d,]*(?:\.\d+)?"
+    r"|\b\d[\d,]*(?:\.\d+)?\s?(?:dollars?|euros?|pounds?|rupees?)\b", re.I)
+_MONTH = (r"January|February|March|April|May|June|July|August|September|October"
+          r"|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sept?|Oct|Nov|Dec")
+_MONTH_DATE = re.compile(
+    rf"\b(?:{_MONTH})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?(?:,?\s+\d{{4}})?\b"
+    rf"|\b(?:{_MONTH})\.?,?\s+\d{{4}}\b")
+_DETERMINISTIC = [
+    ("money", _CURRENCY_AMOUNT),
+    ("date", _MONTH_DATE),
+    ("email_address", re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]{2,}\b", re.I)),
+    ("ip_address", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")),
+    ("ssn", re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)")),
     ("phone_number", re.compile(
-        r"(?<![\d-])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?![\d-])"), None),
-    ("dob", re.compile(
-        r"\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)\d{2}\b"), None),
-    ("date", re.compile(
-        r"\b(?:January|February|March|April|May|June|July|August|September|October"
-        r"|November|December)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+(?:19|20)\d{2})?\b", re.I), None),
-    ("money", re.compile(r"[$£€]\s?\d[\d,]*(?:\.\d{2})?\b"), None),
-    ("numerical_pii", re.compile(r"\b\d{6,}\b"), None),
+        r"(?<![\d-])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?![\d-])")),
 ]
 
-# Keys whose string values carry spoken content in the supported transcript
-# formats (Cekura, Vapi, Retell, Deepgram, ElevenLabs, Pipecat, LiveKit).
-_TRANSCRIPT_TEXT_KEYS = frozenset({
-    "content", "message", "text", "transcript", "word", "punctuated_word",
-    "original_message", "arguments", "result", "result_value", "params_as_json",
-    "summary",
-})
 
-# Top-level payload keys that are scrubbed key-and-value recursively. Cekura's
-# server-side `redact_fields` covers the transcript and the audio only, so these
-# are the fields client-side scrubbing exists for.
-_FREEFORM_PAYLOAD_KEYS = ("metadata", "dynamic_variables")
-
-
-def _luhn(digits: str) -> bool:
-    total, parity = 0, len(digits) % 2
-    for i, ch in enumerate(digits):
-        d = int(ch)
-        if i % 2 == parity:
-            d *= 2
-            if d > 9:
-                d -= 9
-        total += d
-    return total % 10 == 0
+def _deterministic_spans(text: str, fields: Sequence[str]) -> List[Span]:
+    """Regex-derived spans that supplement the model. Every pattern here is
+    unambiguous by construction, so no model judgment is involved."""
+    spans: List[Span] = []
+    for entity, pattern in _DETERMINISTIC:
+        if entity not in fields:
+            continue
+        for match in set(pattern.findall(text)):
+            spans.append({"original_text": match,
+                          "replacement_token": ENTITY_TO_TOKEN[entity]})
+    return spans
 
 
-def _validate(entity: str, match: str, rule: Optional[str]) -> bool:
-    if rule == "luhn":
-        digits = re.sub(r"\D", "", match)
-        return 13 <= len(digits) <= 19 and _luhn(digits)
-    if entity == "ip_address":
-        return all(int(p) <= 255 for p in match.split("."))
-    return True
-
-
-def _known_value_patterns(
-    known_values: Optional[Mapping[str, Sequence[str]]],
-) -> List[tuple]:
-    """Literal values you already hold (CRM name, address, account number).
-
-    These are the highest-signal rules available client-side: regex cannot spot a
-    person's name in a transcript, but you already know it before the call starts.
-    """
-    patterns: List[tuple] = []
+def _known_value_spans(
+    text: str, known_values: Optional[Mapping[str, Sequence[str]]]
+) -> List[Span]:
+    """Optional literal values you already hold (CRM name, address, account
+    number). Detection finds these on its own; passing them in is a belt-and-braces
+    guarantee for the values you cannot afford to miss."""
+    spans: List[Span] = []
     for entity, values in (known_values or {}).items():
+        token = ENTITY_TO_TOKEN.get(entity)
+        if not token:
+            continue
         for value in values:
             value = (value or "").strip()
             if len(value) < 3:  # too short to match safely
                 continue
-            patterns.append((entity, re.compile(
-                r"(?<!\w)" + re.escape(value) + r"(?!\w)", re.I), None))
-    return patterns
+            for match in set(re.findall(
+                    rf"(?<!\w){re.escape(value)}(?!\w)", text, re.I)):
+                spans.append({"original_text": match, "replacement_token": token})
+    return spans
 
 
-def redact_text(
+def detect_spans(
     text: str,
     fields: Iterable[str],
+    detector: Detector,
     known_values: Optional[Mapping[str, Sequence[str]]] = None,
-) -> str:
-    """Replace every requested entity in `text` with its Cekura placeholder token."""
-    requested = {f for f in fields if f in ENTITY_TO_TOKEN}
-    rules = [r for r in _known_value_patterns(known_values) if r[0] in requested]
-    rules += [r for r in _PATTERNS if r[0] in requested]
+) -> List[Span]:
+    """Detect every PII span in `text`, raising RedactionError if detection failed.
 
-    # Claim spans first, apply once, so a token is never re-matched by a later rule.
-    claimed: List[tuple] = []
-    for entity, pattern, rule in rules:
-        for m in pattern.finditer(text):
-            if not m.group().strip() or not _validate(entity, m.group(), rule):
-                continue
-            if any(m.start() < end and start < m.end() for start, end, _ in claimed):
-                continue
-            claimed.append((m.start(), m.end(), ENTITY_TO_TOKEN[entity]))
+    Never treat a failure as "no PII found" — that is the one bug in this whole
+    file that silently ships raw PII.
+    """
+    fields = [f for f in fields if f in ENTITY_TO_TOKEN]
+    if not fields or not text:
+        return []
 
-    out = text
-    for start, end, token in sorted(claimed, reverse=True):
-        out = out[:start] + token + out[end:]
-    return out
+    spans = detector(build_detection_prompt(fields, text))
+    if spans is None:
+        raise RedactionError(
+            "PII detection failed; refusing to return unredacted content")
+
+    spans = [s for s in spans if s.get("original_text") and s.get("replacement_token")]
+    return spans + _deterministic_spans(text, fields) + _known_value_spans(text, known_values)
 
 
-def _walk(node: Any, fields, known_values, text_keys: Optional[frozenset]) -> Any:
-    """Rewrite string leaves. `text_keys=None` means scrub every string found."""
+# ---------------------------------------------------------------------------
+# Transcript / payload redaction
+# ---------------------------------------------------------------------------
+
+# Top-level payload keys scrubbed key-and-value recursively. Cekura's server-side
+# `redact_fields` covers the transcript and the audio only, so these are the
+# fields client-side scrubbing exists for.
+_FREEFORM_PAYLOAD_KEYS = ("metadata", "dynamic_variables")
+
+
+def apply_spans(node: Any, spans: Sequence[Span]) -> Any:
+    """Apply spans to every string leaf of a JSON-ish structure.
+
+    Replacing on the string *values* rather than on `json.dumps(node)` keeps the
+    result valid by construction: a span that happens to contain a quote or brace
+    can never corrupt the surrounding document.
+    """
     if isinstance(node, str):
-        return redact_text(node, fields, known_values)
-    if isinstance(node, list):
-        return [_walk(v, fields, known_values, text_keys) for v in node]
-    if isinstance(node, dict):
-        out = {}
-        for key, value in node.items():
-            if isinstance(value, str) and text_keys is not None:
-                out[key] = (redact_text(value, fields, known_values)
-                            if key in text_keys else value)
-            else:
-                out[key] = _walk(value, fields, known_values, text_keys)
+        out = node
+        # Longest span first: replacing "Jane" before "Jane Doe" would leave the
+        # surname behind as "<PERSON> Doe".
+        for span in sorted(spans, key=lambda s: len(s["original_text"]), reverse=True):
+            out = out.replace(span["original_text"], span["replacement_token"])
         return out
+    if isinstance(node, list):
+        return [apply_spans(v, spans) for v in node]
+    if isinstance(node, dict):
+        return {k: apply_spans(v, spans) for k, v in node.items()}
     return node
 
 
 def redact_transcript(
     transcript_json: Any,
     fields: Iterable[str],
+    detector: Detector,
     known_values: Optional[Mapping[str, Sequence[str]]] = None,
-) -> Any:
-    """Scrub a `transcript_json` value, leaving timings, roles and IDs intact."""
-    return _walk(transcript_json, fields, known_values, _TRANSCRIPT_TEXT_KEYS)
+    return_spans: bool = False,
+):
+    """Scrub a `transcript_json` value, leaving timings, roles and IDs intact.
+
+    Detection runs once over the whole serialized transcript — one call, full
+    conversational context — and the spans are applied per string leaf.
+    """
+    if not transcript_json:
+        return (transcript_json, []) if return_spans else transcript_json
+    spans = detect_spans(json.dumps(transcript_json), fields, detector, known_values)
+    redacted = apply_spans(transcript_json, spans)
+    return (redacted, spans) if return_spans else redacted
 
 
 def redact_payload(
     payload: Mapping[str, Any],
     fields: Iterable[str],
+    detector: Detector,
     known_values: Optional[Mapping[str, Sequence[str]]] = None,
-    redact_customer_number: bool = True,
-) -> Dict[str, Any]:
+    return_spans: bool = False,
+):
     """Return a copy of an observe payload with PII replaced by placeholder tokens.
 
-    Args:
-        payload: the body you would POST to /observability/v1/observe/.
-        fields: entity names to scrub, using the same vocabulary as `redact_fields`.
-        known_values: {entity: [literal values]} you already know for this call.
-        redact_customer_number: also tokenize the top-level `customer_number`.
+    Covers `transcript_json`, `transcript`, `metadata`, `dynamic_variables` and
+    `customer_number`. The recording is handled separately by `redact_audio`.
     """
     fields = list(fields)
     out = dict(payload)
+    all_spans: List[Span] = []
 
     if out.get("transcript_json") is not None:
-        out["transcript_json"] = redact_transcript(
-            out["transcript_json"], fields, known_values)
+        out["transcript_json"], spans = redact_transcript(
+            out["transcript_json"], fields, detector, known_values, return_spans=True)
+        all_spans += spans
 
-    if isinstance(out.get("transcript"), str):
-        out["transcript"] = redact_text(out["transcript"], fields, known_values)
+    # metadata / dynamic_variables / transcript / customer_number are usually
+    # short: detect over them together in one more call, then apply everywhere.
+    side_channel = {k: out[k] for k in _FREEFORM_PAYLOAD_KEYS + ("transcript", "customer_number")
+                    if out.get(k) is not None}
+    if side_channel:
+        side_fields = list(fields)
+        if isinstance(out.get("customer_number"), str) and "phone_number" not in side_fields:
+            side_fields.append("phone_number")
+        spans = detect_spans(json.dumps(side_channel), side_fields, detector, known_values)
+        all_spans += spans
+        for key in side_channel:
+            out[key] = apply_spans(out[key], all_spans)
 
-    for key in _FREEFORM_PAYLOAD_KEYS:
-        if out.get(key) is not None:
-            out[key] = _walk(out[key], fields, known_values, None)
+    return (out, all_spans) if return_spans else out
 
-    if redact_customer_number and isinstance(out.get("customer_number"), str):
-        out["customer_number"] = redact_text(
-            out["customer_number"], list(fields) + ["phone_number"], known_values)
 
-    return out
-```
-```typescript cekuraRedact.ts
-/**
- * Client-side PII redaction for Cekura observability payloads.
- *
- * Scrubs sensitive values out of an /observability/v1/observe/ payload *before*
- * it leaves your infrastructure. No dependencies, no network calls.
- *
- *   import { redactPayload } from "./cekuraRedact";
- *
- *   const body = redactPayload(payload, {
- *     fields: ["email_address", "phone_number", "ssn", "credit_card"],
- *     knownValues: { person_name: ["Jane Doe"], location: ["3753 Conifer Drive"] },
- *   });
- *   await fetch(CEKURA_OBSERVE_URL, { method: "POST", headers, body: JSON.stringify(body) });
- */
+# ---------------------------------------------------------------------------
+# Audio redaction
+# ---------------------------------------------------------------------------
 
-// Placeholder tokens match the ones Cekura's server-side redaction emits, so a
-// transcript scrubbed here reads the same as one scrubbed with `redact_fields`.
-export const ENTITY_TO_TOKEN: Record<string, string> = {
-  person_name: "<PERSON>",
-  age: "<AGE>",
-  phone_number: "<PHONE>",
-  email_address: "<EMAIL>",
-  date: "<DATE>",
-  time: "<TIME>",
-  location: "<LOCATION>",
-  origin: "<ORIGIN>",
-  gender_sexuality: "<GENDER>",
-  physical_attribute: "<ATTRIBUTE>",
-  occupation: "<OCCUPATION>",
-  username: "<USERNAME>",
-  password: "<PASSWORD>",
-  ip_address: "<IP_ADDRESS>",
-  url: "<URL>",
-  filename: "<FILENAME>",
-  event: "<EVENT>",
-  vehicle_id: "<VEHICLE_ID>",
-  dob: "<DOB>",
-  healthcare_number: "<HEALTHCARE_NUMBER>",
-  medical_professional: "<MEDICAL_PROFESSIONAL>",
-  credit_card: "<CREDIT_CARD>",
-  account_number: "<ACCOUNT_NUMBER>",
-  bank_account: "<BANK_ACCOUNT>",
-  money: "<MONEY>",
-  ssn: "<SSN>",
-  passport_number: "<PASSPORT>",
-  driver_license: "<DRIVER_LICENSE>",
-  numerical_pii: "<NUMERICAL_PII>",
-};
+Word = Dict[str, Any]          # {"text": ..., "start": <sec>, "end": <sec>}
+Transcriber = Callable[[bytes], Tuple[str, List[Word]]]
 
-type Rule = { entity: string; pattern: RegExp; check?: "luhn" };
 
-// Ordered: the first rule to claim a span wins, so specific formats
-// (credit card, SSN) are tried before the greedy ones (phone, numerical_pii).
-const PATTERNS: Rule[] = [
-  { entity: "email_address", pattern: /\b[\w.+-]+@[\w-]+\.[\w.-]{2,}\b/gi },
-  { entity: "url", pattern: /\bhttps?:\/\/[^\s<>"']+|\bwww\.[^\s<>"']+/gi },
-  { entity: "ip_address", pattern: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g },
-  { entity: "credit_card", pattern: /(?<![\d-])(?:\d[ -]*?){13,19}(?![\d-])/g, check: "luhn" },
-  { entity: "ssn", pattern: /(?<!\d)\d{3}[- ]\d{2}[- ]\d{4}(?!\d)|(?<![\d-])\d{9}(?![\d-])/g },
-  {
-    entity: "phone_number",
-    pattern: /(?<![\d-])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}(?![\d-])/g,
-  },
-  {
-    entity: "dob",
-    pattern: /\b(?:0?[1-9]|1[0-2])[/-](?:0?[1-9]|[12]\d|3[01])[/-](?:19|20)\d{2}\b/g,
-  },
-  {
-    entity: "date",
-    pattern:
-      /\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+(?:19|20)\d{2})?\b/gi,
-  },
-  { entity: "money", pattern: /[$£€]\s?\d[\d,]*(?:\.\d{2})?\b/g },
-  { entity: "numerical_pii", pattern: /\b\d{6,}\b/g },
-];
+def _multipart(fields: Mapping[str, str], filename: str, content: bytes) -> Tuple[bytes, str]:
+    boundary = uuid.uuid4().hex
+    buffer = io.BytesIO()
+    for name, value in fields.items():
+        buffer.write(f"--{boundary}\r\nContent-Disposition: form-data; "
+                     f'name="{name}"\r\n\r\n{value}\r\n'.encode())
+    buffer.write(f"--{boundary}\r\nContent-Disposition: form-data; "
+                 f'name="file"; filename="{filename}"\r\n'
+                 f"Content-Type: application/octet-stream\r\n\r\n".encode())
+    buffer.write(content)
+    buffer.write(f"\r\n--{boundary}--\r\n".encode())
+    return buffer.getvalue(), f"multipart/form-data; boundary={boundary}"
 
-// Keys whose string values carry spoken content in the supported transcript
-// formats (Cekura, Vapi, Retell, Deepgram, ElevenLabs, Pipecat, LiveKit).
-const TRANSCRIPT_TEXT_KEYS = new Set([
-  "content", "message", "text", "transcript", "word", "punctuated_word",
-  "original_message", "arguments", "result", "result_value", "params_as_json",
-  "summary",
-]);
 
-// Top-level payload keys that are scrubbed key-and-value recursively. Cekura's
-// server-side `redact_fields` covers the transcript and the audio only, so these
-// are the fields client-side scrubbing exists for.
-const FREEFORM_PAYLOAD_KEYS = ["metadata", "dynamic_variables"];
+def openai_compatible_transcriber(
+    base_url: str,
+    api_key: str,
+    model: str = "whisper-1",
+    filename: str = "call.mp3",
+    timeout: int = 300,
+    extra_fields: Optional[Mapping[str, str]] = None,
+) -> Transcriber:
+    """Transcriber backed by an OpenAI-compatible `/audio/transcriptions` endpoint
+    that returns word-level timestamps (OpenAI, Azure OpenAI, Groq, self-hosted
+    Whisper). Word timings are what make audio redaction possible — a transcript
+    without them cannot be aligned back to the waveform.
+    """
+    def transcribe(audio_bytes: bytes) -> Tuple[str, List[Word]]:
+        fields = {"model": model, "response_format": "verbose_json",
+                  "timestamp_granularities[]": "word", **(extra_fields or {})}
+        body, content_type = _multipart(fields, filename, audio_bytes)
+        request = urllib.request.Request(
+            base_url.rstrip("/") + "/audio/transcriptions", data=body,
+            headers={"Content-Type": content_type, "Authorization": f"Bearer {api_key}"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read())
+        words = [{"text": w["word"], "start": float(w["start"]), "end": float(w["end"])}
+                 for w in payload.get("words") or []]
+        if not words:
+            raise RedactionError(
+                "Transcription returned no word timestamps; audio cannot be aligned")
+        return payload.get("text", ""), words
 
-export interface RedactOptions {
-  /** Entity names to scrub, using the same vocabulary as `redact_fields`. */
-  fields: string[];
-  /** { entity: [literal values] } you already know for this call. */
-  knownValues?: Record<string, string[]>;
-  /** Also tokenize the top-level `customer_number`. Defaults to true. */
-  redactCustomerNumber?: boolean;
-}
+    return transcribe
 
-function luhn(digits: string): boolean {
-  let total = 0;
-  const parity = digits.length % 2;
-  for (let i = 0; i < digits.length; i++) {
-    let d = Number(digits[i]);
-    if (i % 2 === parity) {
-      d *= 2;
-      if (d > 9) d -= 9;
-    }
-    total += d;
-  }
-  return total % 10 === 0;
-}
 
-function validate(entity: string, match: string, check?: "luhn"): boolean {
-  if (check === "luhn") {
-    const digits = match.replace(/\D/g, "");
-    return digits.length >= 13 && digits.length <= 19 && luhn(digits);
-  }
-  if (entity === "ip_address") {
-    return match.split(".").every((p) => Number(p) <= 255);
-  }
-  return true;
-}
+def _build_word_index(words: Sequence[Word]) -> Tuple[str, List[Tuple[int, Word]]]:
+    """Lay the words out as one string and record where each one starts, so a
+    detected span can be mapped back to the words it covers."""
+    parts, index, position = [], [], 0
+    for word in words:
+        text = (word.get("text") or "").strip()
+        if not text:
+            continue
+        parts.append(text)
+        index.append((position, {"text": text, "start": word["start"], "end": word["end"]}))
+        position += len(text) + 1
+    return " ".join(parts), index
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
-/**
- * Literal values you already hold (CRM name, address, account number).
- * These are the highest-signal rules available client-side: a regex cannot spot a
- * person's name in a transcript, but you already know it before the call starts.
- */
-function knownValueRules(knownValues?: Record<string, string[]>): Rule[] {
-  const rules: Rule[] = [];
-  for (const [entity, values] of Object.entries(knownValues ?? {})) {
-    for (const raw of values) {
-      const value = (raw ?? "").trim();
-      if (value.length < 3) continue; // too short to match safely
-      rules.push({
-        entity,
-        pattern: new RegExp(`(?<!\\w)${escapeRegExp(value)}(?!\\w)`, "gi"),
-      });
-    }
-  }
-  return rules;
-}
+def find_phrase_timestamps(
+    phrase: str, text: str, index: Sequence[Tuple[int, Word]]
+) -> List[Tuple[float, float]]:
+    """Locate every occurrence of `phrase` in `text`, ignoring case, punctuation
+    and spacing, and return the (start, end) audio range of each."""
+    normalized, positions = [], []
+    for position, character in enumerate(text):
+        if character.isalnum():
+            normalized.append(character.casefold())
+            positions.append(position)
+    needle = "".join(c.casefold() for c in phrase if c.isalnum())
+    if not needle:
+        return []
 
-/** Replace every requested entity in `text` with its Cekura placeholder token. */
-export function redactText(text: string, opts: RedactOptions): string {
-  const requested = new Set(opts.fields.filter((f) => f in ENTITY_TO_TOKEN));
-  const rules = [...knownValueRules(opts.knownValues), ...PATTERNS].filter((r) =>
-    requested.has(r.entity)
-  );
+    haystack = "".join(normalized)
+    timestamps, found = [], haystack.find(needle)
+    while found != -1:
+        start_pos = positions[found]
+        end_pos = positions[found + len(needle) - 1] + 1
+        covered = [word for word_pos, word in index
+                   if word_pos < end_pos and word_pos + len(word["text"]) > start_pos]
+        if covered:
+            timestamps.append((covered[0]["start"], covered[-1]["end"]))
+        found = haystack.find(needle, found + len(needle))
+    return timestamps
 
-  // Claim spans first, apply once, so a token is never re-matched by a later rule.
-  const claimed: Array<[number, number, string]> = [];
-  for (const rule of rules) {
-    for (const m of text.matchAll(rule.pattern)) {
-      const start = m.index ?? 0;
-      const end = start + m[0].length;
-      if (!m[0].trim() || !validate(rule.entity, m[0], rule.check)) continue;
-      if (claimed.some(([s, e]) => start < e && s < end)) continue;
-      claimed.push([start, end, ENTITY_TO_TOKEN[rule.entity]]);
-    }
-  }
 
-  let out = text;
-  for (const [start, end, token] of claimed.sort((a, b) => b[0] - a[0])) {
-    out = out.slice(0, start) + token + out.slice(end);
-  }
-  return out;
-}
+def _fuzzy_phrase_timestamps(
+    phrase: str, index: Sequence[Tuple[int, Word]], max_ratio: float = 0.25
+) -> List[Tuple[float, float]]:
+    """Word-level fuzzy alignment for spans detected on a *different* transcription
+    of the same audio. Two transcribers spell the same speech differently ("Betty"
+    vs "Bette"), so exact matching misses; a bounded edit-distance match on word
+    runs bridges the gap. Short tokens are skipped — at that length everything is
+    within edit distance of everything."""
+    needle = "".join(c.casefold() for c in phrase if c.isalnum())
+    if len(needle) < 4:
+        return []
 
-/** Rewrite string leaves. `textKeys === null` means scrub every string found. */
-function walk(node: unknown, opts: RedactOptions, textKeys: Set<string> | null): unknown {
-  if (typeof node === "string") return redactText(node, opts);
-  if (Array.isArray(node)) return node.map((v) => walk(v, opts, textKeys));
-  if (node && typeof node === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-      if (typeof value === "string" && textKeys !== null) {
-        out[key] = textKeys.has(key) ? redactText(value, opts) : value;
-      } else {
-        out[key] = walk(value, opts, textKeys);
-      }
-    }
-    return out;
-  }
-  return node;
-}
+    def distance(a: str, b: str) -> int:
+        if abs(len(a) - len(b)) > int(len(a) * max_ratio) + 1:
+            return len(a) + len(b)
+        previous = list(range(len(b) + 1))
+        for i, ca in enumerate(a, 1):
+            current = [i]
+            for j, cb in enumerate(b, 1):
+                current.append(min(previous[j] + 1, current[j - 1] + 1,
+                                   previous[j - 1] + (ca != cb)))
+            previous = current
+        return previous[-1]
 
-/** Scrub a `transcript_json` value, leaving timings, roles and IDs intact. */
-export function redactTranscript(transcriptJson: unknown, opts: RedactOptions): unknown {
-  return walk(transcriptJson, opts, TRANSCRIPT_TEXT_KEYS);
-}
+    words = [word for _, word in index]
+    budget = max(1, int(len(needle) * max_ratio))
+    timestamps = []
+    for start_idx in range(len(words)):
+        run = ""
+        for end_idx in range(start_idx, min(start_idx + 12, len(words))):
+            run += "".join(c.casefold() for c in words[end_idx]["text"] if c.isalnum())
+            if len(run) > len(needle) + budget:
+                break
+            if abs(len(run) - len(needle)) <= budget and distance(needle, run) <= budget:
+                timestamps.append((words[start_idx]["start"], words[end_idx]["end"]))
+                break
+    return timestamps
 
-/** Return a copy of an observe payload with PII replaced by placeholder tokens. */
-export function redactPayload(
-  payload: Record<string, unknown>,
-  opts: RedactOptions
-): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...payload };
 
-  if (out.transcript_json != null) {
-    out.transcript_json = redactTranscript(out.transcript_json, opts);
-  }
+def _merge(ranges: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:
+    if not ranges:
+        return []
+    merged = []
+    start, end = sorted(ranges)[0]
+    for next_start, next_end in sorted(ranges)[1:]:
+        if next_start <= end:
+            end = max(end, next_end)
+        else:
+            merged.append((start, end))
+            start, end = next_start, next_end
+    merged.append((start, end))
+    return merged
 
-  if (typeof out.transcript === "string") {
-    out.transcript = redactText(out.transcript, opts);
-  }
 
-  for (const key of FREEFORM_PAYLOAD_KEYS) {
-    if (out[key] != null) out[key] = walk(out[key], opts, null);
-  }
+def apply_beeps(
+    audio_bytes: bytes,
+    ranges: Sequence[Tuple[float, float]],
+    audio_format: Optional[str] = None,
+    export_format: str = "mp3",
+    buffer_ms: int = 100,
+    beep_freq: int = 1000,
+) -> bytes:
+    """Replace each (start, end) range with a beep tone, padded by `buffer_ms` on
+    both sides so a clipped word edge cannot leak a syllable. Needs `pydub`
+    (and ffmpeg for any format other than WAV)."""
+    from pydub import AudioSegment
+    from pydub.generators import Sine
 
-  if ((opts.redactCustomerNumber ?? true) && typeof out.customer_number === "string") {
-    out.customer_number = redactText(out.customer_number, {
-      ...opts,
-      fields: [...opts.fields, "phone_number"],
-    });
-  }
+    audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format=audio_format)
+    if not ranges:
+        return audio_bytes
 
-  return out;
-}
+    segments, last_end = [], 0
+    for start, end in ranges:
+        # Clamp to `last_end`: two ranges less than 2 * buffer_ms apart have
+        # overlapping padding, and beeping the overlap twice would lengthen the
+        # recording and desynchronize every timestamp after it.
+        start_ms = max(0, int(start * 1000) - buffer_ms, last_end)
+        end_ms = min(len(audio), int(end * 1000) + buffer_ms)
+        if end_ms <= start_ms:
+            continue
+        if start_ms > last_end:
+            segments.append(audio[last_end:start_ms])
+        beep = Sine(beep_freq).to_audio_segment(duration=end_ms - start_ms) - 10
+        segments.append(beep.set_frame_rate(audio.frame_rate).set_channels(audio.channels))
+        last_end = end_ms
+    if last_end < len(audio):
+        segments.append(audio[last_end:])
+
+    buffer = io.BytesIO()
+    sum(segments[1:], segments[0]).export(buffer, format=export_format)
+    return buffer.getvalue()
+
+
+def redact_audio(
+    audio_bytes: bytes,
+    fields: Iterable[str],
+    detector: Detector,
+    transcriber: Transcriber,
+    known_values: Optional[Mapping[str, Sequence[str]]] = None,
+    supplemental_spans: Optional[Sequence[Span]] = None,
+    audio_format: Optional[str] = None,
+    export_format: str = "mp3",
+) -> bytes:
+    """Beep every spoken PII value out of a call recording.
+
+    Transcribes with word timestamps using your STT provider, detects PII on that
+    transcription with your LLM, maps each detected span back to its audio range,
+    and replaces those ranges with a tone.
+
+    `supplemental_spans` are spans detected on a *different* transcription of the
+    same call — pass the ones `redact_payload` returned. Each transcription catches
+    entities the other missed, so the union beeps more than either alone.
+
+    Fails closed: if detection fails, or a detected span cannot be aligned to the
+    waveform, RedactionError is raised rather than returning partially redacted
+    audio. Never fall back to uploading the original on that error.
+    """
+    fields = [f for f in fields if f in ENTITY_TO_TOKEN]
+    if not fields:
+        return audio_bytes
+
+    _, words = transcriber(audio_bytes)
+    text, index = _build_word_index(words)
+
+    ranges: List[Tuple[float, float]] = []
+    unaligned: List[str] = []
+    for span in detect_spans(text, fields, detector, known_values):
+        found = find_phrase_timestamps(span["original_text"], text, index)
+        if found:
+            ranges.extend(found)
+        else:
+            unaligned.append(span["original_text"])
+    if unaligned:
+        raise RedactionError(
+            f"{len(unaligned)} detected PII span(s) could not be aligned to audio "
+            f"timestamps; refusing to return partially redacted audio")
+
+    # Supplemental spans come from another transcription, so exact matching often
+    # misses. Align fuzzily; a span that still will not align is a hard failure
+    # when it carries digits (phone, account, card material must never ship
+    # unbeeped) and is skipped otherwise — usually a name spelled differently by
+    # the two transcribers, where failing every time would make redaction unusable.
+    unaligned_numeric = []
+    for span in supplemental_spans or []:
+        original = span.get("original_text")
+        if not original:
+            continue
+        found = (find_phrase_timestamps(original, text, index)
+                 or _fuzzy_phrase_timestamps(original, index))
+        if found:
+            ranges.extend(found)
+        elif sum(c.isdigit() for c in original) >= 4:
+            unaligned_numeric.append(original)
+    if unaligned_numeric:
+        raise RedactionError(
+            "Numeric PII found in the transcript could not be aligned to audio "
+            "timestamps; refusing to return partially redacted audio")
+
+    return apply_beeps(audio_bytes, _merge(ranges),
+                       audio_format=audio_format, export_format=export_format)
 ```
 </CodeGroup>
 
-<Note>
-  The TypeScript version uses regex lookbehind and `String.prototype.matchAll`, so it needs Node 14 or newer (or any modern browser runtime).
-</Note>
-
 ## Using it
 
-Scrub the payload immediately before the POST, so nothing unredacted is ever serialized onto the wire.
+Scrub the payload and the recording, then send both. The spans found on the transcript are passed into the audio pass as `supplemental_spans`: each pass detects on its own text, so the union beeps entities either one alone would have missed.
 
-<CodeGroup>
-```python Python
+```python
+import json
 import os
 import requests
-from cekura_redact import redact_payload
+from cekura_redact import (
+    RedactionError,
+    openai_compatible_detector,
+    openai_compatible_transcriber,
+    redact_audio,
+    redact_payload,
+)
+
+FIELDS = [
+    "person_name", "phone_number", "email_address",
+    "location", "dob", "ssn", "credit_card", "money",
+]
+
+detect = openai_compatible_detector(
+    base_url=os.environ["LLM_BASE_URL"],      # your provider, your key
+    api_key=os.environ["LLM_API_KEY"],
+    model="gpt-4.1-mini",
+)
+transcribe = openai_compatible_transcriber(
+    base_url=os.environ["STT_BASE_URL"],
+    api_key=os.environ["STT_API_KEY"],
+    model="whisper-1",
+)
 
 payload = {
     "call_id": call.id,
@@ -515,98 +780,123 @@ payload = {
     "metadata": {"customer_id": customer.id, "name": customer.full_name},
 }
 
-# Values you already hold beat any regex — pass them in.
+try:
+    clean_payload, spans = redact_payload(payload, FIELDS, detect, return_spans=True)
+    clean_audio = redact_audio(
+        raw_audio_bytes, FIELDS, detect, transcribe,
+        supplemental_spans=spans,        # spans found on the transcript
+        audio_format="mp3",
+    )
+except RedactionError:
+    # Fail closed. Do not fall back to sending the original.
+    raise
+
+# Multipart upload: JSON fields are serialized, the recording is a file part.
+form = dict(clean_payload)
+form["transcript_json"] = json.dumps(form["transcript_json"])
+form["metadata"] = json.dumps(form["metadata"])
+
+requests.post(
+    "https://api.cekura.ai/observability/v1/observe/",
+    data=form,
+    files={"voice_recording": ("call.mp3", clean_audio, "audio/mpeg")},
+    headers={"X-CEKURA-API-KEY": os.environ["CEKURA_API_KEY"]},
+    timeout=60,
+)
+```
+
+<Note>
+  If you host the redacted recording yourself, send `voice_recording_url` in a JSON body instead of uploading `voice_recording` as multipart — the payload is otherwise identical.
+</Note>
+
+**Transcript before:**
+
+```json
+{ "role": "user", "message": "It's Jane Doe, my number's four one five, five five five, oh one two three.", "time": 4.2 }
+```
+
+**Transcript after:**
+
+```json
+{ "role": "user", "message": "It's <PERSON>, my number's <PHONE>.", "time": 4.2 }
+```
+
+The recording gets a tone over `0:04.2–0:09.6` — the span where those words were spoken — and is otherwise byte-for-byte the same length, so transcript timings still line up with the audio in the Cekura player.
+
+## Bringing your own providers
+
+`detector` and `transcriber` are plain callables. The two adapters in the script cover OpenAI-compatible endpoints; anything else is a short function with the same contract.
+
+<AccordionGroup>
+  <Accordion title="Detector contract">
+    Takes the prompt string, returns a list of `{"original_text": ..., "replacement_token": ...}` — or `None` if the call failed. Returning `None` is what makes the script fail closed, so never return `[]` on an error: an empty list means "this transcript contains no PII".
+
+    ```python
+    def detect(prompt: str) -> list[dict] | None:
+        try:
+            response = my_provider.generate(prompt, tools=[SUBMIT_TOOL], temperature=0)
+        except Exception:
+            return None
+        return response.tool_call.arguments["redactions"]
+    ```
+
+    Use a tool call or structured-output mode rather than free-form text — the spans must come back parseable, and `original_text` must be verbatim or the replacement silently misses.
+  </Accordion>
+
+  <Accordion title="Transcriber contract">
+    Takes the audio bytes, returns `(full_text, words)` where each word is `{"text": ..., "start": <seconds>, "end": <seconds>}`. Most STT APIs return this shape under a different key:
+
+    ```python
+    def transcribe(audio_bytes: bytes) -> tuple[str, list[dict]]:
+        result = my_stt.transcribe(audio_bytes, word_timestamps=True)
+        words = [
+            {"text": w["word"], "start": w["start_time"], "end": w["end_time"]}
+            for w in result["words"]
+        ]
+        if not words:
+            raise RedactionError("no word timestamps; cannot align audio")
+        return result["text"], words
+    ```
+
+    Whatever provider you use, confirm word timings are in **seconds** — some APIs return milliseconds or nanoseconds, and a unit mismatch beeps the wrong part of the call without any error.
+  </Accordion>
+
+  <Accordion title="Choosing a model">
+    Detection is a long-context extraction task with a strict verbatim-copy requirement, not a reasoning task. A mid-tier instruction-following model with reliable tool calling is the right trade-off; run it at `temperature=0`.
+
+    Do not cap output tokens tightly. The prompt asks for one entry per occurrence, so a long call with repeated PII produces a long span list, and a truncated tool call fails to parse — which correctly fails closed, but wastes the run.
+  </Accordion>
+</AccordionGroup>
+
+## Optional: pinning values you already know
+
+Detection is automatic, so `known_values` is optional. Pass it when a specific value must never survive — the caller's name and address from your CRM, say — and those literals are scrubbed deterministically on top of whatever the model found:
+
+```python
 clean = redact_payload(
-    payload,
-    fields=[
-        "person_name", "email_address", "phone_number",
-        "ssn", "credit_card", "location", "dob",
-    ],
+    payload, FIELDS, detect,
     known_values={
         "person_name": [customer.full_name, customer.first_name],
         "location": [customer.street_address],
         "account_number": [customer.account_number],
     },
 )
-
-requests.post(
-    "https://api.cekura.ai/observability/v1/observe/",
-    json=clean,
-    headers={"X-CEKURA-API-KEY": os.environ["CEKURA_API_KEY"]},
-    timeout=30,
-)
 ```
 
-```typescript TypeScript
-import { redactPayload } from "./cekuraRedact";
-
-const payload = {
-  call_id: call.id,
-  agent: AGENT_ID,
-  transcript_type: "vapi",
-  transcript_json: call.transcript,
-  customer_number: call.fromNumber,
-  metadata: { customer_id: customer.id, name: customer.fullName },
-};
-
-// Values you already hold beat any regex — pass them in.
-const clean = redactPayload(payload, {
-  fields: [
-    "person_name", "email_address", "phone_number",
-    "ssn", "credit_card", "location", "dob",
-  ],
-  knownValues: {
-    person_name: [customer.fullName, customer.firstName],
-    location: [customer.streetAddress],
-    account_number: [customer.accountNumber],
-  },
-});
-
-await fetch("https://api.cekura.ai/observability/v1/observe/", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "X-CEKURA-API-KEY": process.env.CEKURA_API_KEY!,
-  },
-  body: JSON.stringify(clean),
-});
-```
-</CodeGroup>
-
-**Before:**
-
-```json
-{
-  "role": "user",
-  "message": "Hi, this is Jane Doe, my email is jane.doe@example.com and my number is (415) 555-0123.",
-  "secondsFromStart": 2.32
-}
-```
-
-**After:**
-
-```json
-{
-  "role": "user",
-  "message": "Hi, this is <PERSON>, my email is <EMAIL> and my number is <PHONE>.",
-  "secondsFromStart": 2.32
-}
-```
+The script also runs a small deterministic sweep of its own for the unambiguous cases — currency amounts, month-and-day dates, well-formed emails, IPs, SSNs and phone numbers — so a value the model misreads as something else is still caught.
 
 ## Combining both
 
-Client-side scrubbing only touches the JSON you send. If you also send `voice_recording_url` or `voice_recording`, the spoken PII is still in the audio.
+<CardGroup cols={2}>
+  <Card title="Fully client-side" icon="lock">
+    Scrub the payload and beep the recording yourself, and send neither `redact_fields` nor raw audio. Nothing unredacted ever leaves your network, and no redaction credits are charged.
+  </Card>
+  <Card title="Client-side transcript, server-side audio" icon="scale-balanced">
+    Scrub the JSON yourself — including the `metadata` and `dynamic_variables` that `redact_fields` does not reach — and let Cekura redact the recording on ingest by sending `redact_fields`.
+  </Card>
+</CardGroup>
 
-<Steps>
-  <Step title="Scrub the payload client-side">
-    Removes PII from `transcript_json`, `metadata`, `dynamic_variables` and `customer_number` before they leave your network.
-  </Step>
-  <Step title="Decide what to do about the recording">
-    Either omit the recording entirely, upload a recording you have already redacted yourself, or send `redact_fields` so Cekura redacts the audio on ingest.
-  </Step>
-</Steps>
-
-```json Client-side scrub + server-side audio redaction
+```json Client-side transcript scrub + server-side audio redaction
 {
   "call_id": "call_12345678",
   "agent": 1,
@@ -617,42 +907,32 @@ Client-side scrubbing only touches the JSON you send. If you also send `voice_re
 ```
 
 <Info>
-  Client-side scrubbing is free — it runs in your process. Sending `redact_fields` still costs **0.4 credits per minute**, so if you are not sending audio and your client-side rules already cover you, omit `redact_fields` entirely.
+  Sending `redact_fields` costs **0.4 credits per minute** regardless of how many fields are listed. If your client-side pass already covers you and you are not sending raw audio, omit `redact_fields` entirely.
 </Info>
 
-## Coverage and limits
+## Limits
 
-| Entity | Client-side | Notes |
-|---|---|---|
-| `email_address`, `url`, `ip_address` | Pattern | Reliable — these have unambiguous formats. |
-| `phone_number`, `ssn`, `credit_card` | Pattern | Digit formats only. Credit cards are Luhn-checked to avoid tokenizing ordinary long numbers. |
-| `dob`, `date`, `money` | Pattern | Common written formats (`03/04/1990`, `March 3rd, 1990`, `$1,204.50`). |
-| `numerical_pii` | Pattern | Any run of 6+ digits. Broad by design — the last line of defence for account and reference numbers. |
-| `person_name`, `location`, `occupation`, and other open-vocabulary entities | Known values only | Supply them via `known_values`, or use server-side `redact_fields`. |
-
-Known limitations to plan around:
-
-- **Spelled-out digits.** A caller who says "four one five, five five five" produces no digit run for the patterns to match. Server-side redaction handles spoken numbers; client-side patterns do not.
-- **Misspellings and transcription noise.** `known_values` matches literal strings, so "Jane Do" from an imperfect transcription will not match "Jane Doe". Pass common variants (first name alone, nickname) as extra values.
-- **Broad rules cost context.** Turning on `numerical_pii` tokenizes order numbers and confirmation codes too, which can make metrics about those flows harder to evaluate. Enable the narrowest set of fields that satisfies your policy.
-- **Redaction is not reversible.** Cekura only ever sees the tokens, so a redacted value cannot be recovered later for debugging. Keep your own mapping if you need one.
+- **Detection quality is your model's.** The prompt in the script is the same approach Cekura's own redaction uses, but the result depends on the model behind it. Evaluate on your own calls before trusting it in production.
+- **Audio alignment needs an accurate transcription.** A span the STT transcribed differently cannot be aligned, and the script fails closed rather than shipping partially redacted audio. If that happens often, the fix is a better STT model, not looser alignment.
+- **Two providers, two failure modes.** Detection and transcription are network calls in your ingestion path. Give them generous timeouts and decide up front what you do with a call whose redaction failed — the safe default is to skip sending it.
+- **Redaction is irreversible.** Cekura only ever sees the tokens and the beeps, so a redacted value cannot be recovered later for debugging. Keep your own mapping if you need one.
+- **Broad fields cost context.** Enabling `numerical_pii` tokenizes order and confirmation numbers too, which can make metrics about those flows harder to evaluate. Enable the narrowest set that satisfies your policy.
 
 ## Verifying before you roll out
 
-Run the script over a batch of real payloads and diff, rather than trusting it on the first live call:
+Run the script over a batch of real calls and inspect what changed before putting it in the ingestion path:
 
 ```python
 import json
 from cekura_redact import redact_payload
 
-FIELDS = ["email_address", "phone_number", "ssn", "credit_card", "numerical_pii"]
-
 with open("sample_payloads.jsonl") as fh:
     for line in fh:
         raw = json.loads(line)
-        clean = redact_payload(raw, fields=FIELDS)
-        if json.dumps(raw) != json.dumps(clean):
-            print(raw["call_id"], "->", json.dumps(clean["transcript_json"])[:200])
+        clean, spans = redact_payload(raw, FIELDS, detect, return_spans=True)
+        print(raw["call_id"], len(spans), "spans")
+        for span in spans:
+            print("   ", span["replacement_token"], "<-", span["original_text"][:60])
 ```
 
-Send a handful of scrubbed calls to a throwaway agent first and confirm in the dashboard that the transcripts read the way you expect and that your metrics still evaluate against them.
+Read the span list, not just the output: a short list on a call you know contains PII means detection under-fired, and that is the failure worth catching before it reaches production. Then send a handful of scrubbed calls to a throwaway agent and confirm the transcripts read the way you expect, the recording plays with tones in the right places, and your metrics still evaluate against them.

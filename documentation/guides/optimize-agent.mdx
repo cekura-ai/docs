@@ -93,7 +93,11 @@ If a proposed change targets one of those, it is dropped and the run says so.
 
 A failure that happened in production doesn't always happen in a test. When you start from production calls, the loop treats reproducing the problem as a precondition — not as an optional first attempt.
 
-It writes scenarios from the failing calls and runs each of them several times. The failure counts as reproduced when the metric that flagged those calls in production fails on a meaningful share of those conversations. That check is arithmetic, not a judgement call: conversations that were never scored — a timed-out call, a scoring error — count as neither evidence for nor against.
+It writes scenarios from the failing calls — as few as will cover them, since every cited metric is scored on every conversation — and runs each of them once. The failure counts as reproduced as soon as the metric that flagged those calls in production fails on one of those conversations: that is all the loop needs before it can start measuring whether a change fixes it. The check is arithmetic, not a judgement call: conversations that were never scored — a timed-out call, a scoring error — count as neither evidence for nor against.
+
+Saying the opposite takes more evidence than that, deliberately. "We couldn't reproduce it" either ends the run or sends it to the last resort below, so the loop won't conclude it until enough conversations have actually been scored to stand behind it.
+
+Those same conversations are your baseline. Rather than buy a second, identical batch to measure where the agent starts, the loop scores the ones it just ran — so proving the failure and establishing the "before" number cost one round of testing between them, not two.
 
 If the failure doesn't show up, the loop doesn't give up on the first try. It:
 
@@ -147,6 +151,8 @@ Defaults: up to **15 rounds**, stopping early after **5 rounds without improveme
 **Promote was refused.** Either your live agent changed since the run started, or the copy no longer matches what was measured. Both mean the offered before/after no longer describes reality. Re-run rather than forcing it.
 
 **The run is refused before it starts.** Your project has no rubric rule and no metric enabled for simulations, so there's nothing to score against. See [Metrics](/documentation/key-concepts/metrics/overview).
+
+**It stopped after writing the scenarios, saying it can't score the checks that flagged those calls.** The metrics named on those insights no longer resolve to a metric in the project — deleted, renamed, or two metrics sharing one name — so nothing would have scored the failure and every test conversation would have been paid for with no verdict to show. The scenarios it wrote stay in your evaluators list, so fixing the metric and starting again reuses them.
 
 ## Self-hosted and custom agents
 

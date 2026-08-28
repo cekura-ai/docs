@@ -31,13 +31,14 @@ export const livekitPrompt = [
   "",
   "For the production / observability entrypoint:",
   "- Use cekura.observe_session(ctx, session) — captures transcripts, tool calls, metrics, session logs, AND records dual-channel audio.",
+  "- Optional for Python SDK 1.6.5+: pass async_recording=True to run egress-related APIs in the background and avoid adding their latency to session startup. This can miss opening audio while egress starts; the default False waits for recording to start.",
   "",
   "For the UAT / testing entrypoint:",
   "- Use cekura.track_session(ctx, session, agent) — captures transcripts, tool calls, metrics, session logs, and automatically injects mock tools configured in Cekura. No audio recording.",
   "- Note: track_session takes an additional agent parameter (the Agent instance) so it can inject mock tools.",
   "",
   "Common setup for both (Python):",
-  "1. Install the SDK: pip install \"cekura[livekit]>=1.6.4\"",
+  "1. Install the SDK: pip install \"cekura[livekit]>=1.6.5\"",
   "2. Import LiveKitTracer: from cekura.livekit import LiveKitTracer",
   "3. Initialize the tracer (outside the entrypoint function):",
   "   cekura = LiveKitTracer(",
@@ -210,7 +211,7 @@ Use this setup in your test agents while running simulation calls from the Cekur
 <Tab title="Python">
 
 ```bash
-pip install "cekura[livekit]>=1.6.4"
+pip install "cekura[livekit]>=1.6.5"
 ```
 
 </Tab>
@@ -352,7 +353,7 @@ Use this setup in your production agents for monitoring live calls with audio re
 <Tab title="Python">
 
 ```bash
-pip install "cekura[livekit]>=1.6.4"
+pip install "cekura[livekit]>=1.6.5"
 ```
 
 </Tab>
@@ -430,6 +431,10 @@ export default defineAgent({
 - Captures transcripts, tool calls, metrics, and session logs
 - Records dual-channel audio (agent + user) for analysis
 - Exports data to Cekura observability endpoint
+
+<Note>
+With Python SDK 1.6.5 or later, you can pass `async_recording=True` to run egress-related APIs in the background. This avoids adding their latency to session startup. Transcript, tool-call, metric, and session-report collection are unaffected, but audio produced before egress is ready may be absent from the recording. The default is `False`, which waits for recording to start and preserves opening audio.
+</Note>
 
 </Step>
 
@@ -678,12 +683,15 @@ Monitors production calls with dual-channel audio recording. Collects transcript
 
 ```python
 await cekura.observe_session(
-    ctx,               # Required: LiveKit JobContext
-    session,           # Required: LiveKit AgentSession
-    capture_logs=True, # Optional: Capture session logs (default: True)
-    **metadata         # Optional: Custom metadata
+    ctx,                   # Required: LiveKit JobContext
+    session,               # Required: LiveKit AgentSession
+    capture_logs=True,     # Optional: Capture session logs (default: True)
+    async_recording=False, # Optional: Run egress-related APIs in background
+    **metadata             # Optional: Custom metadata
 )
 ```
+
+Set `async_recording=True` to keep egress-related APIs off the session-start path. The SDK waits for background startup during shutdown so successful recording identifiers are included in the final export. Audio generated before egress becomes ready may not be recorded.
 
 </Tab>
 <Tab title="JavaScript">

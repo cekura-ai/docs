@@ -1186,6 +1186,16 @@ def main():
     parser = argparse.ArgumentParser(description="Cekura OpenAPI MCP Server")
     parser.add_argument("--port", type=int, default=8001, help="Port to run the HTTP server on (default: 8001)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
+    parser.add_argument(
+        "--timeout-keep-alive",
+        type=int,
+        default=int(os.getenv("MCP_TIMEOUT_KEEP_ALIVE", "620")),
+        help=(
+            "Seconds an idle keep-alive connection is held open. Must exceed the idle timeout of any "
+            "proxy in front of the server, otherwise the proxy can reuse a connection the server is "
+            "closing and the client sees a 502 (default: 620, or $MCP_TIMEOUT_KEEP_ALIVE)"
+        ),
+    )
     args = parser.parse_args()
 
     logger.info("Starting Cekura OpenAPI MCP Server...")
@@ -1346,7 +1356,7 @@ def main():
 
     logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port, timeout_keep_alive=args.timeout_keep_alive)
 
 
 if __name__ == "__main__":

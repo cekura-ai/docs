@@ -26,7 +26,12 @@ if os.getenv("AWS_SECRET_NAME"):
 
 import skill_gate
 from config import load_config
-from http_client import build_mcp_headers, create_client
+from http_client import (
+    build_mcp_headers,
+    create_client,
+    ResponseTooLargeError,
+    _max_upstream_response_bytes,
+)
 from openapi_parser import load_openapi_spec
 from tool_generator import (
     apply_overlay_to_description,
@@ -184,6 +189,10 @@ async def initialize_server():
 
         server_config = load_config()
         logger.info(f"Loaded config: Base URL={server_config.base_url}")
+        # Read here as well as per request, so a malformed value fails at boot
+        # instead of surfacing as a per-call error, and the effective cap is on
+        # the record beside any upstream_response_too_large event.
+        logger.info(f"Upstream response cap: {_max_upstream_response_bytes()} bytes")
 
         openapi_parser = load_openapi_spec(server_config.openapi_spec_path)
         logger.info(f"Loaded OpenAPI spec from {server_config.openapi_spec_path}")
@@ -1164,6 +1173,22 @@ def setup_dynamic_tool_handlers():
             nudge = gate_nudge or ""
             return [{"type": "text", "text": f"{text}{nudge}{call_id_suffix}"}]
 
+        except ResponseTooLargeError as e:
+            # The condition this cap exists to catch: record who asked for what,
+            # and how big it got, so the next cap can be sized from data.
+            logger.warning(json.dumps({
+                "event": "upstream_response_too_large",
+                "mcp_call_id": mcp_call_id,
+                "tool": name,
+                "path": e.path,
+                "limit_bytes": e.limit,
+                "bytes_read": e.bytes_read,
+                "content_length": e.content_length,
+                "client_id": telemetry["client_id"],
+                "conversation_id": telemetry["conversation_id"],
+                "cred_hash": _credential_fingerprint(),
+            }))
+            return [{"type": "text", "text": f"Error: {e}{call_id_suffix}"}]
         except ValueError as e:
             return [{"type": "text", "text": f"Authentication Error: {e}{call_id_suffix}"}]
         except Exception as e:

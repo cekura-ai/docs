@@ -1,4 +1,5 @@
 """Tests for the MCP HTTP client's request-body shaping."""
+import gzip
 import json
 
 import httpx
@@ -171,22 +172,19 @@ class TestResponseSizeCap:
         client = _client_returning(json.dumps(payload).encode())
         assert await client.execute_request("GET", "/observability/v2/call-logs/") == payload
 
-    async def test_response_over_cap_is_refused(self):
-        # One row short of a page of transcripts is all it takes.
-        client = _client_returning(b"x" * 2048, max_response_bytes=1024)
+    async def test_response_over_cap_is_refused(self, monkeypatch):
+        monkeypatch.setenv("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES", "1024")
+        client = _client_returning(b"x" * 2048)
+        assert client.max_response_bytes == 1024
         with pytest.raises(ResponseTooLargeError) as excinfo:
             await client.execute_request("GET", "/observability/v2/call-logs/")
-        message = str(excinfo.value)
         # The caller is an LLM: the error has to say what to do next.
+        message = str(excinfo.value)
         assert "1024" in message
         assert "page_size" in message and "ql" in message
-
-    async def test_cap_is_read_from_the_environment(self, monkeypatch):
-        monkeypatch.setenv("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES", "512")
-        client = _client_returning(b"y" * 1024)
-        assert client.max_response_bytes == 512
-        with pytest.raises(ResponseTooLargeError):
-            await client.execute_request("GET", "/observability/v2/call-logs/")
+        # And an operator has to be able to size the next cap.
+        assert excinfo.value.bytes_read > 1024
+        assert excinfo.value.path == "/observability/v2/call-logs/"
 
     async def test_default_cap_applies_without_configuration(self, monkeypatch):
         monkeypatch.delenv("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES", raising=False)
@@ -201,17 +199,9 @@ class TestResponseSizeCap:
         assert "bad range" in str(excinfo.value)
 
     async def test_gzipped_response_is_decoded_once(self):
-        import gzip
-
         payload = {"results": []}
-        client = CekuraAPIClient(base_url="http://example.invalid", credential="test")
-
-        def handler(request):
-            return httpx.Response(
-                200,
-                content=gzip.compress(json.dumps(payload).encode()),
-                headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
-            )
-
-        client.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        client = _client_returning(
+            gzip.compress(json.dumps(payload).encode()),
+            headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
+        )
         assert await client.execute_request("GET", "/observability/v2/call-logs/") == payload

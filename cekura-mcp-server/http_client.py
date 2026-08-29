@@ -1,26 +1,23 @@
-import os
 import httpx
 from typing import Dict, Any, Optional
 import json
 
+from config import _parse_int_env
+
 
 # Upstream responses are read into memory, decoded into a Python object graph and
 # serialized again as MCP text, so a single oversized body costs several times its
-# own size. Stop reading past this many decoded bytes and tell the caller to narrow
-# the request instead. Override with CEKURA_MAX_UPSTREAM_RESPONSE_BYTES.
+# own size. 8 MiB leaves room for that multiple, and for concurrent tool calls,
+# inside the 2 GiB the container is given. Stop reading past this many decoded
+# bytes and tell the caller to narrow the request instead.
 DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
 def _max_upstream_response_bytes() -> int:
-    raw = os.getenv("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES")
-    if not raw:
+    """Effective cap, from CEKURA_MAX_UPSTREAM_RESPONSE_BYTES or the default."""
+    value = _parse_int_env("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES")
+    if value is None:
         return DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES
-    try:
-        value = int(raw)
-    except ValueError:
-        raise ValueError(
-            f"CEKURA_MAX_UPSTREAM_RESPONSE_BYTES must be an integer, got: {raw}"
-        )
     if value <= 0:
         raise ValueError("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES must be positive")
     return value
@@ -62,8 +59,12 @@ def build_mcp_headers(
 class ResponseTooLargeError(Exception):
     """An upstream body exceeded the configured cap and was not read to the end."""
 
-    def __init__(self, limit: int):
+    def __init__(self, limit: int, bytes_read: int = 0,
+                 content_length: Optional[str] = None, path: str = ""):
         self.limit = limit
+        self.bytes_read = bytes_read
+        self.content_length = content_length
+        self.path = path
         super().__init__(
             f"Response too large: the API returned more than {limit} bytes, so it "
             "was not read. Narrow the request and retry — ask for fewer rows "
@@ -84,15 +85,10 @@ class CekuraAPIClient:
         mcp_tool: Optional[str] = None,
         mcp_skill: Optional[str] = None,
         conversation_id: Optional[str] = None,
-        max_response_bytes: Optional[int] = None,
     ):
         self.base_url = base_url
         self.credential_type = credential_type
-        self.max_response_bytes = (
-            max_response_bytes
-            if max_response_bytes is not None
-            else _max_upstream_response_bytes()
-        )
+        self.max_response_bytes = _max_upstream_response_bytes()
         self.client = httpx.AsyncClient(
             headers=build_mcp_headers(
                 credential,
@@ -210,15 +206,17 @@ class CekuraAPIClient:
         async for chunk in response.aiter_bytes():
             body.extend(chunk)
             if len(body) > self.max_response_bytes:
-                raise ResponseTooLargeError(self.max_response_bytes)
+                raise ResponseTooLargeError(
+                    self.max_response_bytes,
+                    bytes_read=len(body),
+                    content_length=response.headers.get("content-length"),
+                    path=response.request.url.path,
+                )
         # aiter_bytes() yields decoded bytes, so the transfer headers describing
         # the original encoded body no longer apply.
-        headers = httpx.Headers(
-            [
-                (k, v) for k, v in response.headers.multi_items()
-                if k.lower() not in ("content-encoding", "content-length")
-            ]
-        )
+        headers = response.headers.copy()
+        headers.pop("content-encoding", None)
+        headers.pop("content-length", None)
         return httpx.Response(
             status_code=response.status_code,
             headers=headers,

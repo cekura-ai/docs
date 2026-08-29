@@ -1,9 +1,14 @@
 """Tests for the MCP HTTP client's request-body shaping."""
 import json
 
+import httpx
 import pytest
 
-from http_client import CekuraAPIClient
+from http_client import (
+    DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES,
+    CekuraAPIClient,
+    ResponseTooLargeError,
+)
 
 
 @pytest.fixture
@@ -143,3 +148,70 @@ class TestSerializeQuery:
 
     def test_scalar_passthrough(self, client):
         assert client._serialize_query({"page": 1, "name": "x"}) == {"page": 1, "name": "x"}
+
+
+def _client_returning(body: bytes, *, status_code=200, headers=None, **kwargs):
+    """A client whose upstream always answers with `body`."""
+    client = CekuraAPIClient(base_url="http://example.invalid", credential="test", **kwargs)
+
+    def handler(request):
+        return httpx.Response(
+            status_code,
+            content=body,
+            headers=headers or {"Content-Type": "application/json"},
+        )
+
+    client.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return client
+
+
+class TestResponseSizeCap:
+    async def test_response_under_cap_is_returned(self):
+        payload = {"results": [{"id": 1, "call_id": "abc"}]}
+        client = _client_returning(json.dumps(payload).encode())
+        assert await client.execute_request("GET", "/observability/v2/call-logs/") == payload
+
+    async def test_response_over_cap_is_refused(self):
+        # One row short of a page of transcripts is all it takes.
+        client = _client_returning(b"x" * 2048, max_response_bytes=1024)
+        with pytest.raises(ResponseTooLargeError) as excinfo:
+            await client.execute_request("GET", "/observability/v2/call-logs/")
+        message = str(excinfo.value)
+        # The caller is an LLM: the error has to say what to do next.
+        assert "1024" in message
+        assert "page_size" in message and "ql" in message
+
+    async def test_cap_is_read_from_the_environment(self, monkeypatch):
+        monkeypatch.setenv("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES", "512")
+        client = _client_returning(b"y" * 1024)
+        assert client.max_response_bytes == 512
+        with pytest.raises(ResponseTooLargeError):
+            await client.execute_request("GET", "/observability/v2/call-logs/")
+
+    async def test_default_cap_applies_without_configuration(self, monkeypatch):
+        monkeypatch.delenv("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES", raising=False)
+        client = CekuraAPIClient(base_url="http://example.invalid", credential="test")
+        assert client.max_response_bytes == DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES
+
+    async def test_error_status_still_reports_upstream_detail(self):
+        # Bounding the read must not swallow the upstream error body.
+        client = _client_returning(json.dumps({"detail": "bad range"}).encode(), status_code=400)
+        with pytest.raises(Exception) as excinfo:
+            await client.execute_request("GET", "/observability/v2/call-logs/")
+        assert "bad range" in str(excinfo.value)
+
+    async def test_gzipped_response_is_decoded_once(self):
+        import gzip
+
+        payload = {"results": []}
+        client = CekuraAPIClient(base_url="http://example.invalid", credential="test")
+
+        def handler(request):
+            return httpx.Response(
+                200,
+                content=gzip.compress(json.dumps(payload).encode()),
+                headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
+            )
+
+        client.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        assert await client.execute_request("GET", "/observability/v2/call-logs/") == payload

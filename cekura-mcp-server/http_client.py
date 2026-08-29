@@ -1,6 +1,29 @@
+import os
 import httpx
 from typing import Dict, Any, Optional
 import json
+
+
+# Upstream responses are read into memory, decoded into a Python object graph and
+# serialized again as MCP text, so a single oversized body costs several times its
+# own size. Stop reading past this many decoded bytes and tell the caller to narrow
+# the request instead. Override with CEKURA_MAX_UPSTREAM_RESPONSE_BYTES.
+DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES = 8 * 1024 * 1024
+
+
+def _max_upstream_response_bytes() -> int:
+    raw = os.getenv("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES")
+    if not raw:
+        return DEFAULT_MAX_UPSTREAM_RESPONSE_BYTES
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(
+            f"CEKURA_MAX_UPSTREAM_RESPONSE_BYTES must be an integer, got: {raw}"
+        )
+    if value <= 0:
+        raise ValueError("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES must be positive")
+    return value
 
 
 def build_mcp_headers(
@@ -36,6 +59,19 @@ def build_mcp_headers(
     return headers
 
 
+class ResponseTooLargeError(Exception):
+    """An upstream body exceeded the configured cap and was not read to the end."""
+
+    def __init__(self, limit: int):
+        self.limit = limit
+        super().__init__(
+            f"Response too large: the API returned more than {limit} bytes, so it "
+            "was not read. Narrow the request and retry — ask for fewer rows "
+            "(page_size), a shorter time window, or fewer fields per row (ql, e.g. "
+            "ql={id,call_id,timestamp}) — or fetch a single record by id instead."
+        )
+
+
 class CekuraAPIClient:
     def __init__(
         self,
@@ -48,9 +84,15 @@ class CekuraAPIClient:
         mcp_tool: Optional[str] = None,
         mcp_skill: Optional[str] = None,
         conversation_id: Optional[str] = None,
+        max_response_bytes: Optional[int] = None,
     ):
         self.base_url = base_url
         self.credential_type = credential_type
+        self.max_response_bytes = (
+            max_response_bytes
+            if max_response_bytes is not None
+            else _max_upstream_response_bytes()
+        )
         self.client = httpx.AsyncClient(
             headers=build_mcp_headers(
                 credential,
@@ -79,13 +121,14 @@ class CekuraAPIClient:
         request_body = self._coerce_body(body, property_types) if body is not None else None
 
         try:
-            response = await self.client.request(
+            async with self.client.stream(
                 method=method,
                 url=url,
                 params=self._serialize_query(query_params or {}),
                 json=request_body,
-            )
-            return self._handle_response(response)
+            ) as response:
+                bounded = await self._read_bounded(response)
+            return self._handle_response(bounded)
         except httpx.TimeoutException:
             raise Exception(f"Request timeout: {method} {url}")
         except httpx.RequestError as e:
@@ -159,6 +202,29 @@ class CekuraAPIClient:
                 return value
 
         return value
+
+    async def _read_bounded(self, response: httpx.Response) -> httpx.Response:
+        """Read at most `max_response_bytes` of decoded body, then rebuild the
+        response around those bytes so the rest of the client is unchanged."""
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            body.extend(chunk)
+            if len(body) > self.max_response_bytes:
+                raise ResponseTooLargeError(self.max_response_bytes)
+        # aiter_bytes() yields decoded bytes, so the transfer headers describing
+        # the original encoded body no longer apply.
+        headers = httpx.Headers(
+            [
+                (k, v) for k, v in response.headers.multi_items()
+                if k.lower() not in ("content-encoding", "content-length")
+            ]
+        )
+        return httpx.Response(
+            status_code=response.status_code,
+            headers=headers,
+            content=bytes(body),
+            request=response.request,
+        )
 
     def _handle_response(self, response: httpx.Response) -> Dict[str, Any]:
         if 200 <= response.status_code < 300:

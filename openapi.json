@@ -25477,6 +25477,58 @@
                 }
             }
         },
+        "/test_framework/v1/personalities-external/clone_voice/": {
+            "post": {
+                "operationId": "personalities-external-clone-voice-create",
+                "description": "Clone a voice from an uploaded audio sample and return its provider voice id.\n\nmultipart/form-data: `file` (the sample), `provider` (\"11labs\" or \"cartesia\"),\nand optionally `name`, `description`, `language` (Cartesia only — ElevenLabs\ninfers language from the audio).\n\nThe returned `voice_id` is what a personality's `voice_id` field expects. The\nclone lands on our shared platform provider account, which is what lets the\nbot synthesise with it later using only its own keys. Nothing is persisted\nhere: the caller owns the id from this point on.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreatePersonality"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/personalities-external/elevenlabs_voices/": {
             "get": {
                 "operationId": "personalities-external-elevenlabs-voices-retrieve",
@@ -25964,6 +26016,58 @@
                 "tags": [
                     "test_framework"
                 ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreatePersonality"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/personalities/clone_voice/": {
+            "post": {
+                "operationId": "personalities-clone-voice-create",
+                "description": "Clone a voice from an uploaded audio sample and return its provider voice id.\n\nmultipart/form-data: `file` (the sample), `provider` (\"11labs\" or \"cartesia\"),\nand optionally `name`, `description`, `language` (Cartesia only — ElevenLabs\ninfers language from the audio).\n\nThe returned `voice_id` is what a personality's `voice_id` field expects. The\nclone lands on our shared platform provider account, which is what lets the\nbot synthesise with it later using only its own keys. Nothing is persisted\nhere: the caller owns the id from this point on.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "oauth2": []
@@ -30868,6 +30972,14 @@
                             "type": "integer"
                         },
                         "description": "Filter runs by result ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ordering",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Sort the run list by one or more columns, comma-separated, prefix with `-` for descending (e.g. `-timestamp`). Defaults to newest first. Allowed fields: id, result_id, scenario_name, timestamp, duration, status, success, agent_name, personality_name, test_profile_name."
                     }
                 ],
                 "tags": [
@@ -31253,6 +31365,14 @@
                             "type": "integer"
                         },
                         "description": "Filter runs by result ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ordering",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Sort the run list by one or more columns, comma-separated, prefix with `-` for descending (e.g. `-timestamp`). Defaults to newest first. Allowed fields: id, result_id, scenario_name, timestamp, duration, status, success, agent_name, personality_name, test_profile_name."
                     }
                 ],
                 "tags": [
@@ -34510,7 +34630,7 @@
             },
             "post": {
                 "operationId": "scenarios-external-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of fixed-message actions; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -34531,12 +34651,15 @@
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "condition_id": {
-                                        "type": "integer"
-                                    },
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "condition_id": {
+                                        "type": "integer"
                                     },
                                     "action_template": {
                                         "type": "string"
@@ -34546,7 +34669,6 @@
                                     }
                                 },
                                 "required": [
-                                    "condition_id",
                                     "file"
                                 ]
                             }
@@ -34615,9 +34737,130 @@
             }
         },
         "/test_framework/v1/scenarios-external/{id}/condition-audio/{audio_id}/": {
+            "put": {
+                "operationId": "scenarios-external-condition-audio-update",
+                "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this scenario.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "audio_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConditionAudioEntry"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
             "delete": {
                 "operationId": "scenarios-external-condition-audio-destroy",
-                "description": "Delete a Detach and delete an audio clip from this scenario's conditional action",
+                "description": "Delete a Delete an audio clip and remove every `<audio>` reference to it from this scenario's conditional actions. Returns 409 without deleting anything if",
                 "parameters": [
                     {
                         "in": "path",
@@ -34675,6 +34918,24 @@
                                     "properties": {
                                         "detail": {
                                             "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 }
@@ -40619,7 +40880,7 @@
             },
             "post": {
                 "operationId": "scenarios-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of fixed-message actions; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -40640,12 +40901,15 @@
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "condition_id": {
-                                        "type": "integer"
-                                    },
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "condition_id": {
+                                        "type": "integer"
                                     },
                                     "action_template": {
                                         "type": "string"
@@ -40655,7 +40919,6 @@
                                     }
                                 },
                                 "required": [
-                                    "condition_id",
                                     "file"
                                 ]
                             }
@@ -40724,9 +40987,130 @@
             }
         },
         "/test_framework/v1/scenarios/{id}/condition-audio/{audio_id}/": {
+            "put": {
+                "operationId": "scenarios-condition-audio-update",
+                "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this scenario.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "audio_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConditionAudioEntry"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
             "delete": {
                 "operationId": "scenarios-condition-audio-destroy",
-                "description": "Delete a Detach and delete an audio clip from this scenario's conditional action",
+                "description": "Delete a Delete an audio clip and remove every `<audio>` reference to it from this scenario's conditional actions. Returns 409 without deleting anything if",
                 "parameters": [
                     {
                         "in": "path",
@@ -40784,6 +41168,24 @@
                                     "properties": {
                                         "detail": {
                                             "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 }
@@ -54739,6 +55141,14 @@
                             "type": "integer"
                         },
                         "description": "Filter runs by result ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ordering",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Sort the run list by one or more columns, comma-separated, prefix with `-` for descending (e.g. `-timestamp`). Defaults to newest first. Allowed fields: id, result_id, scenario_name, timestamp, duration, status, success, agent_name, personality_name, test_profile_name."
                     }
                 ],
                 "tags": [
@@ -56400,7 +56810,7 @@
             },
             "post": {
                 "operationId": "test-framework-v2-scenarios-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of fixed-message actions; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -56421,12 +56831,15 @@
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "condition_id": {
-                                        "type": "integer"
-                                    },
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "condition_id": {
+                                        "type": "integer"
                                     },
                                     "action_template": {
                                         "type": "string"
@@ -56436,7 +56849,6 @@
                                     }
                                 },
                                 "required": [
-                                    "condition_id",
                                     "file"
                                 ]
                             }
@@ -56505,9 +56917,130 @@
             }
         },
         "/test_framework/v2/scenarios/{id}/condition-audio/{audio_id}/": {
+            "put": {
+                "operationId": "test-framework-v2-scenarios-condition-audio-update",
+                "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this scenario.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "audio_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConditionAudioEntry"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
             "delete": {
                 "operationId": "test-framework-v2-scenarios-condition-audio-destroy",
-                "description": "Delete a Detach and delete an audio clip from this scenario's conditional action",
+                "description": "Delete a Delete an audio clip and remove every `<audio>` reference to it from this scenario's conditional actions. Returns 409 without deleting anything if",
                 "parameters": [
                     {
                         "in": "path",
@@ -56565,6 +57098,24 @@
                                     "properties": {
                                         "detail": {
                                             "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 }
@@ -67618,6 +68169,7 @@
             },
             "AIAgentDynamicVariable": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69587,6 +70139,7 @@
             },
             "AuditLog": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69816,6 +70369,7 @@
             },
             "Billing": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69918,6 +70472,7 @@
             },
             "BillingInfo": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "organization": {
                         "type": "integer",
@@ -70478,6 +71033,12 @@
                         "readOnly": true,
                         "description": "The channel index of the testing agent in the audio recording"
                     },
+                    "waveform": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Amplitude envelope of the recording, one array of values per audio channel, so a waveform can be drawn without downloading the audio. Null for recordings processed before peaks were stored."
+                    },
                     "timestamp": {
                         "type": "string",
                         "format": "date-time",
@@ -70985,7 +71546,7 @@
             },
             "ConditionAudioEntry": {
                 "type": "object",
-                "description": "Read serializer for one Scenario.condition_audio entry (a plain dict).\n\nThe caller passes each entry dict with `audio_id` injected; fields are\ntolerant of missing keys. `words` is intentionally not exposed (runtime-only\nplayback timing data).",
+                "description": "Read serializer for one Scenario.condition_audio entry (a plain dict).\n\nThe caller passes each entry dict with `audio_id` injected; fields are\ntolerant of missing keys. `words` is intentionally not exposed (runtime-only\nplayback timing data), and neither is `previous_action` (internal undo state\nfor a clip that replaced a whole action).",
                 "properties": {
                     "audio_id": {
                         "type": [
@@ -71000,10 +71561,21 @@
                         ]
                     },
                     "condition_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "First condition referencing this clip, or null when no action references it. Kept for compatibility - prefer condition_ids."
+                    },
+                    "condition_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Every condition referencing this clip, in authored order. Empty when the clip is uploaded but not referenced by any action yet."
+                    },
+                    "tag": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "The reference to paste into an action, e.g. <audio id=\"greeting\"/>"
                     },
                     "status": {
                         "type": [
@@ -71283,6 +71855,7 @@
             },
             "CreatePersonality": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -71373,38 +71946,177 @@
                         "description": "\nInterruption level\n"
                     },
                     "speed": {
-                        "type": "string",
+                        "type": "number",
+                        "minimum": 0.8,
+                        "maximum": 1.2,
                         "description": "\nSpeed of the voice\n"
                     },
                     "generation_config": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "volume": {
+                                "type": "number",
+                                "minimum": 0.5,
+                                "maximum": 2.0
+                            },
+                            "emotion": {
+                                "type": "string",
+                                "enum": [
+                                    "neutral",
+                                    "happy",
+                                    "excited",
+                                    "enthusiastic",
+                                    "elated",
+                                    "euphoric",
+                                    "triumphant",
+                                    "amazed",
+                                    "surprised",
+                                    "flirtatious",
+                                    "joking/comedic",
+                                    "curious",
+                                    "content",
+                                    "peaceful",
+                                    "serene",
+                                    "calm",
+                                    "grateful",
+                                    "affectionate",
+                                    "trust",
+                                    "sympathetic",
+                                    "anticipation",
+                                    "mysterious",
+                                    "angry",
+                                    "mad",
+                                    "outraged",
+                                    "frustrated",
+                                    "agitated",
+                                    "threatened",
+                                    "disgusted",
+                                    "contempt",
+                                    "envious",
+                                    "sarcastic",
+                                    "ironic",
+                                    "sad",
+                                    "dejected",
+                                    "melancholic",
+                                    "disappointed",
+                                    "hurt",
+                                    "guilty",
+                                    "bored",
+                                    "tired",
+                                    "rejected",
+                                    "nostalgic",
+                                    "wistful",
+                                    "apologetic",
+                                    "hesitant",
+                                    "insecure",
+                                    "confused",
+                                    "resigned",
+                                    "anxious",
+                                    "panicked",
+                                    "alarmed",
+                                    "scared",
+                                    "proud",
+                                    "confident",
+                                    "distant",
+                                    "skeptical",
+                                    "contemplative",
+                                    "determined"
+                                ]
+                            }
+                        },
                         "description": "\nGeneration config for Cartesia Sonic-3 voice model.\nOnly valid when provider is \"cartesia\" and voice_model is \"sonic-3.5\".\nSupports volume and emotion\nExample: {\"volume\": 1.5, \"emotion\": \"happy\"}\n"
                     },
                     "network_simulation": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "packet_loss": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "jitter": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "latency": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            }
+                        },
                         "description": "\nNetwork simulation configuration for testing network impairments.\n"
                     },
                     "message_plan": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "idle_timeout_seconds": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "idle_message_max_spoken_count": {
+                                "type": "integer",
+                                "minimum": 1
+                            }
+                        },
                         "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
                     },
                     "start_speaking_plan": {
-                        "type": "string",
+                        "type": "number",
+                        "minimum": 0,
                         "description": "\nWait seconds before the bot starts speaking (float >= 0).\nIgnored if interruption_level is also set in the same request (preset takes precedence).\nExample: 0.7\n"
                     },
                     "stop_speaking_plan": {
                         "type": [
-                            "string",
+                            "object",
                             "null"
                         ],
+                        "properties": {
+                            "num_words": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "voice_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "backoff_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        },
                         "description": "\nStop speaking plan configuration. Controls when the bot stops speaking.\nSupports num_words (int >= 0), voice_seconds (float >= 0), backoff_seconds (float >= 0).\nIgnored if interruption_level is also set in the same request (preset takes precedence).\nExample: {\"num_words\": 3, \"voice_seconds\": 0.3, \"backoff_seconds\": 0}\n"
                     },
                     "background_sound_volume": {
                         "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "base": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            },
+                            "reduced": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            }
+                        },
+                        "description": "\nBackground sound volume levels (0.0 to 1.0). base sets both the base and normal volume; reduced sets the quieter level during bot speech.\nExample: {\"base\": 0.05, \"reduced\": 0.02}\n"
+                    },
+                    "voice_volume": {
+                        "type": [
                             "string",
                             "null"
                         ],
-                        "description": "\nBackground sound volume levels (0.0 to 1.0). base sets both the base and normal volume; reduced sets the quieter level during bot speech.\nExample: {\"base\": 0.05, \"reduced\": 0.02}\n"
+                        "description": "\nSpeech volume of the testing agent (0.01 to 2.0, default 1.0).\nWorks on every voice provider — it is amplitude scaling applied after synthesis, so it\nreaches far quieter levels than generation_config.volume, which is a Cartesia-native\nparameter limited to Cartesia's own 0.5-2.0.\nSetting this clears any generation_config.volume so the ratio is never applied twice.\nSend null to remove it. Example: 0.05 for a barely-audible caller.\n"
+                    },
+                    "effective_voice_volume": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "\nRead-only. The volume the call will actually play at: voice_volume if set, else a\nlegacy generation_config.volume, else 1.0. Use this to populate a volume control.\n"
                     },
                     "patronus_settings": {
                         "oneOf": [
@@ -71443,6 +72155,7 @@
             },
             "CriticalMetricCategory": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -71489,6 +72202,7 @@
             },
             "CriticalMetricScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -71521,6 +72235,7 @@
             },
             "CronJob": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -72178,6 +72893,7 @@
             },
             "DiscordServer": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73001,6 +73717,7 @@
             },
             "Invite": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73072,6 +73789,7 @@
             },
             "KnowledgeBaseConnector": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73241,6 +73959,7 @@
             },
             "KnowledgeBaseFile": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73588,6 +74307,7 @@
             },
             "MetricDetailSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73847,6 +74567,7 @@
             },
             "MetricDetailV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -74106,6 +74827,7 @@
             },
             "MetricEditSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -75481,6 +76203,7 @@
             },
             "MetricOptimiserCronJob": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -75808,6 +76531,7 @@
             },
             "MetricReviewDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -75868,6 +76592,7 @@
             },
             "MetricReviewInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer"
@@ -76150,6 +76875,7 @@
             },
             "Notification": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -76745,6 +77471,7 @@
             },
             "OverallEvaluation": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -76776,6 +77503,7 @@
             },
             "Pack": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -77046,6 +77774,7 @@
             },
             "PackInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -77986,6 +78715,7 @@
             },
             "PatchedAIAgentDynamicVariable": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78063,6 +78793,7 @@
             },
             "PatchedCreatePersonality": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78153,38 +78884,177 @@
                         "description": "\nInterruption level\n"
                     },
                     "speed": {
-                        "type": "string",
+                        "type": "number",
+                        "minimum": 0.8,
+                        "maximum": 1.2,
                         "description": "\nSpeed of the voice\n"
                     },
                     "generation_config": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "volume": {
+                                "type": "number",
+                                "minimum": 0.5,
+                                "maximum": 2.0
+                            },
+                            "emotion": {
+                                "type": "string",
+                                "enum": [
+                                    "neutral",
+                                    "happy",
+                                    "excited",
+                                    "enthusiastic",
+                                    "elated",
+                                    "euphoric",
+                                    "triumphant",
+                                    "amazed",
+                                    "surprised",
+                                    "flirtatious",
+                                    "joking/comedic",
+                                    "curious",
+                                    "content",
+                                    "peaceful",
+                                    "serene",
+                                    "calm",
+                                    "grateful",
+                                    "affectionate",
+                                    "trust",
+                                    "sympathetic",
+                                    "anticipation",
+                                    "mysterious",
+                                    "angry",
+                                    "mad",
+                                    "outraged",
+                                    "frustrated",
+                                    "agitated",
+                                    "threatened",
+                                    "disgusted",
+                                    "contempt",
+                                    "envious",
+                                    "sarcastic",
+                                    "ironic",
+                                    "sad",
+                                    "dejected",
+                                    "melancholic",
+                                    "disappointed",
+                                    "hurt",
+                                    "guilty",
+                                    "bored",
+                                    "tired",
+                                    "rejected",
+                                    "nostalgic",
+                                    "wistful",
+                                    "apologetic",
+                                    "hesitant",
+                                    "insecure",
+                                    "confused",
+                                    "resigned",
+                                    "anxious",
+                                    "panicked",
+                                    "alarmed",
+                                    "scared",
+                                    "proud",
+                                    "confident",
+                                    "distant",
+                                    "skeptical",
+                                    "contemplative",
+                                    "determined"
+                                ]
+                            }
+                        },
                         "description": "\nGeneration config for Cartesia Sonic-3 voice model.\nOnly valid when provider is \"cartesia\" and voice_model is \"sonic-3.5\".\nSupports volume and emotion\nExample: {\"volume\": 1.5, \"emotion\": \"happy\"}\n"
                     },
                     "network_simulation": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "packet_loss": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "jitter": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "latency": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            }
+                        },
                         "description": "\nNetwork simulation configuration for testing network impairments.\n"
                     },
                     "message_plan": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "idle_timeout_seconds": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "idle_message_max_spoken_count": {
+                                "type": "integer",
+                                "minimum": 1
+                            }
+                        },
                         "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
                     },
                     "start_speaking_plan": {
-                        "type": "string",
+                        "type": "number",
+                        "minimum": 0,
                         "description": "\nWait seconds before the bot starts speaking (float >= 0).\nIgnored if interruption_level is also set in the same request (preset takes precedence).\nExample: 0.7\n"
                     },
                     "stop_speaking_plan": {
                         "type": [
-                            "string",
+                            "object",
                             "null"
                         ],
+                        "properties": {
+                            "num_words": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "voice_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "backoff_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        },
                         "description": "\nStop speaking plan configuration. Controls when the bot stops speaking.\nSupports num_words (int >= 0), voice_seconds (float >= 0), backoff_seconds (float >= 0).\nIgnored if interruption_level is also set in the same request (preset takes precedence).\nExample: {\"num_words\": 3, \"voice_seconds\": 0.3, \"backoff_seconds\": 0}\n"
                     },
                     "background_sound_volume": {
                         "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "base": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            },
+                            "reduced": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            }
+                        },
+                        "description": "\nBackground sound volume levels (0.0 to 1.0). base sets both the base and normal volume; reduced sets the quieter level during bot speech.\nExample: {\"base\": 0.05, \"reduced\": 0.02}\n"
+                    },
+                    "voice_volume": {
+                        "type": [
                             "string",
                             "null"
                         ],
-                        "description": "\nBackground sound volume levels (0.0 to 1.0). base sets both the base and normal volume; reduced sets the quieter level during bot speech.\nExample: {\"base\": 0.05, \"reduced\": 0.02}\n"
+                        "description": "\nSpeech volume of the testing agent (0.01 to 2.0, default 1.0).\nWorks on every voice provider — it is amplitude scaling applied after synthesis, so it\nreaches far quieter levels than generation_config.volume, which is a Cartesia-native\nparameter limited to Cartesia's own 0.5-2.0.\nSetting this clears any generation_config.volume so the ratio is never applied twice.\nSend null to remove it. Example: 0.05 for a barely-audible caller.\n"
+                    },
+                    "effective_voice_volume": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "\nRead-only. The volume the call will actually play at: voice_volume if set, else a\nlegacy generation_config.volume, else 1.0. Use this to populate a volume control.\n"
                     },
                     "patronus_settings": {
                         "oneOf": [
@@ -78218,6 +79088,7 @@
             },
             "PatchedCriticalMetricCategory": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78396,6 +79267,7 @@
             },
             "PatchedDiscordServer": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78426,6 +79298,7 @@
             },
             "PatchedInvite": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78497,6 +79370,7 @@
             },
             "PatchedKnowledgeBaseConnector": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78593,6 +79467,7 @@
             },
             "PatchedMetricEditSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78892,6 +79767,7 @@
             },
             "PatchedMetricOptimiserCronJob": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78991,6 +79867,7 @@
             },
             "PatchedMetricReviewInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer"
@@ -79417,6 +80294,7 @@
             },
             "PatchedOverallEvaluation": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -79445,6 +80323,7 @@
             },
             "PatchedPredefinedMetric": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -79864,6 +80743,7 @@
             },
             "PatchedProviderCredentialDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -80433,6 +81313,12 @@
                         "readOnly": true,
                         "description": "The channel index of the testing agent in the audio recording"
                     },
+                    "waveform": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Amplitude envelope of the recording, one array of values per audio channel, so a waveform can be drawn without downloading the audio. Null for recordings processed before peaks were stored."
+                    },
                     "run_type": {
                         "type": [
                             "string",
@@ -80895,6 +81781,7 @@
             },
             "PatchedSchemaPostMetricEdit": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -81730,6 +82617,7 @@
             },
             "PatchedSlackWorkspace": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -81769,6 +82657,7 @@
             },
             "PatchedTool": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -81907,6 +82796,7 @@
             },
             "PatchedUserAPIKey": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -81987,6 +82877,7 @@
             },
             "PatchedUserMembership": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82052,6 +82943,7 @@
             },
             "PatchedView": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82384,6 +83276,7 @@
             },
             "PaymentHistory": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82461,6 +83354,10 @@
                         "type": "string",
                         "description": "\nName of the personality\nExample: `\"Customer Service\"`\n",
                         "maxLength": 255
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "\nDescription of the personality\nExample: `\"A friendly and helpful customer service agent who is always willing to help\"`\n"
                     },
                     "prompt": {
                         "type": "string",
@@ -82558,31 +83455,168 @@
                         "type": "string"
                     },
                     "speed": {
-                        "type": "string"
+                        "type": "number",
+                        "minimum": 0.8,
+                        "maximum": 1.2
                     },
                     "generation_config": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {
+                            "volume": {
+                                "type": "number",
+                                "minimum": 0.5,
+                                "maximum": 2.0
+                            },
+                            "emotion": {
+                                "type": "string",
+                                "enum": [
+                                    "neutral",
+                                    "happy",
+                                    "excited",
+                                    "enthusiastic",
+                                    "elated",
+                                    "euphoric",
+                                    "triumphant",
+                                    "amazed",
+                                    "surprised",
+                                    "flirtatious",
+                                    "joking/comedic",
+                                    "curious",
+                                    "content",
+                                    "peaceful",
+                                    "serene",
+                                    "calm",
+                                    "grateful",
+                                    "affectionate",
+                                    "trust",
+                                    "sympathetic",
+                                    "anticipation",
+                                    "mysterious",
+                                    "angry",
+                                    "mad",
+                                    "outraged",
+                                    "frustrated",
+                                    "agitated",
+                                    "threatened",
+                                    "disgusted",
+                                    "contempt",
+                                    "envious",
+                                    "sarcastic",
+                                    "ironic",
+                                    "sad",
+                                    "dejected",
+                                    "melancholic",
+                                    "disappointed",
+                                    "hurt",
+                                    "guilty",
+                                    "bored",
+                                    "tired",
+                                    "rejected",
+                                    "nostalgic",
+                                    "wistful",
+                                    "apologetic",
+                                    "hesitant",
+                                    "insecure",
+                                    "confused",
+                                    "resigned",
+                                    "anxious",
+                                    "panicked",
+                                    "alarmed",
+                                    "scared",
+                                    "proud",
+                                    "confident",
+                                    "distant",
+                                    "skeptical",
+                                    "contemplative",
+                                    "determined"
+                                ]
+                            }
+                        }
                     },
                     "network_simulation": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {
+                            "packet_loss": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "jitter": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "latency": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            }
+                        }
                     },
                     "message_plan": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {
+                            "idle_timeout_seconds": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "idle_message_max_spoken_count": {
+                                "type": "integer",
+                                "minimum": 1
+                            }
+                        }
                     },
                     "start_speaking_plan": {
-                        "type": "string"
+                        "type": "number",
+                        "minimum": 0
                     },
                     "stop_speaking_plan": {
                         "type": [
-                            "string",
+                            "object",
                             "null"
-                        ]
+                        ],
+                        "properties": {
+                            "num_words": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "voice_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "backoff_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        }
                     },
                     "background_sound_volume": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "base": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            },
+                            "reduced": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            }
+                        }
+                    },
+                    "voice_volume": {
                         "type": [
                             "string",
                             "null"
                         ]
+                    },
+                    "effective_voice_volume": {
+                        "type": "string",
+                        "readOnly": true
                     },
                     "patronus_settings": {
                         "oneOf": [
@@ -82604,6 +83638,7 @@
                 },
                 "required": [
                     "background_noise",
+                    "description",
                     "name",
                     "prompt",
                     "voice_model"
@@ -82611,6 +83646,7 @@
             },
             "PhoneNumber": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82801,6 +83837,7 @@
             },
             "PhoneNumberInbound": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82847,6 +83884,7 @@
             },
             "PredefinedMetric": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -83482,6 +84520,7 @@
             },
             "ProviderCredentialDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -83538,6 +84577,7 @@
             },
             "ProviderCredentialList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -84380,6 +85420,12 @@
                         "readOnly": true,
                         "description": "The channel index of the testing agent in the audio recording"
                     },
+                    "waveform": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Amplitude envelope of the recording, one array of values per audio channel, so a waveform can be drawn without downloading the audio. Null for recordings processed before peaks were stored."
+                    },
                     "run_type": {
                         "type": [
                             "string",
@@ -85190,6 +86236,12 @@
                         "writeOnly": true,
                         "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
+                    "condition_audio": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of fixed-message actions by pasting its `tag`; `condition_ids` lists the conditions currently referencing it.\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"condition_ids\": [0, 3]}\n}\n```"
+                    },
                     "simulation_description": {
                         "type": "string",
                         "description": "Simulation Description"
@@ -85446,6 +86498,7 @@
             },
             "ScenarioFolder": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -85880,6 +86933,7 @@
             },
             "ScenarioInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -86246,6 +87300,12 @@
                     "conditional_actions": {
                         "writeOnly": true,
                         "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
+                    },
+                    "condition_audio": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of fixed-message actions by pasting its `tag`; `condition_ids` lists the conditions currently referencing it.\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"condition_ids\": [0, 3]}\n}\n```"
                     },
                     "simulation_description": {
                         "type": "string",
@@ -86727,6 +87787,7 @@
             },
             "SchemaGenerateMetricsMetricCreate": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -87535,6 +88596,7 @@
             },
             "SchemaPostMetricEdit": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -88779,6 +89841,12 @@
                         "writeOnly": true,
                         "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
+                    "condition_audio": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of fixed-message actions by pasting its `tag`; `condition_ids` lists the conditions currently referencing it.\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"condition_ids\": [0, 3]}\n}\n```"
+                    },
                     "simulation_description": {
                         "type": "string",
                         "description": "Simulation Description"
@@ -89605,6 +90673,7 @@
             },
             "SlackWorkspace": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -89644,6 +90713,7 @@
             },
             "Subscription": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -89912,6 +90982,7 @@
             },
             "TestSetDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -89998,6 +91069,7 @@
             },
             "TestSetInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -90122,6 +91194,7 @@
             },
             "Tool": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -90246,6 +91319,7 @@
             },
             "UserAPIKey": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -90355,6 +91429,7 @@
             },
             "UserMembership": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -90443,6 +91518,7 @@
             },
             "View": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",

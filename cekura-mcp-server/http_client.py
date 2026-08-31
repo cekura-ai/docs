@@ -200,8 +200,15 @@ class CekuraAPIClient:
         return value
 
     async def _read_bounded(self, response: httpx.Response) -> httpx.Response:
-        """Read at most `max_response_bytes` of decoded body, then rebuild the
-        response around those bytes so the rest of the client is unchanged."""
+        """Stop reading once the decoded body passes `max_response_bytes`, then
+        rebuild the response around what was read so the rest of the client is
+        unchanged.
+
+        The check runs per chunk, so a compressed body can overshoot the cap by
+        whatever one network read decompresses to — measured at ~2 MB of JSON for
+        a 29 KB gzipped page. What the cap reliably prevents is the larger cost
+        past this point: decoding an unbounded body into a Python object graph
+        and serializing it again as MCP text."""
         body = bytearray()
         async for chunk in response.aiter_bytes():
             body.extend(chunk)

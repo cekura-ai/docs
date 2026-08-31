@@ -1160,7 +1160,10 @@ def setup_dynamic_tool_handlers():
             finally:
                 await user_api_client.close()
 
-            text = json.dumps(result, default=str, ensure_ascii=False)
+            if isinstance(result, str):
+                text = result
+            else:
+                text = json.dumps(result, default=str, ensure_ascii=False)
             nudge = gate_nudge or ""
             return [{"type": "text", "text": f"{text}{nudge}{call_id_suffix}"}]
 

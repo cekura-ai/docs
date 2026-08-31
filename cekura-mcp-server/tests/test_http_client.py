@@ -1,9 +1,10 @@
-"""Tests for the MCP HTTP client's request-body shaping."""
+"""Tests for the MCP HTTP client's request-body shaping and response handling."""
 import json
 
+import httpx
 import pytest
 
-from http_client import CekuraAPIClient
+from http_client import CekuraAPIClient, RawJSONBody
 
 
 @pytest.fixture
@@ -143,3 +144,35 @@ class TestSerializeQuery:
 
     def test_scalar_passthrough(self, client):
         assert client._serialize_query({"page": 1, "name": "x"}) == {"page": 1, "name": "x"}
+
+
+def _response(status_code, content=b"", content_type="application/json"):
+    headers = {"content-type": content_type} if content_type else {}
+    return httpx.Response(
+        status_code,
+        headers=headers,
+        content=content,
+        request=httpx.Request("GET", "http://example.invalid/thing/"),
+    )
+
+
+class TestHandleResponse:
+    def test_json_body_is_forwarded_verbatim(self, client):
+        body = b'{"count": 1, "results": [{"id": 7}]}'
+        out = client._handle_response(_response(200, body))
+        assert isinstance(out, RawJSONBody)
+        assert out.text == body.decode()
+
+    def test_non_json_body_is_wrapped(self, client):
+        out = client._handle_response(_response(200, b"plain text", content_type="text/plain"))
+        assert out == {"result": "plain text"}
+
+    def test_empty_body_reports_ok(self, client):
+        assert client._handle_response(_response(204)) == {
+            "status": "ok",
+            "status_code": 204,
+        }
+
+    def test_error_status_still_raises(self, client):
+        with pytest.raises(Exception, match="Resource not found"):
+            client._handle_response(_response(404, b'{"detail": "nope"}'))

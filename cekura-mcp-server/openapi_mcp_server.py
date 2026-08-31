@@ -26,7 +26,7 @@ if os.getenv("AWS_SECRET_NAME"):
 
 import skill_gate
 from config import load_config
-from http_client import RawJSONBody, build_mcp_headers, create_client
+from http_client import build_mcp_headers, create_client
 from openapi_parser import load_openapi_spec
 from tool_generator import (
     apply_overlay_to_description,
@@ -1160,8 +1160,8 @@ def setup_dynamic_tool_handlers():
             finally:
                 await user_api_client.close()
 
-            if isinstance(result, RawJSONBody):
-                text = result.text
+            if isinstance(result, str):
+                text = result
             else:
                 text = json.dumps(result, default=str, ensure_ascii=False)
             nudge = gate_nudge or ""

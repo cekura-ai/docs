@@ -4,7 +4,7 @@ import json
 import httpx
 import pytest
 
-from http_client import CekuraAPIClient, RawJSONBody
+from http_client import CekuraAPIClient
 
 
 @pytest.fixture
@@ -160,8 +160,7 @@ class TestHandleResponse:
     def test_json_body_is_forwarded_verbatim(self, client):
         body = b'{"count": 1, "results": [{"id": 7}]}'
         out = client._handle_response(_response(200, body))
-        assert isinstance(out, RawJSONBody)
-        assert out.text == body.decode()
+        assert out == body.decode()
 
     def test_non_json_body_is_wrapped(self, client):
         out = client._handle_response(_response(200, b"plain text", content_type="text/plain"))

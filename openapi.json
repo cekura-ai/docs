@@ -8351,7 +8351,7 @@
         "/observability/v1/metric-failure-mode-insights/{id}/generate-scenario/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-generate-scenario-create",
-                "description": "Turn one failure mode of a metric failure-mode insight into a test scenario that reproduces the issue against a target agent. Choose the failure mode with `failure_mode_index` and the agent with `agent`. Set `redact_transcripts` to strip personal identifiers from the source call transcripts before they are used to draft the scenario. Runs in the background and returns a `progress_id`; poll scenario generation progress to retrieve the generated scenario id.",
+                "description": "Turn one failure mode of a metric failure-mode insight into a test scenario that reproduces the issue against a target agent. Choose the failure mode with `failure_mode_index` and the agent with `agent`. Set `redact_transcripts` to strip personal identifiers from the source call transcripts before they are used to draft the scenario. Pass `folder_path` to file the generated scenario under an existing scenario folder; it lands in the project's `default` folder otherwise. Runs in the background and returns a `progress_id`; poll scenario generation progress to retrieve the generated scenario id.",
                 "summary": "Generate a test scenario from an insight failure mode",
                 "parameters": [
                     {
@@ -8419,7 +8419,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metric-failure-mode-insights-generate-scenario-create",
-                        "description": "Turn one failure mode of a metric failure-mode insight into a test scenario that reproduces the issue against a target agent. Choose the failure mode with `failure_mode_index` and the agent with `agent`. Set `redact_transcripts` to strip personal identifiers from the source call transcripts before they are used to draft the scenario. Runs in the background and returns a `progress_id`; poll scenario generation progress to retrieve the generated scenario id."
+                        "description": "Turn one failure mode of a metric failure-mode insight into a test scenario that reproduces the issue against a target agent. Choose the failure mode with `failure_mode_index` and the agent with `agent`. Set `redact_transcripts` to strip personal identifiers from the source call transcripts before they are used to draft the scenario. Pass `folder_path` to file the generated scenario under an existing scenario folder; it lands in the project's `default` folder otherwise. Runs in the background and returns a `progress_id`; poll scenario generation progress to retrieve the generated scenario id."
                     }
                 }
             }
@@ -8626,7 +8626,7 @@
         "/observability/v1/metric-failure-mode-insights/categories/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-categories-retrieve",
-                "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) to count only calls handled by those agents; results are sorted by count descending.",
+                "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) to count only calls handled by those agents; results are sorted by count descending. Each category also carries `agents`: the agents that handled its calls, busiest first, each with a call count, its own example call ids, and whether Improve Agent can edit it.",
                 "summary": "List accumulating failure categories for a metric",
                 "parameters": [
                     {
@@ -8682,7 +8682,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metric-failure-mode-insights-categories-retrieve",
-                        "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) to count only calls handled by those agents; results are sorted by count descending."
+                        "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) to count only calls handled by those agents; results are sorted by count descending. Each category also carries `agents`: the agents that handled its calls, busiest first, each with a call count, its own example call ids, and whether Improve Agent can edit it."
                     }
                 }
             }
@@ -8827,7 +8827,7 @@
         "/observability/v1/metric-failure-mode-insights/categories/{category_slug}/fix-metric/": {
             "post": {
                 "operationId": "metric-failure-mode-insights-categories-fix-metric-create",
-                "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with an optional `feedback` note and an optional corrected `expected_value` label (defaults to a pass).",
+                "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with an optional `feedback` note and an optional corrected `expected_value` label (defaults to a pass). The category is then deleted and its calls dismissed — flagging the metric as wrong means it was never a real agent failure.",
                 "summary": "Add an accumulating failure category's example calls to Labs",
                 "parameters": [
                     {
@@ -8896,7 +8896,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metric-failure-mode-insights-categories-fix-metric-create",
-                        "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with an optional `feedback` note and an optional corrected `expected_value` label (defaults to a pass)."
+                        "description": "Sample the latest calls in one persistent failure category and add them to Labs for its metric, with an optional `feedback` note and an optional corrected `expected_value` label (defaults to a pass). The category is then deleted and its calls dismissed — flagging the metric as wrong means it was never a real agent failure."
                     }
                 }
             }
@@ -8904,7 +8904,7 @@
         "/observability/v1/metric-failure-mode-insights/failure-rates/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-failure-rates-retrieve",
-                "description": "Return the percentage of evaluated calls that failed each metric during the selected Insights date range. Optionally scope to `agent_ids` (comma-separated agent ids).",
+                "description": "Return the percentage of evaluated calls that failed each metric during the selected Insights date range. Optionally scope to `agent_ids` (comma-separated agent ids). Rates are counted from the verdicts recorded at evaluation time, so editing a metric's failure criteria changes future calls only.",
                 "summary": "List metric failure rates for the insights window",
                 "parameters": [
                     {
@@ -14604,6 +14604,49 @@
                         "description": "No response body"
                     }
                 }
+            }
+        },
+        "/test_framework/internal/billing/cross-region-withdraw/": {
+            "post": {
+                "operationId": "test-framework-internal-billing-cross-region-withdraw-create",
+                "description": "Source-region endpoint. The shared API key is the only credential.\n\nDeliberately outside the project's normal auth stack: the caller is the\npeer region's celery worker, which has no user and no Supabase session.\nAuthorisation is the per-org opt-in enforced in `apply_withdrawal`.\nNo `audit_log_model` - the response carries no object id for the audit\nmiddleware to resolve, and both sides log every applied transfer.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CrossRegionWithdraw"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CrossRegionWithdraw"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CrossRegionWithdraw"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": {}
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
             }
         },
         "/test_framework/metric-reviews/{id}/": {
@@ -25477,6 +25520,58 @@
                 }
             }
         },
+        "/test_framework/v1/personalities-external/clone_voice/": {
+            "post": {
+                "operationId": "personalities-external-clone-voice-create",
+                "description": "Clone a voice from an uploaded audio sample and return its provider voice id.\n\nmultipart/form-data: `file` (the sample), `provider` (\"11labs\" or \"cartesia\"),\nand optionally `name`, `description`, `language` (Cartesia only — ElevenLabs\ninfers language from the audio).\n\nThe returned `voice_id` is what a personality's `voice_id` field expects. The\nclone lands on our shared platform provider account, which is what lets the\nbot synthesise with it later using only its own keys. Nothing is persisted\nhere: the caller owns the id from this point on.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreatePersonality"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/test_framework/v1/personalities-external/elevenlabs_voices/": {
             "get": {
                 "operationId": "personalities-external-elevenlabs-voices-retrieve",
@@ -25964,6 +26059,58 @@
                 "tags": [
                     "test_framework"
                 ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CreatePersonality"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/personalities/clone_voice/": {
+            "post": {
+                "operationId": "personalities-clone-voice-create",
+                "description": "Clone a voice from an uploaded audio sample and return its provider voice id.\n\nmultipart/form-data: `file` (the sample), `provider` (\"11labs\" or \"cartesia\"),\nand optionally `name`, `description`, `language` (Cartesia only — ElevenLabs\ninfers language from the audio).\n\nThe returned `voice_id` is what a personality's `voice_id` field expects. The\nclone lands on our shared platform provider account, which is what lets the\nbot synthesise with it later using only its own keys. Nothing is persisted\nhere: the caller owns the id from this point on.",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePersonality"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "security": [
                     {
                         "oauth2": []
@@ -30868,6 +31015,14 @@
                             "type": "integer"
                         },
                         "description": "Filter runs by result ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ordering",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Sort the run list by one or more columns, comma-separated, prefix with `-` for descending (e.g. `-timestamp`). Defaults to newest first. Allowed fields: id, result_id, scenario_name, timestamp, duration, status, success, agent_name, personality_name, test_profile_name."
                     }
                 ],
                 "tags": [
@@ -31253,6 +31408,14 @@
                             "type": "integer"
                         },
                         "description": "Filter runs by result ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ordering",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Sort the run list by one or more columns, comma-separated, prefix with `-` for descending (e.g. `-timestamp`). Defaults to newest first. Allowed fields: id, result_id, scenario_name, timestamp, duration, status, success, agent_name, personality_name, test_profile_name."
                     }
                 ],
                 "tags": [
@@ -34510,7 +34673,7 @@
             },
             "post": {
                 "operationId": "scenarios-external-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of fixed-message actions; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -34531,12 +34694,15 @@
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "condition_id": {
-                                        "type": "integer"
-                                    },
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "condition_id": {
+                                        "type": "integer"
                                     },
                                     "action_template": {
                                         "type": "string"
@@ -34546,7 +34712,6 @@
                                     }
                                 },
                                 "required": [
-                                    "condition_id",
                                     "file"
                                 ]
                             }
@@ -34615,9 +34780,130 @@
             }
         },
         "/test_framework/v1/scenarios-external/{id}/condition-audio/{audio_id}/": {
+            "put": {
+                "operationId": "scenarios-external-condition-audio-update",
+                "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this scenario.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "audio_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConditionAudioEntry"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
             "delete": {
                 "operationId": "scenarios-external-condition-audio-destroy",
-                "description": "Delete a Detach and delete an audio clip from this scenario's conditional action",
+                "description": "Delete a Delete an audio clip and remove every `<audio>` reference to it from this scenario's conditional actions. Returns 409 without deleting anything if",
                 "parameters": [
                     {
                         "in": "path",
@@ -34675,6 +34961,24 @@
                                     "properties": {
                                         "detail": {
                                             "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 }
@@ -40619,7 +40923,7 @@
             },
             "post": {
                 "operationId": "scenarios-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of fixed-message actions; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -40640,12 +40944,15 @@
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "condition_id": {
-                                        "type": "integer"
-                                    },
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "condition_id": {
+                                        "type": "integer"
                                     },
                                     "action_template": {
                                         "type": "string"
@@ -40655,7 +40962,6 @@
                                     }
                                 },
                                 "required": [
-                                    "condition_id",
                                     "file"
                                 ]
                             }
@@ -40724,9 +41030,130 @@
             }
         },
         "/test_framework/v1/scenarios/{id}/condition-audio/{audio_id}/": {
+            "put": {
+                "operationId": "scenarios-condition-audio-update",
+                "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this scenario.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "audio_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConditionAudioEntry"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
             "delete": {
                 "operationId": "scenarios-condition-audio-destroy",
-                "description": "Delete a Detach and delete an audio clip from this scenario's conditional action",
+                "description": "Delete a Delete an audio clip and remove every `<audio>` reference to it from this scenario's conditional actions. Returns 409 without deleting anything if",
                 "parameters": [
                     {
                         "in": "path",
@@ -40784,6 +41211,24 @@
                                     "properties": {
                                         "detail": {
                                             "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 }
@@ -54739,6 +55184,14 @@
                             "type": "integer"
                         },
                         "description": "Filter runs by result ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ordering",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Sort the run list by one or more columns, comma-separated, prefix with `-` for descending (e.g. `-timestamp`). Defaults to newest first. Allowed fields: id, result_id, scenario_name, timestamp, duration, status, success, agent_name, personality_name, test_profile_name."
                     }
                 ],
                 "tags": [
@@ -56400,7 +56853,7 @@
             },
             "post": {
                 "operationId": "test-framework-v2-scenarios-condition-audio-create",
-                "description": "Attach an audio clip to a fixed-message conditional action. The clip is transcoded to 24kHz mono PCM WAV, stored in S3, and transcribed asynchronously. Pass action_template with one `<audio />` marker to insert the managed tag inline; omit it for legacy whole-action replacement. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
+                "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of fixed-message actions; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
                         "in": "path",
@@ -56421,12 +56874,15 @@
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "condition_id": {
-                                        "type": "integer"
-                                    },
                                     "file": {
                                         "type": "string",
                                         "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "condition_id": {
+                                        "type": "integer"
                                     },
                                     "action_template": {
                                         "type": "string"
@@ -56436,7 +56892,6 @@
                                     }
                                 },
                                 "required": [
-                                    "condition_id",
                                     "file"
                                 ]
                             }
@@ -56505,9 +56960,130 @@
             }
         },
         "/test_framework/v2/scenarios/{id}/condition-audio/{audio_id}/": {
+            "put": {
+                "operationId": "test-framework-v2-scenarios-condition-audio-update",
+                "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this scenario.",
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "audio_id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "file"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    },
+                    {
+                        "api_key": []
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConditionAudioEntry"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            },
             "delete": {
                 "operationId": "test-framework-v2-scenarios-condition-audio-destroy",
-                "description": "Delete a Detach and delete an audio clip from this scenario's conditional action",
+                "description": "Delete a Delete an audio clip and remove every `<audio>` reference to it from this scenario's conditional actions. Returns 409 without deleting anything if",
                 "parameters": [
                     {
                         "in": "path",
@@ -56565,6 +57141,24 @@
                                     "properties": {
                                         "detail": {
                                             "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "409": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
                                         }
                                     }
                                 }
@@ -67115,6 +67709,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -67135,12 +67730,13 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -67618,6 +68214,7 @@
             },
             "AIAgentDynamicVariable": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -67737,6 +68334,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -67757,11 +68355,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "Primary language for this agent.\nExample: `\"en\"` or `\"es\"`\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "Primary language for this agent.\nExample: `\"en\"` or `\"es\"`\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "description": {
                         "type": "string",
@@ -67846,6 +68445,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -67866,11 +68466,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "Primary language for this agent.\nExample: `\"en\"` or `\"es\"`\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "Primary language for this agent.\nExample: `\"en\"` or `\"es\"`\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "created_at": {
                         "type": "string",
@@ -68076,6 +68677,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -68096,12 +68698,13 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "telephony": {
                         "allOf": [
@@ -68471,6 +69074,8 @@
                         "enum": [
                             "setup",
                             "scenario_generation",
+                            "reproduce",
+                            "force",
                             "baseline_run",
                             "propose",
                             "apply",
@@ -68482,8 +69087,8 @@
                             "string",
                             "null"
                         ],
-                        "description": "* `setup` - Setup\n* `scenario_generation` - Scenario Generation\n* `baseline_run` - Baseline Run\n* `propose` - Propose\n* `apply` - Apply\n* `verify_run` - Verify Run\n* `finalize` - Finalize",
-                        "x-spec-enum-id": "4289dee5a1618abe",
+                        "description": "* `setup` - Setup\n* `scenario_generation` - Scenario Generation\n* `reproduce` - Reproduce\n* `force` - Force\n* `baseline_run` - Baseline Run\n* `propose` - Propose\n* `apply` - Apply\n* `verify_run` - Verify Run\n* `finalize` - Finalize",
+                        "x-spec-enum-id": "994fc0ee8cd8c795",
                         "readOnly": true
                     },
                     "stage_status": {
@@ -68588,6 +69193,12 @@
                                 "type": "null"
                             }
                         ],
+                        "readOnly": true
+                    },
+                    "reproduction": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Reproduction evidence, through the pipeline's own whitelist.\n\nCounts, rates and customer-facing field labels only — no configuration\nvalues, and no raw provider dot-paths.",
                         "readOnly": true
                     },
                     "question_answers": {
@@ -69587,6 +70198,7 @@
             },
             "AuditLog": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69816,6 +70428,7 @@
             },
             "Billing": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -69918,6 +70531,7 @@
             },
             "BillingInfo": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "organization": {
                         "type": "integer",
@@ -70478,6 +71092,12 @@
                         "readOnly": true,
                         "description": "The channel index of the testing agent in the audio recording"
                     },
+                    "waveform": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Amplitude envelope of the recording, one array of values per audio channel, so a waveform can be drawn without downloading the audio. Null for recordings processed before peaks were stored."
+                    },
                     "timestamp": {
                         "type": "string",
                         "format": "date-time",
@@ -70985,7 +71605,7 @@
             },
             "ConditionAudioEntry": {
                 "type": "object",
-                "description": "Read serializer for one Scenario.condition_audio entry (a plain dict).\n\nThe caller passes each entry dict with `audio_id` injected; fields are\ntolerant of missing keys. `words` is intentionally not exposed (runtime-only\nplayback timing data).",
+                "description": "Read serializer for one Scenario.condition_audio entry (a plain dict).\n\nThe caller passes each entry dict with `audio_id` injected; fields are\ntolerant of missing keys. `words` is intentionally not exposed (runtime-only\nplayback timing data), and neither is `previous_action` (internal undo state\nfor a clip that replaced a whole action).",
                 "properties": {
                     "audio_id": {
                         "type": [
@@ -71000,10 +71620,21 @@
                         ]
                     },
                     "condition_id": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ]
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "First condition referencing this clip, or null when no action references it. Kept for compatibility - prefer condition_ids."
+                    },
+                    "condition_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Every condition referencing this clip, in authored order. Empty when the clip is uploaded but not referenced by any action yet."
+                    },
+                    "tag": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "The reference to paste into an action, e.g. <audio id=\"greeting\"/>"
                     },
                     "status": {
                         "type": [
@@ -71283,6 +71914,7 @@
             },
             "CreatePersonality": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -71325,6 +71957,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -71345,11 +71978,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -71373,38 +72007,177 @@
                         "description": "\nInterruption level\n"
                     },
                     "speed": {
-                        "type": "string",
+                        "type": "number",
+                        "minimum": 0.8,
+                        "maximum": 1.2,
                         "description": "\nSpeed of the voice\n"
                     },
                     "generation_config": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "volume": {
+                                "type": "number",
+                                "minimum": 0.5,
+                                "maximum": 2.0
+                            },
+                            "emotion": {
+                                "type": "string",
+                                "enum": [
+                                    "neutral",
+                                    "happy",
+                                    "excited",
+                                    "enthusiastic",
+                                    "elated",
+                                    "euphoric",
+                                    "triumphant",
+                                    "amazed",
+                                    "surprised",
+                                    "flirtatious",
+                                    "joking/comedic",
+                                    "curious",
+                                    "content",
+                                    "peaceful",
+                                    "serene",
+                                    "calm",
+                                    "grateful",
+                                    "affectionate",
+                                    "trust",
+                                    "sympathetic",
+                                    "anticipation",
+                                    "mysterious",
+                                    "angry",
+                                    "mad",
+                                    "outraged",
+                                    "frustrated",
+                                    "agitated",
+                                    "threatened",
+                                    "disgusted",
+                                    "contempt",
+                                    "envious",
+                                    "sarcastic",
+                                    "ironic",
+                                    "sad",
+                                    "dejected",
+                                    "melancholic",
+                                    "disappointed",
+                                    "hurt",
+                                    "guilty",
+                                    "bored",
+                                    "tired",
+                                    "rejected",
+                                    "nostalgic",
+                                    "wistful",
+                                    "apologetic",
+                                    "hesitant",
+                                    "insecure",
+                                    "confused",
+                                    "resigned",
+                                    "anxious",
+                                    "panicked",
+                                    "alarmed",
+                                    "scared",
+                                    "proud",
+                                    "confident",
+                                    "distant",
+                                    "skeptical",
+                                    "contemplative",
+                                    "determined"
+                                ]
+                            }
+                        },
                         "description": "\nGeneration config for Cartesia Sonic-3 voice model.\nOnly valid when provider is \"cartesia\" and voice_model is \"sonic-3.5\".\nSupports volume and emotion\nExample: {\"volume\": 1.5, \"emotion\": \"happy\"}\n"
                     },
                     "network_simulation": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "packet_loss": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "jitter": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "latency": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            }
+                        },
                         "description": "\nNetwork simulation configuration for testing network impairments.\n"
                     },
                     "message_plan": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "idle_timeout_seconds": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "idle_message_max_spoken_count": {
+                                "type": "integer",
+                                "minimum": 1
+                            }
+                        },
                         "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
                     },
                     "start_speaking_plan": {
-                        "type": "string",
+                        "type": "number",
+                        "minimum": 0,
                         "description": "\nWait seconds before the bot starts speaking (float >= 0).\nIgnored if interruption_level is also set in the same request (preset takes precedence).\nExample: 0.7\n"
                     },
                     "stop_speaking_plan": {
                         "type": [
-                            "string",
+                            "object",
                             "null"
                         ],
+                        "properties": {
+                            "num_words": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "voice_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "backoff_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        },
                         "description": "\nStop speaking plan configuration. Controls when the bot stops speaking.\nSupports num_words (int >= 0), voice_seconds (float >= 0), backoff_seconds (float >= 0).\nIgnored if interruption_level is also set in the same request (preset takes precedence).\nExample: {\"num_words\": 3, \"voice_seconds\": 0.3, \"backoff_seconds\": 0}\n"
                     },
                     "background_sound_volume": {
                         "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "base": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            },
+                            "reduced": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            }
+                        },
+                        "description": "\nBackground sound volume levels (0.0 to 1.0). base sets both the base and normal volume; reduced sets the quieter level during bot speech.\nExample: {\"base\": 0.05, \"reduced\": 0.02}\n"
+                    },
+                    "voice_volume": {
+                        "type": [
                             "string",
                             "null"
                         ],
-                        "description": "\nBackground sound volume levels (0.0 to 1.0). base sets both the base and normal volume; reduced sets the quieter level during bot speech.\nExample: {\"base\": 0.05, \"reduced\": 0.02}\n"
+                        "description": "\nSpeech volume of the testing agent (0.01 to 2.0, default 1.0).\nWorks on every voice provider — it is amplitude scaling applied after synthesis, so it\nreaches far quieter levels than generation_config.volume, which is a Cartesia-native\nparameter limited to Cartesia's own 0.5-2.0.\nSetting this clears any generation_config.volume so the ratio is never applied twice.\nSend null to remove it. Example: 0.05 for a barely-audible caller.\n"
+                    },
+                    "effective_voice_volume": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "\nRead-only. The volume the call will actually play at: voice_volume if set, else a\nlegacy generation_config.volume, else 1.0. Use this to populate a volume control.\n"
                     },
                     "patronus_settings": {
                         "oneOf": [
@@ -71443,6 +72216,7 @@
             },
             "CriticalMetricCategory": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -71489,6 +72263,7 @@
             },
             "CriticalMetricScenario": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -71521,6 +72296,7 @@
             },
             "CronJob": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -71599,6 +72375,15 @@
                         "writeOnly": true,
                         "description": "\nMax number of parallel conversations to run per execution.\nLeave unset for no cap (uses default capacity).\nExample: `3`\n"
                     },
+                    "run_settings": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "\nConnection overrides applied on every scheduled run. Keys must match what the\nmatching run endpoint accepts, and depend on execution_mode:\n- voice: `mode`, `outbound_phone_number`, `agent_number`\n- text: `websocket_url`, `outbound_phone_number`, `agent_number`\n- sip: `sip_endpoint`\n- vapi_webrtc: `vapi_assistant_id`\n- retell_webrtc: `retell_agent_id`\n- elevenlabs: `elevenlabs_agent_id`, `elevenlabs_data`\n- livekit_v2: `livekit_data`\n- pipecat_v2: `pipecat_data`\nExample: `{\"livekit_data\": {\"agent_name\": \"support-agent\", \"config\": {\"greeting\": \"hi\"}}}`\n"
+                    },
                     "run_as_text": {
                         "type": "boolean",
                         "description": "\nDEPRECATED: Use execution_mode instead. Kept for backward compatibility.\nRun the cron job as text\nExample: `true` or `false`\n"
@@ -71670,6 +72455,34 @@
                 },
                 "required": [
                     "crontab_expression"
+                ]
+            },
+            "CrossRegionWithdraw": {
+                "type": "object",
+                "properties": {
+                    "transfer_id": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "organization_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "peer_organization_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "amount": {
+                        "type": "string",
+                        "format": "decimal",
+                        "pattern": "^-?\\d{0,10}(?:\\.\\d{0,2})?$"
+                    }
+                },
+                "required": [
+                    "amount",
+                    "organization_id",
+                    "peer_organization_id",
+                    "transfer_id"
                 ]
             },
             "CustomTokenObtainPair": {
@@ -72178,6 +72991,7 @@
             },
             "DiscordServer": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73001,6 +73815,7 @@
             },
             "Invite": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73072,6 +73887,7 @@
             },
             "KnowledgeBaseConnector": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73241,6 +74057,7 @@
             },
             "KnowledgeBaseFile": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73588,6 +74405,7 @@
             },
             "MetricDetailSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -73847,6 +74665,7 @@
             },
             "MetricDetailV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -74106,6 +74925,7 @@
             },
             "MetricEditSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -75481,6 +76301,7 @@
             },
             "MetricOptimiserCronJob": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -75808,6 +76629,7 @@
             },
             "MetricReviewDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -75868,6 +76690,7 @@
             },
             "MetricReviewInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer"
@@ -76150,6 +76973,7 @@
             },
             "Notification": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -76745,6 +77569,7 @@
             },
             "OverallEvaluation": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -76776,6 +77601,7 @@
             },
             "Pack": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -77046,6 +77872,7 @@
             },
             "PackInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -77986,6 +78813,7 @@
             },
             "PatchedAIAgentDynamicVariable": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78063,6 +78891,7 @@
             },
             "PatchedCreatePersonality": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78105,6 +78934,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -78125,11 +78955,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -78153,38 +78984,177 @@
                         "description": "\nInterruption level\n"
                     },
                     "speed": {
-                        "type": "string",
+                        "type": "number",
+                        "minimum": 0.8,
+                        "maximum": 1.2,
                         "description": "\nSpeed of the voice\n"
                     },
                     "generation_config": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "volume": {
+                                "type": "number",
+                                "minimum": 0.5,
+                                "maximum": 2.0
+                            },
+                            "emotion": {
+                                "type": "string",
+                                "enum": [
+                                    "neutral",
+                                    "happy",
+                                    "excited",
+                                    "enthusiastic",
+                                    "elated",
+                                    "euphoric",
+                                    "triumphant",
+                                    "amazed",
+                                    "surprised",
+                                    "flirtatious",
+                                    "joking/comedic",
+                                    "curious",
+                                    "content",
+                                    "peaceful",
+                                    "serene",
+                                    "calm",
+                                    "grateful",
+                                    "affectionate",
+                                    "trust",
+                                    "sympathetic",
+                                    "anticipation",
+                                    "mysterious",
+                                    "angry",
+                                    "mad",
+                                    "outraged",
+                                    "frustrated",
+                                    "agitated",
+                                    "threatened",
+                                    "disgusted",
+                                    "contempt",
+                                    "envious",
+                                    "sarcastic",
+                                    "ironic",
+                                    "sad",
+                                    "dejected",
+                                    "melancholic",
+                                    "disappointed",
+                                    "hurt",
+                                    "guilty",
+                                    "bored",
+                                    "tired",
+                                    "rejected",
+                                    "nostalgic",
+                                    "wistful",
+                                    "apologetic",
+                                    "hesitant",
+                                    "insecure",
+                                    "confused",
+                                    "resigned",
+                                    "anxious",
+                                    "panicked",
+                                    "alarmed",
+                                    "scared",
+                                    "proud",
+                                    "confident",
+                                    "distant",
+                                    "skeptical",
+                                    "contemplative",
+                                    "determined"
+                                ]
+                            }
+                        },
                         "description": "\nGeneration config for Cartesia Sonic-3 voice model.\nOnly valid when provider is \"cartesia\" and voice_model is \"sonic-3.5\".\nSupports volume and emotion\nExample: {\"volume\": 1.5, \"emotion\": \"happy\"}\n"
                     },
                     "network_simulation": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "packet_loss": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "jitter": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "latency": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            }
+                        },
                         "description": "\nNetwork simulation configuration for testing network impairments.\n"
                     },
                     "message_plan": {
-                        "type": "string",
+                        "type": "object",
+                        "properties": {
+                            "idle_timeout_seconds": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "idle_message_max_spoken_count": {
+                                "type": "integer",
+                                "minimum": 1
+                            }
+                        },
                         "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
                     },
                     "start_speaking_plan": {
-                        "type": "string",
+                        "type": "number",
+                        "minimum": 0,
                         "description": "\nWait seconds before the bot starts speaking (float >= 0).\nIgnored if interruption_level is also set in the same request (preset takes precedence).\nExample: 0.7\n"
                     },
                     "stop_speaking_plan": {
                         "type": [
-                            "string",
+                            "object",
                             "null"
                         ],
+                        "properties": {
+                            "num_words": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "voice_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "backoff_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        },
                         "description": "\nStop speaking plan configuration. Controls when the bot stops speaking.\nSupports num_words (int >= 0), voice_seconds (float >= 0), backoff_seconds (float >= 0).\nIgnored if interruption_level is also set in the same request (preset takes precedence).\nExample: {\"num_words\": 3, \"voice_seconds\": 0.3, \"backoff_seconds\": 0}\n"
                     },
                     "background_sound_volume": {
                         "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "base": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            },
+                            "reduced": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            }
+                        },
+                        "description": "\nBackground sound volume levels (0.0 to 1.0). base sets both the base and normal volume; reduced sets the quieter level during bot speech.\nExample: {\"base\": 0.05, \"reduced\": 0.02}\n"
+                    },
+                    "voice_volume": {
+                        "type": [
                             "string",
                             "null"
                         ],
-                        "description": "\nBackground sound volume levels (0.0 to 1.0). base sets both the base and normal volume; reduced sets the quieter level during bot speech.\nExample: {\"base\": 0.05, \"reduced\": 0.02}\n"
+                        "description": "\nSpeech volume of the testing agent (0.01 to 2.0, default 1.0).\nWorks on every voice provider — it is amplitude scaling applied after synthesis, so it\nreaches far quieter levels than generation_config.volume, which is a Cartesia-native\nparameter limited to Cartesia's own 0.5-2.0.\nSetting this clears any generation_config.volume so the ratio is never applied twice.\nSend null to remove it. Example: 0.05 for a barely-audible caller.\n"
+                    },
+                    "effective_voice_volume": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "\nRead-only. The volume the call will actually play at: voice_volume if set, else a\nlegacy generation_config.volume, else 1.0. Use this to populate a volume control.\n"
                     },
                     "patronus_settings": {
                         "oneOf": [
@@ -78218,6 +79188,7 @@
             },
             "PatchedCriticalMetricCategory": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78396,6 +79367,7 @@
             },
             "PatchedDiscordServer": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78426,6 +79398,7 @@
             },
             "PatchedInvite": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78497,6 +79470,7 @@
             },
             "PatchedKnowledgeBaseConnector": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78593,6 +79567,7 @@
             },
             "PatchedMetricEditSerializerV2": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78892,6 +79867,7 @@
             },
             "PatchedMetricOptimiserCronJob": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -78991,6 +79967,7 @@
             },
             "PatchedMetricReviewInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer"
@@ -79417,6 +80394,7 @@
             },
             "PatchedOverallEvaluation": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -79445,6 +80423,7 @@
             },
             "PatchedPredefinedMetric": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -79674,6 +80653,10 @@
                         "type": "boolean",
                         "description": "\nShould show powered by\nExample: `true` or `false`\n"
                     },
+                    "deep_research_enabled": {
+                        "type": "boolean",
+                        "description": "\nEnable Deep Research for this project. Customers own this from project\nsettings: turning it on surfaces the Deep Research section and opts the\nproject into the weekly audit cron and the on-demand Generate button.\nThe global DEEP_RESEARCH_ENABLED SettingValue remains a kill switch above\nit.\nExample: `true` or `false`\n"
+                    },
                     "notify_results_completion": {
                         "type": "boolean",
                         "description": "\nNotify on result completion\nExample: `true` or `false`\n"
@@ -79864,6 +80847,7 @@
             },
             "PatchedProviderCredentialDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -80433,6 +81417,12 @@
                         "readOnly": true,
                         "description": "The channel index of the testing agent in the audio recording"
                     },
+                    "waveform": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Amplitude envelope of the recording, one array of values per audio channel, so a waveform can be drawn without downloading the audio. Null for recordings processed before peaks were stored."
+                    },
                     "run_type": {
                         "type": [
                             "string",
@@ -80600,6 +81590,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -80620,12 +81611,13 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "telephony": {
                         "allOf": [
@@ -80890,11 +81882,15 @@
                         "x-spec-enum-id": "aef421315acd0ca3",
                         "default": "voice",
                         "description": "\nExecution mode for the cron job. Choices: voice, text, sip\nExample: `\"voice\"`, `\"text\"`, or `\"sip\"`\n\n\n* `voice` - Voice\n* `text` - Text\n* `sip` - SIP\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `ello` - Ello\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat\n* `agora` - Agora"
+                    },
+                    "run_settings": {
+                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Unsupported keys are rejected.\n"
                     }
                 }
             },
             "PatchedSchemaPostMetricEdit": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -81169,6 +82165,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -81189,11 +82186,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "Language of the evaluator. Must match the chosen `personality`'s language — mismatches are rejected.\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "Language of the evaluator. Must match the chosen `personality`'s language — mismatches are rejected.\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     }
                 }
             },
@@ -81248,6 +82246,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -81268,12 +82267,13 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -81730,6 +82730,7 @@
             },
             "PatchedSlackWorkspace": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -81769,6 +82770,7 @@
             },
             "PatchedTool": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -81907,6 +82909,7 @@
             },
             "PatchedUserAPIKey": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -81987,6 +82990,7 @@
             },
             "PatchedUserMembership": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82052,6 +83056,7 @@
             },
             "PatchedView": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82384,6 +83389,7 @@
             },
             "PaymentHistory": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82462,6 +83468,10 @@
                         "description": "\nName of the personality\nExample: `\"Customer Service\"`\n",
                         "maxLength": 255
                     },
+                    "description": {
+                        "type": "string",
+                        "description": "\nDescription of the personality\nExample: `\"A friendly and helpful customer service agent who is always willing to help\"`\n"
+                    },
                     "prompt": {
                         "type": "string",
                         "description": "\nPrompt of the personality\nExample: `\"You are a friendly and helpful customer service agent who is always willing to help\"`\n"
@@ -82490,6 +83500,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -82510,11 +83521,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "\nLanguage of the personality\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "accent": {
                         "type": "string",
@@ -82558,31 +83570,168 @@
                         "type": "string"
                     },
                     "speed": {
-                        "type": "string"
+                        "type": "number",
+                        "minimum": 0.8,
+                        "maximum": 1.2
                     },
                     "generation_config": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {
+                            "volume": {
+                                "type": "number",
+                                "minimum": 0.5,
+                                "maximum": 2.0
+                            },
+                            "emotion": {
+                                "type": "string",
+                                "enum": [
+                                    "neutral",
+                                    "happy",
+                                    "excited",
+                                    "enthusiastic",
+                                    "elated",
+                                    "euphoric",
+                                    "triumphant",
+                                    "amazed",
+                                    "surprised",
+                                    "flirtatious",
+                                    "joking/comedic",
+                                    "curious",
+                                    "content",
+                                    "peaceful",
+                                    "serene",
+                                    "calm",
+                                    "grateful",
+                                    "affectionate",
+                                    "trust",
+                                    "sympathetic",
+                                    "anticipation",
+                                    "mysterious",
+                                    "angry",
+                                    "mad",
+                                    "outraged",
+                                    "frustrated",
+                                    "agitated",
+                                    "threatened",
+                                    "disgusted",
+                                    "contempt",
+                                    "envious",
+                                    "sarcastic",
+                                    "ironic",
+                                    "sad",
+                                    "dejected",
+                                    "melancholic",
+                                    "disappointed",
+                                    "hurt",
+                                    "guilty",
+                                    "bored",
+                                    "tired",
+                                    "rejected",
+                                    "nostalgic",
+                                    "wistful",
+                                    "apologetic",
+                                    "hesitant",
+                                    "insecure",
+                                    "confused",
+                                    "resigned",
+                                    "anxious",
+                                    "panicked",
+                                    "alarmed",
+                                    "scared",
+                                    "proud",
+                                    "confident",
+                                    "distant",
+                                    "skeptical",
+                                    "contemplative",
+                                    "determined"
+                                ]
+                            }
+                        }
                     },
                     "network_simulation": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {
+                            "packet_loss": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "jitter": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            "latency": {
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 100
+                            }
+                        }
                     },
                     "message_plan": {
-                        "type": "string"
+                        "type": "object",
+                        "properties": {
+                            "idle_timeout_seconds": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "idle_message_max_spoken_count": {
+                                "type": "integer",
+                                "minimum": 1
+                            }
+                        }
                     },
                     "start_speaking_plan": {
-                        "type": "string"
+                        "type": "number",
+                        "minimum": 0
                     },
                     "stop_speaking_plan": {
                         "type": [
-                            "string",
+                            "object",
                             "null"
-                        ]
+                        ],
+                        "properties": {
+                            "num_words": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "voice_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            },
+                            "backoff_seconds": {
+                                "type": "number",
+                                "minimum": 0
+                            }
+                        }
                     },
                     "background_sound_volume": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "base": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            },
+                            "reduced": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 1.0
+                            }
+                        }
+                    },
+                    "voice_volume": {
                         "type": [
                             "string",
                             "null"
                         ]
+                    },
+                    "effective_voice_volume": {
+                        "type": "string",
+                        "readOnly": true
                     },
                     "patronus_settings": {
                         "oneOf": [
@@ -82604,6 +83753,7 @@
                 },
                 "required": [
                     "background_noise",
+                    "description",
                     "name",
                     "prompt",
                     "voice_model"
@@ -82611,6 +83761,7 @@
             },
             "PhoneNumber": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82801,6 +83952,7 @@
             },
             "PhoneNumberInbound": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -82847,6 +83999,7 @@
             },
             "PredefinedMetric": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -83255,6 +84408,10 @@
                         "type": "boolean",
                         "description": "\nShould show powered by\nExample: `true` or `false`\n"
                     },
+                    "deep_research_enabled": {
+                        "type": "boolean",
+                        "description": "\nEnable Deep Research for this project. Customers own this from project\nsettings: turning it on surfaces the Deep Research section and opts the\nproject into the weekly audit cron and the on-demand Generate button.\nThe global DEEP_RESEARCH_ENABLED SettingValue remains a kill switch above\nit.\nExample: `true` or `false`\n"
+                    },
                     "notify_results_completion": {
                         "type": "boolean",
                         "description": "\nNotify on result completion\nExample: `true` or `false`\n"
@@ -83482,6 +84639,7 @@
             },
             "ProviderCredentialDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -83538,6 +84696,7 @@
             },
             "ProviderCredentialList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -84380,6 +85539,12 @@
                         "readOnly": true,
                         "description": "The channel index of the testing agent in the audio recording"
                     },
+                    "waveform": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Amplitude envelope of the recording, one array of values per audio channel, so a waveform can be drawn without downloading the audio. Null for recordings processed before peaks were stored."
+                    },
                     "run_type": {
                         "type": [
                             "string",
@@ -85190,6 +86355,12 @@
                         "writeOnly": true,
                         "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
+                    "condition_audio": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of fixed-message actions by pasting its `tag`; `condition_ids` lists the conditions currently referencing it.\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"condition_ids\": [0, 3]}\n}\n```"
+                    },
                     "simulation_description": {
                         "type": "string",
                         "description": "Simulation Description"
@@ -85225,6 +86396,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -85245,11 +86417,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -85446,6 +86619,7 @@
             },
             "ScenarioFolder": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "name": {
                         "type": "string",
@@ -85632,6 +86806,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -85652,6 +86827,7 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi",
                             "",
                             null
@@ -85660,8 +86836,8 @@
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "Language of the scenario\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "Language of the scenario\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -85880,6 +87056,7 @@
             },
             "ScenarioInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -85994,6 +87171,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -86014,6 +87192,7 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi",
                             null
                         ],
@@ -86021,8 +87200,8 @@
                             "string",
                             "null"
                         ],
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "Language code for the scenario (ISO language code)\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "Language code for the scenario (ISO language code)\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -86247,6 +87426,12 @@
                         "writeOnly": true,
                         "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
+                    "condition_audio": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of fixed-message actions by pasting its `tag`; `condition_ids` lists the conditions currently referencing it.\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"condition_ids\": [0, 3]}\n}\n```"
+                    },
                     "simulation_description": {
                         "type": "string",
                         "description": "Simulation Description"
@@ -86282,6 +87467,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -86302,11 +87488,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "enum": [
@@ -86727,6 +87914,7 @@
             },
             "SchemaGenerateMetricsMetricCreate": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "agent_id": {
                         "type": "integer",
@@ -87035,6 +88223,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -87055,12 +88244,13 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "telephony": {
                         "allOf": [
@@ -87512,6 +88702,9 @@
                         "x-spec-enum-id": "aef421315acd0ca3",
                         "default": "voice",
                         "description": "\nExecution mode for the cron job. Choices: voice, text, sip\nExample: `\"voice\"`, `\"text\"`, or `\"sip\"`\n\n\n* `voice` - Voice\n* `text` - Text\n* `sip` - SIP\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `ello` - Ello\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat\n* `agora` - Agora"
+                    },
+                    "run_settings": {
+                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Unsupported keys are rejected.\n"
                     }
                 },
                 "required": [
@@ -87535,6 +88728,7 @@
             },
             "SchemaPostMetricEdit": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -88601,6 +89795,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -88621,11 +89816,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "Language of the evaluator. Must match the chosen `personality`'s language — mismatches are rejected.\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "Language of the evaluator. Must match the chosen `personality`'s language — mismatches are rejected.\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     }
                 },
                 "required": [
@@ -88779,6 +89975,12 @@
                         "writeOnly": true,
                         "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"conditions\": [\n    {\"id\": 0, \"condition\": \"FIRST_MESSAGE\", \"action\": \"Hi, I need to schedule an appointment\",\n     \"type\": \"standard\", \"fixed_message\": true},\n    {\"id\": 1, \"condition\": \"when the agent asks for your name\",\n     \"action\": \"Provide your full name: John Smith\", \"type\": \"standard\", \"fixed_message\": false}\n  ]\n}\n```"
                     },
+                    "condition_audio": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of fixed-message actions by pasting its `tag`; `condition_ids` lists the conditions currently referencing it.\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"condition_ids\": [0, 3]}\n}\n```"
+                    },
                     "simulation_description": {
                         "type": "string",
                         "description": "Simulation Description"
@@ -88816,6 +90018,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -88836,11 +90039,12 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
-                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
+                        "description": "\nLanguage of the scenario\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "scenario_type": {
                         "type": "string",
@@ -88955,6 +90159,7 @@
                             "it",
                             "ja",
                             "kn",
+                            "kk",
                             "ko",
                             "ms",
                             "ml",
@@ -88975,12 +90180,13 @@
                             "ta",
                             "te",
                             "uk",
+                            "uz",
                             "vi"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b822ad429c7b7fec",
+                        "x-spec-enum-id": "f996e9ef7edb7fea",
                         "default": "en",
-                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `vi` - Vietnamese"
+                        "description": "\nThe primary language this agent uses for communication (e.g. 'en' for English)\n\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
                     },
                     "assistant_id": {
                         "type": [
@@ -89605,6 +90811,7 @@
             },
             "SlackWorkspace": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -89644,6 +90851,7 @@
             },
             "Subscription": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -89912,6 +91120,7 @@
             },
             "TestSetDetail": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -89998,6 +91207,7 @@
             },
             "TestSetInline": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -90122,6 +91332,7 @@
             },
             "Tool": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -90246,6 +91457,7 @@
             },
             "UserAPIKey": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -90355,6 +91567,7 @@
             },
             "UserMembership": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -90443,6 +91656,7 @@
             },
             "View": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",

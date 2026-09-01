@@ -175,3 +175,53 @@ class TestHandleResponse:
     def test_error_status_still_raises(self, client):
         with pytest.raises(Exception, match="Resource not found"):
             client._handle_response(_response(404, b'{"detail": "nope"}'))
+
+
+def _transport_client(handler, **kwargs):
+    c = CekuraAPIClient(base_url="http://example.invalid", credential="test", **kwargs)
+    c.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return c
+
+
+class TestResponseSizeCap:
+    @pytest.mark.asyncio
+    async def test_body_within_cap_is_returned(self):
+        body = b'{"results": []}'
+        client = _transport_client(
+            lambda request: httpx.Response(
+                200, headers={"content-type": "application/json"}, content=body
+            )
+        )
+        client.max_response_bytes = 1024
+        assert await client.execute_request("GET", "/thing/") == body.decode()
+
+    @pytest.mark.asyncio
+    async def test_oversized_declared_length_is_refused(self):
+        client = _transport_client(
+            lambda request: httpx.Response(
+                200,
+                headers={"content-type": "application/json"},
+                content=b"x" * 4096,
+            )
+        )
+        client.max_response_bytes = 1024
+        with pytest.raises(Exception, match="Response too large: GET /thing/"):
+            await client.execute_request("GET", "/thing/")
+
+    @pytest.mark.asyncio
+    async def test_oversized_streamed_body_is_refused(self):
+        def handler(request):
+            async def chunks():
+                for _ in range(8):
+                    yield b"x" * 512
+
+            return httpx.Response(
+                200,
+                headers={"content-type": "application/json"},
+                content=chunks(),
+            )
+
+        client = _transport_client(handler)
+        client.max_response_bytes = 1024
+        with pytest.raises(Exception, match="Narrow the request"):
+            await client.execute_request("GET", "/thing/")

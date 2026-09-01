@@ -1,4 +1,4 @@
-"""Tests for the MCP HTTP client's request-body shaping."""
+"""Tests for the MCP HTTP client's request-body shaping and response handling."""
 import gzip
 import json
 
@@ -170,7 +170,8 @@ class TestResponseSizeCap:
     async def test_response_under_cap_is_returned(self):
         payload = {"results": [{"id": 1, "call_id": "abc"}]}
         client = _client_returning(json.dumps(payload).encode())
-        assert await client.execute_request("GET", "/observability/v2/call-logs/") == payload
+        body = await client.execute_request("GET", "/observability/v2/call-logs/")
+        assert json.loads(body) == payload
 
     async def test_response_over_cap_is_refused(self, monkeypatch):
         monkeypatch.setenv("CEKURA_MAX_UPSTREAM_RESPONSE_BYTES", "1024")
@@ -204,4 +205,36 @@ class TestResponseSizeCap:
             gzip.compress(json.dumps(payload).encode()),
             headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
         )
-        assert await client.execute_request("GET", "/observability/v2/call-logs/") == payload
+        body = await client.execute_request("GET", "/observability/v2/call-logs/")
+        # Parses cleanly, so the gzip layer was stripped exactly once.
+        assert json.loads(body) == payload
+
+def _response(status_code, content=b"", content_type="application/json"):
+    headers = {"content-type": content_type} if content_type else {}
+    return httpx.Response(
+        status_code,
+        headers=headers,
+        content=content,
+        request=httpx.Request("GET", "http://example.invalid/thing/"),
+    )
+
+
+class TestHandleResponse:
+    def test_json_body_is_forwarded_verbatim(self, client):
+        body = b'{"count": 1, "results": [{"id": 7}]}'
+        out = client._handle_response(_response(200, body))
+        assert out == body.decode()
+
+    def test_non_json_body_is_wrapped(self, client):
+        out = client._handle_response(_response(200, b"plain text", content_type="text/plain"))
+        assert out == {"result": "plain text"}
+
+    def test_empty_body_reports_ok(self, client):
+        assert client._handle_response(_response(204)) == {
+            "status": "ok",
+            "status_code": 204,
+        }
+
+    def test_error_status_still_raises(self, client):
+        with pytest.raises(Exception, match="Resource not found"):
+            client._handle_response(_response(404, b'{"detail": "nope"}'))

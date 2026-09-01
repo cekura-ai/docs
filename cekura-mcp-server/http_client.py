@@ -1,5 +1,5 @@
 import httpx
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
 import json
 
 from config import _parse_int_env
@@ -112,7 +112,7 @@ class CekuraAPIClient:
         query_params: Optional[Dict[str, Any]] = None,
         body: Any = None,
         property_types: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], str]:
         url = f"{self.base_url}{path}"
         request_body = self._coerce_body(body, property_types) if body is not None else None
 
@@ -206,9 +206,9 @@ class CekuraAPIClient:
 
         The check runs per chunk, so a compressed body can overshoot the cap by
         whatever one network read decompresses to — measured at ~2 MB of JSON for
-        a 29 KB gzipped page. What the cap reliably prevents is the larger cost
-        past this point: decoding an unbounded body into a Python object graph
-        and serializing it again as MCP text."""
+        a 29 KB gzipped page. What the cap bounds is every copy that follows:
+        this buffer, the response rebuilt around it, the text `_handle_response`
+        decodes, and the tool-result string it is interpolated into."""
         body = bytearray()
         async for chunk in response.aiter_bytes():
             body.extend(chunk)
@@ -231,15 +231,21 @@ class CekuraAPIClient:
             request=response.request,
         )
 
-    def _handle_response(self, response: httpx.Response) -> Dict[str, Any]:
+    @staticmethod
+    def _is_json_content(response: httpx.Response) -> bool:
+        media_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        return media_type == "application/json" or media_type.endswith("+json")
+
+    def _handle_response(self, response: httpx.Response) -> Union[Dict[str, Any], str]:
         if 200 <= response.status_code < 300:
             # 204 No Content (common for DELETE) and other empty 2xx bodies.
             if response.status_code == 204 or not response.content:
                 return {"status": "ok", "status_code": response.status_code}
-            try:
-                return response.json()
-            except Exception:
-                return {"result": response.text}
+            # A JSON body is already the shape the tool result needs, so it goes
+            # out as-is; only non-JSON bodies need wrapping.
+            if self._is_json_content(response):
+                return response.text
+            return {"result": response.text}
 
         if response.status_code == 401:
             if self.credential_type == "bearer":

@@ -467,6 +467,40 @@
                 }
             }
         },
+        "/app/v2/product-chat/conversations/{conversation_id}/stream-token/": {
+            "get": {
+                "operationId": "app-v2-product-chat-conversations-stream-token-retrieve",
+                "description": "Attach to a conversation's turn that is already in flight.\n\nA send mints a stream token once, for the browser that sent it. Any other\nbrowser state — a reload, a navigation, the dock handing a thread over to\nthe full agent page — has no token and no way to get one, so it falls back\nto polling `ConversationStatusView` and the answer arrives in steps\ninstead of streaming.\n\nThis mints a fresh token for the turn already running, so that browser can\nopen the same SSE stream and receive the rest of it live. Like the\nagent-improvement equivalent it only grants a read: it does not start,\nstop, or otherwise steer the run, and it relies on the same in-memory\nreplay the stream already does for every other consumer.\n\n409 when there is nothing in flight — the caller polls instead, which is\nwhat it was already doing.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "conversation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/app/v2/product-chat/messages/{message_id}/cancel/": {
             "post": {
                 "operationId": "app-v2-product-chat-messages-cancel-create",
@@ -4130,6 +4164,23 @@
                             "minLength": 1
                         },
                         "description": "\nAdvanced JSON filters using CallLogQueryFilter format (same as dashboard filters).\nSupports nested AND/OR conditions, field comparisons, and related field filtering.\n\nExample - Simple filter:\n`{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`\n\nExample - AND conditions:\n`{\"operator\": \"and\", \"conditions\": [{\"field\": \"success\", \"op\": \"eq\", \"value\": true}, {\"field\": \"duration\", \"op\": \"gte\", \"value\": 60}]}`\n\nExample - OR conditions:\n`{\"operator\": \"or\", \"conditions\": [{\"field\": \"call_ended_reason\", \"op\": \"eq\", \"value\": \"completed\"}, {\"field\": \"call_ended_reason\", \"op\": \"eq\", \"value\": \"hangup\"}]}`\n\nSupported fields: success, duration, call_id, timestamp, created_at, call_ended_reason, customer_number, etc.\nSupported operators: eq, neq, gt, gte, lt, lte, contains, startswith, in, isnull\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ql",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "\nSelect which fields each row carries by naming the ones you will read:\n`{id,call_id,timestamp,success,call_ended_reason,metrics}`.\n\nMCP clients get one compact row shape whichever credential they connected with.\n`transcript`, `transcript_object` and `evaluation` (per-metric explanations) are\nleft out of it unless `ql` names them; `metrics` already carries every metric's\nscore. An exclusion (`{-metadata}`) or `{*}` starts from the whole row shape and\nso puts those three back — name the fields you want instead of the ones you\ndon't. Per-call detail that is never on a list row — rubric, user-generated\ntranscript, recording, waveform, dynamic variables — comes from the retrieve\nendpoint.\nNaming a field the row shape does not have returns 400.\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "include_count",
+                        "schema": {
+                            "type": "boolean"
+                        },
+                        "description": "\nWhen true, the response includes `count` — how many call logs match the\nfilters — and `count_capped`. The count is capped at 10000; `count_capped:\ntrue` means the true total exceeds the cap.\n"
                     }
                 ],
                 "tags": [
@@ -4302,6 +4353,23 @@
                             "minLength": 1
                         },
                         "description": "\nAdvanced JSON filters using CallLogQueryFilter format (same as dashboard filters).\nSupports nested AND/OR conditions, field comparisons, and related field filtering.\n\nExample - Simple filter:\n`{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`\n\nExample - AND conditions:\n`{\"operator\": \"and\", \"conditions\": [{\"field\": \"success\", \"op\": \"eq\", \"value\": true}, {\"field\": \"duration\", \"op\": \"gte\", \"value\": 60}]}`\n\nExample - OR conditions:\n`{\"operator\": \"or\", \"conditions\": [{\"field\": \"call_ended_reason\", \"op\": \"eq\", \"value\": \"completed\"}, {\"field\": \"call_ended_reason\", \"op\": \"eq\", \"value\": \"hangup\"}]}`\n\nSupported fields: success, duration, call_id, timestamp, created_at, call_ended_reason, customer_number, etc.\nSupported operators: eq, neq, gt, gte, lt, lte, contains, startswith, in, isnull\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ql",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "\nSelect which fields each row carries by naming the ones you will read:\n`{id,call_id,timestamp,success,call_ended_reason,metrics}`.\n\nMCP clients get one compact row shape whichever credential they connected with.\n`transcript`, `transcript_object` and `evaluation` (per-metric explanations) are\nleft out of it unless `ql` names them; `metrics` already carries every metric's\nscore. An exclusion (`{-metadata}`) or `{*}` starts from the whole row shape and\nso puts those three back — name the fields you want instead of the ones you\ndon't. Per-call detail that is never on a list row — rubric, user-generated\ntranscript, recording, waveform, dynamic variables — comes from the retrieve\nendpoint.\nNaming a field the row shape does not have returns 400.\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "include_count",
+                        "schema": {
+                            "type": "boolean"
+                        },
+                        "description": "\nWhen true, the response includes `count` — how many call logs match the\nfilters — and `count_capped`. The count is capped at 10000; `count_capped:\ntrue` means the true total exceeds the cap.\n"
                     }
                 ],
                 "tags": [
@@ -9801,6 +9869,23 @@
                             "minLength": 1
                         },
                         "description": "\nAdvanced JSON filters using CallLogQueryFilter format (same as dashboard filters).\nSupports nested AND/OR conditions, field comparisons, and related field filtering.\n\nExample - Simple filter:\n`{\"field\": \"success\", \"op\": \"eq\", \"value\": true}`\n\nExample - AND conditions:\n`{\"operator\": \"and\", \"conditions\": [{\"field\": \"success\", \"op\": \"eq\", \"value\": true}, {\"field\": \"duration\", \"op\": \"gte\", \"value\": 60}]}`\n\nExample - OR conditions:\n`{\"operator\": \"or\", \"conditions\": [{\"field\": \"call_ended_reason\", \"op\": \"eq\", \"value\": \"completed\"}, {\"field\": \"call_ended_reason\", \"op\": \"eq\", \"value\": \"hangup\"}]}`\n\nSupported fields: success, duration, call_id, timestamp, created_at, call_ended_reason, customer_number, etc.\nSupported operators: eq, neq, gt, gte, lt, lte, contains, startswith, in, isnull\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "ql",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "\nSelect which fields each row carries by naming the ones you will read:\n`{id,call_id,timestamp,success,call_ended_reason,metrics}`.\n\nMCP clients get one compact row shape whichever credential they connected with.\n`transcript`, `transcript_object` and `evaluation` (per-metric explanations) are\nleft out of it unless `ql` names them; `metrics` already carries every metric's\nscore. An exclusion (`{-metadata}`) or `{*}` starts from the whole row shape and\nso puts those three back — name the fields you want instead of the ones you\ndon't. Per-call detail that is never on a list row — rubric, user-generated\ntranscript, recording, waveform, dynamic variables — comes from the retrieve\nendpoint.\nNaming a field the row shape does not have returns 400.\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "include_count",
+                        "schema": {
+                            "type": "boolean"
+                        },
+                        "description": "\nWhen true, the response includes `count` — how many call logs match the\nfilters — and `count_capped`. The count is capped at 10000; `count_capped:\ntrue` means the true total exceeds the cap.\n"
                     }
                 ],
                 "tags": [
@@ -34051,7 +34136,7 @@
             },
             "post": {
                 "operationId": "scenarios-create_2",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Prefer generation for instruction scenarios:** `scenarios_generate_bg` grounds them in the agent's description, knowledge base and mock tools, and auto-attaches a test profile and the project's metrics — even for a single scenario (`num_scenarios: 1`, with the case described in `extra_instructions`). Use this create tool for `conditional_actions` scenarios whose structure is exactly known, or to save instruction text the user supplied verbatim — not to hand-write behavioral instructions a generation call could produce.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` — plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call. Prefer `scenarios_generate_bg` for these (see above).\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `expected_outcome_prompt` — what a passing call looks like, graded statement by statement after each run. It is evaluated ONLY when the project's Expected Outcome metric is attached to the scenario, so attach that metric every time you set this field.\n- `metrics` — list of metric IDs to evaluate after each run. A scenario created here starts with NO metrics attached (unlike generated ones): always attach the project's baseline set, including the Expected Outcome metric.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator",
                 "tags": [
                     "Scenarios"
@@ -34063,12 +34148,13 @@
                                 "$ref": "#/components/schemas/SchemaPostScenario"
                             },
                             "examples": {
-                                "InstructionScenario(simplest—MostCommon)": {
+                                "InstructionScenario(user-suppliedVerbatimText—OtherwiseUseScenariosGenerateBg)": {
                                     "value": {
                                         "agent": 12,
                                         "name": "Frustrated patient asking about billing",
                                         "scenario_type": "instruction",
                                         "instructions": "You are a patient who just got a surprise bill. Call the clinic, ask for the billing department, and refuse to pay until they explain each line item.",
+                                        "expected_outcome_prompt": "The agent explains each line item on the bill.\nThe agent does not promise to waive or reduce charges.",
                                         "personality": 3,
                                         "metrics": [
                                             5,
@@ -34079,7 +34165,7 @@
                                             "angry-caller"
                                         ]
                                     },
-                                    "summary": "Instruction scenario (simplest — most common)"
+                                    "summary": "Instruction scenario (user-supplied verbatim text — otherwise use scenarios_generate_bg)"
                                 },
                                 "ConditionalActions(structured,DeterministicFlow)": {
                                     "value": {
@@ -34112,6 +34198,7 @@
                                                 }
                                             ]
                                         },
+                                        "expected_outcome_prompt": "The agent books the appointment for Tuesday afternoon.\nThe agent confirms the booking before the call ends.",
                                         "personality": 3,
                                         "metrics": [
                                             5
@@ -34182,7 +34269,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-create",
-                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
+                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Prefer generation for instruction scenarios:** `scenarios_generate_bg` grounds them in the agent's description, knowledge base and mock tools, and auto-attaches a test profile and the project's metrics — even for a single scenario (`num_scenarios: 1`, with the case described in `extra_instructions`). Use this create tool for `conditional_actions` scenarios whose structure is exactly known, or to save instruction text the user supplied verbatim — not to hand-write behavioral instructions a generation call could produce.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` — plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call. Prefer `scenarios_generate_bg` for these (see above).\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `expected_outcome_prompt` — what a passing call looks like, graded statement by statement after each run. It is evaluated ONLY when the project's Expected Outcome metric is attached to the scenario, so attach that metric every time you set this field.\n- `metrics` — list of metric IDs to evaluate after each run. A scenario created here starts with NO metrics attached (unlike generated ones): always attach the project's baseline set, including the Expected Outcome metric.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
                     }
                 }
             }
@@ -34300,7 +34387,7 @@
             },
             "post": {
                 "operationId": "scenarios-create",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Prefer generation for instruction scenarios:** `scenarios_generate_bg` grounds them in the agent's description, knowledge base and mock tools, and auto-attaches a test profile and the project's metrics — even for a single scenario (`num_scenarios: 1`, with the case described in `extra_instructions`). Use this create tool for `conditional_actions` scenarios whose structure is exactly known, or to save instruction text the user supplied verbatim — not to hand-write behavioral instructions a generation call could produce.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` — plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call. Prefer `scenarios_generate_bg` for these (see above).\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `expected_outcome_prompt` — what a passing call looks like, graded statement by statement after each run. It is evaluated ONLY when the project's Expected Outcome metric is attached to the scenario, so attach that metric every time you set this field.\n- `metrics` — list of metric IDs to evaluate after each run. A scenario created here starts with NO metrics attached (unlike generated ones): always attach the project's baseline set, including the Expected Outcome metric.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator",
                 "tags": [
                     "Scenarios"
@@ -34312,12 +34399,13 @@
                                 "$ref": "#/components/schemas/SchemaPostScenario"
                             },
                             "examples": {
-                                "InstructionScenario(simplest—MostCommon)": {
+                                "InstructionScenario(user-suppliedVerbatimText—OtherwiseUseScenariosGenerateBg)": {
                                     "value": {
                                         "agent": 12,
                                         "name": "Frustrated patient asking about billing",
                                         "scenario_type": "instruction",
                                         "instructions": "You are a patient who just got a surprise bill. Call the clinic, ask for the billing department, and refuse to pay until they explain each line item.",
+                                        "expected_outcome_prompt": "The agent explains each line item on the bill.\nThe agent does not promise to waive or reduce charges.",
                                         "personality": 3,
                                         "metrics": [
                                             5,
@@ -34328,7 +34416,7 @@
                                             "angry-caller"
                                         ]
                                     },
-                                    "summary": "Instruction scenario (simplest — most common)"
+                                    "summary": "Instruction scenario (user-supplied verbatim text — otherwise use scenarios_generate_bg)"
                                 },
                                 "ConditionalActions(structured,DeterministicFlow)": {
                                     "value": {
@@ -34361,6 +34449,7 @@
                                                 }
                                             ]
                                         },
+                                        "expected_outcome_prompt": "The agent books the appointment for Tuesday afternoon.\nThe agent confirms the booking before the call ends.",
                                         "personality": 3,
                                         "metrics": [
                                             5
@@ -34550,7 +34639,7 @@
             },
             "patch": {
                 "operationId": "scenarios-partial-update",
-                "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
+                "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**If you set or edit `expected_outcome_prompt`:** it is evaluated only when the project's Expected Outcome metric is attached to the scenario — check its `metrics` and attach that metric if missing.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
                 "summary": "Update an evaluator",
                 "parameters": [
                     {
@@ -40784,7 +40873,7 @@
             },
             "patch": {
                 "operationId": "scenarios-partial-update_2",
-                "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
+                "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**If you set or edit `expected_outcome_prompt`:** it is evaluated only when the project's Expected Outcome metric is attached to the scenario — check its `metrics` and attach that metric if missing.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
                 "summary": "Update an evaluator",
                 "parameters": [
                     {
@@ -40875,7 +40964,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-partial-update",
-                        "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically."
+                        "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**If you set or edit `expected_outcome_prompt`:** it is evaluated only when the project's Expected Outcome metric is attached to the scenario — check its `metrics` and attach that metric if missing.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically."
                     }
                 }
             },
@@ -56480,7 +56569,7 @@
             },
             "post": {
                 "operationId": "scenarios-create_3",
-                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` (default, simplest) — put plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call.\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `metrics` — list of metric IDs to evaluate after each run.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
+                "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Prefer generation for instruction scenarios:** `scenarios_generate_bg` grounds them in the agent's description, knowledge base and mock tools, and auto-attaches a test profile and the project's metrics — even for a single scenario (`num_scenarios: 1`, with the case described in `extra_instructions`). Use this create tool for `conditional_actions` scenarios whose structure is exactly known, or to save instruction text the user supplied verbatim — not to hand-write behavioral instructions a generation call could produce.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` — plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call. Prefer `scenarios_generate_bg` for these (see above).\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `expected_outcome_prompt` — what a passing call looks like, graded statement by statement after each run. It is evaluated ONLY when the project's Expected Outcome metric is attached to the scenario, so attach that metric every time you set this field.\n- `metrics` — list of metric IDs to evaluate after each run. A scenario created here starts with NO metrics attached (unlike generated ones): always attach the project's baseline set, including the Expected Outcome metric.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here.",
                 "summary": "Create an evaluator",
                 "tags": [
                     "Scenarios"
@@ -56492,12 +56581,13 @@
                                 "$ref": "#/components/schemas/SchemaPostScenario"
                             },
                             "examples": {
-                                "InstructionScenario(simplest—MostCommon)": {
+                                "InstructionScenario(user-suppliedVerbatimText—OtherwiseUseScenariosGenerateBg)": {
                                     "value": {
                                         "agent": 12,
                                         "name": "Frustrated patient asking about billing",
                                         "scenario_type": "instruction",
                                         "instructions": "You are a patient who just got a surprise bill. Call the clinic, ask for the billing department, and refuse to pay until they explain each line item.",
+                                        "expected_outcome_prompt": "The agent explains each line item on the bill.\nThe agent does not promise to waive or reduce charges.",
                                         "personality": 3,
                                         "metrics": [
                                             5,
@@ -56508,7 +56598,7 @@
                                             "angry-caller"
                                         ]
                                     },
-                                    "summary": "Instruction scenario (simplest — most common)"
+                                    "summary": "Instruction scenario (user-supplied verbatim text — otherwise use scenarios_generate_bg)"
                                 },
                                 "ConditionalActions(structured,DeterministicFlow)": {
                                     "value": {
@@ -56541,6 +56631,7 @@
                                                 }
                                             ]
                                         },
+                                        "expected_outcome_prompt": "The agent books the appointment for Tuesday afternoon.\nThe agent confirms the booking before the call ends.",
                                         "personality": 3,
                                         "metrics": [
                                             5
@@ -56730,7 +56821,7 @@
             },
             "patch": {
                 "operationId": "scenarios-partial-update_3",
-                "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
+                "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**If you set or edit `expected_outcome_prompt`:** it is evaluated only when the project's Expected Outcome metric is attached to the scenario — check its `metrics` and attach that metric if missing.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically.",
                 "summary": "Update an evaluator",
                 "parameters": [
                     {
@@ -78255,25 +78346,30 @@
             "PaginatedCallLogListList": {
                 "type": "object",
                 "required": [
-                    "count",
                     "results"
                 ],
                 "properties": {
                     "count": {
                         "type": "integer",
-                        "example": 123
+                        "example": 123,
+                        "description": "Only present when the request passes `include_count=true`. Capped at 10000: when `count_capped` is true, the true total exceeds 10000."
+                    },
+                    "count_capped": {
+                        "type": "boolean",
+                        "example": false,
+                        "description": "Only present alongside `count`."
                     },
                     "next": {
                         "type": "string",
                         "nullable": true,
                         "format": "uri",
-                        "example": "http://api.example.org/accounts/?page=4"
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
                     },
                     "previous": {
                         "type": "string",
                         "nullable": true,
                         "format": "uri",
-                        "example": "http://api.example.org/accounts/?page=2"
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
                     },
                     "results": {
                         "type": "array",
@@ -78503,25 +78599,30 @@
             "PaginatedNotificationList": {
                 "type": "object",
                 "required": [
-                    "count",
                     "results"
                 ],
                 "properties": {
                     "count": {
                         "type": "integer",
-                        "example": 123
+                        "example": 123,
+                        "description": "Only present when the request passes `include_count=true`. Capped at 10000: when `count_capped` is true, the true total exceeds 10000."
+                    },
+                    "count_capped": {
+                        "type": "boolean",
+                        "example": false,
+                        "description": "Only present alongside `count`."
                     },
                     "next": {
                         "type": "string",
                         "nullable": true,
                         "format": "uri",
-                        "example": "http://api.example.org/accounts/?page=4"
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
                     },
                     "previous": {
                         "type": "string",
                         "nullable": true,
                         "format": "uri",
-                        "example": "http://api.example.org/accounts/?page=2"
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
                     },
                     "results": {
                         "type": "array",
@@ -78596,25 +78697,30 @@
             "PaginatedResultList": {
                 "type": "object",
                 "required": [
-                    "count",
                     "results"
                 ],
                 "properties": {
                     "count": {
                         "type": "integer",
-                        "example": 123
+                        "example": 123,
+                        "description": "Only present when the request passes `include_count=true`. Capped at 10000: when `count_capped` is true, the true total exceeds 10000."
+                    },
+                    "count_capped": {
+                        "type": "boolean",
+                        "example": false,
+                        "description": "Only present alongside `count`."
                     },
                     "next": {
                         "type": "string",
                         "nullable": true,
                         "format": "uri",
-                        "example": "http://api.example.org/accounts/?page=4"
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
                     },
                     "previous": {
                         "type": "string",
                         "nullable": true,
                         "format": "uri",
-                        "example": "http://api.example.org/accounts/?page=2"
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
                     },
                     "results": {
                         "type": "array",
@@ -78627,25 +78733,30 @@
             "PaginatedRunListList": {
                 "type": "object",
                 "required": [
-                    "count",
                     "results"
                 ],
                 "properties": {
                     "count": {
                         "type": "integer",
-                        "example": 123
+                        "example": 123,
+                        "description": "Only present when the request passes `include_count=true`. Capped at 10000: when `count_capped` is true, the true total exceeds 10000."
+                    },
+                    "count_capped": {
+                        "type": "boolean",
+                        "example": false,
+                        "description": "Only present alongside `count`."
                     },
                     "next": {
                         "type": "string",
                         "nullable": true,
                         "format": "uri",
-                        "example": "http://api.example.org/accounts/?page=4"
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
                     },
                     "previous": {
                         "type": "string",
                         "nullable": true,
                         "format": "uri",
-                        "example": "http://api.example.org/accounts/?page=2"
+                        "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
                     },
                     "results": {
                         "type": "array",

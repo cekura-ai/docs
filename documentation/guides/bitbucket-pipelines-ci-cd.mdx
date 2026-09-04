@@ -1,0 +1,302 @@
+---
+title: 'Bitbucket Pipelines Tutorial'
+sidebarTitle: "Bitbucket Pipelines Tutorial"
+icon: "bitbucket"
+iconType: "brands"
+description: 'Learn how to automatically test your agents in Bitbucket Pipelines with the Cekura pipe'
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+Automate your agent testing with the Cekura Bitbucket pipe. This guide shows you how to run Cekura scenarios on every pull request, on merges to a branch, or on demand, and fail the pipeline when a run fails.
+
+The pipe starts a Cekura test run, waits for it to finish, and reports the result in the step log, the pipeline **Tests** tab, a report on the pull request, and downloadable artifacts, with a shareable link to the full result in Cekura.
+
+## Before You Get Started
+
+You need:
+
+- A Cekura API key
+- An agent and scenarios configured in the [Cekura dashboard](https://dashboard.cekura.ai)
+- A project ID only when selecting scenarios by evaluator folder
+
+The agent ID is optional. If you omit it, Cekura infers the agent from the selected scenarios.
+
+<Note>
+Bitbucket requires two-step verification on your Bitbucket account before Pipelines can be enabled in a new workspace. Enable it under **Personal Bitbucket settings → Two-step verification**. The verification on your Atlassian account does not count.
+</Note>
+
+## Choose Which Scenarios to Run
+
+Choose a selector: scenario IDs, tags, or an evaluator folder. IDs and tags can be combined; a folder cannot be combined with either.
+
+<Tabs>
+  <Tab title="Scenario IDs">
+    Run an exact set of scenarios using comma-separated IDs:
+
+    ```yaml
+    - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+      variables:
+        CEKURA_API_KEY: $CEKURA_API_KEY
+        SCENARIO_IDS: "101,202"
+    ```
+  </Tab>
+
+  <Tab title="Tags">
+    Run scenarios selected by one or more tags:
+
+    ```yaml
+    - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+      variables:
+        CEKURA_API_KEY: $CEKURA_API_KEY
+        TAGS: "smoke,release"
+    ```
+  </Tab>
+
+  <Tab title="Evaluator Folder">
+    Run every scenario in a folder. `PROJECT_ID` is required even when you provide `AGENT_ID`:
+
+    ```yaml
+    - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+      variables:
+        CEKURA_API_KEY: $CEKURA_API_KEY
+        FOLDER_PATH: "Release checks"
+        PROJECT_ID: "1875"
+    ```
+  </Tab>
+</Tabs>
+
+## Run the Pipeline
+
+<Steps>
+  <Step title="Add Your API Key">
+    In your Bitbucket repository, go to **Repository settings → Pipelines → Repository variables**.
+
+    Set the name to `CEKURA_API_KEY`, paste your Cekura API key as the value, and tick **Secured** so Bitbucket masks it in logs.
+
+    To share one key across several repositories, a workspace admin can add it under **Workspace settings → Pipelines → Workspace variables** instead.
+
+    <Warning>
+    Never put your API key directly in `bitbucket-pipelines.yml`.
+    </Warning>
+  </Step>
+
+  <Step title="Add the Pipeline Configuration">
+    Create or edit `bitbucket-pipelines.yml` at the root of your repository:
+
+    ```yaml
+    pipelines:
+      pull-requests:
+        '**':
+          - step:
+              name: Cekura agent tests
+              script:
+                - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+                  variables:
+                    CEKURA_API_KEY: $CEKURA_API_KEY
+                    SCENARIO_IDS: "101,202"
+                    NAME: "PR $BITBUCKET_PR_ID"
+              artifacts:
+                - test-results/**
+                - cekura_summary.md
+                - cekura_details.json
+                - cekura_output.env
+    ```
+
+    Replace the selector with one from [Choose Which Scenarios to Run](#choose-which-scenarios-to-run). The `artifacts` block is optional; it keeps the report files for download and for later steps.
+  </Step>
+
+  <Step title="Start a Test Run">
+    Commit and push the file, then open a pull request. The pipeline starts automatically. If Pipelines is not enabled yet, go to **Repository settings → Pipelines → Settings** and select **Enable Pipelines**.
+
+    You can also start it by hand from **Pipelines → Run pipeline**.
+  </Step>
+
+  <Step title="Review the Results">
+    Open the step to see the run start, a status line every 15 seconds, and the result summary with pass and fail counts, failure reasons, and a shareable link to the full result in Cekura.
+
+    - The step is green when every run passed and red when any run failed or the run timed out.
+    - The **Tests** tab lists each failed scenario with the evaluator's explanation. It appears only when at least one run failed.
+    - The pull request shows a **Cekura agent tests** report with the pass rate and a link to the result. No extra setup is needed.
+    - The **Artifacts** tab holds the summary, details, and JUnit files for 14 days.
+  </Step>
+</Steps>
+
+## Configure Pipeline Triggers
+
+Place the step under the trigger you want. Bitbucket supports several in the same file.
+
+<AccordionGroup>
+  <Accordion title="Run on Pull Requests">
+    ```yaml
+    pipelines:
+      pull-requests:
+        '**':
+          - step:
+              name: Cekura agent tests
+              script:
+                - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+                  variables:
+                    CEKURA_API_KEY: $CEKURA_API_KEY
+                    TAGS: "smoke"
+    ```
+  </Accordion>
+
+  <Accordion title="Run on Merges to a Branch">
+    ```yaml
+    pipelines:
+      branches:
+        main:
+          - step:
+              name: Cekura release checks
+              script:
+                - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+                  variables:
+                    CEKURA_API_KEY: $CEKURA_API_KEY
+                    FOLDER_PATH: "Release checks"
+                    PROJECT_ID: "1875"
+    ```
+  </Accordion>
+
+  <Accordion title="Run Only When Started Manually">
+    A custom pipeline shows a form when you start it from **Pipelines → Run pipeline**:
+
+    ```yaml
+    pipelines:
+      custom:
+        cekura-tests:
+          - variables:
+              - name: SCENARIO_IDS
+                default: "101,202"
+              - name: FREQUENCY
+                default: "1"
+          - step:
+              name: Cekura agent tests
+              script:
+                - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+                  variables:
+                    CEKURA_API_KEY: $CEKURA_API_KEY
+                    SCENARIO_IDS: $SCENARIO_IDS
+                    FREQUENCY: $FREQUENCY
+    ```
+  </Accordion>
+
+  <Accordion title="Run on a Schedule">
+    Define a custom pipeline as above, then create a schedule under **Pipelines → Schedules** that runs it hourly, daily, or weekly on the branch you choose.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+For more on triggers, see the [Bitbucket Pipelines documentation](https://support.atlassian.com/bitbucket-cloud/docs/pipeline-start-conditions/).
+</Note>
+
+## Block Merges on Failed Tests
+
+Go to **Repository settings → Branch restrictions**, edit the rule for your target branch, and enable **Minimum number of successful builds for the last commit** with a value of 1. A red Cekura step then prevents the merge.
+
+## Environment-Specific Testing
+
+Point the pipe at a different Cekura environment with `API_URL`, and use a key issued by that environment:
+
+```yaml
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Cekura tests (staging)
+          script:
+            - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+              variables:
+                CEKURA_API_KEY: $STAGING_CEKURA_API_KEY
+                TAGS: "smoke"
+                API_URL: https://staging.example.cekura.ai
+      - step:
+          name: Cekura tests (production)
+          script:
+            - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+              variables:
+                CEKURA_API_KEY: $CEKURA_API_KEY
+                TAGS: "smoke"
+```
+
+## Use the Result in Another Step
+
+The pipe writes `cekura_output.env` with `RESULT_ID`, `RESULT_URL`, `CEKURA_STATUS`, `CEKURA_FAILED_RUNS`, and `CEKURA_SUCCESS_RATE`. Keep it as an artifact and source it in a later step:
+
+```yaml
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Cekura agent tests
+          script:
+            - pipe: docker://public.ecr.aws/t8m3v5l2/bitbucket:1.0.0
+              variables:
+                CEKURA_API_KEY: $CEKURA_API_KEY
+                TAGS: "smoke"
+          artifacts:
+            - cekura_output.env
+      - step:
+          name: Announce
+          script:
+            - source cekura_output.env
+            - echo "Cekura result $RESULT_ID: $RESULT_URL"
+```
+
+## Pipe Variables
+
+Only `CEKURA_API_KEY` and a scenario selector are needed for a typical run. Empty variables are not sent to Cekura, so the API applies its defaults.
+
+| Variable | Description | Required | Default |
+| --- | --- | --- | --- |
+| `CEKURA_API_KEY` | Cekura API key. Pass a secured repository variable. | Yes | - |
+| `SCENARIO_IDS` | Comma-separated scenario IDs. | No* | - |
+| `TAGS` | Comma-separated scenario tags. | No* | - |
+| `FOLDER_PATH` | Evaluator folder path. Requires `PROJECT_ID`, even when `AGENT_ID` is provided. | No* | - |
+| `PROJECT_ID` | Cekura project ID used with `FOLDER_PATH`. | With folder | - |
+| `AGENT_ID` | Agent ID override. Otherwise inferred from the selected scenarios. | No | - |
+| `PHONE_NUMBER` | Outbound phone number used for testing. | No | - |
+| `AGENT_NUMBER` | Number on which the agent under test receives calls. | No | - |
+| `NAME` | Name for the Cekura test result. | No | - |
+| `API_URL` | Cekura API base URL. | No | `https://api.cekura.ai` |
+| `FREQUENCY` | Number of times to run each scenario. | No | `1` |
+| `PERSONALITY_IDS` | Comma-separated personality ID overrides. | No | - |
+| `TEST_PROFILE_IDS` | Comma-separated test profile ID overrides. | No | - |
+| `MODE` | `same_number` or `different_numbers`. | No | API default |
+| `CONCURRENCY_LIMIT` | Maximum number of parallel calls. | No | API default |
+| `MOCK_TOOL_NAMES` | Comma-separated tools to mock. Use `[]` to mock none; omit to mock all configured tools. | No | API default |
+| `TIMEOUT` | Maximum time to wait for completion, in seconds. | No | `3600` |
+| `POLL_INTERVAL` | Seconds between status checks. | No | `15` |
+| `DEBUG` | Set to `true` to print requests and raw responses. | No | `false` |
+
+*Provide at least one of `SCENARIO_IDS`, `TAGS`, or `FOLDER_PATH`. A folder cannot be combined with IDs or tags.
+
+<Tip>
+Bitbucket stops a step after 120 minutes by default. If you raise `TIMEOUT` above 6000 seconds, also set `max-time` on the step, up to 720 minutes.
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Pipelines Cannot Be Enabled">
+    Bitbucket asks for two-step verification on new workspaces. Enable it under **Personal Bitbucket settings → Security → Two-step verification**, then confirm the email Bitbucket sends. Two-step verification set on the Atlassian account alone is not enough.
+  </Accordion>
+
+  <Accordion title="The Step Fails With HTTP 401">
+    The API key was rejected. Check that `CEKURA_API_KEY` is spelled the same in the pipeline file and in Repository variables, and that the key belongs to the environment `API_URL` points to.
+  </Accordion>
+
+  <Accordion title="The Step Fails Before Any Test Runs">
+    The pipe validates its inputs first. Read the first error line in the step log: it names the variable to fix, for example a folder combined with tags, a non-numeric ID, or a missing `PROJECT_ID`.
+  </Accordion>
+
+  <Accordion title="The Pipe Cannot Be Pulled">
+    Self-hosted runners need outbound HTTPS to `public.ecr.aws` to fetch the pipe image and to `api.cekura.ai` to start the run.
+  </Accordion>
+
+  <Accordion title="The Cekura Tests Fail">
+    Open the step log for failure reasons and individual failed-run details, or the **Tests** tab for the failed scenarios. Follow the **View results** link for transcripts, evaluations, and the AI-generated analysis.
+  </Accordion>
+</AccordionGroup>

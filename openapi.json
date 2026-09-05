@@ -6135,6 +6135,64 @@
                 "x-mcp-tool-name": "call_logs_destroy"
             }
         },
+        "/observability/v1/call-logs/{id}/logs/": {
+            "get": {
+                "operationId": "call-logs-execution-logs-retrieve",
+                "description": "Retrieve the provider execution logs captured for a production call log.\n\nBefore calling this tool, retrieve or list the call log and confirm that `is_log_present` is true; when it is false no logs were captured. Pass the call log's integer `id`, not its provider `call_id`. Entries are normalized across providers into `ts`, `level`, `message` and an optional provider-specific `raw`.",
+                "summary": "Retrieve execution logs for a call log",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CallLogLogsResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "The call log does not exist or has no stored execution logs."
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "call_logs_execution_logs_retrieve",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "call-logs-execution-logs-retrieve",
+                        "description": "Retrieve the provider execution logs captured for a production call log.\n\nBefore calling this tool, retrieve or list the call log and confirm that `is_log_present` is true; when it is false no logs were captured. Pass the call log's integer `id`, not its provider `call_id`. Entries are normalized across providers into `ts`, `level`, `message` and an optional provider-specific `raw`."
+                    }
+                }
+            }
+        },
         "/observability/v1/call-logs/{id}/mark_critical_scenario_wrong/": {
             "post": {
                 "operationId": "call-logs-v1-mark-critical-scenario-wrong-create",
@@ -33150,6 +33208,67 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/runs/{id}/logs/": {
+            "get": {
+                "operationId": "runs-execution-logs-retrieve",
+                "description": "Retrieve the provider execution logs captured for a simulation run.\n\nBefore calling this tool, retrieve the run with `runs_bulk_retrieve` and confirm that `is_log_present` is true; when it is false no logs were captured. Pass the run's integer `id`, not its provider call identifier. Entries are normalized across providers into `ts`, `level`, `message` and an optional provider-specific `raw`.",
+                "summary": "Retrieve execution logs for a simulation run",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "shareable_link": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RunLogsResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "404": {
+                        "description": "The run does not exist or has no stored execution logs."
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "runs_execution_logs_retrieve",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "runs-execution-logs-retrieve",
+                        "description": "Retrieve the provider execution logs captured for a simulation run.\n\nBefore calling this tool, retrieve the run with `runs_bulk_retrieve` and confirm that `is_log_present` is true; when it is false no logs were captured. Pass the run's integer `id`, not its provider call identifier. Entries are normalized across providers into `ts`, `level`, `message` and an optional provider-specific `raw`."
                     }
                 }
             }
@@ -71375,6 +71494,10 @@
                         "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
                         "maxLength": 32
                     },
+                    "is_log_present": {
+                        "type": "boolean",
+                        "description": "Whether provider execution logs are stored for this call."
+                    },
                     "agent": {
                         "type": [
                             "integer",
@@ -71472,6 +71595,10 @@
                         "type": "string",
                         "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
                         "maxLength": 32
+                    },
+                    "is_log_present": {
+                        "type": "boolean",
+                        "description": "Whether provider execution logs are stored for this call."
                     },
                     "timestamp": {
                         "type": "string",
@@ -71613,6 +71740,32 @@
                     "score",
                     "type",
                     "value"
+                ]
+            },
+            "CallLogLogsResponse": {
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider the logs were captured from."
+                    },
+                    "format": {
+                        "type": "string",
+                        "description": "Shape of the source log: `text` for line logs, `events` for structured ones."
+                    },
+                    "fetched_at": {
+                        "type": "string",
+                        "description": "When the logs were captured from the provider."
+                    },
+                    "entries": {
+                        "description": "Normalized log entries, oldest first."
+                    }
+                },
+                "required": [
+                    "entries",
+                    "fetched_at",
+                    "format",
+                    "provider"
                 ]
             },
             "CallLogTraceResponse": {
@@ -71962,6 +72115,10 @@
                         "default": "",
                         "description": "OpenTelemetry trace ID (32-char hex string). Example: \"4bf92f3577b34da6a3ce929d0e0e4736\"",
                         "maxLength": 32
+                    },
+                    "logs": {
+                        "writeOnly": true,
+                        "description": "\nExecution logs for this call: a list of entries, oldest first. Stored outside the\ncall record and read back from the call log's logs endpoint.\n\nEach entry is an object with:\n\n- `message` (required) — what happened, as a single line.\n- `ts` (optional) — when it happened. ISO 8601, a unix timestamp, or seconds\n  into the call (`0`, `4.5`). Shown as a time column.\n- `logger` (optional) — the component that emitted the line, e.g. `pipeline`,\n  `transcriber`, `my.app.tools`. Shown as its own column, and only when at\n  least one entry has it.\n- `level` (optional) — `info`, `warn`, `error`, `debug`, or your own label.\n- `raw` (optional) — an object holding any extra detail for that entry. It is\n  hidden by default and shown when the entry is expanded in the dashboard, so put\n  payloads, IDs and diagnostics here rather than in `message`.\n\nAny other keys you send on an entry are folded into `raw`.\n\nExample:\n```json\n[\n   {\n      \"ts\": \"2026-09-02T10:00:01.120Z\",\n      \"logger\": \"session\",\n      \"level\": \"info\",\n      \"message\": \"Session started\"\n   },\n   {\n      \"ts\": 4.5,\n      \"logger\": \"transcriber\",\n      \"level\": \"info\",\n      \"message\": \"Final transcript | provider=deepgram confidence=0.98\"\n   },\n   {\n      \"ts\": \"00:07\",\n      \"logger\": \"tools\",\n      \"level\": \"error\",\n      \"message\": \"Tool call failed: get_order timed out after 5s\",\n      \"raw\": {\n         \"tool\": \"get_order\",\n         \"timeout_ms\": 5000,\n         \"request\": {\"order_id\": \"ORD-12345\"},\n         \"error\": \"ETIMEDOUT\"\n      }\n   },\n   {\n      \"ts\": \"00:09\",\n      \"logger\": \"session\",\n      \"level\": \"info\",\n      \"message\": \"Session ended\"\n   }\n]\n```\n"
                     },
                     "agent": {
                         "type": "integer",
@@ -74529,6 +74686,7 @@
             },
             "MetricBasicList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -74610,6 +74768,10 @@
                             "integer",
                             "null"
                         ]
+                    },
+                    "user_defined": {
+                        "type": "string",
+                        "readOnly": true
                     }
                 },
                 "required": [
@@ -81403,6 +81565,10 @@
                         "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
                         "maxLength": 32
                     },
+                    "is_log_present": {
+                        "type": "boolean",
+                        "description": "Whether provider execution logs are stored for this run."
+                    },
                     "scenario": {
                         "type": [
                             "integer",
@@ -85548,6 +85714,10 @@
                         "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
                         "maxLength": 32
                     },
+                    "is_log_present": {
+                        "type": "boolean",
+                        "description": "Whether provider execution logs are stored for this run."
+                    },
                     "scenario": {
                         "type": [
                             "integer",
@@ -85845,6 +86015,10 @@
                         "type": "string",
                         "description": "OpenTelemetry trace ID (32-char hex). Set when OTel tracing is enabled.",
                         "maxLength": 32
+                    },
+                    "is_log_present": {
+                        "type": "boolean",
+                        "description": "Whether provider execution logs are stored for this run."
                     },
                     "scenario": {
                         "type": [
@@ -86177,6 +86351,32 @@
                 },
                 "required": [
                     "scenarios"
+                ]
+            },
+            "RunLogsResponse": {
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "description": "Provider the logs were captured from."
+                    },
+                    "format": {
+                        "type": "string",
+                        "description": "Shape of the source log: `text` for line logs, `events` for structured ones."
+                    },
+                    "fetched_at": {
+                        "type": "string",
+                        "description": "When the logs were captured from the provider."
+                    },
+                    "entries": {
+                        "description": "Normalized log entries, oldest first."
+                    }
+                },
+                "required": [
+                    "entries",
+                    "fetched_at",
+                    "format",
+                    "provider"
                 ]
             },
             "RunReviewsRequest": {

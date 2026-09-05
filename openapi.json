@@ -8694,7 +8694,7 @@
         "/observability/v1/metric-failure-mode-insights/categories/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-categories-retrieve",
-                "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) to count only calls handled by those agents; results are sorted by count descending. Each category also carries `agents`: the agents that handled its calls, busiest first, each with a call count, its own example call ids, and whether Improve Agent can edit it.",
+                "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) or `agent_version_ids` (comma-separated agent version ids) to count only calls handled by those agents / agent versions; results are sorted by count descending. Each category also carries `agents`: the agents that handled its calls, busiest first, each with a call count, its own example call ids, and whether Improve Agent can edit it. And `agent_versions`: the agent versions those calls ran on, NEWEST VERSION FIRST, each with the version's name, when it went live, a call count, and its own example call ids — read it to tell whether a version introduced or fixed the failure mode.",
                 "summary": "List accumulating failure categories for a metric",
                 "parameters": [
                     {
@@ -8704,6 +8704,14 @@
                             "type": "string"
                         },
                         "description": "Comma-separated agent ids; only calls handled by these agents are counted."
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_version_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent version ids (the `history_id`s reported in `agent_versions`); only calls that ran on those versions are counted."
                     },
                     {
                         "name": "project",
@@ -8750,7 +8758,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "metric-failure-mode-insights-categories-retrieve",
-                        "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) to count only calls handled by those agents; results are sorted by count descending. Each category also carries `agents`: the agents that handled its calls, busiest first, each with a call count, its own example call ids, and whether Improve Agent can edit it."
+                        "description": "Return the persistent failure categories for a project (optionally one metric), each with a call count and example call ids. Filter by `date_from` / `date_to` (ISO datetimes for an exact window, or bare dates for whole-day bounds) to count only assignments in that range, and by `agent_ids` (comma-separated agent ids) or `agent_version_ids` (comma-separated agent version ids) to count only calls handled by those agents / agent versions; results are sorted by count descending. Each category also carries `agents`: the agents that handled its calls, busiest first, each with a call count, its own example call ids, and whether Improve Agent can edit it. And `agent_versions`: the agent versions those calls ran on, NEWEST VERSION FIRST, each with the version's name, when it went live, a call count, and its own example call ids — read it to tell whether a version introduced or fixed the failure mode."
                     }
                 }
             }
@@ -8809,6 +8817,14 @@
                             "type": "string"
                         },
                         "description": "Comma-separated agent ids; only calls handled by these agents are returned."
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_version_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent version ids; only calls that ran on those agent versions are returned."
                     }
                 ],
                 "tags": [
@@ -8969,10 +8985,114 @@
                 }
             }
         },
+        "/observability/v1/metric-failure-mode-insights/categories/{category_slug}/trend/": {
+            "get": {
+                "operationId": "metric-failure-mode-insights-categories-trend-retrieve",
+                "description": "Return one failure category's rate over time so a regression can be read against the agent releases around it. `buckets` is one point per `bucket` (hour/day/week, default day) over the window (default the last 30 days), each with the mode's `failures`, the `evaluated_calls` that got a verdict for the mode's metric, and `rate` as a percentage of those. `rate` is **null**, not 0, for a bucket with no evaluated calls — before the metric was opted into Insights, or a window with no traffic — so a gap is never read as a clean floor. `versions` is the same rate per agent version, newest first, each with when it went live and `rate_change_pp`: the percentage-point move against the version before it. A version that ran calls but produced none of this failure mode appears at 0%, which is what fixing it looks like. Agent versions belong to one agent, so by default the whole response is scoped to the agent carrying most of this mode's failures (`agent_scope`); `agents` lists every agent it fires on so a caller can compare a different one. Each version also carries `live_from`/`live_until`, the span it was the live version, clamped to the window.",
+                "summary": "Failure-mode rate over time, with agent-version markers",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "category_slug",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[^/]+$"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "project",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "metric_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "date_from",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "date_to",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "bucket",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Time bucket: hour, day (default) or week."
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent ids; only these agents' calls are counted."
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_scope",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "`top` (default) scopes to the agent carrying most of this mode's failures, so the per-version comparison is within one agent's release history; `all` spans every agent the mode occurs on. Ignored when `agent_ids` is given."
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MetricFailureModeInsight"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/observability/v1/metric-failure-mode-insights/failure-rates/": {
             "get": {
                 "operationId": "metric-failure-mode-insights-failure-rates-retrieve",
-                "description": "Return the percentage of evaluated calls that failed each metric during the selected Insights date range. Optionally scope to `agent_ids` (comma-separated agent ids). Rates are counted from the verdicts recorded at evaluation time, so editing a metric's failure criteria changes future calls only.",
+                "description": "Return the percentage of evaluated calls that failed each metric during the selected Insights date range. Optionally scope to `agent_ids` (comma-separated agent ids) and/or `agent_version_ids` (comma-separated agent version ids) — the latter is how you compare a metric's failure rate before and after an agent version change. Rates are counted from the verdicts recorded at evaluation time, so editing a metric's failure criteria changes future calls only.",
                 "summary": "List metric failure rates for the insights window",
                 "parameters": [
                     {
@@ -8982,6 +9102,14 @@
                             "type": "string"
                         },
                         "description": "Comma-separated agent ids; only calls handled by these agents are counted."
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_version_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent version ids; only calls that ran on those agent versions are counted."
                     }
                 ],
                 "tags": [
@@ -71250,6 +71378,15 @@
                         "readOnly": true,
                         "description": "Agent name"
                     },
+                    "agent_version": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {},
+                        "readOnly": true,
+                        "description": "The agent version (history record) that was live when this call was ingested, or null."
+                    },
                     "evaluation": {
                         "allOf": [
                             {
@@ -74529,6 +74666,7 @@
             },
             "MetricBasicList": {
                 "type": "object",
+                "description": "",
                 "properties": {
                     "id": {
                         "type": "integer",
@@ -74610,6 +74748,10 @@
                             "integer",
                             "null"
                         ]
+                    },
+                    "user_defined": {
+                        "type": "string",
+                        "readOnly": true
                     }
                 },
                 "required": [

@@ -414,9 +414,31 @@ agent-tests:
         -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
 ```
 
+```yaml Bitbucket Pipelines
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          name: Agent tests
+          image: curlimages/curl:latest
+          script:
+            - |
+              curl --fail-with-body -sS -X POST \
+                "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true" \
+                -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+                -H "Content-Type: application/json" \
+                -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
+            - |
+              curl --fail-with-body -sS -X POST \
+                "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/" \
+                -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+                -H "Content-Type: application/json" \
+                -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
+```
+
 </CodeGroup>
 
-Runs are asynchronous: the call returns once they are queued. To gate a merge on the outcome, poll the returned result until it reaches a terminal status and then check its `success_rate`. The [GitHub Actions Tutorial](/documentation/guides/github-actions-ci-cd) covers the polling and gating pattern in full — the only difference is which endpoint starts the run.
+Runs are asynchronous: the call returns once they are queued. To gate a merge on the outcome, poll the returned result until it reaches a terminal status and then check its `success_rate`. The [GitHub Actions](/documentation/guides/github-actions-ci-cd), [GitLab CI/CD](/documentation/guides/gitlab-ci-cd), and [Bitbucket Pipelines](/documentation/guides/bitbucket-pipelines-ci-cd) tutorials cover the polling and gating pattern in full — the only difference is which endpoint starts the run.
 
 <Tip>
 Split it across two jobs: run the dry check on every push (free, fast, catches a broken file), and the real run only on the branches you actually want tested.

@@ -1,0 +1,105 @@
+---
+title: "Deep Research"
+sidebarTitle: "Deep Research"
+icon: "microscope"
+iconType: "regular"
+description: "Audit a window of production calls for failure modes nobody wrote a metric for — an urgency-ranked report of what the agent got wrong, each finding with a suggested fix and example calls."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## What it does
+
+Metrics only catch what you thought to measure. Deep Research reads a window of your real calls end to end and reports the ways the agent misbehaved — including the ones no metric covers.
+
+For a project, an audit:
+
+1. Samples calls from the window you pick and reads each one's transcript and call end reason against that call's agent description — the agent's own script, disclosures, and required steps.
+2. Clusters what it finds into **failure modes**: distinct patterns that share a root cause and would be resolved by the same fix.
+3. Returns the modes ranked by urgency — critical first, then high, then medium — each with a description, a concrete suggested fix, and example calls you can open.
+
+Findings are judged against the agent's own expected behavior, not generic voice-AI norms: something the agent's script mandates is never reported as a failure. Every mode has to be fixable by changing the agent's prompt, conversation logic, or configuration — user-side behavior, telephony errors, and transcription artifacts are deliberately left out.
+
+<Note>
+  Deep Research is enabled per project. If you don't see the section, contact [support@cekura.ai](mailto:support@cekura.ai) to turn it on.
+</Note>
+
+### How it differs from Insights
+
+| | [Insights](/documentation/guides/observability/insights) | Deep Research |
+|---|---|---|
+| Scope | One metric at a time | The whole project |
+| Trigger | Continuous, as failing calls arrive | Weekly, plus on demand |
+| Finds | Why calls fail a metric you enabled | Misbehavior no metric measures |
+| Output | Failure themes with running counts | Urgency-ranked modes with suggested fixes |
+
+The two are complements. Deep Research deliberately steers away from ground your existing metrics already cover, and reports a finding an enabled metric already measures only when it's critical. The usual loop is: run Deep Research, find a mode worth watching, turn it into a metric, and let Insights track it from then on.
+
+## Running an audit
+
+Navigate to **Observability → Insights**. The **Deep Research** card sits below the per-metric grid.
+
+Click **Generate** to open the run dialog:
+
+- **Audit calls from** — the window to audit. Defaults to the last 7 days; quick ranges cover the last 24 hours, 2 days, 7 days, and 30 days, and you can pick any custom range, including one in the past. A single audit can span at most 30 days.
+- **Focus** — an optional sentence describing what you want investigated, for example `voicemail handling` or `agents promising callbacks they can't schedule`.
+
+Then run it one of two ways:
+
+- **Run full audit** — the standard sweep. Reports every fixable failure mode it finds in the window.
+- **Run focused audit** — only available once you've written a focus. Reports only modes relevant to what you asked about, hunting the window for that concern specifically and splitting distinct root causes into separate modes. A clean result here is a real answer: zero modes means the audit read the calls and didn't find that problem.
+
+The card polls while the audit runs and fills in on its own when it's done. Large call volumes can take 10–15 minutes. Pressing **Generate** again while a run is in flight just returns the run already going — wait for it to finish before auditing a different window.
+
+<Note>
+  Each run costs credits; the exact amount is shown on the **Generate** button and in the run dialog (20 credits by default). A press that only returns an already-running audit isn't charged.
+</Note>
+
+## Reading the report
+
+The result is a table of failure modes, most urgent first. Above it, a badge names the window that was audited and how many calls were analyzed, plus the focus if the run had one.
+
+Each row carries:
+
+- **A severity dot** — red for critical, orange for high, yellow for medium. Critical covers compliance and safety problems, unauthorized actions, invented confirmation numbers or IDs, and claiming success the transcript doesn't support. High covers task outcomes and tool-use failures. Medium covers conversation quality and customer experience.
+- **A title and description** of the pattern.
+- **A suggested fix** — one or two sentences naming the concrete change to make to the agent, derived from that agent's own description.
+- **Example calls** — call IDs that open the call log in a new tab. These are examples, not the full set; expand the row to see the rest.
+
+### Acting on a finding
+
+- **Create metric** turns the mode into a metric. It opens the AI metric builder with the mode's title, description, and expected behavior already filled in, so the pattern gets scored on every future call.
+- **Thumbs down** dismisses the mode. Add an optional note explaining why it isn't useful, and the mode is hidden from every future Deep Research report for the project — future audits are told not to report it again. Dismissals are project-wide and can't be undone from the dashboard.
+
+### When there are no findings
+
+The card explains itself instead of showing an empty table:
+
+- **Not enough calls in this window to audit** — the window holds fewer than 5 calls. Widen the range.
+- **No failure modes surfaced in this window** — the audit ran and found nothing that clears its bar. On a focused audit, this means the calls look clean on the concern you asked about.
+- **Unable to process message; falling back to full audit** — the focus you supplied couldn't be interpreted, so the run went ahead as a standard full audit.
+
+## Weekly audits
+
+Projects with Deep Research enabled are audited automatically once a week over their trailing 7 days, so there's a current report waiting without anyone pressing a button. Projects with fewer than 5 calls in the window are skipped. Manual runs and the weekly run share the same card — the card always shows the most recent successful report.
+
+## What the audit reads
+
+Per call, the audit reads the transcript and the call end reason. It also reads every agent description in the project and the definitions of the metrics you already track, so it can judge behavior against the right script and avoid reporting what a metric already measures. It does not read audio or metric scores.
+
+By default an audit samples up to 500 calls from the window. The sample is random rather than the most recent calls, so a pattern confined to one stretch of the window still shows up.
+
+## API
+
+Deep Research is also available over the API:
+
+- [Generate Deep Research Insights](/api-reference/observability/generate-deep-research-insights) — queue an audit. Scope with `project`; pass `date_from` / `date_to` for an exact window or `window_days` for a rolling lookback, `max_calls` to cap the sample, and `focus` for a focused audit. Returns the new row in `pending`.
+- [List Deep Research Insights](/api-reference/observability/list-deep-research-insights) — pass `project`, and `latest_only=1` for just the current report.
+- [Get Deep Research Insight](/api-reference/observability/get-deep-research-insight) — poll a row's `status` until it reads `succeeded`.
+- [Retrieve Deep Research Insights Pricing](/api-reference/observability/retrieve-deep-research-insights-pricing) — the credit cost of a run, before you spend it.
+- [Dismiss Deep Research Insight Mode](/api-reference/observability/dismiss-deep-research-insight-mode) — suppress a mode across the project by `mode_title`.
+- [Delete Deep Research Insight](/api-reference/observability/delete-deep-research-insight) — remove a report.
+
+A row's `status` moves through `pending` → `running` → `succeeded`. `skipped_not_enough_data` means the window had too few calls, and `failed` carries an `error_message`.

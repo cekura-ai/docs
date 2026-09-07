@@ -26,7 +26,12 @@ if os.getenv("AWS_SECRET_NAME"):
 
 import skill_gate
 from config import load_config
-from http_client import build_mcp_headers, create_client
+from http_client import (
+    build_mcp_headers,
+    create_client,
+    ResponseTooLargeError,
+    _max_upstream_response_bytes,
+)
 from openapi_parser import load_openapi_spec
 from tool_generator import (
     apply_overlay_to_description,
@@ -184,6 +189,10 @@ async def initialize_server():
 
         server_config = load_config()
         logger.info(f"Loaded config: Base URL={server_config.base_url}")
+        # Read here as well as per request, so a malformed value fails at boot
+        # instead of surfacing as a per-call error, and the effective cap is on
+        # the record beside any upstream_response_too_large event.
+        logger.info(f"Upstream response cap: {_max_upstream_response_bytes()} bytes")
 
         openapi_parser = load_openapi_spec(server_config.openapi_spec_path)
         logger.info(f"Loaded OpenAPI spec from {server_config.openapi_spec_path}")
@@ -1160,10 +1169,29 @@ def setup_dynamic_tool_handlers():
             finally:
                 await user_api_client.close()
 
-            text = json.dumps(result, default=str, ensure_ascii=False)
+            if isinstance(result, str):
+                text = result
+            else:
+                text = json.dumps(result, default=str, ensure_ascii=False)
             nudge = gate_nudge or ""
             return [{"type": "text", "text": f"{text}{nudge}{call_id_suffix}"}]
 
+        except ResponseTooLargeError as e:
+            # The condition this cap exists to catch: record who asked for what,
+            # and how big it got, so the next cap can be sized from data.
+            logger.warning(json.dumps({
+                "event": "upstream_response_too_large",
+                "mcp_call_id": mcp_call_id,
+                "tool": name,
+                "path": e.path,
+                "limit_bytes": e.limit,
+                "bytes_read": e.bytes_read,
+                "content_length": e.content_length,
+                "client_id": telemetry["client_id"],
+                "conversation_id": telemetry["conversation_id"],
+                "cred_hash": _credential_fingerprint(),
+            }))
+            return [{"type": "text", "text": f"Error: {e}{call_id_suffix}"}]
         except ValueError as e:
             return [{"type": "text", "text": f"Authentication Error: {e}{call_id_suffix}"}]
         except Exception as e:
@@ -1186,6 +1214,16 @@ def main():
     parser = argparse.ArgumentParser(description="Cekura OpenAPI MCP Server")
     parser.add_argument("--port", type=int, default=8001, help="Port to run the HTTP server on (default: 8001)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
+    parser.add_argument(
+        "--timeout-keep-alive",
+        type=int,
+        default=int(os.getenv("MCP_TIMEOUT_KEEP_ALIVE", "620")),
+        help=(
+            "Seconds an idle keep-alive connection is held open. Must exceed the idle timeout of any "
+            "proxy in front of the server, otherwise the proxy can reuse a connection the server is "
+            "closing and the client sees a 502 (default: 620, or $MCP_TIMEOUT_KEEP_ALIVE)"
+        ),
+    )
     args = parser.parse_args()
 
     logger.info("Starting Cekura OpenAPI MCP Server...")
@@ -1346,7 +1384,7 @@ def main():
 
     logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    uvicorn.run(app, host=args.host, port=args.port, timeout_keep_alive=args.timeout_keep_alive)
 
 
 if __name__ == "__main__":

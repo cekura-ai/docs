@@ -646,7 +646,7 @@ def _is_older_version(reported: str, latest: str) -> bool:
 
 
 def _latest_plugin_version() -> str:
-    return os.environ.get("CEKURA_LATEST_PLUGIN_VERSION", "0.9.0")
+    return os.environ.get("CEKURA_LATEST_PLUGIN_VERSION", "0.14.2")
 
 
 # /upgrade-skills only moves the installed version pin from this version on

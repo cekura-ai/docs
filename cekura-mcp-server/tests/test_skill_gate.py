@@ -51,8 +51,8 @@ JSON_ARRAY_BODY = {"content": {"application/json": {"schema": {"type": "array", 
 # ── family / tool table ──────────────────────────────────────────────────────
 
 class TestFamilyTable:
-    def test_exactly_ten_gated_tools(self):
-        assert len(skill_gate.GATED_TOOLS) == 10
+    def test_exactly_twelve_gated_tools(self):
+        assert len(skill_gate.GATED_TOOLS) == 12
 
     def test_every_gated_tool_maps_to_a_family(self):
         for tool in skill_gate.GATED_TOOLS:
@@ -244,7 +244,7 @@ class TestManifest:
         source = skill_gate._load_baked()
         assert source == "baked"
         m = skill_gate.get_manifest()
-        assert len(m) == 11
+        assert len(m) == 12
         # every family slug in the code table is present in the shipped snapshot
         for slug in skill_gate.ALL_FAMILY_SLUGS:
             assert slug in m
@@ -253,7 +253,7 @@ class TestManifest:
         # loadable = the skill-backed subset of the family slugs (commands ship
         # only inside the plugin and have no SKILL.md to deliver)
         assert set(skill_gate.LOADABLE_SKILLS) <= skill_gate.ALL_FAMILY_SLUGS
-        assert len(skill_gate.LOADABLE_SKILLS) == 7
+        assert len(skill_gate.LOADABLE_SKILLS) == 8
 
 
 # ── apply_gate: the complete handler-side step ───────────────────────────────

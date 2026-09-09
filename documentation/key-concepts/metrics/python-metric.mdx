@@ -49,6 +49,7 @@ When writing your custom code, you have access to different variables depending 
 | <span title="ISO 8601 formatted timestamp">**timestamp**</span> | ✅ | ✅ |
 | <span title="Additional context metadata dictionary">**metadata**</span> | ✅ | ✅ |
 | <span title="Audio metadata and analysis results">**recording_data**</span> | ✅ | ✅ |
+| <span title="Provider execution logs as list of entries">**logs**</span> | ✅ | ✅ |
 | <span title="Results from evaluated metrics">**Metric Results**</span> | ✅ | ✅ |
 | <span title="Call topic/subject (Observability only)">**topic**</span> | ❌ | ✅ |
 | <span title="Average latency and detailed latency data">**Latency Metrics**</span> | ✅ | ✅ |
@@ -226,6 +227,32 @@ When writing your custom code, you have access to different variables depending 
       "main_speaking": [[1.32, 8.39], [21.45, 23.6], [36.62, 37.05]],
       "testing_speaking": [[0.33, 8.44], [9.35, 9.5], [19.43, 20.29]]
     }
+    ```
+  </Accordion>
+  <Accordion title="logs" href="#logs">
+    **Availability:** ✅ Simulation | ✅ Observability
+
+    Provider execution logs as a list of entry dicts. Only populated when execution logs were captured for the call or run.
+
+    Each entry has:
+    - `ts` — timestamp (ISO 8601, unix epoch, or seconds into the call)
+    - `level` — severity (`info`, `warn`, `error`, `debug`)
+    - `message` — what happened
+    - `logger` (optional) — the component that emitted the line
+    - `raw` (optional) — extra provider-specific detail
+
+    ```python
+    # Access execution logs
+    logs = data.get("logs", [])
+    # Example:
+    # [
+    #   {"ts": "00:05", "level": "info", "message": "Final transcript | provider=deepgram confidence=0.98"},
+    #   {"ts": "00:07", "level": "error", "message": "Tool call failed: get_order timed out after 5s",
+    #    "raw": {"tool": "get_order", "timeout_ms": 5000}}
+    # ]
+
+    # Check for tool-call failures
+    tool_errors = [e for e in logs if e.get("level") == "error" and "tool" in e.get("message", "").lower()]
     ```
   </Accordion>
 </AccordionGroup>
@@ -580,6 +607,11 @@ Here's the complete structure of data available to your custom Python code:
   "dynamic_variables": {
     "customer_name": "John"
   },
+  "logs": [
+    {"ts": "00:05", "level": "info", "message": "Final transcript received"},
+    {"ts": "00:07", "level": "error", "message": "Tool call failed: get_order timed out after 5s",
+     "raw": {"tool": "get_order", "timeout_ms": 5000}}
+  ],
   "tags": ["priority", "billing_inquiry"],
 
   // ---------- Recording Data ----------

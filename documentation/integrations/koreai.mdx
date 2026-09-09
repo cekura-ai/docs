@@ -1,0 +1,131 @@
+---
+title: "Kore.ai Integration"
+sidebarTitle: "Kore.ai"
+icon: "phone"
+iconType: "regular"
+description: "Connect a Kore.ai Contact Center AI app to Cekura to run phone-based simulations and pull the Kore.ai conversation history and service-call logs into every result."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## Overview
+
+Cekura tests Kore.ai voice agents over the phone. Cekura dials the number attached to your Kore.ai flow, runs the scenario as a simulated caller, and then uses the Kore.ai public APIs to find that session and fetch its conversation history. The result shows the transcript as recorded by Kore.ai, with every service-node (integration) call the flow made shown inline as a function call.
+
+<Note>
+This guide covers **voice** testing over telephony. Kore.ai chat testing uses a separate Web Client API key under **Kore.ai Chat Settings** and is not covered here.
+</Note>
+
+## Prerequisites
+
+- A Kore.ai **Contact Center AI** app on the XO Platform, with the flow you want to test.
+- A phone number added to that app and attached to the flow.
+- An **API scope** mapping for the app (created below) that lets Cekura read sessions, chat history, and debug logs.
+
+## Set up Kore.ai
+
+<Steps>
+  <Step title="Create the app">
+    In the Kore.ai XO Platform, create a **Contact Center AI** app (or open the one that already contains your voice flow).
+  </Step>
+
+  <Step title="Attach a phone number to your flow">
+    Open [Telephony](https://platform.kore.ai/builder/app/telephony) for the app, add a phone number, and attach the flow you want to test. This is the number Cekura will dial.
+  </Step>
+
+  <Step title="Create an API scope mapping">
+    Open [Dev Tools → API Scopes](https://platform.kore.ai/builder/app/devtools/apiscope) and create a new mapping for the app. Set the JWT signing algorithm to **HS256** and enable these scopes:
+
+    | Scope | Why Cekura needs it |
+    |---|---|
+    | **App Sessions** | Find the Kore.ai session created by the test call. |
+    | **Chat History** | Read the messages of that session to build the transcript. |
+    | **Debug Logs** | Read the flow's service-node execution logs so integration calls appear in the result. |
+
+    Other signing algorithms are not supported. Cekura signs its requests with HS256 using the client secret from this mapping.
+  </Step>
+
+  <Step title="Copy the credentials">
+    From the mapping, copy the **Client ID** and **Client Secret**. Also copy the **App ID** of the app (it starts with `st-`; the Client ID starts with `cs-`). Store the secret before leaving the page.
+  </Step>
+</Steps>
+
+## Connect Kore.ai in Cekura
+
+<Steps>
+  <Step title="Select Kore.ai">
+    In Cekura, go to **Agents**, create an agent, and select **Kore.ai** as the provider. If you don't see it, click **More options** to expand the full provider list.
+
+    <img src="/images/koreai/select-provider.png" alt="Kore.ai selected in the Cekura provider grid" />
+  </Step>
+
+  <Step title="Enter the Kore.ai credentials">
+    Fill in the fields under **Integration Settings**:
+
+    | Field | Value |
+    |---|---|
+    | **Kore.ai Client Secret** | The Client Secret from the API scope mapping. Stored encrypted and never shown again. |
+    | **Kore.ai Client ID** | The Client ID from the API scope mapping (`cs-...`). |
+    | **Kore.ai Bot ID** | The **App ID** of your Contact Center AI app (`st-...`). |
+    | **Kore.ai Host** | Optional. Leave blank for the standard Kore.ai cloud. Only set it if your account runs on a dedicated or regional Kore.ai host, and enter the domain only (no `https://`). |
+
+    <img src="/images/koreai/integration-settings.png" alt="Kore.ai Client Secret, Client ID, Bot ID, and Host fields in Cekura Integration Settings" />
+  </Step>
+
+  <Step title="Add the phone number">
+    Under **Connections**, turn on **Telephony**, then enter the Kore.ai phone number attached to your flow under **Telephony Settings**. Leave **Inbound** on so Cekura dials your number.
+
+    <img src="/images/koreai/telephony-settings.png" alt="Telephony Settings with the Kore.ai phone number and Inbound enabled" />
+  </Step>
+
+  <Step title="Save the agent">
+    Save the agent. The secret field shows **Client Secret Configured** once it is stored; use **Update** to rotate it later.
+
+    <img src="/images/koreai/settings-configured.png" alt="Saved Kore.ai integration settings showing the stored client secret" />
+  </Step>
+</Steps>
+
+## Run a test
+
+Open an evaluator, click **Run**, and start the run using the **Telephony** connection. Cekura dials your Kore.ai number and plays the scenario as the caller.
+
+When the call ends, Cekura:
+
+1. Looks up the app's sessions that started within a short window around the time Cekura placed the call.
+2. Fetches the chat history of each candidate and confirms the match by comparing timing and conversation content, so parallel test calls to the same number are each paired with the right Kore.ai session.
+3. Fetches the debug logs for the matched session.
+4. Replaces its own transcript with the Kore.ai one and attaches the Kore.ai session ID to the result.
+
+In the result, Kore.ai bot turns are labeled **Main Agent** and caller turns are labeled **Testing Agent**. Each service-node call the flow made appears as a **Function Call** entry in the transcript, with the request and response details from the debug logs, so you can write metrics against what the flow actually did.
+
+<Note>
+If Cekura cannot find a matching session, the result keeps Cekura's own transcript of the call. See the troubleshooting section below.
+</Note>
+
+## Troubleshooting
+
+- **Authentication fails**: check that the API scope mapping uses **HS256**, and that the Client ID and Client Secret come from the same mapping. The Bot ID must be the App ID (`st-...`) of the app that owns the mapping.
+- **No Kore.ai transcript on the result**: make sure the mapping has the **App Sessions** and **Chat History** scopes, and that the number under **Telephony Settings** is the one attached to the flow you tested.
+- **Transcript present but no Function Call entries**: add the **Debug Logs** scope to the mapping. Without it Cekura still imports the conversation but cannot see the flow's service-node calls.
+- **Host errors**: if you set **Kore.ai Host**, enter only the domain, for example `platform.kore.ai`.
+
+## Configure through the API
+
+When creating or updating an agent through the [API](/api-reference/test_framework/create-agent), set the provider to `koreai` and pass the credentials:
+
+```json
+{
+  "assistant_provider": "koreai",
+  "transcript_provider": "koreai",
+  "koreai_client_secret": "<client-secret>",
+  "koreai_data": {
+    "client_id": "cs-...",
+    "bot_id": "st-..."
+  },
+  "contact_number": "+15551234567"
+}
+```
+
+Add `"host"` to `koreai_data` only if your account runs on a dedicated Kore.ai host. The response never returns the secret. Use the read-only `koreai_client_secret_configured` field to check whether one is stored.

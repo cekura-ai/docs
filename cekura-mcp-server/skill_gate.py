@@ -77,6 +77,19 @@ _FAMILIES = (
         write_hint="scenario / test-profile write calls (`scenarios_*`, `test_profiles_*`)",
     ),
     _family(
+        "personality-design",
+        write_tools={
+            "personalities_create",
+            "personalities_partial_update",
+        },
+        skill_slugs={
+            "cekura-personality-design",
+        },
+        command_slugs=set(),
+        load_hint='cekura_load_skill(skill_name="cekura-personality-design")',
+        write_hint="personality write calls (`personalities_create`, `personalities_partial_update`)",
+    ),
+    _family(
         "metric-design",
         write_tools={
             "metrics_create",

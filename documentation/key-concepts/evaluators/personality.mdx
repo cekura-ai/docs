@@ -15,6 +15,23 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 A personality defines how your evaluator behaves during conversations with your AI agent. It determines the language, tone, and behavioral characteristics of the testing agent, allowing you to simulate diverse real-world user interactions.
 
+### Personality vs. evaluator
+
+The two answer different questions, and mixing them up is the most common source of tests that quietly do not test what you meant:
+
+| | Personality | Evaluator |
+|---|---|---|
+| Answers | Who is calling, and how do they sound? | What are they trying to get done? |
+| Applies | As the call is placed | Turn by turn during the call |
+| Owns | Voice and accent, language, speaking speed, interruption timing, idle timing, background noise, volume, network conditions | The objective, the caller's turns, the expected outcome, the attached metrics |
+| Reused across | Many evaluators | Many runs |
+
+<Warning>
+**Evaluator instructions cannot override a personality setting.** "Speak with a strong accent", "interrupt constantly", "talk very quietly" and "stay silent for 30 seconds" have no effect when written into instructions — the call runs and the result comes back, but the behavior never happened. Anything that lasts the whole call belongs on the personality.
+</Warning>
+
+The rule of thumb is duration. A trait that colours every turn (an accent, a speaking pace, ambient noise, a poor connection) is a personality. A single moment ("gets frustrated at step 4", one interruption) belongs in the evaluator's instructions.
+
 ## Why Use Different Personalities?
 
 Testing your AI agent against different personalities helps you:
@@ -27,7 +44,11 @@ Testing your AI agent against different personalities helps you:
 
 ### Language
 
-The primary language in which the evaluator will communicate with your agent. This ensures your AI agent is tested in the languages it's designed to support.
+The primary language in which the evaluator will communicate with your agent. This ensures your AI agent is tested in the languages it's designed to support. Choose it first — personalities are language-specific, and an evaluator's `scenario_language` must match its personality's language.
+
+### Voice (and therefore accent)
+
+The voice is what the caller actually sounds like, and it is where the accent comes from. The `accent` shown on a personality is a **read-only label derived from its voice**, not a setting: speech is synthesised from the voice ID alone, so testing a different accent means choosing a different voice. Browse the catalog with `GET /test_framework/v1/personalities/elevenlabs_voices/` (which publishes an accent label per voice) or `GET /test_framework/v1/personalities/cartesia_voices/`, then set that id on the personality.
 
 ### Behavioral Characteristics
 
@@ -54,7 +75,7 @@ For a pause in one specific step rather than call-wide, use a `<hold>` tag in a 
 | Normal Male | Calm, clear speech, no interruptions | Baseline testing |
 | Interrupter | Interruptions, urgent tone, fast pace | Interruption testing |
 | Normal Male - Bg Noise | Street noise, café ambiance | Real-world environment testing |
-| Slow Speaker | Slower pace, accent variations | Interruption testing |
+| Slow Speaker | Slower pace | Comprehension and patience testing |
 | Spanglish | Multilingual Personality | Language capability testing |
 
 ## Assigning Personalities to Evaluators
@@ -82,7 +103,7 @@ For comprehensive testing, consider creating evaluators with:
 
 - 60% standard, clear communication
 - 20% challenging conditions (background noise, interruptions)
-- 10% non-native speakers or accent variations
+- 10% non-native speakers or accent variations (a personality per accent — see [Accent Testing](/documentation/guides/testing-agents/accent-testing))
 - 10% edge cases (frustrated users, very fast/slow speakers)
 
 This distribution mirrors real-world user demographics while ensuring thorough testing coverage.

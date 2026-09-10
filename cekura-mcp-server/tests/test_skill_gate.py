@@ -51,8 +51,8 @@ JSON_ARRAY_BODY = {"content": {"application/json": {"schema": {"type": "array", 
 # ── family / tool table ──────────────────────────────────────────────────────
 
 class TestFamilyTable:
-    def test_exactly_twelve_gated_tools(self):
-        assert len(skill_gate.GATED_TOOLS) == 12
+    def test_exactly_thirteen_gated_tools(self):
+        assert len(skill_gate.GATED_TOOLS) == 13
 
     def test_every_gated_tool_maps_to_a_family(self):
         for tool in skill_gate.GATED_TOOLS:
@@ -80,7 +80,6 @@ class TestFamilyTable:
     def test_generation_and_read_tools_are_not_gated(self):
         for tool in (
             "metrics_generate",
-            "scenarios_generate_bg",
             "scenarios_agent_create",
             "metric_failure_mode_insights_generate_scenario_create",
             "predefined_metrics_copy_create",
@@ -88,6 +87,21 @@ class TestFamilyTable:
             "metrics_retrieve",
         ):
             assert tool not in skill_gate.GATED_TOOLS
+
+    def test_duplication_is_gated_with_the_authoring_family(self):
+        """Copying evaluators is a decision the design playbook governs, and
+        the conversions that follow it are where the defects land."""
+        assert "scenarios_duplicate_create" in skill_gate.GATED_TOOLS
+        assert skill_gate._family_for_tool("scenarios_duplicate_create")["name"] == (
+            "eval-design"
+        )
+
+    def test_scenario_generation_is_not_gated_here_yet(self):
+        """Not an oversight: the product-chat runtime gates generation, and
+        gating it here would stop the onboarding and report playbooks, which
+        call it directly and carry no eval-design tag. Delete this test when
+        they do."""
+        assert "scenarios_generate_bg" not in skill_gate.GATED_TOOLS
 
 
 # ── decision by mode ─────────────────────────────────────────────────────────
@@ -193,6 +207,15 @@ class TestEvaluate:
 
     def test_sandbox_bypass(self):
         d = skill_gate.evaluate("scenarios_create", None, "enforce", is_sandbox=True)
+        assert d.action == "allow" and d.reason == "sandbox_bypass"
+
+    def test_sandbox_bypass_covers_duplication_too(self):
+        """The bypass is total by design: inside Product Chat the runtime's own
+        gate is the authoritative one, and it binds activation to the current
+        turn, which this server cannot see."""
+        d = skill_gate.evaluate(
+            "scenarios_duplicate_create", None, "enforce", is_sandbox=True
+        )
         assert d.action == "allow" and d.reason == "sandbox_bypass"
 
     def test_does_not_raise_on_odd_input(self):

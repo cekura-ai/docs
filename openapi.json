@@ -2568,6 +2568,124 @@
                 "description": "Enums"
             }
         },
+        "/github/agent-scan/": {
+            "post": {
+                "operationId": "github-agent-scan-create",
+                "description": "POST — start a discovery scan across the org's connected repositories.",
+                "tags": [
+                    "github"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/github/agent-scan/{scan_id}/": {
+            "get": {
+                "operationId": "github-agent-scan-retrieve",
+                "description": "GET — poll one scan's status, stage progress and result.\n\n``status`` always reaches a terminal value, so the client poll has a\nprovable stop condition.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "scan_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "github"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/github/agent-scan/{scan_id}/extract/": {
+            "post": {
+                "operationId": "github-agent-scan-extract-create",
+                "description": "POST — extract the config of one candidate from a completed scan.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "scan_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "github"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/github/agent-scan/sdk-pr/": {
+            "get": {
+                "operationId": "github-agent-scan-sdk-pr-retrieve",
+                "description": "POST — open the SDK pull request. GET — find it again by agent id.\n\nThe GET is what makes the client's lost state irrelevant. Creating the agent\nnavigates the browser to the next onboarding step, which unmounts everything\nthat knew about the scan, so the banner there looks the row up by the agent\nid it already has rather than carrying anything across.\n\nNo ``_assert_org_admin``, deliberately, matching the rest of ``_RepoScanView``.\nThe person doing onboarding is an engineer, not necessarily the billing\nadmin, and a 403 here would land *after* the agent was created — a promise\nalready made on the review card and no way for them to act on it. The write\nis bounded instead: PR-only onto a fresh ``cekura/*`` branch, one repo, a JIT\ntoken, and the per-agent uniqueness constraint plus the rate limit below.",
+                "tags": [
+                    "github"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            },
+            "post": {
+                "operationId": "github-agent-scan-sdk-pr-create",
+                "description": "POST — open the SDK pull request. GET — find it again by agent id.\n\nThe GET is what makes the client's lost state irrelevant. Creating the agent\nnavigates the browser to the next onboarding step, which unmounts everything\nthat knew about the scan, so the banner there looks the row up by the agent\nid it already has rather than carrying anything across.\n\nNo ``_assert_org_admin``, deliberately, matching the rest of ``_RepoScanView``.\nThe person doing onboarding is an engineer, not necessarily the billing\nadmin, and a 403 here would land *after* the agent was created — a promise\nalready made on the review card and no way for them to act on it. The write\nis bounded instead: PR-only onto a fresh ``cekura/*`` branch, one repo, a JIT\ntoken, and the per-agent uniqueness constraint plus the rate limit below.",
+                "tags": [
+                    "github"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/github/checkout-token/": {
             "post": {
                 "operationId": "github-checkout-token-create",
@@ -3330,6 +3448,119 @@
                         "multipart/form-data": {
                             "schema": {
                                 "$ref": "#/components/schemas/AgentImprovementPromoteRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/agent-improvement-sessions/{id}/regression-suite/": {
+            "get": {
+                "operationId": "agent-improvement-sessions-regression-suite-retrieve",
+                "description": "The suite for this session, and the state of any batch it started.\n\nThe suite is derived live, because the folder is editable between runs;\nthe run state is derived from the stored batch, so it survives the\ncustomer leaving the page. Poll while `run.status` is \"running\".",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this agent improvement session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AgentImprovementSession"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/observability/v1/agent-improvement-sessions/{id}/run-regression-suite/": {
+            "post": {
+                "operationId": "agent-improvement-sessions-run-regression-suite-create",
+                "description": "Re-run the project's regression suite against this session's agent.\n\nThe suite is what the customer filed in the reserved Regression Suite\nfolder for the agent this run targeted — the checks they want repeated\nafter every change, not the scenarios this run was asked to fix. It runs\non the transport the session was measured on, against the run's private\ncopy while that exists and the live agent once it does not.\n\nReturns the same shape as `regression-suite`, so the caller can render\nthe started batch without a second request. Every refusal comes back as\na 409 with a stable ``code``, like `promote`.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "A unique integer value identifying this agent improvement session.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AgentImprovementSession"
                             }
                         }
                     }
@@ -31560,6 +31791,27 @@
                     },
                     {
                         "in": "query",
+                        "name": "scenario_name",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_name__icontains",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_name__in",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
                         "name": "created_at_range",
                         "schema": {
                             "type": "string"
@@ -31947,6 +32199,27 @@
                     {
                         "in": "query",
                         "name": "call_ended_reason__in",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_name",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_name__icontains",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_name__in",
                         "schema": {
                             "type": "string"
                         }
@@ -49327,7 +49600,7 @@
             },
             "post": {
                 "operationId": "aiagents-create",
-                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed to dial; connect Webex Contact Center from the dashboard for transcripts\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
+                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed to dial; connect Webex Contact Center from the dashboard for transcripts\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow/bland) with `provider.agent_id` + `provider.credentials.api_key` (omit the key to use the project's saved provider key; list importable ids with `GET /v2/aiagents/provider-assistants/`). An assistant already imported into the project is refused with **409**. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "test_framework"
@@ -49681,7 +49954,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "aiagents-create",
-                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed to dial; connect Webex Contact Center from the dashboard for transcripts\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow) with `provider.agent_id` + `provider.credentials.api_key`. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
+                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed to dial; connect Webex Contact Center from the dashboard for transcripts\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow/bland) with `provider.agent_id` + `provider.credentials.api_key` (omit the key to use the project's saved provider key; list importable ids with `GET /v2/aiagents/provider-assistants/`). An assistant already imported into the project is refused with **409**. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
                     }
                 }
             }
@@ -51065,6 +51338,68 @@
                     }
                 },
                 "x-docs-exclude": true
+            }
+        },
+        "/test_framework/v2/aiagents/provider-assistants/": {
+            "get": {
+                "operationId": "aiagents-provider-assistants-retrieve",
+                "description": "List every assistant/agent the project's saved provider API key can see on a cloud provider (vapi, retell, elevenlabs, synthflow, bland), flagging those already imported into the project. Import one with `POST /v2/aiagents/` + `provider.configure_from_provider`; when `provider.credentials.api_key` is omitted there, the same saved key is used.",
+                "summary": "List assistants on a connected provider account",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "provider",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "One of: vapi, retell, elevenlabs, synthflow, bland.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProviderAssistantListResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProviderAssistantListErrorResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
             }
         },
         "/test_framework/v2/aiagents/runs_overview_project/": {
@@ -55946,6 +56281,27 @@
                     {
                         "in": "query",
                         "name": "call_ended_reason__in",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_name",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_name__icontains",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_name__in",
                         "schema": {
                             "type": "string"
                         }
@@ -72691,15 +73047,24 @@
                             "pipecat",
                             "livekit",
                             "elevenlabs",
+                            "bland",
                             "none-mono"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "cf3e002831f464f4",
+                        "x-spec-enum-id": "5bd44c2413a0d481",
                         "writeOnly": true,
-                        "description": "Format of the `transcript_json` payload. Tells Cekura how to parse roles and timestamps.\n\n- `vapi` — Vapi webhook format: `[{\"role\": \"bot\"|\"user\", \"message\": \"...\", \"time\": 0.0}]`\n- `retell` — Retell webhook format\n- `elevenlabs` — ElevenLabs format\n- `livekit` — LiveKit format\n- `pipecat` — Pipecat format\n- `deepgram` — Deepgram format\n- `cekura` (default) — `[{\"role\": \"Testing Agent\"|\"Main Agent\", \"content\": \"...\", \"start_time\": 0.0, \"end_time\": 2.5}]`. **Valid roles are `\"Testing Agent\"` and `\"Main Agent\"` only** — using `\"agent\"` or `\"user\"` will return a validation error.\n- `none-mono` — mono audio with no transcript; Cekura generates the transcript automatically.\n\nOmit this field to use the default Cekura format.\n\n* `cekura` - cekura\n* `vocera` - vocera\n* `vapi` - vapi\n* `retell` - retell\n* `deepgram` - deepgram\n* `pipecat` - pipecat\n* `livekit` - livekit\n* `elevenlabs` - elevenlabs\n* `none-mono` - none-mono"
+                        "description": "Format of the `transcript_json` payload. Tells Cekura how to parse roles and timestamps.\n\n- `vapi` — Vapi webhook format: `[{\"role\": \"bot\"|\"user\", \"message\": \"...\", \"time\": 0.0}]`\n- `retell` — Retell webhook format\n- `elevenlabs` — ElevenLabs format\n- `bland` — Bland call-detail format, or its `transcripts` array\n- `livekit` — LiveKit format\n- `pipecat` — Pipecat format\n- `deepgram` — Deepgram format\n- `cekura` (default) — `[{\"role\": \"Testing Agent\"|\"Main Agent\", \"content\": \"...\", \"start_time\": 0.0, \"end_time\": 2.5}]`. **Valid roles are `\"Testing Agent\"` and `\"Main Agent\"` only** — using `\"agent\"` or `\"user\"` will return a validation error.\n- `none-mono` — mono audio with no transcript; Cekura generates the transcript automatically.\n\nOmit this field to use the default Cekura format.\n\n* `cekura` - cekura\n* `vocera` - vocera\n* `vapi` - vapi\n* `retell` - retell\n* `deepgram` - deepgram\n* `pipecat` - pipecat\n* `livekit` - livekit\n* `elevenlabs` - elevenlabs\n* `bland` - bland\n* `none-mono` - none-mono"
                     },
                     "transcript_json": {
                         "description": "\nCall transcript in supported format (Vapi, Retell, Deepgram, ElevenLabs, Cekura)\n\nCheck the [Transcript Format](/documentation/advanced/transcript-format) documentation for more details.\n\nCekura Transcript Format Example:\n```json\n[\n   {\n      \"role\": \"Testing Agent\",\n      \"content\": \"Hello.\",\n      \"end_time\": 1.9399999,\n      \"start_time\": 1.4399999\n   },\n   {\n      \"role\": \"Main Agent\",\n      \"content\": \"Hello. I want to book appointment today. My name is John.\",\n      \"end_time\": 7.539999511718751,\n      \"start_time\": 3.1\n   },\n   {\n      \"role\": \"Testing Agent\",\n      \"content\": \"Well, I mean, sure. What time exactly are we talking about here\",\n      \"end_time\": 15.71,\n      \"start_time\": 12.01\n   },\n   {\n      \"role\": \"Main Agent\",\n      \"content\": \"6 PM.\",\n      \"end_time\": 18.269999,\n      \"start_time\": 17.609999\n   }\n]\n```\n"
+                    },
+                    "reconcile_with_cekura_transcript": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "writeOnly": true,
+                        "description": "Per-request override of the project's `reconcile_transcripts_with_cekura` setting. Omit (or send null) to use the project setting. `true` requires both a recording and a provider transcript: for dual-channel audio Cekura transcribes the recording and publishes its speaker-exact transcript (keeping the provider's tool and system events) before metrics run; mono audio and transcription failures keep the provider transcript. `false` keeps the provider transcript even when the project setting is on. Billed per minute of audio at the reconciliation rate whenever a Cekura transcript is published."
                     },
                     "call_ended_reason": {
                         "type": [
@@ -81579,6 +81944,10 @@
                         "type": "boolean",
                         "description": "When true, evaluations use the provider transcript instead of Cekura transcript with provider side tool calls. Defaults to false."
                     },
+                    "reconcile_transcripts_with_cekura": {
+                        "type": "boolean",
+                        "description": "When true, observability calls that arrive with both a recording and a provider transcript are transcribed by Cekura, and for dual-channel audio the Cekura transcript is published before metrics run (provider tool and system events are kept). Mono audio and transcription failures keep the provider transcript. Billed per minute of audio at the reconciliation rate whenever a Cekura transcript is published. The create-CallLog API field `reconcile_with_cekura_transcript` overrides this per request. Defaults to false."
+                    },
                     "should_show_powered_by": {
                         "type": "boolean",
                         "description": "\nShould show powered by\nExample: `true` or `false`\n"
@@ -81739,6 +82108,15 @@
                         "description": "\nElevenLabs API key\nExample: `\"elevenlabs_api_key_123\"`\n"
                     },
                     "elevenlabs_api_key_configured": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "bland_api_key": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nBland API key\nExample: `\"bland_api_key_123\"`\n"
+                    },
+                    "bland_api_key_configured": {
                         "type": "string",
                         "readOnly": true
                     },
@@ -85355,6 +85733,10 @@
                         "type": "boolean",
                         "description": "When true, evaluations use the provider transcript instead of Cekura transcript with provider side tool calls. Defaults to false."
                     },
+                    "reconcile_transcripts_with_cekura": {
+                        "type": "boolean",
+                        "description": "When true, observability calls that arrive with both a recording and a provider transcript are transcribed by Cekura, and for dual-channel audio the Cekura transcript is published before metrics run (provider tool and system events are kept). Mono audio and transcription failures keep the provider transcript. Billed per minute of audio at the reconciliation rate whenever a Cekura transcript is published. The create-CallLog API field `reconcile_with_cekura_transcript` overrides this per request. Defaults to false."
+                    },
                     "should_show_powered_by": {
                         "type": "boolean",
                         "description": "\nShould show powered by\nExample: `true` or `false`\n"
@@ -85518,6 +85900,15 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "bland_api_key": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nBland API key\nExample: `\"bland_api_key_123\"`\n"
+                    },
+                    "bland_api_key_configured": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "livekit_api_key": {
                         "type": "string",
                         "writeOnly": true,
@@ -85586,6 +85977,96 @@
                 },
                 "required": [
                     "name"
+                ]
+            },
+            "ProviderAssistantListErrorResponse": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "detail"
+                ]
+            },
+            "ProviderAssistantListItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "channel": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "already_imported": {
+                        "type": "boolean"
+                    },
+                    "imported_agent_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "imported_agent_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "already_imported",
+                    "channel",
+                    "id",
+                    "imported_agent_id",
+                    "imported_agent_name",
+                    "kind",
+                    "name",
+                    "updated_at"
+                ]
+            },
+            "ProviderAssistantListResponse": {
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "integer"
+                    },
+                    "assistants": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProviderAssistantListItem"
+                        }
+                    }
+                },
+                "required": [
+                    "assistants",
+                    "count",
+                    "provider"
                 ]
             },
             "ProviderCredentialDetail": {
@@ -87618,6 +88099,21 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "Human-readable path with case preservation"
+                    },
+                    "is_deletable": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Whether this folder can be deleted"
+                    },
+                    "is_renamable": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Whether this folder can be renamed or moved"
+                    },
+                    "is_regression_suite": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Whether this is the project's regression suite folder"
                     },
                     "created_at": {
                         "type": "string",

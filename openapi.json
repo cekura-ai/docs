@@ -3090,6 +3090,26 @@
                 "x-docs-exclude": true
             }
         },
+        "/github/connection/refresh/": {
+            "post": {
+                "operationId": "github-connection-refresh-create",
+                "description": "POST — re-read this org's repository list from GitHub, authoritatively.\n\nThe connection GET answers from a cached list. That cache is only as fresh\nas the last webhook, and a webhook that never arrived — a rotated secret, a\ndelivery GitHub gave up on — leaves it stale indefinitely, showing\nrepositories the installation no longer grants. This is the button that\nsettles it: a fresh installation token, every page of GitHub's list, and the\nsaved row replaced with the answer.\n\nWhat it deliberately does not do: change anything on GitHub, reconnect an\ninactive installation, reactivate a suspended or deleted one, or start a\nscan. It only edits Cekura's copy of what GitHub already says, which is why\na member who can see the connection may press it while connect and\ndisconnect stay org-admin.",
+                "tags": [
+                    "github"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/github/install-url/": {
             "get": {
                 "operationId": "github-install-url-retrieve",
@@ -3183,7 +3203,7 @@
         "/github/webhook/": {
             "post": {
                 "operationId": "github-webhook-create",
-                "description": "GitHub App webhook. No auth class — the HMAC signature is the gate.",
+                "description": "GitHub App webhook. No auth class — the HMAC signature is the gate.\n\nTwo rules shape everything below, and they follow from one fact: **GitHub\ndoes not redeliver a webhook it saw fail.** A delivery we answer 2xx to is\ngone, redeliverable only by hand from the App's settings page.\n\n1. *Acknowledge last.* A delivery is recorded as processed only once its\n   state change is complete or its work has been durably accepted by the\n   broker. The old order — record, then handle, then return 200 whatever\n   happened — meant a handler that threw produced a delivery GitHub\n   considered delivered, us considered processed, and nobody had acted on.\n2. *Fail visibly.* A broker or handler failure answers non-2xx, so the\n   delivery shows as failed in GitHub's log and can be redelivered from\n   there. The inherited comment here warned about a retry storm; that risk\n   belongs to providers that retry automatically, and this one does not.\n\nDuplicates stay safe because the work is idempotent, not because the\nidempotency key is checked first: a lifecycle update is a set, and a\nrepository sync replaces the whole list under a compare-and-swap.",
                 "tags": [
                     "github"
                 ],
@@ -35280,15 +35300,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_list",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-list",
-                        "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_list"
             },
             "post": {
                 "operationId": "scenarios-create_2",
@@ -35419,15 +35431,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_create",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-create",
-                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Prefer generation for instruction scenarios:** `scenarios_generate_bg` grounds them in the agent's description, knowledge base and mock tools, and auto-attaches a test profile and the project's metrics — even for a single scenario (`num_scenarios: 1`, with the case described in `extra_instructions`). Use this create tool for `conditional_actions` scenarios whose structure is exactly known, or to save instruction text the user supplied verbatim — not to hand-write behavioral instructions a generation call could produce.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` — plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call. Prefer `scenarios_generate_bg` for these (see above).\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `expected_outcome_prompt` — what a passing call looks like, graded statement by statement after each run. It is evaluated ONLY when the project's Expected Outcome metric is attached to the scenario, so attach that metric every time you set this field.\n- `metrics` — list of metric IDs to evaluate after each run. A scenario created here starts with NO metrics attached (unlike generated ones): always attach the project's baseline set, including the Expected Outcome metric.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_create"
             }
         },
         "/test_framework/v1/scenarios-external/": {
@@ -42006,6 +42010,70 @@
                 }
             }
         },
+        "/test_framework/v1/scenarios-external/validate_scenarios_json/": {
+            "post": {
+                "operationId": "scenarios-validate-json",
+                "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one.",
+                "summary": "Validate a JSON test-suite spec without running it",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{dry_run, valid, plan}"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-tool-name": "scenarios_validate_json"
+            }
+        },
         "/test_framework/v1/scenarios/{id}/": {
             "get": {
                 "operationId": "scenarios-retrieve_2",
@@ -42063,18 +42131,10 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_retrieve",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-retrieve",
-                        "description": "Fetch a single evaluator by id. Returns full configuration including instructions, expected outcome, metrics, test profile, and — when the agent has mock tools attached and the scenario was auto-generated — the expected mock tool calls (`generated_mock_tool_entries`) with their inputs and outputs."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_retrieve"
             },
             "put": {
-                "operationId": "scenarios-update",
+                "operationId": "scenarios-v1-update",
                 "description": "Update a test scenario",
                 "parameters": [
                     {
@@ -42221,15 +42281,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_partial_update",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-partial-update",
-                        "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**If you set or edit `expected_outcome_prompt`:** it is evaluated only when the project's Expected Outcome metric is attached to the scenario — check its `metrics` and attach that metric if missing.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_partial_update"
             },
             "delete": {
                 "operationId": "scenarios-destroy_2",
@@ -42280,21 +42332,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_destroy",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-destroy",
-                        "description": "⚠ Irreversible. Deletes the evaluator. Past runs remain in the result history but become orphaned in the UI."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_destroy"
             }
         },
         "/test_framework/v1/scenarios/{id}/condition-audio/": {
             "get": {
-                "operationId": "scenarios-condition-audio-list",
-                "description": "Scenarios condition audio",
+                "operationId": "scenarios-v1-condition-audio-list",
+                "description": "Scenarios v1 condition audio",
                 "parameters": [
                     {
                         "in": "path",
@@ -42352,7 +42396,7 @@
                 }
             },
             "post": {
-                "operationId": "scenarios-condition-audio-create",
+                "operationId": "scenarios-v1-condition-audio-create",
                 "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of fixed-message actions; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
@@ -42461,7 +42505,7 @@
         },
         "/test_framework/v1/scenarios/{id}/condition-audio/{audio_id}/": {
             "put": {
-                "operationId": "scenarios-condition-audio-update",
+                "operationId": "scenarios-v1-condition-audio-update",
                 "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
                 "parameters": [
                     {
@@ -42582,7 +42626,7 @@
                 }
             },
             "delete": {
-                "operationId": "scenarios-condition-audio-destroy",
+                "operationId": "scenarios-v1-condition-audio-destroy",
                 "description": "Delete a Delete an audio clip and remove every `<audio>` reference to it from this scenario's conditional actions. Returns 409 without deleting anything if",
                 "parameters": [
                     {
@@ -42671,8 +42715,8 @@
         },
         "/test_framework/v1/scenarios/{id}/edit/": {
             "post": {
-                "operationId": "scenarios-edit-create",
-                "description": "Scenarios edit",
+                "operationId": "scenarios-v1-edit-create",
+                "description": "Scenarios v1 edit",
                 "parameters": [
                     {
                         "in": "path",
@@ -42734,8 +42778,8 @@
         },
         "/test_framework/v1/scenarios/{id}/history/": {
             "get": {
-                "operationId": "scenarios-history-list",
-                "description": "Scenarios history",
+                "operationId": "scenarios-v1-history-list",
+                "description": "Scenarios v1 history",
                 "parameters": [
                     {
                         "in": "path",
@@ -42791,8 +42835,8 @@
         },
         "/test_framework/v1/scenarios/{id}/history/edit/": {
             "patch": {
-                "operationId": "scenarios-history-edit-partial-update",
-                "description": "Scenarios history edit",
+                "operationId": "scenarios-v1-history-edit-partial-update",
+                "description": "Scenarios v1 history edit",
                 "parameters": [
                     {
                         "in": "path",
@@ -42853,8 +42897,8 @@
         },
         "/test_framework/v1/scenarios/{id}/restore/": {
             "post": {
-                "operationId": "scenarios-restore-create",
-                "description": "Scenarios restore",
+                "operationId": "scenarios-v1-restore-create",
+                "description": "Scenarios v1 restore",
                 "parameters": [
                     {
                         "in": "path",
@@ -42916,7 +42960,7 @@
         },
         "/test_framework/v1/scenarios/{id}/transcript_embeddings/": {
             "get": {
-                "operationId": "scenarios-transcript-embeddings-retrieve",
+                "operationId": "scenarios-v1-transcript-embeddings-retrieve",
                 "description": "Fetches the pre-calculated transcript embeddings for a specific scenario.\nCalled by Pipecat service.\nIncludes audio sample metadata if available.\nApplies test_profile variable substitution to transcript messages.",
                 "parameters": [
                     {
@@ -42953,7 +42997,7 @@
         },
         "/test_framework/v1/scenarios/{id}/update_conditional_actions/": {
             "post": {
-                "operationId": "scenarios-update-conditional-actions-create",
+                "operationId": "scenarios-v1-update-conditional-actions-create",
                 "description": "DEPRECATED: Use PATCH /v1/scenarios/{id}/ with conditional_actions field instead.\n\nThis endpoint is deprecated and will be removed in a future version.\nPlease use the standard scenario update endpoint (PATCH /v1/scenarios/{id}/)\nwith the 'conditional_actions' field in the request body.\n\nExample:\nPATCH /v1/scenarios/{id}/\n{\n    \"conditional_actions\": {\n        \"role\": \"optional role description\",\n        \"conditions\": [...]\n    }\n}\n\n---\n\nUpdate a scenario with conditional actions data.\nTakes conditional actions in JSON format and saves it to the scenario's instructions field.\n\nURL parameter:\n    - pk: ID of the scenario to update (from URL)\n\nRequest body:\n    - conditional_actions: Object with format:\n        {\n            \"role\": \"optional role description\",\n            \"conditions\": [\n                {\n                    \"condition\": \"when text\",\n                    \"action\": \"action text\",\n                    \"type\": \"standard\" or \"fixed_message\" (optional, defaults to \"standard\")\n                },\n                ...\n            ]\n        }\n\nReturns:\n    - Success message\n\nUpdates:\n    - instructions: JSON string of conditional actions data",
                 "parameters": [
                     {
@@ -43075,22 +43119,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_update_scenario_with_transcript_create",
-                "summary": "Update a scenario from a transcript",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-update-scenario-with-transcript-create",
-                        "description": "Update a scenario with transcript-based simulation data.\nTakes a transcript in JSON format and processes it for simulation testing,\nsaving the processed data to the specified scenario including embeddings and\nformatted simulation description.\n\nURL parameter:\n    - pk: ID of the scenario to update (from URL)\n\nRequest body:\n    - transcript_json: List of transcript message objects with format:\n        [\n            {\"role\": \"Main Agent\", \"content\": \"Hello\"},\n            {\"role\": \"Testing Agent\", \"content\": \"Hi\"},\n            ...\n        ]\n\nReturns:\n    - Scenario data with updated transcript simulation data\n\nUpdates:\n    - transcript_embeddings: Embeddings for Main Agent responses\n    - simulation_description: Formatted transcript description"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_update_scenario_with_transcript_create"
             }
         },
         "/test_framework/v1/scenarios/add_infrastructure_suite/": {
             "post": {
-                "operationId": "scenarios-add-infrastructure-suite-create",
-                "description": "Scenarios add infrastructure suite",
+                "operationId": "scenarios-v1-add-infrastructure-suite-create",
+                "description": "Scenarios v1 add infrastructure suite",
                 "tags": [
                     "test_framework"
                 ],
@@ -43141,8 +43176,8 @@
         },
         "/test_framework/v1/scenarios/add_tags/": {
             "post": {
-                "operationId": "scenarios-add-tags-create",
-                "description": "Scenarios add tags",
+                "operationId": "scenarios-v1-add-tags-create",
+                "description": "Scenarios v1 add tags",
                 "tags": [
                     "test_framework"
                 ],
@@ -43289,21 +43324,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_bulk_update",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-bulk-update",
-                        "description": "Update many evaluators in a single call. Useful for attaching/detaching metrics, switching personality, appending instructions, or moving a batch between folders.\n\n**Non-idempotent fields:** `append_instruction` concatenates — calling twice with the same string adds it twice. `metric_ids_to_add`/`metric_ids_to_remove` and `tool_ids_to_add`/`tool_ids_to_remove` are set-mutating and shouldn't be replayed blindly.\n\n**Affects every ID in `scenarios`.** For modifying a single evaluator, prefer `scenarios_partial_update`. Confirm the `scenarios` list with the user before calling — the change is applied across the whole list in one transaction.\n\n**Required:** `scenarios` (list of evaluator IDs). One of `agent` or `project` is also required to scope the permission check. All other fields are optional and are applied only when present."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_bulk_update"
             }
         },
         "/test_framework/v1/scenarios/cancel-agent/": {
             "post": {
-                "operationId": "scenarios-cancel-agent-create",
-                "description": "Scenarios cancel agent",
+                "operationId": "scenarios-v1-cancel-agent-create",
+                "description": "Scenarios v1 cancel agent",
                 "tags": [
                     "test_framework"
                 ],
@@ -43456,22 +43483,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_create_from_transcript_bg",
-                "summary": "Create a scenario from a transcript",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-create-from-transcript-bg",
-                        "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, Returns a `progress_id`immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_create_from_transcript_bg"
             }
         },
         "/test_framework/v1/scenarios/create-from-transcript-progress/": {
             "get": {
                 "operationId": "scenarios-create-from-transcript-progress_2",
-                "description": "Get scenario-from-transcript progress",
+                "description": "Scenarios create from transcript progress",
                 "parameters": [
                     {
                         "in": "query",
@@ -43552,22 +43570,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_create_from_transcript_progress",
-                "summary": "Get scenario-from-transcript progress",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-create-from-transcript-progress",
-                        "description": "Get scenario-from-transcript progress"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_create_from_transcript_progress"
             }
         },
         "/test_framework/v1/scenarios/create_folder/": {
             "post": {
                 "operationId": "scenarios-folder-create_2",
-                "description": "Create a scenario folder",
+                "description": "Scenarios folder",
                 "tags": [
                     "test_framework"
                 ],
@@ -43614,22 +43623,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_folder_create",
-                "summary": "Create a scenario folder",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-folder-create",
-                        "description": "Create a scenario folder"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_folder_create"
             }
         },
         "/test_framework/v1/scenarios/delete_folder/": {
             "post": {
                 "operationId": "scenarios-folder-delete_2",
-                "description": "Delete a scenario folder",
+                "description": "Scenarios folder delete",
                 "tags": [
                     "test_framework"
                 ],
@@ -43669,16 +43669,7 @@
                         "description": "No response body"
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_folder_delete",
-                "summary": "Delete a scenario folder",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-folder-delete",
-                        "description": "Delete a scenario folder"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_folder_delete"
             }
         },
         "/test_framework/v1/scenarios/delete_scenarios/": {
@@ -43756,15 +43747,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_bulk_delete",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-bulk-delete",
-                        "description": "⚠ Cannot be undone from the UI. Bulk-deletes the listed evaluators — they disappear from `scenarios_list` and from any future evaluator runs.\n\n**Always confirm the exact list of `scenarios` IDs with the user before calling.** For deleting a single evaluator prefer `scenarios_destroy`.\n\n**Required:** `scenarios` (list of evaluator IDs). One of `agent_id` or `project_id` is also required to scope the permission check."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_bulk_delete"
             }
         },
         "/test_framework/v1/scenarios/duplicate/": {
@@ -43871,15 +43854,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_duplicate_create",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-duplicate-create",
-                        "description": "Create copies of existing evaluators in this project or another project in the same organization. Use this instead of recreating evaluators with `scenarios_create`; same-project copies retain their metrics and test profiles, while cross-project copies use the destination project's predefined metrics. Set `copy_to_project` to the source project for a folder-only copy; `folder_path` is created when needed, and copied evaluators are named `Copy of <original name>`."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_duplicate_create"
             }
         },
         "/test_framework/v1/scenarios/export_scenarios/": {
@@ -43992,7 +43967,7 @@
         "/test_framework/v1/scenarios/folders/": {
             "get": {
                 "operationId": "scenarios-folders-list_2",
-                "description": "List scenario folders",
+                "description": "List scenario folders for a project",
                 "parameters": [
                     {
                         "name": "page",
@@ -44036,24 +44011,6 @@
                             "type": "string"
                         },
                         "description": "Search folders by name (case-insensitive)"
-                    },
-                    {
-                        "name": "agent_id",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
-                    },
-                    {
-                        "name": "assistant_id",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
                     }
                 ],
                 "tags": [
@@ -44082,16 +44039,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_folders_list",
-                "summary": "List scenario folders",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-folders-list",
-                        "description": "List scenario folders"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_folders_list"
             }
         },
         "/test_framework/v1/scenarios/generate-bg/": {
@@ -44167,16 +44115,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_generate_bg",
-                "summary": "Generate scenarios in background",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-generate-bg",
-                        "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- When the agent has mock tools attached, each generated scenario also gets `generated_mock_tool_entries` — the expected mock tool calls for that scenario, shaped `[{tool_id, tool_name, new_entry: {input, output}}]`. These are returned on scenario reads and can be edited later via `scenarios_partial_update`.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_generate_bg"
             }
         },
         "/test_framework/v1/scenarios/generate-clarify-answer/": {
@@ -44240,7 +44179,7 @@
         "/test_framework/v1/scenarios/generate-instructions/": {
             "post": {
                 "operationId": "scenarios-generate-instructions-create_2",
-                "description": "Generate scenario instructions",
+                "description": "Scenarios generate instructions",
                 "tags": [
                     "test_framework"
                 ],
@@ -44287,22 +44226,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_generate_instructions_create",
-                "summary": "Generate scenario instructions",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-generate-instructions-create",
-                        "description": "Generate scenario instructions"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_generate_instructions_create"
             }
         },
         "/test_framework/v1/scenarios/generate-progress/": {
             "get": {
                 "operationId": "scenarios-generate-progress_2",
-                "description": "Get scenario generation progress",
+                "description": "Scenarios generate progress",
                 "parameters": [
                     {
                         "in": "query",
@@ -44525,22 +44455,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_generate_progress",
-                "summary": "Get scenario generation progress",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-generate-progress",
-                        "description": "Get scenario generation progress"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_generate_progress"
             }
         },
         "/test_framework/v1/scenarios/has_infrastructure_suite/": {
             "get": {
-                "operationId": "scenarios-has-infrastructure-suite-retrieve",
-                "description": "Scenarios has infrastructure suite",
+                "operationId": "scenarios-v1-has-infrastructure-suite-retrieve",
+                "description": "Scenarios v1 has infrastructure suite",
                 "tags": [
                     "test_framework"
                 ],
@@ -44572,7 +44493,7 @@
         "/test_framework/v1/scenarios/improve_instructions/": {
             "post": {
                 "operationId": "scenarios-improve-instructions-create_2",
-                "description": "Improve scenario instructions",
+                "description": "Scenarios improve instructions",
                 "tags": [
                     "test_framework"
                 ],
@@ -44637,22 +44558,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_improve_instructions_create",
-                "summary": "Improve scenario instructions",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-improve-instructions-create",
-                        "description": "Improve scenario instructions"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_improve_instructions_create"
             }
         },
         "/test_framework/v1/scenarios/infrastructure_suite_preview/": {
             "get": {
-                "operationId": "scenarios-infrastructure-suite-preview-retrieve",
-                "description": "Scenarios infrastructure suite preview",
+                "operationId": "scenarios-v1-infrastructure-suite-preview-retrieve",
+                "description": "Scenarios v1 infrastructure suite preview",
                 "tags": [
                     "test_framework"
                 ],
@@ -44684,7 +44596,7 @@
         "/test_framework/v1/scenarios/instructions-progress/": {
             "get": {
                 "operationId": "scenarios-instructions-progress-retrieve_2",
-                "description": "Get scenario instructions progress",
+                "description": "Scenarios instructions progress",
                 "tags": [
                     "test_framework"
                 ],
@@ -44711,45 +44623,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_instructions_progress_retrieve",
-                "summary": "Get scenario instructions progress",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-instructions-progress-retrieve",
-                        "description": "Get scenario instructions progress"
-                    }
-                },
-                "parameters": [
-                    {
-                        "name": "agent_id",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
-                    },
-                    {
-                        "name": "project_id",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
-                    },
-                    {
-                        "name": "assistant_id",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        },
-                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
-                    }
-                ]
+                "x-mcp-tool-name": "scenarios_instructions_progress_retrieve"
             }
         },
         "/test_framework/v1/scenarios/json_schema/": {
@@ -44793,21 +44667,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_json_schema",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-json-schema",
-                        "description": "Fetch the JSON Schema for test-suite spec files"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_json_schema"
             }
         },
         "/test_framework/v1/scenarios/move_folder/": {
             "post": {
                 "operationId": "scenarios-folder-move_2",
-                "description": "Move a scenario folder",
+                "description": "Scenarios folder move",
                 "tags": [
                     "test_framework"
                 ],
@@ -44854,22 +44720,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_folder_move",
-                "summary": "Move a scenario folder",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-folder-move",
-                        "description": "Move a scenario folder"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_folder_move"
             }
         },
         "/test_framework/v1/scenarios/rename_folder/": {
             "post": {
                 "operationId": "scenarios-folder-rename_2",
-                "description": "Rename a scenario folder",
+                "description": "Scenarios folder rename",
                 "tags": [
                     "test_framework"
                 ],
@@ -44916,16 +44773,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_folder_rename",
-                "summary": "Rename a scenario folder",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-folder-rename",
-                        "description": "Rename a scenario folder"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_folder_rename"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios/": {
@@ -45232,15 +45080,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_voice",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-voice",
-                        "description": "VOICE RUN: Execute evaluators against your agent using a real voice / phone / SIP call. This is the primary 'run your evaluators' endpoint for voice-mode testing. Requires `telephony.phone_number` configured on the agent (any provider).\n\n**Run-count math:** total calls = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`. Each call is billed at the voice-simulation rate — check `frequency` carefully.\n\n**Concurrency:** use `concurrency_limit` to cap parallel calls. Default: unbounded (subject to provider rate limits).\n\n**Scenario selection (pick one):**\n- `scenarios` — list of integer evaluator IDs (e.g. `[101, 102]`)\n- `tags` — select by tag\n- `folder_path` — select by folder path (e.g. `\"Sales.Inbound\"`); requires `project_id`\n\n**Phone-number overrides:**\n- `outbound_phone_number` — override the number dialed\n- `agent_number` — override the contact number the inbound agent receives calls on\n- `mode` — `same_number` (all runs use one pair) vs `different_numbers`\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `run_scenarios_text` — text / SMS / chat mode; cheaper, no voice cost\n- `run_scenarios_with_websockets` — each scenario carries its own websocket URL\n- `run_scenarios_pipecat` — Pipecat/Daily.co WebRTC deployment\n\n**Personality override:** `personality_ids` must be IDs that are already enabled for the agent's project. Check which are enabled via `aiagents_retrieve` → `enabled_personalities` field. To enable a new personality, call `aiagents_partial_update` with the updated `enabled_personalities` list before using it here. Note: enabling a personality applies project-wide, not just to one agent. Passing an ID that is not enabled returns `[\"Invalid personalities provided.\"]`.\n\n**Scheduled runs:** to run on a recurring cron schedule, create a CronJob via `POST /test_framework/v1/cron_jobs/` with `execution_mode=\"voice\"` instead of looping this endpoint.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'. There is no separate progress endpoint for runs. Check `failed_reasons` for infrastructure errors; check `runs[run_id].error_message` for per-run errors.\n\n**Outbound dial window:** for outbound runs (agent `inbound=false`), your agent must dial the run's `outbound_number` before `outbound_dial_window_closes_at` (default 300s after the run reaches `waiting_for_call` / pending state). Dials received after that deadline are dropped and the run returns `status: timeout`."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_voice"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_agora/": {
@@ -45452,15 +45292,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_agora",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-agora",
-                        "description": "AGORA RTC VOICE RUN: Execute evaluators against an agent reachable in an Agora RTC channel. Cekura joins the channel as a participant and converses. The agent must have `agora_data.session_endpoint_url` configured — an endpoint that mints the per-call channel and token; Cekura calls it at run time and never stores the join details.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)\n- `scenarios_run_pipecat_v2` — Pipecat Cloud WebRTC"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_agora"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_api_chat/": {
@@ -45742,15 +45574,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_chirp",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-chirp",
-                        "description": "RAW-PCM WEBSOCKET VOICE RUN: Execute evaluators against an agent that exposes a raw-PCM WebSocket endpoint (16 kHz, 16-bit mono, binary frames). The agent must have a websocket endpoint configured (`telephony.websocket_url`); optional Basic Auth lives in `telephony.websocket_auth`. Pass `websocket_url` to override the agent's stored endpoint for this run.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_websocket` — JSON/text WebSocket protocol (per-scenario URLs)\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_pipecat_v2` — Pipecat Cloud WebRTC"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_chirp"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_elevenlabs/": {
@@ -45963,21 +45787,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_elevenlabs",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-elevenlabs",
-                        "description": "ELEVENLABS CONVERSATIONAL VOICE RUN: Execute evaluators against an ElevenLabs Conversational AI agent. The agent must have ElevenLabs credentials configured AND `assistant_id` set to the ElevenLabs agent ID.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_elevenlabs"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_ello/": {
             "post": {
-                "operationId": "scenarios-run-scenarios-ello-create",
-                "description": "Scenarios run scenarios ello",
+                "operationId": "scenarios-v1-run-scenarios-ello-create",
+                "description": "Scenarios v1 run scenarios ello",
                 "tags": [
                     "test_framework"
                 ],
@@ -46159,21 +45975,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_email",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-email",
-                        "description": "EMAIL RUN: Execute evaluators against an agent that communicates over email. Cekura sends an email to the agent's address and simulates the full conversation, receiving replies via inbound webhook.\n\nThe agent must have an `email_id` configured, or you can supply `agent_email` as a one-time override. The `agent_email` field takes precedence if both are set.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Inbound agents** (`agent.inbound=true`): Cekura sends the first email to the agent. **Outbound agents** (`agent.inbound=false`): the response includes `inbound_email` — the address your agent should email first to start the conversation.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_email"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_jotform/": {
             "post": {
-                "operationId": "scenarios-run-scenarios-jotform-create",
-                "description": "Scenarios run scenarios jotform",
+                "operationId": "scenarios-v1-run-scenarios-jotform-create",
+                "description": "Scenarios v1 run scenarios jotform",
                 "tags": [
                     "test_framework"
                 ],
@@ -46457,22 +46265,13 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-destructive": true,
-                "x-mcp-tool-name": "scenarios_run_json",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-json",
-                        "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_json"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_livekit/": {
             "post": {
-                "operationId": "scenarios-run-scenarios-livekit-create",
-                "description": "Scenarios run scenarios livekit",
+                "operationId": "scenarios-v1-run-scenarios-livekit-create",
+                "description": "Scenarios v1 run scenarios livekit",
                 "tags": [
                     "test_framework"
                 ],
@@ -46523,8 +46322,8 @@
         },
         "/test_framework/v1/scenarios/run_scenarios_livekit_chat/": {
             "post": {
-                "operationId": "scenarios-run-scenarios-livekit-chat-create",
-                "description": "Scenarios run scenarios livekit chat",
+                "operationId": "scenarios-v1-run-scenarios-livekit-chat-create",
+                "description": "Scenarios v1 run scenarios livekit chat",
                 "tags": [
                     "test_framework"
                 ],
@@ -46805,15 +46604,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_livekit_v2",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-livekit-v2",
-                        "description": "LIVEKIT VOICE RUN (project credentials, v2): Execute evaluators against a LiveKit agent using credentials configured at the project (or agent) level. Cekura creates the rooms; you don't pass URLs per-scenario. Requires `livekit_api_key`, `livekit_data.api_secret`, and `livekit_data.url` on the agent or project.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**Per-request `room_config` override** is allowed; merges over agent defaults.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_websocket` — JSON/text WebSocket runs"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_livekit_v2"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_pipecat/": {
@@ -47029,15 +46820,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_pipecat_v1",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-pipecat-v1",
-                        "description": "PIPECAT WEBRTC RUN (manual room URLs, v1): Execute evaluators against an agent running on Pipecat / Daily.co WebRTC. Each scenario entry carries its own `pipecat_room_url` and optional token. For project-credential-based runs (no per-scenario URL), use `scenarios_run_pipecat_v2` instead.\n\n**Run-count:** one run per entry in `scenarios` — this endpoint does not support `frequency` or personality/test-profile multipliers. To run the same scenario multiple times, include it multiple times in the `scenarios` list.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `run_scenarios` — real voice / phone / SIP call\n- `run_scenarios_text` — text / SMS / chat mode\n- `run_scenarios_with_websockets` — agent exposes a plain websocket URL (non-Pipecat)\n\n**Scheduled runs:** WebRTC sessions are not generally scheduled. Use `run_scenarios` or `run_scenarios_text` via CronJob for recurring evaluator runs."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_pipecat_v1"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_pipecat_v2/": {
@@ -47254,15 +47037,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_pipecat_v2",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-pipecat-v2",
-                        "description": "PIPECAT CLOUD VOICE RUN (project credentials, v2): Execute evaluators against an agent deployed on Pipecat Cloud using credentials configured at the project level. Cekura creates the sessions; you don't pass per-scenario room URLs (that's the v1 endpoint). Requires Pipecat Cloud credentials with `pipecat_agent_name` set on the agent or project.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**Per-request `session_config` override** is allowed; merges over agent defaults.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_pipecat_v1` — manual room URLs per scenario\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_pipecat_v2"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_retell_webrtc/": {
@@ -47476,15 +47251,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_retell_webrtc",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-retell-webrtc",
-                        "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (LiveKit infrastructure). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_retell_webrtc"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_sip/": {
@@ -47696,15 +47463,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_sip",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-sip",
-                        "description": "SIP VOICE RUN (direct SIP): Execute evaluators against an agent over a direct SIP connection (orchestrated by Cekura's SIP voice service). The agent must have a SIP endpoint configured (`telephony.sip_uri` on the v2 agent).\n\n**Custom SIP headers:** to send custom headers to the agent, attach a test profile whose `main_agent_variables` contain `X-` prefixed keys (pass its ID in `test_profile_ids`) — headers cannot be set on the agent or in this request.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_sip"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_text/": {
@@ -47939,15 +47698,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_text",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-text",
-                        "description": "TEXT / SMS / CHAT RUN: Execute evaluators against your agent using text-only simulation (SMS, chat, or an agent-hosted websocket). Cheaper than voice — billed at the text-simulation rate. Requires a chat connection (`provider.chat_agent_details`) on the agent, or a websocket URL for `self_hosted` agents.\n\n**Run-count math:** total conversations = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**Concurrency:** use `concurrency_limit` to cap parallel conversations. Default: unbounded (subject to provider rate limits).\n\n**Scenario selection (pick one):**\n- `scenarios` — list of integer evaluator IDs (e.g. `[101, 102]`)\n- `tags` — select by tag\n- `folder_path` — select by folder path (e.g. `\"Sales.Inbound\"`); requires `project_id`\n\n**Websocket override:** if the agent exposes a plain websocket URL for text, pass it as `websocket_url` — this bypasses the agent's standard text-readiness check. Pass `websocket_headers` (JSON object) to override connection headers for this run — merged over the agent's configured headers, with the per-run values winning.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `run_scenarios` — real voice / phone / SIP call\n- `run_scenarios_with_websockets` — each scenario carries its own websocket URL (bulk)\n- `run_scenarios_pipecat` — Pipecat/Daily.co WebRTC deployment\n\n**`self_hosted` agents:** agents with `assistant_provider=\"self_hosted\"` require a websocket URL. Either pre-configure `websocket_url` on the agent, or pass it directly in this request. Without it, the run fails with `[\"Agent does not have a websocket URL\"]`. Passing `websocket_url` here changes the result's `run_type` to `\"WebSocket\"` instead of `\"Text\"`.\n\n**Personality override:** `personality_ids` must be IDs that are already enabled for the agent's project. Check which are enabled via `aiagents_retrieve` → `enabled_personalities` field. To enable a new personality, call `aiagents_partial_update` with the updated `enabled_personalities` list before using it here. Note: enabling a personality applies project-wide, not just to one agent. Passing an ID that is not enabled returns `[\"Invalid personalities provided.\"]`.\n\n**Scheduled runs:** to run on a cron schedule, create a CronJob via `POST /test_framework/v1/cron_jobs/` with `execution_mode=\"text\"` instead.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'. There is no separate progress endpoint for runs. Check `failed_reasons` for infrastructure errors; check `runs[run_id].error_message` for per-run errors."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_text"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_vapi_webrtc/": {
@@ -48162,15 +47913,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_vapi_webrtc",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-vapi-webrtc",
-                        "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. Required: `vapi_assistant_id` (the VAPI assistant). The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_vapi_webrtc"
             }
         },
         "/test_framework/v1/scenarios/run_scenarios_with_websockets/": {
@@ -48390,20 +48133,12 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_run_websocket",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-run-websocket",
-                        "description": "WEBSOCKET RUN (per-scenario URLs, bulk): Execute evaluators where each scenario carries its own websocket URL. Useful when you have a fleet of agents or stateful websocket sessions to test in a single batch.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`. (Personality and test-profile multipliers are not supported on this endpoint.)\n\n**`frequency` is required** on this endpoint (no default).\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `run_scenarios_text` — single websocket URL or SMS/chat mode (simpler)\n- `run_scenarios` — real voice / phone / SIP call\n- `run_scenarios_pipecat` — Pipecat/Daily.co WebRTC deployment\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'.\n\n**Known limitation:** `result.run_type` may show 'Text' instead of 'WebSocket' for runs triggered via this endpoint — this is a display issue only and does not affect execution."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_run_websocket"
             }
         },
         "/test_framework/v1/scenarios/save_spec_cases/": {
             "post": {
-                "operationId": "scenarios-save-spec-cases-create",
+                "operationId": "scenarios-v1-save-spec-cases-create",
                 "description": "Keep generated test cases in the project's Regression Suite",
                 "summary": "Keep generated test cases in the project's Regression Suite",
                 "tags": [
@@ -48515,16 +48250,7 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_refine",
-                "summary": "Clarify what evaluator scenarios should cover",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-refine",
-                        "description": "Clarify what a set of evaluator scenarios should cover before generating them.\n\nSend the agent and a natural-language brief; the AI comes back with the questions it needs answered (or confirms it has enough) so `scenarios_generate_bg` produces scenarios that match what you actually meant.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Improving existing evaluators is not done here.** Read the evaluator with `scenarios_retrieve` (or the list endpoint), decide the edit yourself, and write it back with `scenarios_partial_update` or `scenarios_bulk_update`. This tool changes evaluator scenarios only; it never changes an AI agent's prompt, configuration, tools, or provider settings — for `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill."
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_refine"
             }
         },
         "/test_framework/v1/scenarios/scenario-agent-progress/": {
@@ -48586,21 +48312,12 @@
                         "description": ""
                     }
                 },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_refine_progress",
-                "summary": "Get scenario-refinement progress",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-refine-progress",
-                        "description": "Check the progress of a scenario-instruction clarification request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is still working (keep polling)\n- `completed` - AI finished; read the clarification in the `result` field\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, feed the answers into `scenarios_generate_bg`"
-                    }
-                }
+                "x-mcp-tool-name": "scenarios_refine_progress"
             }
         },
         "/test_framework/v1/scenarios/spec_from_pr/": {
             "get": {
-                "operationId": "scenarios-spec-from-pr-retrieve",
+                "operationId": "scenarios-v1-spec-from-pr-retrieve",
                 "description": "Preview the test suite a generated pull request contains",
                 "summary": "Preview the test suite a generated pull request contains",
                 "parameters": [
@@ -48660,8 +48377,8 @@
         },
         "/test_framework/v1/scenarios/tags/": {
             "get": {
-                "operationId": "scenarios-tags-retrieve",
-                "description": "Scenarios tags",
+                "operationId": "scenarios-v1-tags-retrieve",
+                "description": "Scenarios v1 tags",
                 "tags": [
                     "test_framework"
                 ],
@@ -48688,6 +48405,70 @@
                         "description": ""
                     }
                 }
+            }
+        },
+        "/test_framework/v1/scenarios/validate_scenarios_json/": {
+            "post": {
+                "operationId": "scenarios-validate-json_2",
+                "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one.",
+                "summary": "Validate a JSON test-suite spec without running it",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{dry_run, valid, plan}"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-tool-name": "scenarios_validate_json"
             }
         },
         "/test_framework/v1/share-tokens/{token}/resolve/": {
@@ -58214,7 +57995,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_list"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_list",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-list",
+                        "description": "scenarios_list: List evaluators (test scenarios) that simulate callers interacting with your agent. Filter by `agent_id`, `project_id`, `tags`, `folder_path`, or other params (see Schema). Returns paginated scenarios with their instructions, type, personalities, and metrics.\n\nPerformance tip: pass the most specific filter you have. `agent_id` if a specific agent is in context, `folder_path` if you're discussing a specific folder, or `project_id` for a workspace-level view. `page_size=20` is a reasonable starting size if you want to peek at recent ones first."
+                    }
+                }
             },
             "post": {
                 "operationId": "scenarios-create_3",
@@ -58345,7 +58134,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_create"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_create",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-create",
+                        "description": "scenarios_create: Create a test scenario (evaluator) that simulates a caller interacting with your agent. Required: `name`, `instructions` or program (see modes), and an `agent` or `project` to attach to.\n\n**Prefer generation for instruction scenarios:** `scenarios_generate_bg` grounds them in the agent's description, knowledge base and mock tools, and auto-attaches a test profile and the project's metrics — even for a single scenario (`num_scenarios: 1`, with the case described in `extra_instructions`). Use this create tool for `conditional_actions` scenarios whose structure is exactly known, or to save instruction text the user supplied verbatim — not to hand-write behavioral instructions a generation call could produce.\n\n**Two modes — pick one via `scenario_type`:**\n\n- `instruction` — plain-text caller instructions in the `instructions` field. The simulated caller uses an LLM to paraphrase your instructions during the call. Prefer `scenarios_generate_bg` for these (see above).\n\n- `conditional_actions` — deterministic, rule-based caller. Provide the structured `conditional_actions` object. Use either `conditional_actions` or `instructions` — not both.\n\n**Common companion fields:**\n- `personality` (required) — caller voice/personality ID. Browse via `GET /personalities/`. It also sets the caller's spoken language.\n- `expected_outcome_prompt` — what a passing call looks like, graded statement by statement after each run. It is evaluated ONLY when the project's Expected Outcome metric is attached to the scenario, so attach that metric every time you set this field.\n- `metrics` — list of metric IDs to evaluate after each run. A scenario created here starts with NO metrics attached (unlike generated ones): always attach the project's baseline set, including the Expected Outcome metric.\n- `tags` — for grouping and later selection via `run_scenarios?tags=[...]`.\n- `folder_path` — e.g. `\"Sales.Inbound\"` for folder organization.\n- `test_profile` — a test profile ID providing caller metadata (order_id, user_email, etc.).\n\n**To run evaluators after creating:** call `run_scenarios` (voice), `run_scenarios_text`, `run_scenarios_with_websockets`, or `run_scenarios_pipecat` with the scenario ID(s) returned here."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/{id}/": {
@@ -58405,10 +58202,18 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_retrieve"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_retrieve",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-retrieve",
+                        "description": "Fetch a single evaluator by id. Returns full configuration including instructions, expected outcome, metrics, test profile, and — when the agent has mock tools attached and the scenario was auto-generated — the expected mock tool calls (`generated_mock_tool_entries`) with their inputs and outputs."
+                    }
+                }
             },
             "put": {
-                "operationId": "test-framework-v2-scenarios-update",
+                "operationId": "scenarios-update",
                 "description": "Update a test scenario",
                 "parameters": [
                     {
@@ -58555,7 +58360,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_partial_update"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_partial_update",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-partial-update",
+                        "description": "Partially update an evaluator. Same field shape as create — see `scenarios_create` for details.\n\n**If you set or edit `expected_outcome_prompt`:** it is evaluated only when the project's Expected Outcome metric is attached to the scenario — check its `metrics` and attach that metric if missing.\n\n**Tip:** to add or modify a single condition inside a `conditional_actions` scenario, fetch the scenario with GET, mutate its `conditional_actions` object, and PATCH the full object back. The server replaces all conditions atomically."
+                    }
+                }
             },
             "delete": {
                 "operationId": "scenarios-destroy_3",
@@ -58606,12 +58419,20 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_destroy"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_destroy",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-destroy",
+                        "description": "⚠ Irreversible. Deletes the evaluator. Past runs remain in the result history but become orphaned in the UI."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/{id}/condition-audio/": {
             "get": {
-                "operationId": "test-framework-v2-scenarios-condition-audio-list",
+                "operationId": "scenarios-condition-audio-list",
                 "description": "Scenarios condition audio",
                 "parameters": [
                     {
@@ -58670,7 +58491,7 @@
                 }
             },
             "post": {
-                "operationId": "test-framework-v2-scenarios-condition-audio-create",
+                "operationId": "scenarios-condition-audio-create",
                 "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of fixed-message actions; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Shares the condition-audio URL with the list endpoint (GET lists, POST uploads).",
                 "parameters": [
                     {
@@ -58779,7 +58600,7 @@
         },
         "/test_framework/v2/scenarios/{id}/condition-audio/{audio_id}/": {
             "put": {
-                "operationId": "test-framework-v2-scenarios-condition-audio-update",
+                "operationId": "scenarios-condition-audio-update",
                 "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
                 "parameters": [
                     {
@@ -58900,7 +58721,7 @@
                 }
             },
             "delete": {
-                "operationId": "test-framework-v2-scenarios-condition-audio-destroy",
+                "operationId": "scenarios-condition-audio-destroy",
                 "description": "Delete a Delete an audio clip and remove every `<audio>` reference to it from this scenario's conditional actions. Returns 409 without deleting anything if",
                 "parameters": [
                     {
@@ -58989,7 +58810,7 @@
         },
         "/test_framework/v2/scenarios/{id}/edit/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-edit-create",
+                "operationId": "scenarios-edit-create",
                 "description": "Scenarios edit",
                 "parameters": [
                     {
@@ -59052,7 +58873,7 @@
         },
         "/test_framework/v2/scenarios/{id}/history/": {
             "get": {
-                "operationId": "test-framework-v2-scenarios-history-list",
+                "operationId": "scenarios-history-list",
                 "description": "Scenarios history",
                 "parameters": [
                     {
@@ -59109,7 +58930,7 @@
         },
         "/test_framework/v2/scenarios/{id}/history/edit/": {
             "patch": {
-                "operationId": "test-framework-v2-scenarios-history-edit-partial-update",
+                "operationId": "scenarios-history-edit-partial-update",
                 "description": "Scenarios history edit",
                 "parameters": [
                     {
@@ -59171,7 +58992,7 @@
         },
         "/test_framework/v2/scenarios/{id}/restore/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-restore-create",
+                "operationId": "scenarios-restore-create",
                 "description": "Scenarios restore",
                 "parameters": [
                     {
@@ -59234,7 +59055,7 @@
         },
         "/test_framework/v2/scenarios/{id}/transcript_embeddings/": {
             "get": {
-                "operationId": "test-framework-v2-scenarios-transcript-embeddings-retrieve",
+                "operationId": "scenarios-transcript-embeddings-retrieve",
                 "description": "Fetches the pre-calculated transcript embeddings for a specific scenario.\nCalled by Pipecat service.\nIncludes audio sample metadata if available.\nApplies test_profile variable substitution to transcript messages.",
                 "parameters": [
                     {
@@ -59271,7 +59092,7 @@
         },
         "/test_framework/v2/scenarios/{id}/update_conditional_actions/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-update-conditional-actions-create",
+                "operationId": "scenarios-update-conditional-actions-create",
                 "description": "DEPRECATED: Use PATCH /v1/scenarios/{id}/ with conditional_actions field instead.\n\nThis endpoint is deprecated and will be removed in a future version.\nPlease use the standard scenario update endpoint (PATCH /v1/scenarios/{id}/)\nwith the 'conditional_actions' field in the request body.\n\nExample:\nPATCH /v1/scenarios/{id}/\n{\n    \"conditional_actions\": {\n        \"role\": \"optional role description\",\n        \"conditions\": [...]\n    }\n}\n\n---\n\nUpdate a scenario with conditional actions data.\nTakes conditional actions in JSON format and saves it to the scenario's instructions field.\n\nURL parameter:\n    - pk: ID of the scenario to update (from URL)\n\nRequest body:\n    - conditional_actions: Object with format:\n        {\n            \"role\": \"optional role description\",\n            \"conditions\": [\n                {\n                    \"condition\": \"when text\",\n                    \"action\": \"action text\",\n                    \"type\": \"standard\" or \"fixed_message\" (optional, defaults to \"standard\")\n                },\n                ...\n            ]\n        }\n\nReturns:\n    - Success message\n\nUpdates:\n    - instructions: JSON string of conditional actions data",
                 "parameters": [
                     {
@@ -59393,12 +59214,21 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_update_scenario_with_transcript_create"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_update_scenario_with_transcript_create",
+                "summary": "Update a scenario from a transcript",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-update-scenario-with-transcript-create",
+                        "description": "Update a scenario with transcript-based simulation data.\nTakes a transcript in JSON format and processes it for simulation testing,\nsaving the processed data to the specified scenario including embeddings and\nformatted simulation description.\n\nURL parameter:\n    - pk: ID of the scenario to update (from URL)\n\nRequest body:\n    - transcript_json: List of transcript message objects with format:\n        [\n            {\"role\": \"Main Agent\", \"content\": \"Hello\"},\n            {\"role\": \"Testing Agent\", \"content\": \"Hi\"},\n            ...\n        ]\n\nReturns:\n    - Scenario data with updated transcript simulation data\n\nUpdates:\n    - transcript_embeddings: Embeddings for Main Agent responses\n    - simulation_description: Formatted transcript description"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/add_infrastructure_suite/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-add-infrastructure-suite-create",
+                "operationId": "scenarios-add-infrastructure-suite-create",
                 "description": "Scenarios add infrastructure suite",
                 "tags": [
                     "test_framework"
@@ -59450,7 +59280,7 @@
         },
         "/test_framework/v2/scenarios/add_tags/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-add-tags-create",
+                "operationId": "scenarios-add-tags-create",
                 "description": "Scenarios add tags",
                 "tags": [
                     "test_framework"
@@ -59598,12 +59428,20 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_bulk_update"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_bulk_update",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-bulk-update",
+                        "description": "Update many evaluators in a single call. Useful for attaching/detaching metrics, switching personality, appending instructions, or moving a batch between folders.\n\n**Non-idempotent fields:** `append_instruction` concatenates — calling twice with the same string adds it twice. `metric_ids_to_add`/`metric_ids_to_remove` and `tool_ids_to_add`/`tool_ids_to_remove` are set-mutating and shouldn't be replayed blindly.\n\n**Affects every ID in `scenarios`.** For modifying a single evaluator, prefer `scenarios_partial_update`. Confirm the `scenarios` list with the user before calling — the change is applied across the whole list in one transaction.\n\n**Required:** `scenarios` (list of evaluator IDs). One of `agent` or `project` is also required to scope the permission check. All other fields are optional and are applied only when present."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/cancel-agent/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-cancel-agent-create",
+                "operationId": "scenarios-cancel-agent-create",
                 "description": "Scenarios cancel agent",
                 "tags": [
                     "test_framework"
@@ -59757,13 +59595,22 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_create_from_transcript_bg"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_create_from_transcript_bg",
+                "summary": "Create a scenario from a transcript",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-create-from-transcript-bg",
+                        "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, Returns a `progress_id`immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/create-from-transcript-progress/": {
             "get": {
                 "operationId": "scenarios-create-from-transcript-progress_3",
-                "description": "Scenarios create from transcript progress",
+                "description": "Get scenario-from-transcript progress",
                 "parameters": [
                     {
                         "in": "query",
@@ -59844,13 +59691,22 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_create_from_transcript_progress"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_create_from_transcript_progress",
+                "summary": "Get scenario-from-transcript progress",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-create-from-transcript-progress",
+                        "description": "Get scenario-from-transcript progress"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/create_folder/": {
             "post": {
                 "operationId": "scenarios-folder-create_3",
-                "description": "Scenarios folder",
+                "description": "Create a scenario folder",
                 "tags": [
                     "test_framework"
                 ],
@@ -59897,13 +59753,22 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_folder_create"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_folder_create",
+                "summary": "Create a scenario folder",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-folder-create",
+                        "description": "Create a scenario folder"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/delete_folder/": {
             "post": {
                 "operationId": "scenarios-folder-delete_3",
-                "description": "Scenarios folder delete",
+                "description": "Delete a scenario folder",
                 "tags": [
                     "test_framework"
                 ],
@@ -59943,7 +59808,16 @@
                         "description": "No response body"
                     }
                 },
-                "x-mcp-tool-name": "scenarios_folder_delete"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_folder_delete",
+                "summary": "Delete a scenario folder",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-folder-delete",
+                        "description": "Delete a scenario folder"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/delete_scenarios/": {
@@ -60021,7 +59895,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_bulk_delete"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_bulk_delete",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-bulk-delete",
+                        "description": "⚠ Cannot be undone from the UI. Bulk-deletes the listed evaluators — they disappear from `scenarios_list` and from any future evaluator runs.\n\n**Always confirm the exact list of `scenarios` IDs with the user before calling.** For deleting a single evaluator prefer `scenarios_destroy`.\n\n**Required:** `scenarios` (list of evaluator IDs). One of `agent_id` or `project_id` is also required to scope the permission check."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/duplicate/": {
@@ -60128,7 +60010,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_duplicate_create"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_duplicate_create",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-duplicate-create",
+                        "description": "Create copies of existing evaluators in this project or another project in the same organization. Use this instead of recreating evaluators with `scenarios_create`; same-project copies retain their metrics and test profiles, while cross-project copies use the destination project's predefined metrics. Set `copy_to_project` to the source project for a folder-only copy; `folder_path` is created when needed, and copied evaluators are named `Copy of <original name>`."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/export_scenarios/": {
@@ -60241,7 +60131,7 @@
         "/test_framework/v2/scenarios/folders/": {
             "get": {
                 "operationId": "scenarios-folders-list_3",
-                "description": "List scenario folders for a project",
+                "description": "List scenario folders",
                 "parameters": [
                     {
                         "name": "page",
@@ -60285,6 +60175,24 @@
                             "type": "string"
                         },
                         "description": "Search folders by name (case-insensitive)"
+                    },
+                    {
+                        "name": "agent_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    },
+                    {
+                        "name": "assistant_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
                     }
                 ],
                 "tags": [
@@ -60313,7 +60221,16 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_folders_list"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_folders_list",
+                "summary": "List scenario folders",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-folders-list",
+                        "description": "List scenario folders"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/generate-bg/": {
@@ -60389,7 +60306,16 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_generate_bg"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_generate_bg",
+                "summary": "Generate scenarios in background",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-generate-bg",
+                        "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- When the agent has mock tools attached, each generated scenario also gets `generated_mock_tool_entries` — the expected mock tool calls for that scenario, shaped `[{tool_id, tool_name, new_entry: {input, output}}]`. These are returned on scenario reads and can be edited later via `scenarios_partial_update`.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/generate-clarify-answer/": {
@@ -60453,7 +60379,7 @@
         "/test_framework/v2/scenarios/generate-instructions/": {
             "post": {
                 "operationId": "scenarios-generate-instructions-create_3",
-                "description": "Scenarios generate instructions",
+                "description": "Generate scenario instructions",
                 "tags": [
                     "test_framework"
                 ],
@@ -60500,13 +60426,22 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_generate_instructions_create"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_generate_instructions_create",
+                "summary": "Generate scenario instructions",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-generate-instructions-create",
+                        "description": "Generate scenario instructions"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/generate-progress/": {
             "get": {
                 "operationId": "scenarios-generate-progress_3",
-                "description": "Scenarios generate progress",
+                "description": "Get scenario generation progress",
                 "parameters": [
                     {
                         "in": "query",
@@ -60729,12 +60664,21 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_generate_progress"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_generate_progress",
+                "summary": "Get scenario generation progress",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-generate-progress",
+                        "description": "Get scenario generation progress"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/has_infrastructure_suite/": {
             "get": {
-                "operationId": "test-framework-v2-scenarios-has-infrastructure-suite-retrieve",
+                "operationId": "scenarios-has-infrastructure-suite-retrieve",
                 "description": "Scenarios has infrastructure suite",
                 "tags": [
                     "test_framework"
@@ -60767,7 +60711,7 @@
         "/test_framework/v2/scenarios/improve_instructions/": {
             "post": {
                 "operationId": "scenarios-improve-instructions-create_3",
-                "description": "Scenarios improve instructions",
+                "description": "Improve scenario instructions",
                 "tags": [
                     "test_framework"
                 ],
@@ -60832,13 +60776,22 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_improve_instructions_create"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_improve_instructions_create",
+                "summary": "Improve scenario instructions",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-improve-instructions-create",
+                        "description": "Improve scenario instructions"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/infrastructure_suite_preview/": {
             "get": {
-                "operationId": "test-framework-v2-scenarios-infrastructure-suite-preview-retriev",
-                "description": "Scenarios infrastructure suite preview retriev",
+                "operationId": "scenarios-infrastructure-suite-preview-retrieve",
+                "description": "Scenarios infrastructure suite preview",
                 "tags": [
                     "test_framework"
                 ],
@@ -60870,7 +60823,7 @@
         "/test_framework/v2/scenarios/instructions-progress/": {
             "get": {
                 "operationId": "scenarios-instructions-progress-retrieve_3",
-                "description": "Scenarios instructions progress",
+                "description": "Get scenario instructions progress",
                 "tags": [
                     "test_framework"
                 ],
@@ -60897,7 +60850,45 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_instructions_progress_retrieve"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_instructions_progress_retrieve",
+                "summary": "Get scenario instructions progress",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-instructions-progress-retrieve",
+                        "description": "Get scenario instructions progress"
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "agent_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    },
+                    {
+                        "name": "project_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    },
+                    {
+                        "name": "assistant_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Tenant scope. Supply one of `agent_id`, `project_id`, `assistant_id` when authenticating with a user session or OAuth bearer token; omit when using an API key already scoped to the tenant."
+                    }
+                ]
             }
         },
         "/test_framework/v2/scenarios/json_schema/": {
@@ -60941,13 +60932,21 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_json_schema"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_json_schema",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-json-schema",
+                        "description": "Fetch the JSON Schema for test-suite spec files"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/move_folder/": {
             "post": {
                 "operationId": "scenarios-folder-move_3",
-                "description": "Scenarios folder move",
+                "description": "Move a scenario folder",
                 "tags": [
                     "test_framework"
                 ],
@@ -60994,13 +60993,22 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_folder_move"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_folder_move",
+                "summary": "Move a scenario folder",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-folder-move",
+                        "description": "Move a scenario folder"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/rename_folder/": {
             "post": {
                 "operationId": "scenarios-folder-rename_3",
-                "description": "Scenarios folder rename",
+                "description": "Rename a scenario folder",
                 "tags": [
                     "test_framework"
                 ],
@@ -61047,7 +61055,16 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_folder_rename"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_folder_rename",
+                "summary": "Rename a scenario folder",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-folder-rename",
+                        "description": "Rename a scenario folder"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios/": {
@@ -61354,7 +61371,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_voice"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_voice",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-voice",
+                        "description": "VOICE RUN: Execute evaluators against your agent using a real voice / phone / SIP call. This is the primary 'run your evaluators' endpoint for voice-mode testing. Requires `telephony.phone_number` configured on the agent (any provider).\n\n**Run-count math:** total calls = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`. Each call is billed at the voice-simulation rate — check `frequency` carefully.\n\n**Concurrency:** use `concurrency_limit` to cap parallel calls. Default: unbounded (subject to provider rate limits).\n\n**Scenario selection (pick one):**\n- `scenarios` — list of integer evaluator IDs (e.g. `[101, 102]`)\n- `tags` — select by tag\n- `folder_path` — select by folder path (e.g. `\"Sales.Inbound\"`); requires `project_id`\n\n**Phone-number overrides:**\n- `outbound_phone_number` — override the number dialed\n- `agent_number` — override the contact number the inbound agent receives calls on\n- `mode` — `same_number` (all runs use one pair) vs `different_numbers`\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `run_scenarios_text` — text / SMS / chat mode; cheaper, no voice cost\n- `run_scenarios_with_websockets` — each scenario carries its own websocket URL\n- `run_scenarios_pipecat` — Pipecat/Daily.co WebRTC deployment\n\n**Personality override:** `personality_ids` must be IDs that are already enabled for the agent's project. Check which are enabled via `aiagents_retrieve` → `enabled_personalities` field. To enable a new personality, call `aiagents_partial_update` with the updated `enabled_personalities` list before using it here. Note: enabling a personality applies project-wide, not just to one agent. Passing an ID that is not enabled returns `[\"Invalid personalities provided.\"]`.\n\n**Scheduled runs:** to run on a recurring cron schedule, create a CronJob via `POST /test_framework/v1/cron_jobs/` with `execution_mode=\"voice\"` instead of looping this endpoint.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'. There is no separate progress endpoint for runs. Check `failed_reasons` for infrastructure errors; check `runs[run_id].error_message` for per-run errors.\n\n**Outbound dial window:** for outbound runs (agent `inbound=false`), your agent must dial the run's `outbound_number` before `outbound_dial_window_closes_at` (default 300s after the run reaches `waiting_for_call` / pending state). Dials received after that deadline are dropped and the run returns `status: timeout`."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_agora/": {
@@ -61566,7 +61591,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_agora"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_agora",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-agora",
+                        "description": "AGORA RTC VOICE RUN: Execute evaluators against an agent reachable in an Agora RTC channel. Cekura joins the channel as a participant and converses. The agent must have `agora_data.session_endpoint_url` configured — an endpoint that mints the per-call channel and token; Cekura calls it at run time and never stores the join details.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)\n- `scenarios_run_pipecat_v2` — Pipecat Cloud WebRTC"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_api_chat/": {
@@ -61848,7 +61881,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_chirp"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_chirp",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-chirp",
+                        "description": "RAW-PCM WEBSOCKET VOICE RUN: Execute evaluators against an agent that exposes a raw-PCM WebSocket endpoint (16 kHz, 16-bit mono, binary frames). The agent must have a websocket endpoint configured (`telephony.websocket_url`); optional Basic Auth lives in `telephony.websocket_auth`. Pass `websocket_url` to override the agent's stored endpoint for this run.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_websocket` — JSON/text WebSocket protocol (per-scenario URLs)\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_pipecat_v2` — Pipecat Cloud WebRTC"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_elevenlabs/": {
@@ -62061,12 +62102,20 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_elevenlabs"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_elevenlabs",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-elevenlabs",
+                        "description": "ELEVENLABS CONVERSATIONAL VOICE RUN: Execute evaluators against an ElevenLabs Conversational AI agent. The agent must have ElevenLabs credentials configured AND `assistant_id` set to the ElevenLabs agent ID.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_ello/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-run-scenarios-ello-create",
+                "operationId": "scenarios-run-scenarios-ello-create",
                 "description": "Scenarios run scenarios ello",
                 "tags": [
                     "test_framework"
@@ -62249,12 +62298,20 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_email"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_email",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-email",
+                        "description": "EMAIL RUN: Execute evaluators against an agent that communicates over email. Cekura sends an email to the agent's address and simulates the full conversation, receiving replies via inbound webhook.\n\nThe agent must have an `email_id` configured, or you can supply `agent_email` as a one-time override. The `agent_email` field takes precedence if both are set.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`.\n\n**Inbound agents** (`agent.inbound=true`): Cekura sends the first email to the agent. **Outbound agents** (`agent.inbound=false`): the response includes `inbound_email` — the address your agent should email first to start the conversation.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_jotform/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-run-scenarios-jotform-create",
+                "operationId": "scenarios-run-scenarios-jotform-create",
                 "description": "Scenarios run scenarios jotform",
                 "tags": [
                     "test_framework"
@@ -62539,12 +62596,21 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_json"
+                "x-mcp-expose": true,
+                "x-mcp-destructive": true,
+                "x-mcp-tool-name": "scenarios_run_json",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-json",
+                        "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_livekit/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-run-scenarios-livekit-create",
+                "operationId": "scenarios-run-scenarios-livekit-create",
                 "description": "Scenarios run scenarios livekit",
                 "tags": [
                     "test_framework"
@@ -62596,7 +62662,7 @@
         },
         "/test_framework/v2/scenarios/run_scenarios_livekit_chat/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-run-scenarios-livekit-chat-create",
+                "operationId": "scenarios-run-scenarios-livekit-chat-create",
                 "description": "Scenarios run scenarios livekit chat",
                 "tags": [
                     "test_framework"
@@ -62878,7 +62944,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_livekit_v2"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_livekit_v2",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-livekit-v2",
+                        "description": "LIVEKIT VOICE RUN (project credentials, v2): Execute evaluators against a LiveKit agent using credentials configured at the project (or agent) level. Cekura creates the rooms; you don't pass URLs per-scenario. Requires `livekit_api_key`, `livekit_data.api_secret`, and `livekit_data.url` on the agent or project.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**Per-request `room_config` override** is allowed; merges over agent defaults.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_websocket` — JSON/text WebSocket runs"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_pipecat/": {
@@ -63094,7 +63168,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_pipecat_v1"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_pipecat_v1",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-pipecat-v1",
+                        "description": "PIPECAT WEBRTC RUN (manual room URLs, v1): Execute evaluators against an agent running on Pipecat / Daily.co WebRTC. Each scenario entry carries its own `pipecat_room_url` and optional token. For project-credential-based runs (no per-scenario URL), use `scenarios_run_pipecat_v2` instead.\n\n**Run-count:** one run per entry in `scenarios` — this endpoint does not support `frequency` or personality/test-profile multipliers. To run the same scenario multiple times, include it multiple times in the `scenarios` list.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `run_scenarios` — real voice / phone / SIP call\n- `run_scenarios_text` — text / SMS / chat mode\n- `run_scenarios_with_websockets` — agent exposes a plain websocket URL (non-Pipecat)\n\n**Scheduled runs:** WebRTC sessions are not generally scheduled. Use `run_scenarios` or `run_scenarios_text` via CronJob for recurring evaluator runs."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_pipecat_v2/": {
@@ -63311,7 +63393,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_pipecat_v2"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_pipecat_v2",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-pipecat-v2",
+                        "description": "PIPECAT CLOUD VOICE RUN (project credentials, v2): Execute evaluators against an agent deployed on Pipecat Cloud using credentials configured at the project level. Cekura creates the sessions; you don't pass per-scenario room URLs (that's the v1 endpoint). Requires Pipecat Cloud credentials with `pipecat_agent_name` set on the agent or project.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**Per-request `session_config` override** is allowed; merges over agent defaults.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_pipecat_v1` — manual room URLs per scenario\n- `scenarios_run_voice` — phone / SIP voice run\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_retell_webrtc/": {
@@ -63525,7 +63615,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_retell_webrtc"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_retell_webrtc",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-retell-webrtc",
+                        "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (LiveKit infrastructure). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_sip/": {
@@ -63737,7 +63835,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_sip"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_sip",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-sip",
+                        "description": "SIP VOICE RUN (direct SIP): Execute evaluators against an agent over a direct SIP connection (orchestrated by Cekura's SIP voice service). The agent must have a SIP endpoint configured (`telephony.sip_uri` on the v2 agent).\n\n**Custom SIP headers:** to send custom headers to the agent, attach a test profile whose `main_agent_variables` contain `X-` prefixed keys (pass its ID in `test_profile_ids`) — headers cannot be set on the agent or in this request.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone calls via Cekura's standard voice path\n- `scenarios_run_vapi_webrtc` / `_retell_webrtc` — provider-managed WebRTC\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_text/": {
@@ -63972,7 +64078,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_text"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_text",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-text",
+                        "description": "TEXT / SMS / CHAT RUN: Execute evaluators against your agent using text-only simulation (SMS, chat, or an agent-hosted websocket). Cheaper than voice — billed at the text-simulation rate. Requires a chat connection (`provider.chat_agent_details`) on the agent, or a websocket URL for `self_hosted` agents.\n\n**Run-count math:** total conversations = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**Concurrency:** use `concurrency_limit` to cap parallel conversations. Default: unbounded (subject to provider rate limits).\n\n**Scenario selection (pick one):**\n- `scenarios` — list of integer evaluator IDs (e.g. `[101, 102]`)\n- `tags` — select by tag\n- `folder_path` — select by folder path (e.g. `\"Sales.Inbound\"`); requires `project_id`\n\n**Websocket override:** if the agent exposes a plain websocket URL for text, pass it as `websocket_url` — this bypasses the agent's standard text-readiness check. Pass `websocket_headers` (JSON object) to override connection headers for this run — merged over the agent's configured headers, with the per-run values winning.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `run_scenarios` — real voice / phone / SIP call\n- `run_scenarios_with_websockets` — each scenario carries its own websocket URL (bulk)\n- `run_scenarios_pipecat` — Pipecat/Daily.co WebRTC deployment\n\n**`self_hosted` agents:** agents with `assistant_provider=\"self_hosted\"` require a websocket URL. Either pre-configure `websocket_url` on the agent, or pass it directly in this request. Without it, the run fails with `[\"Agent does not have a websocket URL\"]`. Passing `websocket_url` here changes the result's `run_type` to `\"WebSocket\"` instead of `\"Text\"`.\n\n**Personality override:** `personality_ids` must be IDs that are already enabled for the agent's project. Check which are enabled via `aiagents_retrieve` → `enabled_personalities` field. To enable a new personality, call `aiagents_partial_update` with the updated `enabled_personalities` list before using it here. Note: enabling a personality applies project-wide, not just to one agent. Passing an ID that is not enabled returns `[\"Invalid personalities provided.\"]`.\n\n**Scheduled runs:** to run on a cron schedule, create a CronJob via `POST /test_framework/v1/cron_jobs/` with `execution_mode=\"text\"` instead.\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'. There is no separate progress endpoint for runs. Check `failed_reasons` for infrastructure errors; check `runs[run_id].error_message` for per-run errors."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_vapi_webrtc/": {
@@ -64187,7 +64301,15 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_vapi_webrtc"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_vapi_webrtc",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-vapi-webrtc",
+                        "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. Required: `vapi_assistant_id` (the VAPI assistant). The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/run_scenarios_with_websockets/": {
@@ -64407,12 +64529,20 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_run_websocket"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_run_websocket",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-run-websocket",
+                        "description": "WEBSOCKET RUN (per-scenario URLs, bulk): Execute evaluators where each scenario carries its own websocket URL. Useful when you have a fleet of agents or stateful websocket sessions to test in a single batch.\n\n**Run-count:** total conversations = `len(scenarios) × frequency`. (Personality and test-profile multipliers are not supported on this endpoint.)\n\n**`frequency` is required** on this endpoint (no default).\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `run_scenarios_text` — single websocket URL or SMS/chat mode (simpler)\n- `run_scenarios` — real voice / phone / SIP call\n- `run_scenarios_pipecat` — Pipecat/Daily.co WebRTC deployment\n\n**Polling for completion:** the response contains a `result.id` with `status: 'running'`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is 'completed' or 'failed'.\n\n**Known limitation:** `result.run_type` may show 'Text' instead of 'WebSocket' for runs triggered via this endpoint — this is a display issue only and does not affect execution."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/save_spec_cases/": {
             "post": {
-                "operationId": "test-framework-v2-scenarios-save-spec-cases-create",
+                "operationId": "scenarios-save-spec-cases-create",
                 "description": "Keep generated test cases in the project's Regression Suite",
                 "summary": "Keep generated test cases in the project's Regression Suite",
                 "tags": [
@@ -64524,7 +64654,16 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_refine"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_refine",
+                "summary": "Clarify what evaluator scenarios should cover",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-refine",
+                        "description": "Clarify what a set of evaluator scenarios should cover before generating them.\n\nSend the agent and a natural-language brief; the AI comes back with the questions it needs answered (or confirms it has enough) so `scenarios_generate_bg` produces scenarios that match what you actually meant.\n\n**Response:** Returns `progress_id` for polling status at /scenario-agent-progress/\n\n**Improving existing evaluators is not done here.** Read the evaluator with `scenarios_retrieve` (or the list endpoint), decide the edit yourself, and write it back with `scenarios_partial_update` or `scenarios_bulk_update`. This tool changes evaluator scenarios only; it never changes an AI agent's prompt, configuration, tools, or provider settings — for `improve agent <id>`, use the `cekura:cekura-self-improving-agent` skill."
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/scenario-agent-progress/": {
@@ -64586,12 +64725,21 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_refine_progress"
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "scenarios_refine_progress",
+                "summary": "Get scenario-refinement progress",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-refine-progress",
+                        "description": "Check the progress of a scenario-instruction clarification request.\n\nAfter calling POST /scenario-agent/, use the returned `progress_id` to poll this endpoint.\n\n**Status values:**\n- `in_progress` - AI is still working (keep polling)\n- `completed` - AI finished; read the clarification in the `result` field\n- `cancelled` - Request was cancelled\n- `failed` - An error occurred; see `error` field\n\n**Typical flow:**\n1. POST /scenario-agent/ → receive `progress_id`\n2. Poll this endpoint every few seconds\n3. When `status == 'completed'`, feed the answers into `scenarios_generate_bg`"
+                    }
+                }
             }
         },
         "/test_framework/v2/scenarios/spec_from_pr/": {
             "get": {
-                "operationId": "test-framework-v2-scenarios-spec-from-pr-retrieve",
+                "operationId": "scenarios-spec-from-pr-retrieve",
                 "description": "Preview the test suite a generated pull request contains",
                 "summary": "Preview the test suite a generated pull request contains",
                 "parameters": [
@@ -64651,7 +64799,7 @@
         },
         "/test_framework/v2/scenarios/tags/": {
             "get": {
-                "operationId": "test-framework-v2-scenarios-tags-retrieve",
+                "operationId": "scenarios-tags-retrieve",
                 "description": "Scenarios tags",
                 "tags": [
                     "test_framework"
@@ -64677,6 +64825,79 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v2/scenarios/validate_scenarios_json/": {
+            "post": {
+                "operationId": "scenarios-validate-json_3",
+                "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one.",
+                "summary": "Validate a JSON test-suite spec without running it",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{dry_run, valid, plan}"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": false,
+                "x-mcp-tool-name": "scenarios_validate_json",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-validate-json",
+                        "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one."
                     }
                 }
             }
@@ -85903,6 +86124,11 @@
                     "is_starred": {
                         "type": "boolean",
                         "description": "\nWhether the personality is starred\n"
+                    },
+                    "is_hidden": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "\nWhether the personality is hidden\n"
                     }
                 },
                 "required": [
@@ -94529,7 +94755,7 @@
                     },
                     "data": {
                         "type": "array",
-                        "description": "Chart data. Format depends on `chart_type`:\n\n**Line chart:** `[{id, timestamp, value}, ...]`\n\n**Bar chart:** `[{time_interval, value, sample_count}, ...]`\n\n**Pie chart:** `[{label, value, percentage}, ...]`\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#chart-output-formats) for full examples.",
+                        "description": "Chart data. Format depends on `chart_type`:\n\n**Line chart:** `[{id, timestamp, value}, ...]`\n\n**Bar chart:** `[{time_interval, value, sample_count}, ...]`\n\n**Enum daily share:** `[{time_interval, group, value, selected_calls, total_calls, evaluated_calls}, ...]`, where `value` is the selected enum value's percentage of total filtered calls.\n\n**Pie chart:** `[{label, value, percentage}, ...]`\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#chart-output-formats) for full examples.",
                         "items": {
                             "type": "object"
                         },
@@ -94611,13 +94837,28 @@
                                     "boolean",
                                     "string",
                                     "datetime",
-                                    "dynamic"
+                                    "dynamic",
+                                    "percentage"
                                 ],
                                 "description": "Resolved data type of the field"
                             },
                             "filter_value": {
                                 "description": "The filter value used (e.g. metric ID), or null",
                                 "nullable": true
+                            },
+                            "series_dimension": {
+                                "type": "string",
+                                "enum": [
+                                    "enum_value"
+                                ],
+                                "description": "Server-supplied series dimension for enum daily shares."
+                            },
+                            "normalization": {
+                                "type": "string",
+                                "enum": [
+                                    "total_calls"
+                                ],
+                                "description": "Denominator used for enum daily shares."
                             }
                         }
                     }

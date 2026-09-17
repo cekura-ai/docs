@@ -3090,6 +3090,26 @@
                 "x-docs-exclude": true
             }
         },
+        "/github/connection/refresh/": {
+            "post": {
+                "operationId": "github-connection-refresh-create",
+                "description": "POST — re-read this org's repository list from GitHub, authoritatively.\n\nThe connection GET answers from a cached list. That cache is only as fresh\nas the last webhook, and a webhook that never arrived — a rotated secret, a\ndelivery GitHub gave up on — leaves it stale indefinitely, showing\nrepositories the installation no longer grants. This is the button that\nsettles it: a fresh installation token, every page of GitHub's list, and the\nsaved row replaced with the answer.\n\nWhat it deliberately does not do: change anything on GitHub, reconnect an\ninactive installation, reactivate a suspended or deleted one, or start a\nscan. It only edits Cekura's copy of what GitHub already says, which is why\na member who can see the connection may press it while connect and\ndisconnect stay org-admin.",
+                "tags": [
+                    "github"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/github/install-url/": {
             "get": {
                 "operationId": "github-install-url-retrieve",
@@ -3183,7 +3203,7 @@
         "/github/webhook/": {
             "post": {
                 "operationId": "github-webhook-create",
-                "description": "GitHub App webhook. No auth class — the HMAC signature is the gate.",
+                "description": "GitHub App webhook. No auth class — the HMAC signature is the gate.\n\nTwo rules shape everything below, and they follow from one fact: **GitHub\ndoes not redeliver a webhook it saw fail.** A delivery we answer 2xx to is\ngone, redeliverable only by hand from the App's settings page.\n\n1. *Acknowledge last.* A delivery is recorded as processed only once its\n   state change is complete or its work has been durably accepted by the\n   broker. The old order — record, then handle, then return 200 whatever\n   happened — meant a handler that threw produced a delivery GitHub\n   considered delivered, us considered processed, and nobody had acted on.\n2. *Fail visibly.* A broker or handler failure answers non-2xx, so the\n   delivery shows as failed in GitHub's log and can be redelivered from\n   there. The inherited comment here warned about a retry storm; that risk\n   belongs to providers that retry automatically, and this one does not.\n\nDuplicates stay safe because the work is idempotent, not because the\nidempotency key is checked first: a lifecycle update is a set, and a\nrepository sync replaces the whole list under a compare-and-swap.",
                 "tags": [
                     "github"
                 ],
@@ -42006,6 +42026,70 @@
                 }
             }
         },
+        "/test_framework/v1/scenarios-external/validate_scenarios_json/": {
+            "post": {
+                "operationId": "scenarios-validate-json",
+                "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one.",
+                "summary": "Validate a JSON test-suite spec without running it",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{dry_run, valid, plan}"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-tool-name": "scenarios_validate_json"
+            }
+        },
         "/test_framework/v1/scenarios/{id}/": {
             "get": {
                 "operationId": "scenarios-retrieve_2",
@@ -48686,6 +48770,79 @@
                             }
                         },
                         "description": ""
+                    }
+                }
+            }
+        },
+        "/test_framework/v1/scenarios/validate_scenarios_json/": {
+            "post": {
+                "operationId": "scenarios-validate-json_2",
+                "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one.",
+                "summary": "Validate a JSON test-suite spec without running it",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{dry_run, valid, plan}"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-destructive": false,
+                "x-mcp-tool-name": "scenarios_validate_json",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "scenarios-validate-json",
+                        "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one."
                     }
                 }
             }
@@ -64679,6 +64836,70 @@
                         "description": ""
                     }
                 }
+            }
+        },
+        "/test_framework/v2/scenarios/validate_scenarios_json/": {
+            "post": {
+                "operationId": "scenarios-validate-json_3",
+                "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one.",
+                "summary": "Validate a JSON test-suite spec without running it",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/TestSuiteSpecUpload"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{dry_run, valid, plan}"
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                },
+                "x-mcp-tool-name": "scenarios_validate_json"
             }
         },
         "/user/api/v1/oauth-token/": {
@@ -85903,6 +86124,11 @@
                     "is_starred": {
                         "type": "boolean",
                         "description": "\nWhether the personality is starred\n"
+                    },
+                    "is_hidden": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "\nWhether the personality is hidden\n"
                     }
                 },
                 "required": [
@@ -94529,7 +94755,7 @@
                     },
                     "data": {
                         "type": "array",
-                        "description": "Chart data. Format depends on `chart_type`:\n\n**Line chart:** `[{id, timestamp, value}, ...]`\n\n**Bar chart:** `[{time_interval, value, sample_count}, ...]`\n\n**Pie chart:** `[{label, value, percentage}, ...]`\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#chart-output-formats) for full examples.",
+                        "description": "Chart data. Format depends on `chart_type`:\n\n**Line chart:** `[{id, timestamp, value}, ...]`\n\n**Bar chart:** `[{time_interval, value, sample_count}, ...]`\n\n**Enum daily share:** `[{time_interval, group, value, selected_calls, total_calls, evaluated_calls}, ...]`, where `value` is the selected enum value's percentage of total filtered calls.\n\n**Pie chart:** `[{label, value, percentage}, ...]`\n\nSee the [Dashboards guide](https://docs.cekura.ai/documentation/guides/dashboards#chart-output-formats) for full examples.",
                         "items": {
                             "type": "object"
                         },
@@ -94611,13 +94837,28 @@
                                     "boolean",
                                     "string",
                                     "datetime",
-                                    "dynamic"
+                                    "dynamic",
+                                    "percentage"
                                 ],
                                 "description": "Resolved data type of the field"
                             },
                             "filter_value": {
                                 "description": "The filter value used (e.g. metric ID), or null",
                                 "nullable": true
+                            },
+                            "series_dimension": {
+                                "type": "string",
+                                "enum": [
+                                    "enum_value"
+                                ],
+                                "description": "Server-supplied series dimension for enum daily shares."
+                            },
+                            "normalization": {
+                                "type": "string",
+                                "enum": [
+                                    "total_calls"
+                                ],
+                                "description": "Denominator used for enum daily shares."
                             }
                         }
                     }

@@ -1,0 +1,131 @@
+---
+title: "Gemini Enterprise CX Integration"
+sidebarTitle: "Gemini Enterprise CX"
+icon: "/logo/gemini_cx_icon1.svg"
+description: "Connect a Google Gemini Enterprise CX (CX Agent Studio) agent to Cekura without sharing any key: grant Cekura's identity read access through Google Cloud impersonation and test phone calls to your agent."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## Overview
+
+Gemini Enterprise CX is Google's platform for building customer-service agents (the successor of Dialogflow CX; the agent builder is called **CX Agent Studio**). Cekura connects to it the way Google recommends: **no key file leaves your Google Cloud project**. Instead, you create a small read-only service account in your project and allow one Cekura identity to act as it. Cekura then asks Google for a short-lived token each time it needs to read your agent, and Google checks your grant every time. Removing the grant cuts Cekura off immediately.
+
+Once connected, Cekura can dial your agent's phone number to run scenarios as a simulated caller, and can read the agent's conversation history from Google for observability.
+
+<Note>
+This guide covers **voice** agents reached over telephony. Text testing of Gemini Enterprise CX agents is not supported yet.
+</Note>
+
+## Prerequisites
+
+- A Google Cloud project that contains your CX Agent Studio agent, and its **location** (region), for example `us-central1` or `global`.
+- Permission in that project to create a service account and to edit its permissions (the **Service Account Admin** role, or Owner).
+- A phone number attached to the agent, if you want Cekura to place test calls.
+
+## How the connection works
+
+| Who | What | Where |
+|---|---|---|
+| You | Create a **reader** service account with read access to the agent | Your Google Cloud project |
+| You | Allow **Cekura's identity** to act as that reader (one permission grant) | Your Google Cloud project |
+| Cekura | Mints a short-lived token as your reader and reads the agent | At call time, checked by Google |
+
+Cekura's identity is a Google service account that Cekura owns, one per Cekura project. Its address is shown in the Cekura dashboard when you connect the agent. Only that address can use your grant.
+
+## Set up Google Cloud
+
+<Steps>
+  <Step title="Create the reader service account">
+    In the Google Cloud console, open **IAM & Admin → Service Accounts** in the project that contains your agent and click **Create service account**. Name it, for example, `cekura-reader`. Google generates its address in the form `cekura-reader@<your-project>.iam.gserviceaccount.com`. Copy it; you will paste it into Cekura.
+  </Step>
+
+  <Step title="Give the reader read access to the agent">
+    On the **Grant this service account access to project** step (or later under **IAM**), give the reader the **CX Agent Studio Viewer** role. This read-only role lets it list and read agents and their conversations, and nothing else. See Google's [access control page](https://docs.cloud.google.com/gemini-enterprise-cx/cx-agent-studio/access-control) for the full list of roles.
+  </Step>
+
+  <Step title="Get Cekura's identity">
+    In Cekura, go to **Agents**, create an agent, and select **Gemini Enterprise CX** as the provider. The setup card shows the Cekura identity for your project. Click **Copy**.
+
+    <img src="/images/gemini-cx/setup-steps.png" alt="Cekura setup card showing the identity to grant and the three setup steps" />
+  </Step>
+
+  <Step title="Allow Cekura's identity to act as the reader">
+    Back in the Google Cloud console, open the reader service account you created, go to its **Permissions** tab, click **Grant access**, paste the Cekura identity as the principal and give it the role **Service Account Token Creator**. Save.
+
+    This is the only link between your project and Cekura. Cekura can now request tokens that act as the reader, and nothing more. New grants take up to a minute to apply.
+  </Step>
+</Steps>
+
+## Connect the agent in Cekura
+
+<Steps>
+  <Step title="Select Gemini Enterprise CX">
+    In Cekura, go to **Agents**, create an agent, and select **Gemini Enterprise CX**. If you don't see it, click **More options** to expand the full provider list.
+
+    <img src="/images/gemini-cx/select-provider.png" alt="Gemini Enterprise CX selected in the Cekura provider grid" />
+  </Step>
+
+  <Step title="Enter the agent details">
+    Fill in the fields under **Integration Settings**:
+
+    | Field | Value |
+    |---|---|
+    | **Reader service account email** | The reader's address from your project, `cekura-reader@<your-project>.iam.gserviceaccount.com`. |
+    | **Location** | The agent's region, for example `us-central1` or `global`. |
+    | **GCP Project ID** | Optional. Taken from the reader's address; set it only if the agent lives in a different project than the reader. |
+    | **CX Agent ID** | Optional. The agent's id in CX Agent Studio. |
+
+    <img src="/images/gemini-cx/integration-settings.png" alt="Reader service account email, Location, GCP Project ID and CX Agent ID fields in Cekura Integration Settings" />
+  </Step>
+
+  <Step title="Test the connection">
+    Click **Test connection**. Cekura asks Google for a token acting as your reader and shows the result. **Connected** means the grant works. **Not connected** shows Google's answer and what to check.
+
+    <img src="/images/gemini-cx/connection-status.png" alt="Connection status row with the Test connection button" />
+  </Step>
+
+  <Step title="Add the phone number">
+    Under **Connections**, **Telephony** is on. Enter the phone number attached to your agent under **Telephony Settings**. Leave **Inbound** on so Cekura dials your number.
+
+    <img src="/images/gemini-cx/telephony-settings.png" alt="Telephony Settings with the agent's phone number and Inbound enabled" />
+  </Step>
+
+  <Step title="Save the agent">
+    Save the agent. The connection status is stored with it, so you can see when it was last checked and re-test at any time from the agent's settings.
+
+    <img src="/images/gemini-cx/settings-configured.png" alt="Saved Gemini Enterprise CX integration settings with the connection status" />
+  </Step>
+</Steps>
+
+## Run a test
+
+Open an evaluator, click **Run**, and start the run using the **Telephony** connection. Cekura dials your agent's number and plays the scenario as the caller. The result shows Cekura's transcript of the call.
+
+## Troubleshooting
+
+- **Not connected: Google refused to let … act as …**: the reader has not granted the Cekura identity shown in the card, or the grant names a different address. Open the reader's **Permissions** tab and check that the principal is exactly the address in the card with the **Service Account Token Creator** role. Wait a minute after adding it.
+- **The service account belongs to project X, not Y**: the **GCP Project ID** you typed does not match the project in the reader's address. Clear the field to use the reader's project, or enter the project that actually contains the agent.
+- **Cekura's Google identity is not available right now**: Cekura's side is not configured for Google Cloud in this environment. Contact Cekura support.
+- **Revoking access**: remove the Service Account Token Creator grant from the reader, or delete the reader. Cekura's next request is refused by Google.
+
+## Configure through the API
+
+When creating or updating an agent through the [API](/api-reference/test_framework/create-agent), set the provider to `gemini_cx`, put the CX agent id in `assistant_id`, and pass the access details:
+
+```json
+{
+  "assistant_provider": "gemini_cx",
+  "transcript_provider": "gemini_cx",
+  "assistant_id": "<cx-agent-id>",
+  "gemini_cx_data": {
+    "service_account_email": "cekura-reader@your-project.iam.gserviceaccount.com",
+    "location": "us-central1"
+  },
+  "contact_number": "+15551234567"
+}
+```
+
+`project_id` inside `gemini_cx_data` is optional and defaults to the project in the reader's address. Nothing here is secret. The read-only `gemini_cx_connection` field on the agent reports the last connection check: `status` (`not_checked`, `connected` or `failed`), `checked_at`, `acting_as` and `error`.

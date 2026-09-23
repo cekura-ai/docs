@@ -63,6 +63,7 @@ _FAMILIES = (
             "scenarios_partial_update",
             "scenarios_create_from_transcript_bg",
             "scenarios_update_scenario_with_transcript_create",
+            "scenarios_duplicate_create",
             "test_profiles_create",
             "test_profiles_partial_update",
         },
@@ -75,6 +76,19 @@ _FAMILIES = (
         command_slugs={"manual-create-update-eval", "autogen-eval"},
         load_hint='cekura_load_skill(skill_name="cekura-eval-design")',
         write_hint="scenario / test-profile write calls (`scenarios_*`, `test_profiles_*`)",
+    ),
+    _family(
+        "personality-design",
+        write_tools={
+            "personalities_create",
+            "personalities_partial_update",
+        },
+        skill_slugs={
+            "cekura-personality-design",
+        },
+        command_slugs=set(),
+        load_hint='cekura_load_skill(skill_name="cekura-personality-design")',
+        write_hint="personality write calls (`personalities_create`, `personalities_partial_update`)",
     ),
     _family(
         "metric-design",
@@ -94,8 +108,23 @@ _FAMILIES = (
     ),
 )
 
-# Every tool the gate can act on. Read/list/run and generation tools are
-# intentionally absent — the model does not author their payload content.
+# Every tool the gate can act on. Read/list/run tools are absent: nothing is
+# authored to gate.
+#
+# Duplication is here even though the model writes no payload, because what it
+# does write is a decision — which evaluators to copy and where — and the
+# defects that follow land in the conversions it makes afterwards through the
+# gated update tools. A 2026-09 product-chat audit traced 18 duplicated
+# scenarios with stale expected outcomes and wrong-direction DTMF tools to
+# exactly that sequence.
+#
+# `scenarios_generate_bg` is deliberately NOT here yet, and its absence is a
+# sequencing decision rather than a judgement that generation is safe. The
+# product-chat runtime gates it already. Gating it here too would stop the
+# onboarding and report playbooks, which call it directly and carry no tag in
+# this family, and the denial asks the caller to load eval-design — which
+# onboarding's own text forbids mid-workflow. It belongs here once those two
+# playbooks carry a tag the eval-design family accepts.
 GATED_TOOLS = frozenset().union(*(f["write_tools"] for f in _FAMILIES))
 
 # Every slug that can carry a recognized tag.

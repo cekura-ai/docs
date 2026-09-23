@@ -185,6 +185,15 @@ class OpenAPIParser:
 
         properties = {}
         for prop_name, prop_schema in schema.get("properties", {}).items():
+            # Server-owned fields. drf-spectacular marks a property `readOnly`
+            # exactly when the serializer refuses it as input, so offering it as a
+            # tool argument invites a write that is silently dropped — the model
+            # sends `accent` or `provider_agent_id`, gets a 200 back, and reports
+            # a change that never happened. These schemas are request bodies only
+            # (responses are documented separately), so nothing here needs them.
+            if prop_schema.get("readOnly"):
+                continue
+
             prop_description = prop_schema.get("description", "")
 
             # Resolve oneOf/anyOf to a concrete type. When one option is {} (any-type),

@@ -3,7 +3,7 @@ title: "Kore.ai Integration"
 sidebarTitle: "Kore.ai"
 icon: "phone"
 iconType: "regular"
-description: "Connect a Kore.ai Contact Center AI app to Cekura to run phone-based simulations and pull the Kore.ai conversation history and service-call logs into every result."
+description: "Connect a Kore.ai XO Platform app or a Kore.ai Agent Platform (Artemis) project to Cekura to run phone-based simulations and pull the Kore.ai transcript, tool calls, and LLM usage into every result."
 ---
 
 import { CopyPageButton } from "/snippets/copy-page-button.mdx";
@@ -12,19 +12,30 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 ## Overview
 
-Cekura tests Kore.ai voice agents over the phone. Cekura dials the number attached to your Kore.ai flow, runs the scenario as a simulated caller, and then uses the Kore.ai public APIs to find that session and fetch its conversation history. The result shows the transcript as recorded by Kore.ai, with every service-node (integration) call the flow made shown inline as a function call.
+Cekura tests Kore.ai voice agents over the phone. Cekura dials the number attached to your Kore.ai agent, runs the scenario as a simulated caller, and then uses the Kore.ai public APIs to find that session and fetch its conversation history. The result shows the transcript as recorded by Kore.ai, with every tool or service call the agent made shown inline as a function call.
+
+Kore.ai offers two products, and Cekura supports both under the same **Kore.ai** provider. Pick the one your agent runs on with the **Platform** setting:
+
+| Platform | Kore.ai product | Credentials |
+|---|---|---|
+| **XO** (default) | XO Platform, Contact Center AI apps built from flows | Client ID, Client Secret, and App ID from an API scope mapping |
+| **Artemis** | Kore.ai Agent Platform, LLM agents with tools and handoffs | A project-bound API key, the platform host, and the project ID |
+
+Existing Kore.ai agents are on the XO platform and keep working unchanged. Follow the [XO Platform](#xo-platform) section or the [Agent Platform (Artemis)](#agent-platform-artemis) section depending on your setup.
 
 <Note>
-This guide covers **voice** testing over telephony. Kore.ai chat testing uses a separate Web Client API key under **Kore.ai Chat Settings** and is not covered here.
+This guide covers **voice** testing over telephony. Kore.ai chat testing is available for XO Platform agents only, using a separate Web Client API key under **Kore.ai Chat Settings**, and is not covered here. Artemis agents are tested over voice only.
 </Note>
 
-## Prerequisites
+## XO Platform
+
+### Prerequisites
 
 - A Kore.ai **Contact Center AI** app on the XO Platform, with the flow you want to test.
 - A phone number added to that app and attached to the flow.
 - An **API scope** mapping for the app (created below) that lets Cekura read sessions, chat history, and debug logs.
 
-## Set up Kore.ai
+### Set up Kore.ai
 
 <Steps>
   <Step title="Create the app">
@@ -52,7 +63,7 @@ This guide covers **voice** testing over telephony. Kore.ai chat testing uses a 
   </Step>
 </Steps>
 
-## Connect Kore.ai in Cekura
+### Connect Kore.ai in Cekura
 
 <Steps>
   <Step title="Select Kore.ai">
@@ -66,6 +77,7 @@ This guide covers **voice** testing over telephony. Kore.ai chat testing uses a 
 
     | Field | Value |
     |---|---|
+    | **Platform** | Leave on **XO**. |
     | **Kore.ai Client Secret** | The Client Secret from the API scope mapping. Stored encrypted and never shown again. |
     | **Kore.ai Client ID** | The Client ID from the API scope mapping (`cs-...`). |
     | **Kore.ai Bot ID** | The **App ID** of your Contact Center AI app (`st-...`). |
@@ -87,7 +99,7 @@ This guide covers **voice** testing over telephony. Kore.ai chat testing uses a 
   </Step>
 </Steps>
 
-## Run a test
+### Run a test
 
 Open an evaluator, click **Run**, and start the run using the **Telephony** connection. Cekura dials your Kore.ai number and plays the scenario as the caller.
 
@@ -104,14 +116,14 @@ In the result, Kore.ai bot turns are labeled **Main Agent** and caller turns are
 If Cekura cannot find a matching session, the result keeps Cekura's own transcript of the call. See the troubleshooting section below.
 </Note>
 
-## Troubleshooting
+### Troubleshooting
 
 - **Authentication fails**: check that the API scope mapping uses **HS256**, and that the Client ID and Client Secret come from the same mapping. The Bot ID must be the App ID (`st-...`) of the app that owns the mapping.
 - **No Kore.ai transcript on the result**: make sure the mapping has the **App Sessions** and **Chat History** scopes, and that the number under **Telephony Settings** is the one attached to the flow you tested.
 - **Transcript present but no Function Call entries**: add the **Debug Logs** scope to the mapping. Without it Cekura still imports the conversation but cannot see the flow's service-node calls.
 - **Host errors**: if you set **Kore.ai Host**, enter only the domain, for example `platform.kore.ai`.
 
-## Configure through the API
+### Configure through the API
 
 When creating or updating an agent through the [API](/api-reference/test_framework/create-agent), set the provider to `koreai` and pass the credentials:
 
@@ -129,3 +141,107 @@ When creating or updating an agent through the [API](/api-reference/test_framewo
 ```
 
 Add `"host"` to `koreai_data` only if your account runs on a dedicated Kore.ai host. The response never returns the secret. Use the read-only `koreai_client_secret_configured` field to check whether one is stored.
+
+## Agent Platform (Artemis)
+
+Kore.ai Agent Platform agents are LLM-driven: a supervisor agent identifies the caller, routes to specialised sub-agents, calls tools, and may transfer the call to a human queue. Cekura pairs the test call with the Agent Platform session, imports its transcript and tool calls, and keeps the session's LLM usage with the result.
+
+### Prerequisites
+
+- A Kore.ai Agent Platform **project** containing the voice agent you want to test, reachable on a phone number.
+- The **host** your project runs on, for example `ind-agents.kore.ai`. Enter the domain only, without `https://`.
+- A **project-bound API key** for that project with the `session:read` and `analytics:read` permissions. Ask your Kore.ai administrator to issue one; it starts with `abl_`.
+- If Cekura dials from its own numbers, make sure the Kore.ai project accepts calls from them. Kore.ai only creates a session once the call reaches the agent, so an IVR or allow-list in front of it must let the Cekura number through.
+
+### Connect Kore.ai Agent Platform in Cekura
+
+<Steps>
+  <Step title="Select Kore.ai">
+    In Cekura, go to **Agents**, create an agent, and select **Kore.ai** as the provider. If you don't see it, click **More options** to expand the full provider list.
+  </Step>
+
+  <Step title="Switch the platform to Artemis">
+    Under **Integration Settings**, set **Platform** to **Artemis**. The XO fields are replaced by the Agent Platform fields:
+
+    | Field | Value |
+    |---|---|
+    | **Kore.ai API Key** | The project-bound API key (`abl_...`). Stored encrypted and never shown again. |
+    | **Kore.ai Host** | The Agent Platform host, for example `ind-agents.kore.ai`. Domain only. |
+    | **Kore.ai Project ID** | The ID of the project the API key is bound to. |
+
+    Switching platforms does not delete the other platform's credentials. An agent can hold both sets, and **Platform** decides which one Cekura uses.
+  </Step>
+
+  <Step title="Add the phone number">
+    Under **Connections**, turn on **Telephony**, then enter the phone number that reaches your Agent Platform agent under **Telephony Settings**. Leave **Inbound** on so Cekura dials your number.
+  </Step>
+
+  <Step title="Save the agent">
+    Save the agent. The key field shows **API Key Configured** once it is stored; use **Update** to rotate it later.
+  </Step>
+</Steps>
+
+### Run a test
+
+Open an evaluator, click **Run**, and start the run using the **Telephony** connection. Cekura dials your number and plays the scenario as the caller.
+
+When the call ends, Cekura:
+
+1. Lists the project's voice sessions that started between 30 seconds before Cekura placed the call and 60 seconds after it ended. Kore.ai indexes a finished session a few seconds after the call, so Cekura retries for up to two minutes if nothing is there yet.
+2. Fetches each candidate's conversation history and confirms the match by comparing timing and conversation content, so parallel test calls to the same number are each paired with the right session.
+3. Handles **transferred calls**. If the agent handed the caller to a human queue, Kore.ai's session covers only the middle of the call: it starts after the IVR and ends at the transfer. Cekura places that slice on its own timeline and matches it against the same stretch of its transcript, so the session is still paired even though the two transcripts differ in length.
+4. Fetches the matched session's tool calls, failed LLM and tool calls, and per-call LLM usage, and attaches the session ID to the result.
+
+In the result, agent turns are labeled **Main Agent** and caller turns **Testing Agent**. Each tool the agent ran appears as a **Function Call** entry with its arguments and a **Function Call Result** entry with its response. Handoffs between sub-agents appear the same way, showing the sub-agent that took over and what it said to the caller. Kore.ai's internal bookkeeping calls are left out.
+
+The result's provider data holds the session summary (status, duration, message and token counts, estimated cost), one row per LLM call (model, tokens, latency, cost, status, and whether it produced a spoken response or a filler phrase), and any failed LLM or tool calls with their reason.
+
+<Note>
+Kore.ai's session ends when the agent transfers the call. Anything the caller hears after that, such as queue announcements or a human agent, is not in the Kore.ai transcript. Cekura's own recording still covers the full call.
+</Note>
+
+### Troubleshooting
+
+- **Authentication fails**: the API key is invalid, expired, or missing the `session:read` or `analytics:read` permission. Kore.ai returns the same error for a key bound to a different project, so also check **Kore.ai Project ID**.
+- **No Kore.ai transcript on the result**: confirm the call reached the agent. Kore.ai does not create a session for a call that ended in the IVR or was rejected by an allow-list, and the result then keeps Cekura's own transcript.
+- **Transcript stops early**: the agent transferred the call. Kore.ai logs nothing after a transfer; see the note above.
+- **Chat runs are refused**: Agent Platform agents can only be tested over voice. Switch **Platform** to **XO** if you need Kore.ai chat testing.
+- **Host errors**: enter only the domain, for example `ind-agents.kore.ai`.
+
+### Configure through the API
+
+Artemis uses the same `koreai` provider. Set `"platform": "artemis"` and pass the Agent Platform credentials inside `koreai_data`:
+
+```json
+{
+  "assistant_provider": "koreai",
+  "transcript_provider": "koreai",
+  "koreai_data": {
+    "platform": "artemis",
+    "artemis_api_key": "abl_...",
+    "artemis_host": "ind-agents.kore.ai",
+    "artemis_project_id": "<project-id>"
+  },
+  "contact_number": "+914068511282"
+}
+```
+
+Through the v2 agent API the same values go under `provider.credentials.config`:
+
+```json
+{
+  "provider": {
+    "type": "koreai",
+    "credentials": {
+      "config": {
+        "platform": "artemis",
+        "artemis_api_key": "abl_...",
+        "artemis_host": "ind-agents.kore.ai",
+        "artemis_project_id": "<project-id>"
+      }
+    }
+  }
+}
+```
+
+`platform` accepts `xo` (the default when omitted) or `artemis`. Updates merge into the stored configuration, so a later request can send only the keys that change, and switching `platform` keeps the other platform's credentials in place. The response never returns the key. Use the read-only `artemis_api_key_configured` field inside `koreai_data` to check whether one is stored.

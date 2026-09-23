@@ -1,8 +1,9 @@
 name: Deploy MCP Server (PROD)
 
-# Targets the new AWS account (cet-prd-cekura-workload-prod, us-west-2).
-# Builds + pushes image to shared-services ECR (212351099297), then
-# deploys to the new prod workload account (593108103736) us-west-2 cluster.
+# Builds once in shared-services ECR, waits for cross-region replication, then
+# deploys the same image tag to the selected production MCP services. Normal
+# pushes deploy all three production regions; manual dispatch can select a
+# subset.
 
 on:
   push:
@@ -14,12 +15,26 @@ on:
       - 'mint.json'
       - 'scripts/**'
       - '.github/workflows/deploy-mcp-server.yml'
+  workflow_dispatch:
+    inputs:
+      deploy-usa:
+        description: 'Deploy USA (us-west-2)'
+        required: false
+        type: boolean
+        default: true
+      deploy-india:
+        description: 'Deploy India (ap-south-1)'
+        required: false
+        type: boolean
+        default: true
+      deploy-eu:
+        description: 'Deploy EU (eu-central-1)'
+        required: false
+        type: boolean
+        default: true
 
 env:
-  AWS_REGION: us-west-2
   ECR_REPOSITORY: cekura/mcp-server
-  ECS_CLUSTER: cet-prd-usw2-cekura-ecs-cluster
-  ECS_SERVICE: cet-prd-usw2-mcp-server-ecs-service
 
 permissions:
   id-token: write
@@ -31,10 +46,10 @@ concurrency:
 
 jobs:
   build:
+    name: build
     runs-on: ubuntu-latest
     outputs:
-      image-tag: ${{ steps.construct-tag.outputs.image-tag }}
-      registry: ${{ steps.login-ecr.outputs.registry }}
+      image-tag: ${{ steps.publish-tag.outputs.image-tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,7 +63,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN_SHARED }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-west-2
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -65,15 +80,15 @@ jobs:
       - name: Generate structured llms.txt
         run: python3 scripts/generate_llms_txt.py --write
 
-      - name: Construct Docker image tag
+      - name: Construct image tag
         id: construct-tag
         run: |
           SHORT_SHA=$(git rev-parse --short HEAD)
           BRANCH_NAME=${GITHUB_REF_NAME//\//-}
-          IMAGE_TAG="${BRANCH_NAME}-${SHORT_SHA}"
-          echo "image-tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "image-tag=${BRANCH_NAME}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push image to ECR
+      - name: Build and push image to shared-services ECR
+        id: build-image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -85,64 +100,188 @@ jobs:
             type=gha,scope=mcp-server-main
           cache-to: type=gha,mode=max,scope=mcp-server-${{ github.ref_name }}
 
-  deploy:
-    name: deploy
-    needs: [build]
+      - name: Publish image tag
+        id: publish-tag
+        shell: bash
+        run: echo "image-tag=${{ steps.construct-tag.outputs.image-tag }}" >> "$GITHUB_OUTPUT"
+
+  build-matrix:
+    name: resolve deployment regions
+    needs: build
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Build deployment matrix
+        id: set-matrix
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            DEPLOY_USA=true
+            DEPLOY_INDIA=true
+            DEPLOY_EU=true
+          else
+            DEPLOY_USA='${{ inputs.deploy-usa }}'
+            DEPLOY_INDIA='${{ inputs.deploy-india }}'
+            DEPLOY_EU='${{ inputs.deploy-eu }}'
+          fi
+
+          REGIONS='[]'
+          if [[ "$DEPLOY_USA" == "true" ]]; then
+            REGIONS=$(echo "$REGIONS" | jq -c '. += [{"environment":"prod-usw2","aws_region":"us-west-2","cluster":"cet-prd-usw2-cekura-ecs-cluster","service":"cet-prd-usw2-mcp-server-ecs-service","task_def_dir":"prod-usw2","desired_count":2,"display_name":"USA (us-west-2)"}]')
+          fi
+          if [[ "$DEPLOY_INDIA" == "true" ]]; then
+            REGIONS=$(echo "$REGIONS" | jq -c '. += [{"environment":"prod-aps1","aws_region":"ap-south-1","cluster":"cet-prd-aps1-cekura-ecs-cluster","service":"cet-prd-aps1-mcp-server-ecs-service","task_def_dir":"prod-aps1","desired_count":1,"display_name":"India (ap-south-1)"}]')
+          fi
+          if [[ "$DEPLOY_EU" == "true" ]]; then
+            REGIONS=$(echo "$REGIONS" | jq -c '. += [{"environment":"prod-euc1","aws_region":"eu-central-1","cluster":"cet-prd-euc1-cekura-ecs-cluster","service":"cet-prd-euc1-mcp-server-ecs-service","task_def_dir":"prod-euc1","desired_count":1,"display_name":"EU (eu-central-1)"}]')
+          fi
+
+          if [[ $(echo "$REGIONS" | jq 'length') -eq 0 ]]; then
+            echo 'At least one production region must be selected.' >&2
+            exit 1
+          fi
+          echo "matrix={\"include\":$REGIONS}" >> "$GITHUB_OUTPUT"
+
+  wait-for-replication-india:
+    name: wait for ECR replication to India
+    needs: [build, build-matrix]
+    if: contains(needs.build-matrix.outputs.matrix, 'ap-south-1')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_SHARED }}
+          aws-region: ap-south-1
+
+      - name: Wait for image in India ECR
+        shell: bash
+        run: |
+          IMAGE_TAG='${{ needs.build.outputs.image-tag }}'
+          for attempt in $(seq 1 30); do
+            if aws ecr describe-images \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-ids imageTag="$IMAGE_TAG" \
+              --region ap-south-1 >/dev/null 2>&1; then
+              echo "Image $IMAGE_TAG is available in India ECR."
+              exit 0
+            fi
+            echo "Attempt $attempt/30: image is not available in India ECR; waiting 10 seconds."
+            sleep 10
+          done
+          echo "Image $IMAGE_TAG was not replicated to India ECR." >&2
+          exit 1
+
+  wait-for-replication-eu:
+    name: wait for ECR replication to EU
+    needs: [build, build-matrix]
+    if: contains(needs.build-matrix.outputs.matrix, 'eu-central-1')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN_SHARED }}
+          aws-region: eu-central-1
+
+      - name: Wait for image in EU ECR
+        shell: bash
+        run: |
+          IMAGE_TAG='${{ needs.build.outputs.image-tag }}'
+          for attempt in $(seq 1 30); do
+            if aws ecr describe-images \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-ids imageTag="$IMAGE_TAG" \
+              --region eu-central-1 >/dev/null 2>&1; then
+              echo "Image $IMAGE_TAG is available in EU ECR."
+              exit 0
+            fi
+            echo "Attempt $attempt/30: image is not available in EU ECR; waiting 10 seconds."
+            sleep 10
+          done
+          echo "Image $IMAGE_TAG was not replicated to EU ECR." >&2
+          exit 1
+
+  deploy:
+    name: deploy ${{ matrix.display_name }}
+    needs: [build, build-matrix, wait-for-replication-india, wait-for-replication-eu]
+    if: >-
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.wait-for-replication-india.result == 'success' || needs.wait-for-replication-india.result == 'skipped') &&
+      (needs.wait-for-replication-eu.result == 'success' || needs.wait-for-replication-eu.result == 'skipped')
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (workload account for ECS deploy)
+      - name: Configure AWS credentials for ${{ matrix.display_name }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN_PROD }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ matrix.aws_region }}
 
-      - name: Render + register task definition
+      - name: Render and register task definition
         id: register
+        shell: bash
         run: |
           sed "s|<IMAGE_TAG>|${{ needs.build.outputs.image-tag }}|g" \
-            cekura-mcp-server/deployment/ecs/prod-usw2/mcp-server-task-def.json \
-            > /tmp/mcp-server-task-def.rendered.json
+            "cekura-mcp-server/deployment/ecs/${{ matrix.task_def_dir }}/mcp-server-task-def.json" \
+            > /tmp/mcp-server-task-def-rendered.json
           TASK_DEF_ARN=$(aws ecs register-task-definition \
-            --cli-input-json file:///tmp/mcp-server-task-def.rendered.json \
+            --cli-input-json file:///tmp/mcp-server-task-def-rendered.json \
+            --region "${{ matrix.aws_region }}" \
             --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "task-def-arn=$TASK_DEF_ARN" >> "$GITHUB_OUTPUT"
 
       - name: Update ECS service
+        id: update
+        shell: bash
         run: |
           aws ecs update-service \
-            --cluster "$ECS_CLUSTER" \
-            --service "$ECS_SERVICE" \
+            --cluster "${{ matrix.cluster }}" \
+            --service "${{ matrix.service }}" \
             --task-definition "${{ steps.register.outputs.task-def-arn }}" \
+            --desired-count "${{ matrix.desired_count }}" \
             --force-new-deployment \
+            --region "${{ matrix.aws_region }}" \
             --query 'service.[serviceName,taskDefinition,desiredCount]' --output text
 
-      - name: Wait for service stable
+      - name: Wait for ECS service stability
+        shell: bash
         run: |
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
-          echo "✅ Service stable"
+          aws ecs wait services-stable \
+            --cluster "${{ matrix.cluster }}" \
+            --services "${{ matrix.service }}" \
+            --region "${{ matrix.aws_region }}"
+          echo "${{ matrix.display_name }} MCP service is stable."
 
   notify:
-    needs: [build, deploy]
+    name: notify
+    needs: [build, build-matrix, wait-for-replication-india, wait-for-replication-eu, deploy]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Compose message
         id: collect
+        shell: bash
         run: |
-          IMAGE_TAG="${{ needs.build.outputs.image-tag }}"
-          if [ "${{ needs.build.result }}" != "success" ]; then
-            echo "message=*❌ mcp-server build failed for prod!* (tag: ${IMAGE_TAG:-n/a})" >> "$GITHUB_OUTPUT"
-          elif [ "${{ needs.deploy.result }}" = "success" ]; then
-            echo "message=*✅ mcp-server deployed to prod* (tag: ${IMAGE_TAG})" >> "$GITHUB_OUTPUT"
+          IMAGE_TAG='${{ needs.build.outputs.image-tag }}'
+          REGIONS=$(echo '${{ needs.build-matrix.outputs.matrix }}' | jq -r '.include[].display_name' | paste -sd ', ' -)
+          if [[ '${{ needs.build.result }}' != 'success' ]]; then
+            echo "message=*❌ mcp-server build failed for prod!* (regions: $REGIONS)" >> "$GITHUB_OUTPUT"
+          elif [[ '${{ needs.wait-for-replication-india.result }}' == 'failure' ]]; then
+            echo "message=*❌ mcp-server deployment blocked!* Image $IMAGE_TAG did not replicate to India." >> "$GITHUB_OUTPUT"
+          elif [[ '${{ needs.wait-for-replication-eu.result }}' == 'failure' ]]; then
+            echo "message=*❌ mcp-server deployment blocked!* Image $IMAGE_TAG did not replicate to EU." >> "$GITHUB_OUTPUT"
+          elif [[ '${{ needs.deploy.result }}' == 'success' ]]; then
+            echo "message=*✅ mcp-server deployed to $REGIONS* (tag: $IMAGE_TAG)" >> "$GITHUB_OUTPUT"
           else
-            DD_LINK="https://us5.datadoghq.com/logs?query=env%3Aprod%20version%3A${IMAGE_TAG}%20service%3Amcp-server"
-            echo "message=*❌ mcp-server deploy to prod failed* (tag: ${IMAGE_TAG}) - <${DD_LINK}|Datadog logs>" >> "$GITHUB_OUTPUT"
+            echo "message=*❌ mcp-server deployment failed in one or more regions* (tag: $IMAGE_TAG)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Notify Slack
@@ -152,12 +291,12 @@ jobs:
           SLACK_CHANNEL: ${{ vars.SLACK_DEPLOYMENTS_CHANNEL }}
           MESSAGE: ${{ steps.collect.outputs.message }}
         run: |
-          if [ -z "$SLACK_TOKEN" ] || [ -z "$SLACK_CHANNEL" ]; then
-            echo "(Slack creds missing — skipping notification)"
+          if [[ -z "$SLACK_TOKEN" || -z "$SLACK_CHANNEL" ]]; then
+            echo '(Slack credentials missing; skipping notification.)'
             exit 0
           fi
           curl -sS -X POST https://slack.com/api/chat.postMessage \
             -H "Authorization: Bearer $SLACK_TOKEN" \
             -H 'Content-Type: application/json; charset=utf-8' \
-            -d "$(jq -n --arg ch "$SLACK_CHANNEL" --arg msg "$MESSAGE" '{channel:$ch,text:$msg}')" \
+            -d "$(jq -n --arg channel "$SLACK_CHANNEL" --arg message "$MESSAGE" '{channel:$channel,text:$message}')" \
             | jq '{ok,error}'

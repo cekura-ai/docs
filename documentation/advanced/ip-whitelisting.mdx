@@ -52,37 +52,21 @@ Twilio uses one global media range for every region and edge location. This is r
 
 Allow the **full UDP port range**, in both directions. Twilio picks a port from this range for each call, so allowing only some ports makes calls fail at random.
 
-### 2. Regional signaling IP ranges (SIP)
+### 2. Signaling IP ranges (SIP)
 
-Cekura's calls normally arrive from the Virginia range:
+Cekura's calls come from Twilio's Virginia region. Allow the Virginia range, and the Oregon range as well so calls keep working if Twilio fails over from Virginia to Oregon:
 
-| Region | Edge | IP range | Ports |
-|---|---|---|---|
-| North America Virginia (`us1`) | `ashburn` | `54.172.60.0/30` (`54.172.60.0` – `54.172.60.3`) | UDP/TCP `5060`, TLS `5061` |
+| Region | Edge | IP range | Ports | Status |
+|---|---|---|---|---|
+| North America Virginia (`us1`) | `ashburn` | `54.172.60.0/30` (`54.172.60.0` – `54.172.60.3`) | UDP/TCP `5060`, TLS `5061` | Required |
+| North America Oregon (`us2`) | `umatilla` | `54.244.51.0/30` (`54.244.51.0` – `54.244.51.3`) | UDP/TCP `5060`, TLS `5061` | Recommended (failover) |
 
-Allow the whole `/30` range, not a single address. Twilio can send a call from any IP in it.
-
-<Warning>
-Twilio asks you to allow the signaling ranges for **all** of its regions. If the Virginia gateways are down, Twilio routes calls through another region, such as Oregon. Allowing only Virginia works day to day, but calls can fail during a Twilio failover.
-</Warning>
-
-| Region | IP range | Ports |
-|---|---|---|
-| North America Virginia (`us1`) | `54.172.60.0/30` | UDP/TCP `5060`, TLS `5061` |
-| North America Oregon (`us2`) | `54.244.51.0/30` | UDP/TCP `5060`, TLS `5061` |
-| Europe Ireland (`ie1`) | `54.171.127.192/30` | UDP/TCP `5060`, TLS `5061` |
-| Europe Frankfurt (`de1`) | `35.156.191.128/30` | UDP/TCP `5060`, TLS `5061` |
-| Asia Pacific Tokyo (`jp1`) | `54.65.63.192/30` | UDP/TCP `5060`, TLS `5061` |
-| Asia Pacific Singapore (`sg1`) | `54.169.127.128/30` | UDP/TCP `5060`, TLS `5061` |
-| Asia Pacific Sydney (`au1`) | `54.252.254.64/30` | UDP/TCP `5060`, TLS `5061` |
-| South America São Paulo (`br1`) | `177.71.206.192/30` | UDP/TCP `5060`, TLS `5061` |
-
-Twilio may change these ranges. Check the [Twilio page](https://www.twilio.com/docs/sip-trunking/ip-addresses) for the current list.
+Allow each whole `/30` range, not a single address. Twilio can send a call from any IP in it. Twilio may change these ranges; see [Twilio SIP IP addresses](https://www.twilio.com/docs/sip-trunking/ip-addresses) for the current list, including its other regions.
 
 ### Checklist
 
 - Allow RTP to and from the global media range `168.86.128.0/18` on UDP ports `10000` – `60000`.
-- Allow inbound SIP from the Twilio signaling ranges (Virginia at minimum, all regions recommended) on the port your endpoint listens on (`5060` for UDP/TCP, `5061` for TLS).
+- Allow inbound SIP from the Twilio signaling ranges (Virginia required, Oregon recommended) on the port your endpoint listens on (`5060` for UDP/TCP, `5061` for TLS).
 - If your endpoint is behind NAT, make sure the SDP it sends advertises its public IP and port, so Twilio's audio can reach it.
 - Your endpoint must accept the G.711 codecs, μ-law (PCMU) or A-law (PCMA). DTMF is sent as RFC 2833 events.
 - For encrypted signaling, add `;transport=tls` to your SIP endpoint (for example `sip:agent@yourdomain.com;transport=tls`). Twilio then connects on port `5061`.
@@ -90,7 +74,7 @@ Twilio may change these ranges. Check the [Twilio page](https://www.twilio.com/d
 
 ### Twilio references
 
-- [SIP IP addresses and ports](https://www.twilio.com/docs/sip-trunking/ip-addresses): the global media range and regional signaling ranges above
+- [SIP IP addresses and ports](https://www.twilio.com/docs/sip-trunking/ip-addresses): the global media range and signaling ranges above
 - [SIP Interface](https://www.twilio.com/docs/voice/api/sip-interface): supported codecs, TLS, and secure media (SRTP)
 - [Sending SIP from Twilio](https://www.twilio.com/docs/voice/api/sending-sip): how Twilio places calls to SIP endpoints
 - [TwiML `<Sip>`](https://www.twilio.com/docs/voice/twiml/sip): transport options and custom header limits

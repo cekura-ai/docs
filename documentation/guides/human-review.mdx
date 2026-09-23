@@ -1,0 +1,143 @@
+---
+title: "Human Review"
+sidebarTitle: "Human Review"
+icon: "clipboard-check"
+iconType: "regular"
+description: "Label real calls to produce ground truth, measure how far each metric is from your reviewers, and feed those labels back into the metric."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+A metric is a judgement, and a judgement is only trustworthy if you have checked
+it against a human's. Human Review is where that checking happens: you collect
+real calls into a **dataset**, people label them for the metrics you care about,
+and Cekura reports how often each metric agreed. Those labels are also what
+[Metric Lab](/documentation/guides/metric-lab) optimizes a metric against.
+
+## What a dataset is
+
+A dataset is a named set of calls plus the metrics reviewers should label on
+them. Two things follow from that shape:
+
+- **A call is added once, not once per metric.** Whatever metrics the dataset
+  targets, a reviewer answers them all in a single pass over the call.
+- **A call can sit in several datasets.** A compliance sweep and a booking-quality
+  sweep can both include the same call without duplicating it.
+
+## Create a dataset
+
+Go to **Human Review → New dataset** and fill in:
+
+| Field | What it does |
+|---|---|
+| **Name** / **Description** | What reviewers are looking for in this set |
+| **Metrics to review** | Reviewers give a ground-truth answer for each of these on every call |
+| **Require a note when disagreeing** | Blocks a correction that has no written reason |
+| **Triage** | Lets reviewers categorize a call by failure type or theme, independently of any metric |
+
+<Tip>
+Turn on **Require a note when disagreeing** if the dataset is feeding Metric
+Lab. A correction on its own tells the optimizer *what* the answer should be; the
+note tells it *why*, which is what actually changes the metric's reasoning.
+</Tip>
+
+### Triage
+
+Triage is a free label on the call itself — "Hallucination", "Wrong transfer",
+"Tone" — separate from any metric's pass/fail. Configure whether reviewers pick
+from your predefined categories, type their own, or both, and whether a call
+takes one category or several.
+
+## Add calls
+
+A new dataset starts empty. Calls come from three places:
+
+<Tabs>
+  <Tab title="Production calls">
+    On **Calls**, select the calls you want and choose **Add to human review**
+    from the Actions menu — or use the per-row menu for a single call.
+  </Tab>
+  <Tab title="Simulation runs">
+    On a **Result**, select runs and click **Add to human review**. You can also
+    add a single run from its row menu or from the run's transcript view.
+  </Tab>
+  <Tab title="Auto-add rules">
+    On the dataset's **Auto-add rules** tab, set a condition on a metric — for
+    example *Booking confirmed is false* — and matching calls are pulled in
+    automatically as they finish evaluation.
+
+    **Sample** admits a percentage of matches rather than all of them, so a broad
+    rule doesn't flood the queue. Sampling is deterministic per call, so a
+    re-evaluated call never gets added twice or silently dropped.
+  </Tab>
+</Tabs>
+
+The dialog lets you pick more than one dataset at a time. Adding a call that is
+already in a dataset reports it as skipped rather than duplicating it, so
+re-adding is always safe.
+
+<Note>
+To capture an entire filter — "every failing call this week" — use an auto-add
+rule rather than selecting them by hand. Selecting *all matching* on the Calls
+page cannot be added directly, because that selection is a count rather than a
+list of calls.
+</Note>
+
+## Review
+
+Click **Start reviewing**, or **Review** on any row. The reviewer surface puts the
+transcript and recording on the left and one card per metric on the right, with
+next/previous through the queue so you can work a whole dataset without going
+back to the list.
+
+Each card shows:
+
+- **what the metric scored**, and its explanation for that score
+- **your label**, pre-filled with the metric's own answer
+
+That pre-fill is the point. Most calls are ones the metric got right, so
+confirming is a single click and you only slow down where you disagree. When your
+label differs, the card says so and asks for the reason.
+
+`N/A` is a real answer, distinct from a failure: a metric that should never have
+fired on this call is a different judgement from one that fired and scored false,
+and the optimizer needs to tell those apart.
+
+**Skip** sets a call aside without labelling it. A skipped call stays skipped —
+it won't drift back to pending as other metrics get reviewed.
+
+## Read the agreement rate
+
+The **Progress** tab shows completion and, per metric, how often that metric
+matched your reviewers.
+
+Agreement is counted **only over calls a human has actually reviewed**. When a
+call is added, its label starts as a copy of the metric's own answer, so counting
+everything would report a flattering 100% over calls nobody has read. A metric
+with nothing reviewed shows `—`, not `0%`.
+
+A low agreement rate is the signal worth acting on: it tells you which metric to
+take to Metric Lab, and the disagreements themselves are the training data.
+
+## Feed it back into the metric
+
+Once a dataset has reviewed calls, go to [Metric Lab](/documentation/guides/metric-lab),
+pick the metric and the datasets holding its ground truth, and optimize. Labs
+uses every call your reviewers labelled for that metric across the datasets you
+select.
+
+## Corrections made elsewhere
+
+You don't have to be on the review page to record a label:
+
+- **👎 on a metric result** in a call or run detail view records a correction with
+  a reason.
+- **Fix metric** on an Insights failure mode labels a sample of that mode's calls
+  in one action.
+
+Both write the same ground truth. When the call already sits in a dataset
+tracking that metric, the dataset picks the label up and counts it as reviewed.
+The Insights action goes further and files its corrections into a dataset for that
+metric, so they are reachable by an optimization run.

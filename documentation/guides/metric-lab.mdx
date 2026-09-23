@@ -29,8 +29,17 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 ## Advanced Features of Metric Lab
 
 <Note>
-Metric Lab is for **refining and improving metric definitions** — you annotate a sample of calls with the correct expected values, then use Auto Improve to tighten the metric prompt based on those annotations. If you need to **run automated per-call comparisons between a Cekura metric score and a manually supplied ground-truth value across all your calls**, write a [Python metric that accesses other metric results](/documentation/key-concepts/metrics/python-metric#metric-results-access) instead. See [Can I compare Cekura metric results against my own manual or ground-truth scores?](/documentation/FAQ#can-i-compare-cekura-metric-results-against-my-own-manual-or-ground-truth-scores) in the FAQ.
+Metric Lab is for **refining and improving metric definitions**. The labels it
+learns from live in [Human Review](/documentation/guides/human-review) — you
+collect calls into a dataset, reviewers label them, and Labs optimizes the metric
+against those labels. If you need to **run automated per-call comparisons between a Cekura metric score and a manually supplied ground-truth value across all your calls**, write a [Python metric that accesses other metric results](/documentation/key-concepts/metrics/python-metric#metric-results-access) instead. See [Can I compare Cekura metric results against my own manual or ground-truth scores?](/documentation/FAQ#can-i-compare-cekura-metric-results-against-my-own-manual-or-ground-truth-scores) in the FAQ.
 </Note>
+
+<Warning>
+The screenshots below still show the previous Labs layout, where calls were added
+to a per-metric lab and annotated inside the editor. The steps are current; the
+images are being retaken.
+</Warning>
 
 Metric Lab provides powerful tools for defining, testing, and optimizing custom metrics for your AI assistant. This guide walks you through the process of refining metrics to ensure they accurately reflect real-world performance.
 
@@ -61,48 +70,63 @@ After your agent runs, you might notice discrepancies where the metric result do
 These inconsistencies are signals that your metric definition (prompt or code) needs refinement.
 
 
-### Add to Labs
+### Collect the calls into a review dataset
 
-To fix these issues, you need to create a test set from these problematic calls.
+The metric needs examples of where it went wrong, and they live in a
+[Human Review](/documentation/guides/human-review) dataset.
 
-*   Locate the specific calls in your logs where the metric failed.
-*   Select them and click **Add to Lab**.
-*   Assign them to the "Appointment Booked" metric lab.
+*   Go to **Human Review** and create a dataset — call it "Appointment booked QA"
+    — with **Appointment Booked** as its metric.
+*   Locate the calls in your logs where the metric got it wrong, select them, and
+    choose **Add to human review**.
+*   Or set an **auto-add rule** on the dataset so failing calls arrive on their
+    own as they come in.
 
-<img src="/images/metriclab/2-add-to-lab.png" alt="Add to Labs" className="rounded-md"/>
-
-
-### Initial Run
-
-Once inside the Lab, run your current metric against the newly added test set to establish a baseline.
-
-*   Click the **Run** button in the Metric Lab.
-*   The system will evaluate the "Appointment Booked" metric against all the calls in your test set.
-*   Review the **Overall Score** (e.g., 3/5) to see the current accuracy.
-
-<img src="/images/metriclab/3-initial-run.png" alt="Initial Run" className="rounded-md"/>
+<img src="/images/metriclab/2-add-to-lab.png" alt="Adding calls to a review dataset" className="rounded-md"/>
 
 
-### Annotate
-This is the most critical step. You must tell the system what the *correct* result should have been for each failed call.
+### Label them
 
-*   Scroll down to the **Table View**.
-*   Look for rows where **Actual Value** (what the metric thought) differs from what really happened.
-*   **Update Expected Value**: Change the expected status to the correct one (e.g., change "False" to "True" if it was actually booked).
-*   **Add Notes**: Click the feedback/notes icon and explain *why* the metric was wrong (e.g., "The user implicitly confirmed the time by saying 'Sounds good', so this should count as a booking").
+This is the most critical step: you tell the system what the result *should* have
+been, and why.
 
-<img src="/images/metriclab/4-annotate.png" alt="Annotate and Add Notes" className="rounded-md"/>
+*   Open the dataset and click **Start reviewing**.
+*   Each metric card shows what the metric scored, pre-filled as your label — so
+    confirming a call the metric got right is one click.
+*   Where the metric was wrong, change the label (e.g. **False** → **True** if the
+    appointment really was booked).
+*   Add a note explaining *why* — "the user implicitly confirmed by saying 'Sounds
+    good', so this counts as a booking". The label tells the optimizer what; the
+    note tells it why, and the why is what changes the metric's reasoning.
+
+<img src="/images/metriclab/4-annotate.png" alt="Labelling a call in Human Review" className="rounded-md"/>
+
+The dataset's **Progress** tab now shows the metric's **agreement rate** — how
+often it matched your reviewers. That number is your baseline, counted only over
+calls someone has actually reviewed.
+
+<img src="/images/metriclab/3-initial-run.png" alt="Agreement rate" className="rounded-md"/>
 
 
-### Auto Improve
+### Optimize
 
-Instead of rewriting the prompt manually, let the Metric Lab's optimizer do the work for you.
+*   Go to **Labs**.
+*   Pick the metric to optimize, then the review datasets holding its labels — you
+    can select several.
+*   Labs shows how many labelled calls that adds up to and the metric's current
+    agreement. Click **Optimize metric**.
 
-*   Ensure you have annotated the mismatches and added notes.
-*   Click the **Auto Improve** button at the top right.
-*   The system will analyze the transcripts, your notes, and the expected outcomes to generate a better metric definition.
+The optimizer reads the transcripts, your labels and your notes, and rewrites the
+metric definition to handle the cases you identified.
 
-<img src="/images/metriclab/5-auto-improve.jpg" alt="Auto Improve Button" className="rounded-md"/>
+<img src="/images/metriclab/5-auto-improve.jpg" alt="Optimize a metric against its datasets" className="rounded-md"/>
+
+<Note>
+Only calls a reviewer has labelled are used. An unreviewed call carries the
+metric's own answer as its label, so optimizing against it would just teach the
+metric to agree with itself — Labs will tell you when a selection has nothing
+reviewed rather than starting a pointless run.
+</Note>
 
 
 ### View, Analyze and Save
@@ -158,13 +182,15 @@ An optimization can pause and ask you a question when it hits something it canno
 The run waits for your answer and resumes as soon as you submit it, so you can leave the page and come back. If it has been waiting a while it checkpoints itself and resumes automatically once you answer, rather than failing.
 
 
-### Re-run and Observe Improvement
+### Re-check and Observe Improvement
 
 Finally, verify that your new metric is robust.
 
 *   The metric is now updated with the optimized logic.
 *   Future calls will be evaluated using this smarter definition.
-*   You can manually **Run** the review again to confirm the score remains high (e.g., 5/5).
+*   Re-review a few calls in the dataset — or add fresh ones — and watch the
+    **agreement rate** climb. That number, not a one-off score, is the durable
+    measure of whether the metric now judges the way you do.
 
 
 ## Benefits of Metric Optimization
@@ -174,3 +200,5 @@ This iterative optimization process allows you to:
 - Improve metric accuracy from as low as 50% to 95% or higher
 - Ensure the labels you see from your AI assistant accurately reflect real performance
 - Make data-driven decisions based on reliable metrics
+- Defend a metric with a number: the agreement rate says how far it is from your
+  own reviewers, on calls you can point at

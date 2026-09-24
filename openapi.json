@@ -20,6 +20,26 @@
                 "description": ".well known oauth authorization server"
             }
         },
+        "/app/internal/stage-datadog-alert-test/": {
+            "post": {
+                "operationId": "app-internal-stage-datadog-alert-test-create",
+                "description": "Emit a plain or traceback-bearing stage error log for monitor validation.",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/app/otel/validate/": {
             "get": {
                 "operationId": "app-otel-validate-retrieve",
@@ -4106,6 +4126,9 @@
                         "api_key": []
                     },
                     {
+                        "oauth2": []
+                    },
+                    {
                         "embedded_session": []
                     },
                     {
@@ -4169,6 +4192,9 @@
                         "api_key": []
                     },
                     {
+                        "oauth2": []
+                    },
+                    {
                         "embedded_session": []
                     },
                     {
@@ -4220,6 +4246,9 @@
                 "security": [
                     {
                         "api_key": []
+                    },
+                    {
+                        "oauth2": []
                     },
                     {
                         "embedded_session": []
@@ -4292,6 +4321,9 @@
                         "api_key": []
                     },
                     {
+                        "oauth2": []
+                    },
+                    {
                         "embedded_session": []
                     },
                     {
@@ -4353,6 +4385,9 @@
                         "api_key": []
                     },
                     {
+                        "oauth2": []
+                    },
+                    {
                         "embedded_session": []
                     },
                     {
@@ -4404,6 +4439,9 @@
                         "api_key": []
                     },
                     {
+                        "oauth2": []
+                    },
+                    {
                         "embedded_session": []
                     },
                     {
@@ -4448,6 +4486,9 @@
                 "security": [
                     {
                         "api_key": []
+                    },
+                    {
+                        "oauth2": []
                     },
                     {
                         "embedded_session": []
@@ -4513,6 +4554,9 @@
                         "api_key": []
                     },
                     {
+                        "oauth2": []
+                    },
+                    {
                         "embedded_session": []
                     },
                     {
@@ -4544,6 +4588,9 @@
                 "security": [
                     {
                         "api_key": []
+                    },
+                    {
+                        "oauth2": []
                     },
                     {
                         "embedded_session": []
@@ -4598,6 +4645,9 @@
                         "api_key": []
                     },
                     {
+                        "oauth2": []
+                    },
+                    {
                         "embedded_session": []
                     },
                     {
@@ -4628,6 +4678,9 @@
                 "security": [
                     {
                         "api_key": []
+                    },
+                    {
+                        "oauth2": []
                     },
                     {
                         "embedded_session": []
@@ -9988,7 +10041,7 @@
         "/observability/v1/observe/": {
             "post": {
                 "operationId": "observe-create",
-                "description": "Primary ingestion endpoint for production call logs. Your agent (or its provider's post-call webhook) POSTs here with the transcript, recording URL, and metadata; Cekura stores it as a `CallLog`, schedules metric evaluation, and surfaces it in Observability.\n\n**Identifying the agent (pick one):**\n- `agent` — Cekura agent ID (preferred when you've already registered via `POST /aiagents/`)\n- `assistant_id` — external assistant identifier (VAPI/Retell/OpenAI-style `asst_...`). Cekura resolves it to your agent.\n\n**Transcript formats** (via `transcript_type`):\n- `vapi`, `retell`, `elevenlabs`, `bland`, `livekit`, `pipecat`, `koreai` — provider-native shapes; pass `transcript_json` exactly as the provider emits it.\n- `cekura` (default) — `[{role, content, start_time, end_time}, ...]`. Valid roles: `\"Testing Agent\"` (the caller) and `\"Main Agent\"` (the agent under test). Note: `\"agent\"` and `\"user\"` are **not** valid for this format.\n\n**Provider-specific alternatives:**\n- LiveKit webhooks: `POST /observability/v1/livekit/observe/` (raw LiveKit webhook shape)\n- Pipecat webhooks: `POST /observability/v1/pipecat/observe/` (raw Pipecat webhook shape)\n\n**Fields to know:**\n- `voice_recording_url` — link to the call audio; enables audio-based metrics.\n- `metadata` — freeform tags for filtering in Observability (`customer_id`, `campaign_id`, etc.).\n- `dynamic_variables` — values injected into the agent at runtime; shown alongside the transcript.\n- `customer_number` — caller's number in E.164 format, e.g. `+14155551234`.\n- `call_ended_reason` — reason for call termination (`completed`, `user-hangup`, `agent-hangup`, etc.).\n- `metric_ids` — comma-separated metric IDs to evaluate immediately (e.g. `\"1,2,3\"`).\n\n**Async processing:** metrics are evaluated in the background. The initial response shows `status: \"evaluating\"` with an empty `metrics` list. Retrieve the call log again after 30–60 seconds to see completed metric results.\n\n**Billing:** each ingested call consumes observability credits. Calls with audio cost more than text-only calls. Check your balance via `GET /test_framework/v1/billing_info`.",
+                "description": "Primary ingestion endpoint for production call logs. Your agent (or its provider's post-call webhook) POSTs here with the transcript, recording URL, and metadata; Cekura stores it as a `CallLog`, schedules metric evaluation, and surfaces it in Observability.\n\n**Identifying the agent (pick one):**\n- `agent` — Cekura agent ID (preferred when you've already registered via `POST /aiagents/`)\n- `assistant_id` — external assistant identifier (VAPI/Retell/OpenAI-style `asst_...`). Cekura resolves it to your agent.\n\n**Transcript formats** (via `transcript_type`):\n- `vapi`, `retell`, `elevenlabs`, `bland`, `livekit`, `pipecat`, `koreai` — provider-native shapes; pass `transcript_json` exactly as the provider emits it.\n- `cekura` (default) — `[{role, content, start_time, end_time}, ...]`. Valid roles: `\"Main Agent\"` (the agent being monitored) and `\"Testing Agent\"` (the other party on the call, whether a person or a simulator). Note: `\"agent\"` and `\"user\"` are **not** valid for this format.\n\n**Provider-specific alternatives:**\n- LiveKit webhooks: `POST /observability/v1/livekit/observe/` (raw LiveKit webhook shape)\n- Pipecat webhooks: `POST /observability/v1/pipecat/observe/` (raw Pipecat webhook shape)\n\n**Fields to know:**\n- `voice_recording_url` — link to the call audio; enables audio-based metrics.\n- `metadata` — freeform tags for filtering in Observability (`customer_id`, `campaign_id`, etc.).\n- `dynamic_variables` — values injected into the agent at runtime; shown alongside the transcript.\n- `customer_number` — caller's number in E.164 format, e.g. `+14155551234`.\n- `call_ended_reason` — reason for call termination (`completed`, `user-hangup`, `agent-hangup`, etc.).\n- `metric_ids` — comma-separated metric IDs to evaluate immediately (e.g. `\"1,2,3\"`).\n\n**Async processing:** metrics are evaluated in the background. The initial response shows `status: \"evaluating\"` with an empty `metrics` list. Retrieve the call log again after 30–60 seconds to see completed metric results.\n\n**Billing:** each ingested call consumes observability credits. Calls with audio cost more than text-only calls. Check your balance via `GET /test_framework/v1/billing_info`.",
                 "summary": "Ingest a production call (webhook)",
                 "tags": [
                     "Observability"
@@ -10109,7 +10162,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "observe-create",
-                        "description": "Primary ingestion endpoint for production call logs. Your agent (or its provider's post-call webhook) POSTs here with the transcript, recording URL, and metadata; Cekura stores it as a `CallLog`, schedules metric evaluation, and surfaces it in Observability.\n\n**Identifying the agent (pick one):**\n- `agent` — Cekura agent ID (preferred when you've already registered via `POST /aiagents/`)\n- `assistant_id` — external assistant identifier (VAPI/Retell/OpenAI-style `asst_...`). Cekura resolves it to your agent.\n\n**Transcript formats** (via `transcript_type`):\n- `vapi`, `retell`, `elevenlabs`, `bland`, `livekit`, `pipecat`, `koreai` — provider-native shapes; pass `transcript_json` exactly as the provider emits it.\n- `cekura` (default) — `[{role, content, start_time, end_time}, ...]`. Valid roles: `\"Testing Agent\"` (the caller) and `\"Main Agent\"` (the agent under test). Note: `\"agent\"` and `\"user\"` are **not** valid for this format.\n\n**Provider-specific alternatives:**\n- LiveKit webhooks: `POST /observability/v1/livekit/observe/` (raw LiveKit webhook shape)\n- Pipecat webhooks: `POST /observability/v1/pipecat/observe/` (raw Pipecat webhook shape)\n\n**Fields to know:**\n- `voice_recording_url` — link to the call audio; enables audio-based metrics.\n- `metadata` — freeform tags for filtering in Observability (`customer_id`, `campaign_id`, etc.).\n- `dynamic_variables` — values injected into the agent at runtime; shown alongside the transcript.\n- `customer_number` — caller's number in E.164 format, e.g. `+14155551234`.\n- `call_ended_reason` — reason for call termination (`completed`, `user-hangup`, `agent-hangup`, etc.).\n- `metric_ids` — comma-separated metric IDs to evaluate immediately (e.g. `\"1,2,3\"`).\n\n**Async processing:** metrics are evaluated in the background. The initial response shows `status: \"evaluating\"` with an empty `metrics` list. Retrieve the call log again after 30–60 seconds to see completed metric results.\n\n**Billing:** each ingested call consumes observability credits. Calls with audio cost more than text-only calls. Check your balance via `GET /test_framework/v1/billing_info`."
+                        "description": "Primary ingestion endpoint for production call logs. Your agent (or its provider's post-call webhook) POSTs here with the transcript, recording URL, and metadata; Cekura stores it as a `CallLog`, schedules metric evaluation, and surfaces it in Observability.\n\n**Identifying the agent (pick one):**\n- `agent` — Cekura agent ID (preferred when you've already registered via `POST /aiagents/`)\n- `assistant_id` — external assistant identifier (VAPI/Retell/OpenAI-style `asst_...`). Cekura resolves it to your agent.\n\n**Transcript formats** (via `transcript_type`):\n- `vapi`, `retell`, `elevenlabs`, `bland`, `livekit`, `pipecat`, `koreai` — provider-native shapes; pass `transcript_json` exactly as the provider emits it.\n- `cekura` (default) — `[{role, content, start_time, end_time}, ...]`. Valid roles: `\"Main Agent\"` (the agent being monitored) and `\"Testing Agent\"` (the other party on the call, whether a person or a simulator). Note: `\"agent\"` and `\"user\"` are **not** valid for this format.\n\n**Provider-specific alternatives:**\n- LiveKit webhooks: `POST /observability/v1/livekit/observe/` (raw LiveKit webhook shape)\n- Pipecat webhooks: `POST /observability/v1/pipecat/observe/` (raw Pipecat webhook shape)\n\n**Fields to know:**\n- `voice_recording_url` — link to the call audio; enables audio-based metrics.\n- `metadata` — freeform tags for filtering in Observability (`customer_id`, `campaign_id`, etc.).\n- `dynamic_variables` — values injected into the agent at runtime; shown alongside the transcript.\n- `customer_number` — caller's number in E.164 format, e.g. `+14155551234`.\n- `call_ended_reason` — reason for call termination (`completed`, `user-hangup`, `agent-hangup`, etc.).\n- `metric_ids` — comma-separated metric IDs to evaluate immediately (e.g. `\"1,2,3\"`).\n\n**Async processing:** metrics are evaluated in the background. The initial response shows `status: \"evaluating\"` with an empty `metrics` list. Retrieve the call log again after 30–60 seconds to see completed metric results.\n\n**Billing:** each ingested call consumes observability credits. Calls with audio cost more than text-only calls. Check your balance via `GET /test_framework/v1/billing_info`."
                     }
                 }
             }
@@ -14241,6 +14294,64 @@
                 "description": "Retrieve a subscriptions subscription by ID"
             }
         },
+        "/subscriptions/subscriptions/{id}/abandon-plan-switch/": {
+            "post": {
+                "operationId": "subscriptions-subscriptions-abandon-plan-switch-create",
+                "description": "Release a plan switch whose payment was never confirmed by the customer.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "subscriptions"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Subscription"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Subscription"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/subscriptions/subscriptions/{id}/cancel/": {
             "post": {
                 "operationId": "subscriptions-subscriptions-cancel-create",
@@ -17021,7 +17132,7 @@
             },
             "post": {
                 "operationId": "aiagents-v1-create",
-                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (Retell uses that field for voice too when it is set).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex. Dial over SIP (`sip_endpoint`) or phone; connect Webex Contact Center (OAuth via the dashboard, or `cisco_client_secret` + `cisco_data`) to fetch the Cisco transcript and interaction id after each run.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell/ElevenLabs/Bland).\n- `auto_sync_prompt_enabled` — one-way prompt sync from the provider to Cekura on a schedule; Cekura updates its agent description and does not push changes back to the provider. Supported for VAPI, Retell, ElevenLabs, Synthflow, Telnyx, and Bland.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
+                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (Retell uses that field for voice too when it is set).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex. Dial over SIP (`sip_endpoint`) or phone; connect Webex Contact Center (OAuth via the dashboard, or `cisco_client_secret` + `cisco_data`) to fetch the Cisco transcript and interaction id after each run.\n- `gemini_cx` — Gemini Enterprise CX (Google CX Agent Studio). Requires `gemini_cx_data` with `service_account_email` (your reader service account, which Cekura's per-project identity impersonates) and `location` (project_id defaults from the email; a phone number is optional); the CX agent id goes in `assistant_id`. Voice runs dial the agent by phone, text runs are not supported.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*`, `gemini_cx_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | gemini_cx | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell/ElevenLabs/Bland).\n- `auto_sync_prompt_enabled` — one-way prompt sync from the provider to Cekura on a schedule; Cekura updates its agent description and does not push changes back to the provider. Supported for VAPI, Retell, ElevenLabs, Synthflow, Telnyx, and Bland.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "AI Agents"
@@ -18796,7 +18907,7 @@
         "/test_framework/v1/aiagents/{id}/history/": {
             "get": {
                 "operationId": "aiagents-v1-history-list",
-                "description": "Paginated version history for an agent: name/language/description plus the mock\ntools, dynamic variables, and knowledge base files active at each version.",
+                "description": "Paginated version history for an agent: its configuration (name, prompt, language,\ntelephony, provider and credential status, webhook, ...) plus the mock tools, dynamic\nvariables, knowledge base files and connectors active at each version. Secrets are\nreported as configured flags (with a last-four hint for keys), never as values.",
                 "parameters": [
                     {
                         "in": "path",
@@ -19034,7 +19145,7 @@
         "/test_framework/v1/aiagents/{id}/restore/": {
             "post": {
                 "operationId": "aiagents-v1-restore-create",
-                "description": "Restore an agent to a previous version, creating a new version for the restore.\n\nRestores the versioned concrete fields (name, language, description) and the related\ncollections: tools and dynamic variables are reverted in place to their\nlinked versions (ids preserved) and any not in the version are soft-deleted; knowledge\nbase files referenced by the version are reactivated and the rest soft-deleted.",
+                "description": "Restore an agent to a previous version, creating a new version for the restore.\n\nRestores every versioned configuration column (name, prompt, language, telephony,\nprovider wiring, webhook, toggles — see AIAgent.RESTORE_EXCLUDED_FIELDS for what is\nleft alone) and the related collections: tools, dynamic variables, provider\ncredentials and knowledge base connectors are reverted in place to their linked\nversions (ids preserved); tools, variables and connectors not in the version are\ndeactivated, while credentials for other providers are left in place; knowledge base\nfiles referenced by the version are reactivated and the rest soft-deleted. Returns 400\nif the restored provider settings no longer validate.",
                 "parameters": [
                     {
                         "in": "path",
@@ -19313,6 +19424,170 @@
             "get": {
                 "operationId": "aiagents-v1-runs-overview-project-retrieve",
                 "description": "Aiagents v1 runs overview project",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Project whose runs to summarize. Optional when the API key is scoped to a project"
+                    },
+                    {
+                        "in": "query",
+                        "name": "from",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Start of the reporting window (ISO 8601). The window of the same length before it supplies the comparison values",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "to",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "End of the reporting window (ISO 8601). Default: now"
+                    },
+                    {
+                        "in": "query",
+                        "name": "chart_type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "bar",
+                                "line"
+                            ]
+                        },
+                        "description": "Shape of the metric time series. Default: bar"
+                    },
+                    {
+                        "in": "query",
+                        "name": "period",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "hour",
+                                "week"
+                            ]
+                        },
+                        "description": "Bucket size for bar charts. Default: hour"
+                    },
+                    {
+                        "in": "query",
+                        "name": "tags",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated scenario tags"
+                    },
+                    {
+                        "in": "query",
+                        "name": "filter_type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "and",
+                                "not",
+                                "or"
+                            ]
+                        },
+                        "description": "How tags combine. Default: and"
+                    },
+                    {
+                        "in": "query",
+                        "name": "cronjob_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated cron job IDs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "source",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all",
+                                "monitors",
+                                "non_monitors"
+                            ]
+                        },
+                        "description": "Which runs to include: `monitors` for runs a monitor (cron job) created, `non_monitors` for one-off runs. Default: all"
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated scenario IDs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "personality_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated personality IDs, matched on the run or, when the run has none, on its scenario"
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Single agent ID. Ignored when agent_ids is given"
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent IDs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "run_type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "text",
+                                "voice"
+                            ]
+                        },
+                        "description": "Restrict to voice or text runs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "folder_paths",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated scenario folder paths, each including its subfolders. Example: \"Sales Team.Inbound\""
+                    },
+                    {
+                        "in": "query",
+                        "name": "result_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated result IDs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "run_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated run IDs"
+                    }
+                ],
                 "tags": [
                     "test_framework"
                 ],
@@ -20631,6 +20906,46 @@
                 "description": "Create a new email inbound"
             }
         },
+        "/test_framework/v1/gemini-cx/identity/": {
+            "get": {
+                "operationId": "gemini-cx-identity-retrieve",
+                "description": "Which Cekura identity the customer must grant, created on first use for the project.",
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
+        "/test_framework/v1/gemini-cx/test-connection/": {
+            "post": {
+                "operationId": "gemini-cx-test-connection-create",
+                "description": "Mint a token as the customer's reader account and report whether the grant works.\n\nBody: ``project_id`` plus either the form values (``service_account_email``, optional\n``gcp_project_id``) or ``agent_id`` (uses the agent's stored reader and records the outcome on\nit). A customer-side problem is a 200 with ``ok: false`` and a message; only Cekura-side\nproblems are error statuses.\n\nTwo different projects appear in the body on purpose: ``project_id`` is the *Cekura* project\nthe agent belongs to (used for access scoping and to pick the Cekura identity), while\n``gcp_project_id`` is the customer's *Google Cloud* project the form shows (only checked to\nagree with the reader address). The scoped Cekura project is what the token chain uses.",
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/test_framework/v1/knowledge-base-connectors/": {
             "get": {
                 "operationId": "knowledge-base-connectors-list",
@@ -20881,7 +21196,7 @@
             },
             "delete": {
                 "operationId": "knowledge-base-connectors-destroy",
-                "description": "Delete a BigQuery knowledge base connectors attached to AI agent",
+                "description": "Soft delete: the row (and its files) are kept so an agent version restore can bring\nthe connector back with the same id; its scheduled sync is disabled.",
                 "parameters": [
                     {
                         "in": "path",
@@ -49990,7 +50305,7 @@
             },
             "post": {
                 "operationId": "aiagents-create",
-                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed to dial; connect Webex Contact Center from the dashboard for transcripts\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow/bland) with `provider.agent_id` + `provider.credentials.api_key` (omit the key to use the project's saved provider key; list importable ids with `GET /v2/aiagents/provider-assistants/`). An assistant already imported into the project is refused with **409**. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
+                "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed to dial; connect Webex Contact Center from the dashboard for transcripts\n- gemini_cx: no api_key; agent_id (CX agent id) + config.{service_account_email, location}; config.project_id defaults from the email\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow/bland) with `provider.agent_id` + `provider.credentials.api_key` (omit the key to use the project's saved provider key; list importable ids with `GET /v2/aiagents/provider-assistants/`). An assistant already imported into the project is refused with **409**. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads.",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "test_framework"
@@ -50344,7 +50659,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "aiagents-create",
-                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed to dial; connect Webex Contact Center from the dashboard for transcripts\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow/bland) with `provider.agent_id` + `provider.credentials.api_key` (omit the key to use the project's saved provider key; list importable ids with `GET /v2/aiagents/provider-assistants/`). An assistant already imported into the project is refused with **409**. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
+                        "description": "Register a new AI voice agent. Required fields: name, description, project, inbound. Provider credentials are nested under provider.{type, agent_id, credentials} instead of flat fields. transcript_provider defaults to provider.type when omitted.\n\n**provider.credentials keys by type (voice providers only):**\n- vapi: api_key + config.{public_key, trigger_url}\n- retell: api_key + agent_id + optional chat_agent_details.config.agent_id\n- elevenlabs: api_key + config.{trigger_url}\n- bland: api_key + agent_id (pathway_id) + config.{encrypted_key} for Twilio\n- livekit: api_key + config.{api_secret (required), url (required)}\n- pipecat: api_key + config.{webhook_url}\n- cisco: no credentials needed to dial; connect Webex Contact Center from the dashboard for transcripts\n- gemini_cx: no api_key; agent_id (CX agent id) + config.{service_account_email, location}; config.project_id defaults from the email\n- self-hosted chat: provider.type=custom + chat_agent_details.{type: self_hosted, config.{url (wss://), headers}}\nNote: agentforce goes in chat_agent_details; koreai/genesys/synthflow use the v1 API.\n\n**Auto-import from a cloud provider** — set `provider.configure_from_provider: true` (vapi/retell/elevenlabs/synthflow/bland) with `provider.agent_id` + `provider.credentials.api_key` (omit the key to use the project's saved provider key; list importable ids with `GET /v2/aiagents/provider-assistants/`). An assistant already imported into the project is refused with **409**. Cekura fetches the prompt, name, language, who-speaks-first, phone number, tool calls, dynamic variables and knowledge base and configures the agent automatically — `name` and `description` become optional (auto-fetched). The response is **202** with the created agent plus a `progress_id`; poll `auto-fetch-progress/` to follow the staged import.\n\nSee examples below for full per-provider payloads."
                     }
                 }
             }
@@ -51180,7 +51495,7 @@
         "/test_framework/v2/aiagents/{id}/history/": {
             "get": {
                 "operationId": "aiagents-history-list",
-                "description": "Paginated version history for an agent: name/language/description plus the mock\ntools, dynamic variables, and knowledge base files active at each version.",
+                "description": "Paginated version history for an agent: its configuration (name, prompt, language,\ntelephony, provider and credential status, webhook, ...) plus the mock tools, dynamic\nvariables, knowledge base files and connectors active at each version. Secrets are\nreported as configured flags (with a last-four hint for keys), never as values.",
                 "parameters": [
                     {
                         "in": "path",
@@ -51446,7 +51761,7 @@
         "/test_framework/v2/aiagents/{id}/restore/": {
             "post": {
                 "operationId": "aiagents-restore-create",
-                "description": "Restore an agent to a previous version, creating a new version for the restore.\n\nRestores the versioned concrete fields (name, language, description) and the related\ncollections: tools and dynamic variables are reverted in place to their\nlinked versions (ids preserved) and any not in the version are soft-deleted; knowledge\nbase files referenced by the version are reactivated and the rest soft-deleted.",
+                "description": "Restore an agent to a previous version, creating a new version for the restore.\n\nRestores every versioned configuration column (name, prompt, language, telephony,\nprovider wiring, webhook, toggles — see AIAgent.RESTORE_EXCLUDED_FIELDS for what is\nleft alone) and the related collections: tools, dynamic variables, provider\ncredentials and knowledge base connectors are reverted in place to their linked\nversions (ids preserved); tools, variables and connectors not in the version are\ndeactivated, while credentials for other providers are left in place; knowledge base\nfiles referenced by the version are reactivated and the rest soft-deleted. Returns 400\nif the restored provider settings no longer validate.",
                 "parameters": [
                     {
                         "in": "path",
@@ -51796,6 +52111,170 @@
             "get": {
                 "operationId": "aiagents-runs-overview-project-retrieve",
                 "description": "Aiagents runs overview project",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "project_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Project whose runs to summarize. Optional when the API key is scoped to a project"
+                    },
+                    {
+                        "in": "query",
+                        "name": "from",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "Start of the reporting window (ISO 8601). The window of the same length before it supplies the comparison values",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "to",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "description": "End of the reporting window (ISO 8601). Default: now"
+                    },
+                    {
+                        "in": "query",
+                        "name": "chart_type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "bar",
+                                "line"
+                            ]
+                        },
+                        "description": "Shape of the metric time series. Default: bar"
+                    },
+                    {
+                        "in": "query",
+                        "name": "period",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "hour",
+                                "week"
+                            ]
+                        },
+                        "description": "Bucket size for bar charts. Default: hour"
+                    },
+                    {
+                        "in": "query",
+                        "name": "tags",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated scenario tags"
+                    },
+                    {
+                        "in": "query",
+                        "name": "filter_type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "and",
+                                "not",
+                                "or"
+                            ]
+                        },
+                        "description": "How tags combine. Default: and"
+                    },
+                    {
+                        "in": "query",
+                        "name": "cronjob_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated cron job IDs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "source",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all",
+                                "monitors",
+                                "non_monitors"
+                            ]
+                        },
+                        "description": "Which runs to include: `monitors` for runs a monitor (cron job) created, `non_monitors` for one-off runs. Default: all"
+                    },
+                    {
+                        "in": "query",
+                        "name": "scenario_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated scenario IDs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "personality_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated personality IDs, matched on the run or, when the run has none, on its scenario"
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Single agent ID. Ignored when agent_ids is given"
+                    },
+                    {
+                        "in": "query",
+                        "name": "agent_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated agent IDs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "run_type",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "text",
+                                "voice"
+                            ]
+                        },
+                        "description": "Restrict to voice or text runs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "folder_paths",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated scenario folder paths, each including its subfolders. Example: \"Sales Team.Inbound\""
+                    },
+                    {
+                        "in": "query",
+                        "name": "result_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated result IDs"
+                    },
+                    {
+                        "in": "query",
+                        "name": "run_ids",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Comma-separated run IDs"
+                    }
+                ],
                 "tags": [
                     "test_framework"
                 ],
@@ -69995,16 +70474,18 @@
                             "koreai",
                             "custom",
                             "cisco",
+                            "gemini_cx",
                             "genesys",
                             "agora",
                             "amazon_connect",
                             "telnyx",
+                            "assemblyai",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2b38755f8404d645",
+                        "x-spec-enum-id": "8fe31393fdfed3f4",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `agora` - Agora\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `gemini_cx` - Gemini Enterprise CX\n* `genesys` - Genesys\n* `agora` - Agora\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `assemblyai` - AssemblyAI"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -70027,12 +70508,14 @@
                             "amazon_connect",
                             "telnyx",
                             "sierra",
+                            "gemini_cx",
+                            "assemblyai",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "be289759a77f8b31",
+                        "x-spec-enum-id": "5390d14650598206",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (used for voice too when set).\n- `bland` — requires `bland_api_key`; `assistant_id` is the Bland persona_id (voice), `chat_assistant_id` the pathway_id (text); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `sierra` — requires `sierra_agent_token`; optional `sierra_data` (host, api_secret). Chat/text runs only.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex. Dial the agent over SIP (`sip_endpoint`) or phone; optionally connect Webex Contact Center (OAuth, or `cisco_client_secret` + `cisco_data`) so the call's Cisco transcript and interaction id are fetched after each run.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `sierra` - Sierra"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (used for voice too when set).\n- `bland` — requires `bland_api_key`; `assistant_id` is the Bland persona_id (voice), `chat_assistant_id` the pathway_id (text); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `sierra` — requires `sierra_agent_token`; optional `sierra_data` (host, api_secret). Chat/text runs only.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex. Dial the agent over SIP (`sip_endpoint`) or phone; optionally connect Webex Contact Center (OAuth, or `cisco_client_secret` + `cisco_data`) so the call's Cisco transcript and interaction id are fetched after each run.\n- `gemini_cx` — Gemini Enterprise CX (Google CX Agent Studio). Requires `gemini_cx_data` with `service_account_email` and `location` (a phone number is optional); Cekura reads the agent by impersonating that service account, so no key is stored. Voice runs dial the agent by phone, text runs are not supported.\n- `assemblyai` — AssemblyAI Voice Agent API. Requires `assemblyai_api_key` + `assistant_id` (AssemblyAI agent id); optional `assemblyai_data.region` (`us` default, or `eu`). Voice runs dial the agent by phone; the call transcript and tool calls are fetched from AssemblyAI after each run.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*`, `gemini_cx_*`, `assemblyai_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `sierra` - Sierra\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -70107,7 +70590,7 @@
                     "koreai_client_secret": {
                         "type": "string",
                         "writeOnly": true,
-                        "description": "\nClient secret key for Kore.ai service provider\nExample: `\"client_secret_key_123\"`\n"
+                        "description": "\nClient secret key for Kore.ai service provider (XO platform)\nExample: `\"client_secret_key_123\"`\n"
                     },
                     "koreai_client_secret_configured": {
                         "type": "string",
@@ -70119,7 +70602,7 @@
                     },
                     "koreai_data": {
                         "type": "string",
-                        "description": "\nKore.ai additional data.\nFor the RTM runner: {\"api_secret\": \"<xo-webclient API key>\", \"host\": \"platform.kore.ai\"}\nFor transcript fetch: {\"client_id\": \"cs-...\", \"bot_id\": \"st-...\", \"host\": \"bots.kore.ai\"}\napi_secret is encrypted at rest automatically.\n"
+                        "description": "\nKore.ai additional data.\nFor the RTM runner: {\"api_secret\": \"<xo-webclient API key>\", \"host\": \"platform.kore.ai\"}\nFor XO transcript fetch: {\"client_id\": \"cs-...\", \"bot_id\": \"st-...\", \"host\": \"bots.kore.ai\"}\nFor Artemis transcript fetch: {\"platform\": \"artemis\", \"artemis_api_key\": \"abl_...\", \"artemis_host\": \"ind-agents.kore.ai\", \"artemis_project_id\": \"<Artemis project id>\"}\nplatform (\"xo\", default, or \"artemis\") selects which set is used; both sets can be stored side by side.\napi_secret and artemis_api_key are encrypted at rest and returned as *_configured flags.\n"
                     },
                     "genesys_client_secret": {
                         "type": "string",
@@ -70151,6 +70634,15 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "Read-only Webex Contact Center connection status for the Connect/Reconnect control."
+                    },
+                    "gemini_cx_data": {
+                        "type": "string",
+                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-project identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
+                    },
+                    "gemini_cx_connection": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Read-only result of the last Gemini Enterprise CX connection check (status, checked_at, acting_as, error)."
                     },
                     "agentforce_client_secret": {
                         "type": "string",
@@ -70246,6 +70738,19 @@
                     "telnyx_api_key_configured": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "assemblyai_api_key": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAssemblyAI Voice Agent API key. Pair with `assistant_id` (the AssemblyAI agent id) so the call transcript and tool calls can be fetched after each run.\nExample: `\"assemblyai_api_key_123\"`\n"
+                    },
+                    "assemblyai_api_key_configured": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "assemblyai_data": {
+                        "type": "string",
+                        "description": "\nAssemblyAI additional configuration. `region` selects the AssemblyAI deployment the agent lives in: `us` (default; phone agents) or `eu`.\nExample: `{\"region\": \"us\"}`\n"
                     },
                     "enabled_personalities": {
                         "type": "array",
@@ -70409,7 +70914,7 @@
             },
             "AIAgentHistory": {
                 "type": "object",
-                "description": "A single AIAgent version: versioned concrete fields + resolved related collections.\n\nManifests store child ``history_id`` lists (tools/dynamic vars) and uploaded-file ids\n(kb). The values are resolved on read. Use ``build_context()`` to batch the resolution\nacross a page of records and pass it as the serializer context (avoids N+1).",
+                "description": "A single AIAgent version: its configuration plus the related collections at that version.\n\nThe `telephony` and `provider` blocks are rendered by the same code as the v2 agent\nresponse, fed the version's own columns and the credential rows it points at, so a\nversion reads exactly like the settings page did at the time. Secrets are masked the\nsame way (`*_configured` flags) with a `*_hint` (last four characters) so two versions\ncan be told apart; passwords get the flag only.\n\nManifests store child ``history_id`` lists (tools / dynamic vars / credentials /\nconnectors) and uploaded-file ids (kb). The values are resolved on read. Use\n``build_context()`` to batch the resolution across a page of records and pass it as the\nserializer context (avoids N+1).",
                 "properties": {
                     "history_id": {
                         "type": "integer",
@@ -70535,6 +71040,77 @@
                         "type": "string",
                         "description": "Description of the agent's purpose and capabilities.\nExample: `\"AI agent for handling customer support inquiries and resolving technical issues\"`"
                     },
+                    "agent_speaks_first": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "email_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Email address this agent receives at. When set, enables email-based test runs.",
+                        "maxLength": 254
+                    },
+                    "webhook_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "description": "Webhook URL for this agent. When set, overrides the project-level webhook URL for events from this agent.",
+                        "maxLength": 200
+                    },
+                    "webhook_secret_configured": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "webhook_secret_hint": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "mock_tools_enabled": {
+                        "type": "boolean",
+                        "description": "Whether mock tools should be selected by default when configuring a run."
+                    },
+                    "pronunciation_words": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "List of words with phonemes for pronunciation analysis.\nExample: `[[\"hello\", \"HH AH L OW\"], [\"world\", \"W ER L D\"]]`"
+                    },
+                    "spelling_word_types": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "List of word types/categories to check for spelling analysis.\nExample: `[\"name\", \"postcode\", \"email\", \"address\"]`"
+                    },
+                    "telephony": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentTelephony"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "provider": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentProvider"
+                            }
+                        ],
+                        "readOnly": true
+                    },
                     "mock_tools": {
                         "type": "string",
                         "readOnly": true
@@ -70545,6 +71121,14 @@
                     },
                     "knowledge_base_files": {
                         "type": "string",
+                        "readOnly": true
+                    },
+                    "knowledge_base_connectors": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
                         "readOnly": true
                     }
                 },
@@ -71106,7 +71690,7 @@
                     "api_key": {
                         "type": "string",
                         "writeOnly": true,
-                        "description": "API key or client secret for the provider (write-only — never returned). Required for: vapi, retell, elevenlabs, bland, livekit, pipecat, synthflow. koreai and genesys use their client secret (passed as api_key); cisco only when using a customer-owned Service App. Not needed for: self_hosted."
+                        "description": "API key or client secret for the provider (write-only — never returned). Required for: vapi, retell, elevenlabs, bland, livekit, pipecat, synthflow, telnyx, assemblyai. koreai and genesys use their client secret (passed as api_key); cisco only when using a customer-owned Service App. Not needed for: self_hosted, gemini_cx (Cekura impersonates config.service_account_email; no key)."
                     },
                     "config": {
                         "oneOf": [
@@ -71662,19 +72246,21 @@
                             "genesys",
                             "amazon_connect",
                             "telnyx",
+                            "gemini_cx",
+                            "assemblyai",
                             "custom",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "3f5fcc0e5ae82793",
-                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `custom` - Custom (chat-only, no voice provider)"
+                        "x-spec-enum-id": "633b60b8e3e09d4e",
+                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, assemblyai, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `custom` - Custom (chat-only, no voice provider)"
                     },
                     "agent_id": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
+                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, telnyx, assemblyai, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
                     },
                     "credentials": {
                         "oneOf": [
@@ -72364,6 +72950,21 @@
                 "required": [
                     "question"
                 ]
+            },
+            "AssemblyAIConfig": {
+                "type": "object",
+                "description": "AssemblyAI Voice Agent API provider configuration. The API key goes in credentials.api_key, the agent id in provider.agent_id.",
+                "properties": {
+                    "region": {
+                        "enum": [
+                            "us",
+                            "eu"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "450cf1402ab1a3c6",
+                        "description": "AssemblyAI deployment the agent lives in. Defaults to us (phone agents are US-hosted).\n\n* `us` - us\n* `eu` - eu"
+                    }
+                }
             },
             "AuditLog": {
                 "type": "object",
@@ -73949,7 +74550,7 @@
             },
             "ConversationStatus": {
                 "type": "object",
-                "description": "Body of GET /v2/product-chat/conversations/:id/status/.\n\n`active_message` is null when the conversation has no assistant turns yet.",
+                "description": "Body of GET /v2/product-chat/conversations/:id/status/.\n\n`active_message` is null when the conversation has no assistant turns yet.\n\nThe workflow fields let a progress panel follow a workflow conversation\n(the infra-suite generator, for one) from a single lean poll: the turn's\nstatus says whether the run is live, `workflow_state.steps` says how far it\ngot and what each step produced. They are copied straight off the\nconversation row, so a `general` conversation reports empty strings and an\nempty object.",
                 "properties": {
                     "conversation_id": {
                         "type": "string",
@@ -73964,6 +74565,22 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "workflow_id": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "workflow_variant": {
+                        "type": "string",
+                        "default": ""
+                    },
+                    "workflow_state": {
+                        "type": "object",
+                        "additionalProperties": {}
+                    },
+                    "page_context": {
+                        "type": "object",
+                        "additionalProperties": {}
                     }
                 },
                 "required": [
@@ -75697,6 +76314,29 @@
                     }
                 }
             },
+            "GeminiEnterpriseCxConfig": {
+                "type": "object",
+                "description": "Gemini Enterprise CX (Google CX Agent Studio) provider configuration. No API key: Cekura impersonates the reader service account.",
+                "properties": {
+                    "service_account_email": {
+                        "type": "string",
+                        "description": "Your reader service account (name@project.iam.gserviceaccount.com) that Cekura's per-project identity is allowed to act as."
+                    },
+                    "project_id": {
+                        "type": "string",
+                        "description": "GCP project that hosts the agent. Defaults to the project named in the service-account email."
+                    },
+                    "location": {
+                        "type": "string",
+                        "description": "Agent region, e.g. us-central1 or global. The CX agent id goes in provider.agent_id."
+                    }
+                },
+                "required": [
+                    "location",
+                    "service_account_email"
+                ],
+                "title": "Gemini Enterprise CX"
+            },
             "GenerateClarifyAnswer": {
                 "type": "object",
                 "description": "Body for POST /scenarios/generate-clarify-answer/.",
@@ -76368,25 +77008,43 @@
             },
             "KoreAiConfig": {
                 "type": "object",
-                "description": "Kore.ai provider configuration.",
+                "description": "Kore.ai provider configuration. XO platform (default) uses api_key + client_id + bot_id; the Artemis agent platform uses the artemis_* keys. Both sets can be stored side by side; platform selects the active one.",
                 "properties": {
+                    "platform": {
+                        "enum": [
+                            "xo",
+                            "artemis"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "b86d1a405f4d0697",
+                        "description": "Kore product the agent runs on: \"xo\" (default) or \"artemis\".\n\n* `xo` - xo\n* `artemis` - artemis"
+                    },
                     "client_id": {
                         "type": "string",
-                        "description": "KoreAI OAuth2 Client ID."
+                        "description": "KoreAI OAuth2 Client ID. XO platform."
                     },
                     "bot_id": {
                         "type": "string",
-                        "description": "KoreAI Bot ID to connect to."
+                        "description": "KoreAI Bot ID to connect to. XO platform."
                     },
                     "host": {
                         "type": "string",
-                        "description": "KoreAI host URL. Defaults to https://bots.kore.ai."
+                        "description": "KoreAI XO host. Defaults to bots.kore.ai."
+                    },
+                    "artemis_api_key": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "Artemis project-bound x-api-key. Encrypted at rest; returned as artemis_api_key_configured."
+                    },
+                    "artemis_host": {
+                        "type": "string",
+                        "description": "Artemis host, e.g. ind-agents.kore.ai."
+                    },
+                    "artemis_project_id": {
+                        "type": "string",
+                        "description": "Artemis project ID the API key is bound to."
                     }
                 },
-                "required": [
-                    "bot_id",
-                    "client_id"
-                ],
                 "title": "Kore.ai"
             },
             "LiveKitConfig": {
@@ -79541,6 +80199,15 @@
                         "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
                         "description": "Dollar amount threshold - notify when credits remaining is below this value. Example: 100.00"
                     },
+                    "low_credits_additional_thresholds": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "description": "Additional credit thresholds that each trigger a one-time low credits email (e.g. [750, 500, 250]). Usage blocking uses low_credits_threshold only.",
+                        "maxItems": 10
+                    },
                     "cronjob_low_balance_mute_days": {
                         "enum": [
                             "0",
@@ -82447,6 +83114,15 @@
                         "pattern": "^-?\\d{0,8}(?:\\.\\d{0,2})?$",
                         "description": "Dollar amount threshold - notify when credits remaining is below this value. Example: 100.00"
                     },
+                    "low_credits_additional_thresholds": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1
+                        },
+                        "description": "Additional credit thresholds that each trigger a one-time low credits email (e.g. [750, 500, 250]). Usage blocking uses low_credits_threshold only.",
+                        "maxItems": 10
+                    },
                     "cronjob_low_balance_mute_days": {
                         "enum": [
                             "0",
@@ -83234,14 +83910,17 @@
                             "amazon_connect",
                             "agora",
                             "telnyx",
-                            "sierra"
+                            "sierra",
+                            "gemini_cx",
+                            "assemblyai"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `cisco` - Cisco Webex\n* `amazon_connect` - Amazon Connect\n* `agora` - Agora\n* `telnyx` - Telnyx\n* `sierra` - Sierra",
-                        "x-spec-enum-id": "66d64b6a7149e5fe"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `cisco` - Cisco Webex\n* `amazon_connect` - Amazon Connect\n* `agora` - Agora\n* `telnyx` - Telnyx\n* `sierra` - Sierra\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI",
+                        "x-spec-enum-id": "91c0f9897f3b01d6"
                     },
                     "key": {
                         "type": "string",
+                        "writeOnly": true,
                         "maxLength": 255
                     },
                     "data": {},
@@ -84743,16 +85422,18 @@
                             "koreai",
                             "custom",
                             "cisco",
+                            "gemini_cx",
                             "genesys",
                             "agora",
                             "amazon_connect",
                             "telnyx",
+                            "assemblyai",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2b38755f8404d645",
+                        "x-spec-enum-id": "8fe31393fdfed3f4",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `agora` - Agora\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `gemini_cx` - Gemini Enterprise CX\n* `genesys` - Genesys\n* `agora` - Agora\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `assemblyai` - AssemblyAI"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -84775,12 +85456,14 @@
                             "amazon_connect",
                             "telnyx",
                             "sierra",
+                            "gemini_cx",
+                            "assemblyai",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "be289759a77f8b31",
+                        "x-spec-enum-id": "5390d14650598206",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (used for voice too when set).\n- `bland` — requires `bland_api_key`; `assistant_id` is the Bland persona_id (voice), `chat_assistant_id` the pathway_id (text); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `sierra` — requires `sierra_agent_token`; optional `sierra_data` (host, api_secret). Chat/text runs only.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex. Dial the agent over SIP (`sip_endpoint`) or phone; optionally connect Webex Contact Center (OAuth, or `cisco_client_secret` + `cisco_data`) so the call's Cisco transcript and interaction id are fetched after each run.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `sierra` - Sierra"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (used for voice too when set).\n- `bland` — requires `bland_api_key`; `assistant_id` is the Bland persona_id (voice), `chat_assistant_id` the pathway_id (text); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `sierra` — requires `sierra_agent_token`; optional `sierra_data` (host, api_secret). Chat/text runs only.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex. Dial the agent over SIP (`sip_endpoint`) or phone; optionally connect Webex Contact Center (OAuth, or `cisco_client_secret` + `cisco_data`) so the call's Cisco transcript and interaction id are fetched after each run.\n- `gemini_cx` — Gemini Enterprise CX (Google CX Agent Studio). Requires `gemini_cx_data` with `service_account_email` and `location` (a phone number is optional); Cekura reads the agent by impersonating that service account, so no key is stored. Voice runs dial the agent by phone, text runs are not supported.\n- `assemblyai` — AssemblyAI Voice Agent API. Requires `assemblyai_api_key` + `assistant_id` (AssemblyAI agent id); optional `assemblyai_data.region` (`us` default, or `eu`). Voice runs dial the agent by phone; the call transcript and tool calls are fetched from AssemblyAI after each run.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*`, `gemini_cx_*`, `assemblyai_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `sierra` - Sierra\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -84855,7 +85538,7 @@
                     "koreai_client_secret": {
                         "type": "string",
                         "writeOnly": true,
-                        "description": "\nClient secret key for Kore.ai service provider\nExample: `\"client_secret_key_123\"`\n"
+                        "description": "\nClient secret key for Kore.ai service provider (XO platform)\nExample: `\"client_secret_key_123\"`\n"
                     },
                     "koreai_client_secret_configured": {
                         "type": "string",
@@ -84867,7 +85550,7 @@
                     },
                     "koreai_data": {
                         "type": "string",
-                        "description": "\nKore.ai additional data.\nFor the RTM runner: {\"api_secret\": \"<xo-webclient API key>\", \"host\": \"platform.kore.ai\"}\nFor transcript fetch: {\"client_id\": \"cs-...\", \"bot_id\": \"st-...\", \"host\": \"bots.kore.ai\"}\napi_secret is encrypted at rest automatically.\n"
+                        "description": "\nKore.ai additional data.\nFor the RTM runner: {\"api_secret\": \"<xo-webclient API key>\", \"host\": \"platform.kore.ai\"}\nFor XO transcript fetch: {\"client_id\": \"cs-...\", \"bot_id\": \"st-...\", \"host\": \"bots.kore.ai\"}\nFor Artemis transcript fetch: {\"platform\": \"artemis\", \"artemis_api_key\": \"abl_...\", \"artemis_host\": \"ind-agents.kore.ai\", \"artemis_project_id\": \"<Artemis project id>\"}\nplatform (\"xo\", default, or \"artemis\") selects which set is used; both sets can be stored side by side.\napi_secret and artemis_api_key are encrypted at rest and returned as *_configured flags.\n"
                     },
                     "genesys_client_secret": {
                         "type": "string",
@@ -84899,6 +85582,15 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "Read-only Webex Contact Center connection status for the Connect/Reconnect control."
+                    },
+                    "gemini_cx_data": {
+                        "type": "string",
+                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-project identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
+                    },
+                    "gemini_cx_connection": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Read-only result of the last Gemini Enterprise CX connection check (status, checked_at, acting_as, error)."
                     },
                     "agentforce_client_secret": {
                         "type": "string",
@@ -84994,6 +85686,19 @@
                     "telnyx_api_key_configured": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "assemblyai_api_key": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAssemblyAI Voice Agent API key. Pair with `assistant_id` (the AssemblyAI agent id) so the call transcript and tool calls can be fetched after each run.\nExample: `\"assemblyai_api_key_123\"`\n"
+                    },
+                    "assemblyai_api_key_configured": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "assemblyai_data": {
+                        "type": "string",
+                        "description": "\nAssemblyAI additional configuration. `region` selects the AssemblyAI deployment the agent lives in: `us` (default; phone agents) or `eu`.\nExample: `{\"region\": \"us\"}`\n"
                     },
                     "enabled_personalities": {
                         "type": "array",
@@ -86690,6 +87395,9 @@
                     },
                     "new_score": {
                         "description": "Optimized accuracy after this run: {num_correct, num_total, score} over the same evaluated samples as old_score."
+                    },
+                    "estimated_cost_per_sample": {
+                        "description": "Display-only before/after estimated credits per evaluated sample: 0 for pure Python, the configured LLM-judge rate for a text judge, and duration-based pricing for an audio judge. Each value includes credits, uses_llm_judge, uses_audio, and audio_seconds."
                     }
                 },
                 "required": [
@@ -87221,14 +87929,17 @@
                             "amazon_connect",
                             "agora",
                             "telnyx",
-                            "sierra"
+                            "sierra",
+                            "gemini_cx",
+                            "assemblyai"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `cisco` - Cisco Webex\n* `amazon_connect` - Amazon Connect\n* `agora` - Agora\n* `telnyx` - Telnyx\n* `sierra` - Sierra",
-                        "x-spec-enum-id": "66d64b6a7149e5fe"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `cisco` - Cisco Webex\n* `amazon_connect` - Amazon Connect\n* `agora` - Agora\n* `telnyx` - Telnyx\n* `sierra` - Sierra\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI",
+                        "x-spec-enum-id": "91c0f9897f3b01d6"
                     },
                     "key": {
                         "type": "string",
+                        "writeOnly": true,
                         "maxLength": 255
                     },
                     "data": {},
@@ -87279,11 +87990,13 @@
                             "amazon_connect",
                             "agora",
                             "telnyx",
-                            "sierra"
+                            "sierra",
+                            "gemini_cx",
+                            "assemblyai"
                         ],
                         "type": "string",
-                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `cisco` - Cisco Webex\n* `amazon_connect` - Amazon Connect\n* `agora` - Agora\n* `telnyx` - Telnyx\n* `sierra` - Sierra",
-                        "x-spec-enum-id": "66d64b6a7149e5fe"
+                        "description": "* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `agentforce` - Agentforce\n* `genesys` - Genesys\n* `cisco` - Cisco Webex\n* `amazon_connect` - Amazon Connect\n* `agora` - Agora\n* `telnyx` - Telnyx\n* `sierra` - Sierra\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI",
+                        "x-spec-enum-id": "91c0f9897f3b01d6"
                     },
                     "created_at": {
                         "type": "string",
@@ -87320,6 +88033,12 @@
                     },
                     {
                         "$ref": "#/components/schemas/CiscoConfig"
+                    },
+                    {
+                        "$ref": "#/components/schemas/GeminiEnterpriseCxConfig"
+                    },
+                    {
+                        "$ref": "#/components/schemas/AssemblyAIConfig"
                     },
                     {
                         "$ref": "#/components/schemas/PipecatConfig"
@@ -90302,19 +91021,21 @@
                             "genesys",
                             "amazon_connect",
                             "telnyx",
+                            "gemini_cx",
+                            "assemblyai",
                             "custom",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "3f5fcc0e5ae82793",
-                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `custom` - Custom (chat-only, no voice provider)"
+                        "x-spec-enum-id": "633b60b8e3e09d4e",
+                        "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, assemblyai, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `custom` - Custom (chat-only, no voice provider)"
                     },
                     "agent_id": {
                         "type": [
                             "string",
                             "null"
                         ],
-                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
+                        "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, telnyx, assemblyai, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
                     },
                     "credentials": {
                         "oneOf": [
@@ -93024,16 +93745,18 @@
                             "koreai",
                             "custom",
                             "cisco",
+                            "gemini_cx",
                             "genesys",
                             "agora",
                             "amazon_connect",
                             "telnyx",
+                            "assemblyai",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "2b38755f8404d645",
+                        "x-spec-enum-id": "8fe31393fdfed3f4",
                         "default": "",
-                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `genesys` - Genesys\n* `agora` - Agora\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx"
+                        "description": "\nService provider for speech-to-text transcription\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `synthflow` - Synthflow\n* `elevenlabs` - Elevenlabs\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `koreai` - Kore\n* `custom` - Custom\n* `cisco` - Cisco\n* `gemini_cx` - Gemini Enterprise CX\n* `genesys` - Genesys\n* `agora` - Agora\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `assemblyai` - AssemblyAI"
                     },
                     "assistant_provider": {
                         "enum": [
@@ -93056,12 +93779,14 @@
                             "amazon_connect",
                             "telnyx",
                             "sierra",
+                            "gemini_cx",
+                            "assemblyai",
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "be289759a77f8b31",
+                        "x-spec-enum-id": "5390d14650598206",
                         "default": "",
-                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (used for voice too when set).\n- `bland` — requires `bland_api_key`; `assistant_id` is the Bland persona_id (voice), `chat_assistant_id` the pathway_id (text); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `sierra` — requires `sierra_agent_token`; optional `sierra_data` (host, api_secret). Chat/text runs only.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex. Dial the agent over SIP (`sip_endpoint`) or phone; optionally connect Webex Contact Center (OAuth, or `cisco_client_secret` + `cisco_data`) so the call's Cisco transcript and interaction id are fetched after each run.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `sierra` - Sierra"
+                        "description": "\nService provider for the AI assistant functionality. Valid values (live enum):\n\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (used for voice too when set).\n- `bland` — requires `bland_api_key`; `assistant_id` is the Bland persona_id (voice), `chat_assistant_id` the pathway_id (text); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — requires `agentforce_client_secret` + `agentforce_data`.\n- `sierra` — requires `sierra_agent_token`; optional `sierra_data` (host, api_secret). Chat/text runs only.\n- `amazon_connect` — requires `amazon_connect_data` with `snippet_id` and `connect_host`; optional `amazon_connect_security_token` and `region`.\n- `cisco` — Cisco Webex. Dial the agent over SIP (`sip_endpoint`) or phone; optionally connect Webex Contact Center (OAuth, or `cisco_client_secret` + `cisco_data`) so the call's Cisco transcript and interaction id are fetched after each run.\n- `gemini_cx` — Gemini Enterprise CX (Google CX Agent Studio). Requires `gemini_cx_data` with `service_account_email` and `location` (a phone number is optional); Cekura reads the agent by impersonating that service account, so no key is stored. Voice runs dial the agent by phone, text runs are not supported.\n- `assemblyai` — AssemblyAI Voice Agent API. Requires `assemblyai_api_key` + `assistant_id` (AssemblyAI agent id); optional `assemblyai_data.region` (`us` default, or `eu`). Voice runs dial the agent by phone; the call transcript and tool calls are fetched from AssemblyAI after each run.\n- `vocera` — Cekura-hosted.\n- `sms` / `whatsapp` — text-only channels; use `chat_assistant_id`.\n- `\"\"` (empty) — unset; agent is not runnable until a provider is configured.\n\nNote: the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*`, `gemini_cx_*`, `assemblyai_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `vocera` - Vocera\n* `sms` - Sms\n* `whatsapp` - Whatsapp\n* `self_hosted` - Self Hosted\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `sierra` - Sierra\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI"
                     },
                     "vapi_api_key": {
                         "type": "string",
@@ -93136,7 +93861,7 @@
                     "koreai_client_secret": {
                         "type": "string",
                         "writeOnly": true,
-                        "description": "\nClient secret key for Kore.ai service provider\nExample: `\"client_secret_key_123\"`\n"
+                        "description": "\nClient secret key for Kore.ai service provider (XO platform)\nExample: `\"client_secret_key_123\"`\n"
                     },
                     "koreai_client_secret_configured": {
                         "type": "string",
@@ -93148,7 +93873,7 @@
                     },
                     "koreai_data": {
                         "type": "string",
-                        "description": "\nKore.ai additional data.\nFor the RTM runner: {\"api_secret\": \"<xo-webclient API key>\", \"host\": \"platform.kore.ai\"}\nFor transcript fetch: {\"client_id\": \"cs-...\", \"bot_id\": \"st-...\", \"host\": \"bots.kore.ai\"}\napi_secret is encrypted at rest automatically.\n"
+                        "description": "\nKore.ai additional data.\nFor the RTM runner: {\"api_secret\": \"<xo-webclient API key>\", \"host\": \"platform.kore.ai\"}\nFor XO transcript fetch: {\"client_id\": \"cs-...\", \"bot_id\": \"st-...\", \"host\": \"bots.kore.ai\"}\nFor Artemis transcript fetch: {\"platform\": \"artemis\", \"artemis_api_key\": \"abl_...\", \"artemis_host\": \"ind-agents.kore.ai\", \"artemis_project_id\": \"<Artemis project id>\"}\nplatform (\"xo\", default, or \"artemis\") selects which set is used; both sets can be stored side by side.\napi_secret and artemis_api_key are encrypted at rest and returned as *_configured flags.\n"
                     },
                     "genesys_client_secret": {
                         "type": "string",
@@ -93180,6 +93905,15 @@
                         "type": "string",
                         "readOnly": true,
                         "description": "Read-only Webex Contact Center connection status for the Connect/Reconnect control."
+                    },
+                    "gemini_cx_data": {
+                        "type": "string",
+                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-project identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
+                    },
+                    "gemini_cx_connection": {
+                        "type": "string",
+                        "readOnly": true,
+                        "description": "Read-only result of the last Gemini Enterprise CX connection check (status, checked_at, acting_as, error)."
                     },
                     "agentforce_client_secret": {
                         "type": "string",
@@ -93275,6 +94009,19 @@
                     "telnyx_api_key_configured": {
                         "type": "string",
                         "readOnly": true
+                    },
+                    "assemblyai_api_key": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAssemblyAI Voice Agent API key. Pair with `assistant_id` (the AssemblyAI agent id) so the call transcript and tool calls can be fetched after each run.\nExample: `\"assemblyai_api_key_123\"`\n"
+                    },
+                    "assemblyai_api_key_configured": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "assemblyai_data": {
+                        "type": "string",
+                        "description": "\nAssemblyAI additional configuration. `region` selects the AssemblyAI deployment the agent lives in: `us` (default; phone agents) or `eu`.\nExample: `{\"region\": \"us\"}`\n"
                     },
                     "enabled_personalities": {
                         "type": "array",

@@ -237,6 +237,17 @@ The condition with `id: 0` is special—it represents the **first message** the 
 The `condition` field for the first message must be `"FIRST_MESSAGE"` exactly. An empty string or any other value will fail validation.
 </Warning>
 
+<Note>
+The first message is sent **once** and is never retried. If the main agent's speech cuts it off, whatever had not played yet is dropped and never spoken later. A `<silence>` always gives way when the main agent starts talking, so a greeting that arrives during a leading `<silence>` drops the whole line; spoken text gives way according to the personality's interruption settings. The conversation then continues through the other conditions as usual. To let the main agent greet first and then say an exact line, leave `id: 0` empty and put the line on a `standard` condition with `id: 1` that matches the greeting:
+
+```json
+[
+  { "id": 0, "condition": "FIRST_MESSAGE", "action": "", "type": "standard", "fixed_message": true },
+  { "id": 1, "condition": "The agent greets the caller", "action": "Hi, I'm calling because my fare came out higher than the estimate.", "type": "standard", "fixed_message": true }
+]
+```
+</Note>
+
 ## Condition Types
 
 ### Standard Conditions
@@ -730,10 +741,23 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
     The testing agent will interrupt the main agent after 3 seconds and speak this message.
 
     <Warning>
-    `<interruption>` has two requirements:
+    `<interruption>` has three requirements:
     1. The condition must have `type: "action_followup"`
     2. The tag must appear at the **very start** of the action string
+    3. Something audible must follow it: spoken text, or a sound clip (`<noise>` or `<audio>`). A bare tag, or one followed only by `<silence>` or `<hold>`, is rejected
     </Warning>
+
+    To cut in with a sound and no words, for example a cough over the agent:
+
+    ```json
+    {
+      "id": 3,
+      "type": "action_followup",
+      "condition": 2,
+      "action": "<interruption time=\"1.2s\" /> <noise sound=\"cough1\" />",
+      "fixed_message": true
+    }
+    ```
 
     **Attributes:**
     - `time`: Duration to wait before interrupting (required) - format: "Xs" where X is a number (e.g., "3s", "5.5s")
@@ -754,7 +778,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     **Attributes:**
     - `sound`: Sound name (required) - see supported sounds below
-    - `volume`: Volume level (optional) - default applies if not specified
+    - `volume`: Volume level (optional) - between **0 and 1.0**; default applies if not specified
 
     **Supported sounds:**
 
@@ -807,7 +831,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     **Attributes:**
     - `sound`: Sound name (required) - a name from the sound library below, or a direct `https://` URL to an audio file
-    - `volume`: Volume level (optional)
+    - `volume`: Volume level (optional) - between **0 and 1.0**
     - `time`: Duration in ms (optional)
 
     **Sound library**: `office`, `beep`, `cough1`, `cough2`, `female-crying`, `male-crying`, `ringback`. The library grows over time - newly added sounds work with the same syntax as soon as they are available.

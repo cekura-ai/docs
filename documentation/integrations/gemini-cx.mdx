@@ -37,33 +37,49 @@ Cekura's identity is a Google service account that Cekura owns, one per Cekura p
 
 ## Set up Google Cloud
 
+Run these in [Cloud Shell](https://console.cloud.google.com/?cloudshell=true) (the `>_` icon in the Google Cloud console) as someone who can create service accounts in the project that contains your agent. Cekura shows the same commands, with your values filled in, on the agent form.
+
 <Steps>
-  <Step title="Create the reader service account">
-    In the Google Cloud console, open **IAM & Admin → Service Accounts** in the project that contains your agent and click **Create service account**. Name it, for example, `cekura-reader`. Google generates its address in the form `cekura-reader@<your-project>.iam.gserviceaccount.com`. Copy it; you will paste it into Cekura.
+  <Step title="Set your values">
+    Your Google project id, and the Cekura identity shown on the agent form (see the next section; it looks like `cekura-project-<n>@<cekura-project>.iam.gserviceaccount.com`).
+
+    ```bash
+    PROJECT=<your-project-id>
+    CEKURA=<cekura-identity-from-the-form>
+    ```
   </Step>
 
-  <Step title="Give the reader read access to the agent">
-    On the **Grant this service account access to project** step (or later under **IAM**), give the reader the **CX Agent Studio Viewer** role. This read-only role lets it list and read agents and their conversations, and nothing else. See Google's [access control page](https://docs.cloud.google.com/gemini-enterprise-cx/cx-agent-studio/access-control) for the full list of roles.
-  </Step>
+  <Step title="Create the reader and let it read the agent">
+    A small service account in your project with the read-only **Gemini Enterprise for Customer Experience Viewer** role (`roles/ces.viewer`): it can list and read agents and their conversations, nothing else.
 
-  <Step title="Get Cekura's identity">
-    In Cekura, go to **Agents**, create an agent, and select **Gemini Enterprise CX** as the provider. The setup card shows the Cekura identity for your project. Click **Copy**.
-
-    <img src="/images/gemini-cx/setup-steps.png" alt="Cekura setup card showing the identity to grant and the three setup steps" />
+    ```bash
+    gcloud iam service-accounts create cekura-reader --project "$PROJECT" --display-name="Cekura reader"
+    gcloud projects add-iam-policy-binding "$PROJECT" \
+      --member="serviceAccount:cekura-reader@$PROJECT.iam.gserviceaccount.com" \
+      --role="roles/ces.viewer"
+    ```
   </Step>
 
   <Step title="Allow Cekura's identity to act as the reader">
-    Back in the Google Cloud console, open the reader service account you created, go to its **Permissions** tab, click **Grant access**, paste the Cekura identity as the principal and give it the role **Service Account Token Creator**. Save.
+    This is the only link between your project and Cekura. Cekura can request tokens that act as the reader, and nothing more. New grants take up to a minute to apply.
 
-    This is the only link between your project and Cekura. Cekura can now request tokens that act as the reader, and nothing more. New grants take up to a minute to apply.
+    ```bash
+    gcloud iam service-accounts add-iam-policy-binding "cekura-reader@$PROJECT.iam.gserviceaccount.com" \
+      --member="serviceAccount:$CEKURA" \
+      --role="roles/iam.serviceAccountTokenCreator"
+    ```
+
+    Prefer the console? Open **IAM & Admin → Service Accounts**, click the reader, open its **Permissions** tab, click **Grant access**, paste the Cekura identity as the principal and choose the role **Service Account Token Creator**. Note this is the reader's own Permissions tab, not the project's IAM page.
   </Step>
 </Steps>
+
+<img src="/images/gemini-cx/setup-steps.png" alt="Cekura setup card with the gcloud commands prefilled with the Cekura identity" />
 
 ## Connect the agent in Cekura
 
 <Steps>
   <Step title="Select Gemini Enterprise CX">
-    In Cekura, go to **Agents**, create an agent, and select **Gemini Enterprise CX**. If you don't see it, click **More options** to expand the full provider list.
+    In Cekura, go to **Agents**, create an agent, and select **Gemini Enterprise CX**. If you don't see it, click **More options** to expand the full provider list. The setup card at the top shows the commands above with your Cekura identity filled in; **Copy commands** copies them.
 
     <img src="/images/gemini-cx/select-provider.png" alt="Gemini Enterprise CX selected in the Cekura provider grid" />
   </Step>
@@ -106,7 +122,7 @@ Open an evaluator, click **Run**, and start the run using the **Telephony** conn
 
 ## Troubleshooting
 
-- **Not connected: Google refused to let … act as …**: the reader has not granted the Cekura identity shown in the card, or the grant names a different address. Open the reader's **Permissions** tab and check that the principal is exactly the address in the card with the **Service Account Token Creator** role. Wait a minute after adding it.
+- **Not connected: Google refused to let … act as …**: the reader has not granted the Cekura identity shown in the card, or the grant names a different address. Re-run the last command with the exact address from the card, or check the reader's **Permissions** tab. Wait a minute after adding it.
 - **The service account belongs to project X, not Y**: the **GCP Project ID** you typed does not match the project in the reader's address. Clear the field to use the reader's project, or enter the project that actually contains the agent.
 - **Cekura's Google identity is not available right now**: Cekura's side is not configured for Google Cloud in this environment. Contact Cekura support.
 - **Revoking access**: remove the Service Account Token Creator grant from the reader, or delete the reader. Cekura's next request is refused by Google.

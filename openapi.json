@@ -18907,7 +18907,7 @@
         "/test_framework/v1/aiagents/{id}/history/": {
             "get": {
                 "operationId": "aiagents-v1-history-list",
-                "description": "Paginated version history for an agent: name/language/description plus the mock\ntools, dynamic variables, and knowledge base files active at each version.",
+                "description": "Paginated version history for an agent: its configuration (name, prompt, language,\ntelephony, provider and credential status, webhook, ...) plus the mock tools, dynamic\nvariables, knowledge base files and connectors active at each version. Secrets are\nreported as configured flags (with a last-four hint for keys), never as values.",
                 "parameters": [
                     {
                         "in": "path",
@@ -19145,7 +19145,7 @@
         "/test_framework/v1/aiagents/{id}/restore/": {
             "post": {
                 "operationId": "aiagents-v1-restore-create",
-                "description": "Restore an agent to a previous version, creating a new version for the restore.\n\nRestores the versioned concrete fields (name, language, description) and the related\ncollections: tools and dynamic variables are reverted in place to their\nlinked versions (ids preserved) and any not in the version are soft-deleted; knowledge\nbase files referenced by the version are reactivated and the rest soft-deleted.",
+                "description": "Restore an agent to a previous version, creating a new version for the restore.\n\nRestores every versioned configuration column (name, prompt, language, telephony,\nprovider wiring, webhook, toggles — see AIAgent.RESTORE_EXCLUDED_FIELDS for what is\nleft alone) and the related collections: tools, dynamic variables, provider\ncredentials and knowledge base connectors are reverted in place to their linked\nversions (ids preserved); tools, variables and connectors not in the version are\ndeactivated, while credentials for other providers are left in place; knowledge base\nfiles referenced by the version are reactivated and the rest soft-deleted. Returns 400\nif the restored provider settings no longer validate.",
                 "parameters": [
                     {
                         "in": "path",
@@ -21196,7 +21196,7 @@
             },
             "delete": {
                 "operationId": "knowledge-base-connectors-destroy",
-                "description": "Delete a BigQuery knowledge base connectors attached to AI agent",
+                "description": "Soft delete: the row (and its files) are kept so an agent version restore can bring\nthe connector back with the same id; its scheduled sync is disabled.",
                 "parameters": [
                     {
                         "in": "path",
@@ -51495,7 +51495,7 @@
         "/test_framework/v2/aiagents/{id}/history/": {
             "get": {
                 "operationId": "aiagents-history-list",
-                "description": "Paginated version history for an agent: name/language/description plus the mock\ntools, dynamic variables, and knowledge base files active at each version.",
+                "description": "Paginated version history for an agent: its configuration (name, prompt, language,\ntelephony, provider and credential status, webhook, ...) plus the mock tools, dynamic\nvariables, knowledge base files and connectors active at each version. Secrets are\nreported as configured flags (with a last-four hint for keys), never as values.",
                 "parameters": [
                     {
                         "in": "path",
@@ -51761,7 +51761,7 @@
         "/test_framework/v2/aiagents/{id}/restore/": {
             "post": {
                 "operationId": "aiagents-restore-create",
-                "description": "Restore an agent to a previous version, creating a new version for the restore.\n\nRestores the versioned concrete fields (name, language, description) and the related\ncollections: tools and dynamic variables are reverted in place to their\nlinked versions (ids preserved) and any not in the version are soft-deleted; knowledge\nbase files referenced by the version are reactivated and the rest soft-deleted.",
+                "description": "Restore an agent to a previous version, creating a new version for the restore.\n\nRestores every versioned configuration column (name, prompt, language, telephony,\nprovider wiring, webhook, toggles — see AIAgent.RESTORE_EXCLUDED_FIELDS for what is\nleft alone) and the related collections: tools, dynamic variables, provider\ncredentials and knowledge base connectors are reverted in place to their linked\nversions (ids preserved); tools, variables and connectors not in the version are\ndeactivated, while credentials for other providers are left in place; knowledge base\nfiles referenced by the version are reactivated and the rest soft-deleted. Returns 400\nif the restored provider settings no longer validate.",
                 "parameters": [
                     {
                         "in": "path",
@@ -70914,7 +70914,7 @@
             },
             "AIAgentHistory": {
                 "type": "object",
-                "description": "A single AIAgent version: versioned concrete fields + resolved related collections.\n\nManifests store child ``history_id`` lists (tools/dynamic vars) and uploaded-file ids\n(kb). The values are resolved on read. Use ``build_context()`` to batch the resolution\nacross a page of records and pass it as the serializer context (avoids N+1).",
+                "description": "A single AIAgent version: its configuration plus the related collections at that version.\n\nThe `telephony` and `provider` blocks are rendered by the same code as the v2 agent\nresponse, fed the version's own columns and the credential rows it points at, so a\nversion reads exactly like the settings page did at the time. Secrets are masked the\nsame way (`*_configured` flags) with a `*_hint` (last four characters) so two versions\ncan be told apart; passwords get the flag only.\n\nManifests store child ``history_id`` lists (tools / dynamic vars / credentials /\nconnectors) and uploaded-file ids (kb). The values are resolved on read. Use\n``build_context()`` to batch the resolution across a page of records and pass it as the\nserializer context (avoids N+1).",
                 "properties": {
                     "history_id": {
                         "type": "integer",
@@ -71040,6 +71040,77 @@
                         "type": "string",
                         "description": "Description of the agent's purpose and capabilities.\nExample: `\"AI agent for handling customer support inquiries and resolving technical issues\"`"
                     },
+                    "agent_speaks_first": {
+                        "type": [
+                            "boolean",
+                            "null"
+                        ],
+                        "readOnly": true
+                    },
+                    "email_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "email",
+                        "description": "Email address this agent receives at. When set, enables email-based test runs.",
+                        "maxLength": 254
+                    },
+                    "webhook_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "description": "Webhook URL for this agent. When set, overrides the project-level webhook URL for events from this agent.",
+                        "maxLength": 200
+                    },
+                    "webhook_secret_configured": {
+                        "type": "boolean",
+                        "readOnly": true
+                    },
+                    "webhook_secret_hint": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "mock_tools_enabled": {
+                        "type": "boolean",
+                        "description": "Whether mock tools should be selected by default when configuring a run."
+                    },
+                    "pronunciation_words": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "List of words with phonemes for pronunciation analysis.\nExample: `[[\"hello\", \"HH AH L OW\"], [\"world\", \"W ER L D\"]]`"
+                    },
+                    "spelling_word_types": {
+                        "oneOf": [
+                            {},
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "List of word types/categories to check for spelling analysis.\nExample: `[\"name\", \"postcode\", \"email\", \"address\"]`"
+                    },
+                    "telephony": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentTelephony"
+                            }
+                        ],
+                        "readOnly": true
+                    },
+                    "provider": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AgentProvider"
+                            }
+                        ],
+                        "readOnly": true
+                    },
                     "mock_tools": {
                         "type": "string",
                         "readOnly": true
@@ -71050,6 +71121,14 @@
                     },
                     "knowledge_base_files": {
                         "type": "string",
+                        "readOnly": true
+                    },
+                    "knowledge_base_connectors": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": {}
+                        },
                         "readOnly": true
                     }
                 },

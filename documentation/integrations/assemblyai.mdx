@@ -1,0 +1,121 @@
+---
+title: "AssemblyAI Integration"
+sidebarTitle: "AssemblyAI"
+icon: "/images/providers/assemblyai.svg"
+description: "Connect an AssemblyAI Voice Agent to Cekura to run phone-based simulations and pull the AssemblyAI transcript and tool calls into every result."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## Overview
+
+Cekura tests agents built on the [AssemblyAI Voice Agent API](https://www.assemblyai.com/docs/voice-agents/voice-agent-api) over the phone. Cekura dials the number attached to your agent, runs the scenario as a simulated caller, and then uses the AssemblyAI API to find that call and fetch its recorded conversation. The result shows the transcript as AssemblyAI recorded it, with every tool the agent called shown inline as a function call, including the arguments it sent and the response it received.
+
+<Note>
+AssemblyAI connects over **telephony only**. AssemblyAI agents answer inbound calls, so Cekura always places the call; the telephony connection is enabled automatically once the AssemblyAI credentials are saved.
+</Note>
+
+## Prerequisites
+
+- An **AssemblyAI API key** with access to the Voice Agent API.
+- A **stored agent** on AssemblyAI and its agent id (it starts with `agent_`).
+- A **phone number** routed to that agent. AssemblyAI receives calls from a Twilio number over a SIP trunk; see [Set up an inbound phone agent via SIP](https://www.assemblyai.com/docs/voice-agents/voice-agent-api/connect-to-twilio) in the AssemblyAI docs.
+
+<Warning>
+AssemblyAI keeps agents, phone numbers and calls **separate per region**. Phone agents are hosted in the **US** region, and an agent created on the default (EU) host cannot answer a phone number. Create the agent and register the number on the same region, and select that region in Cekura.
+</Warning>
+
+## Set up AssemblyAI
+
+<Steps>
+  <Step title="Create the agent">
+    Create a stored agent through the AssemblyAI API or dashboard in the region you will use for telephony, and copy its id (`agent_…`). The prompt, greeting, voice and HTTP tools all live on this agent.
+  </Step>
+
+  <Step title="Attach a phone number">
+    Follow AssemblyAI's Twilio guide: create a Twilio SIP trunk that routes to AssemblyAI, attach your Twilio number to it, then import the number on AssemblyAI and bind the agent to it. Calling the number should reach your agent before you continue.
+  </Step>
+
+  <Step title="Copy the API key">
+    Copy the API key from the AssemblyAI dashboard. Cekura uses it only to list your agent's calls and download each call's conversation after a test.
+  </Step>
+</Steps>
+
+## Connect AssemblyAI in Cekura
+
+<Steps>
+  <Step title="Select AssemblyAI">
+    In Cekura, go to **Agents**, create an agent, and select **AssemblyAI** as the provider. If you don't see it, click **More options** to expand the full provider list.
+
+    <img src="/images/assemblyai/select-provider.png" alt="AssemblyAI selected in the Cekura provider grid" />
+  </Step>
+
+  <Step title="Enter the AssemblyAI credentials">
+    Fill in the fields under **Integration Settings**:
+
+    | Field | Value |
+    |---|---|
+    | **AssemblyAI Agent ID** | The id of your stored agent (`agent_…`). Cekura uses it to find the calls that agent took. |
+    | **AssemblyAI API Key** | Your AssemblyAI API key. Stored encrypted and never shown again. |
+    | **Region** | The AssemblyAI region your agent lives in: **US** (default, phone agents) or **EU**. |
+
+    <img src="/images/assemblyai/integration-settings.png" alt="AssemblyAI Agent ID, API Key, and Region fields in Cekura Integration Settings" />
+  </Step>
+
+  <Step title="Add the phone number">
+    Under **Telephony Settings**, enter the phone number attached to your AssemblyAI agent. Telephony is the only connection type for AssemblyAI and is enabled automatically. Leave **Inbound** on so Cekura dials your number.
+
+    <img src="/images/assemblyai/telephony-settings.png" alt="Telephony Settings with the AssemblyAI phone number and Inbound enabled" />
+  </Step>
+
+  <Step title="Save the agent">
+    Save the agent. The key field shows **API Key Configured** once it is stored; use **Update** to rotate it later.
+
+    <img src="/images/assemblyai/settings-configured.png" alt="Saved AssemblyAI integration settings showing the stored API key" />
+  </Step>
+</Steps>
+
+## Run a test
+
+Open an evaluator, click **Run**, and start the run using the **Telephony** connection. Cekura dials your AssemblyAI number and plays the scenario as the caller.
+
+When the call ends, Cekura:
+
+1. Lists the recent calls on your AssemblyAI account and keeps the ones answered by your agent, placed from the Cekura number, and started within a few seconds of the test call.
+2. Waits for AssemblyAI to write the call's conversation record, which usually takes a few seconds after the call ends.
+3. Confirms the match by comparing the call duration and the conversation content, so parallel test calls to the same agent are each paired with the right AssemblyAI call.
+4. Replaces its own transcript with the AssemblyAI one and attaches the AssemblyAI call id to the result.
+
+In the result, agent turns are labeled **Main Agent** and caller turns are labeled **Testing Agent**. Each HTTP tool the agent called appears as a **Function Call** entry followed by a **Function Call Result** entry, with the arguments AssemblyAI sent and the response your endpoint returned, so you can write metrics against what the agent actually did.
+
+<Note>
+If Cekura cannot find a matching call, the result keeps Cekura's own transcript of the call. See the troubleshooting section below.
+</Note>
+
+## Troubleshooting
+
+- **Authentication fails**: check that the API key has Voice Agent API access and that the selected **Region** matches where the agent was created. A key is valid in both regions, but an agent created in one region does not exist in the other.
+- **No AssemblyAI transcript on the result**: confirm the **AssemblyAI Agent ID** is the agent bound to the number under **Telephony Settings**. Cekura only considers calls answered by that agent.
+- **Call not matched**: Cekura matches on the phone number it dialed from and the call's start time. Make sure the run used the **Telephony** connection and that the number under **Telephony Settings** is the one bound to the agent on AssemblyAI.
+- **Number never connects**: AssemblyAI answers the call, not Cekura, so a number that does not reach the agent when dialed by hand will not work in a test either. Re-check the SIP trunk routing and the number's agent binding on AssemblyAI, in the same region as the agent.
+
+## Configure through the API
+
+When creating or updating an agent through the [API](/api-reference/test_framework/create-agent), set the provider to `assemblyai` and pass the credentials:
+
+```json
+{
+  "transcript_provider": "assemblyai",
+  "assistant_id": "agent_3f9c2d7e8a1b4c6d9e0f1a2b3c4d5e6f",
+  "assemblyai_api_key": "<api-key>",
+  "assemblyai_data": {
+    "region": "us"
+  },
+  "contact_number": "+15551234567",
+  "inbound": true
+}
+```
+
+`assistant_id` is the AssemblyAI agent id and is required whenever a key is set. `assemblyai_data.region` is `us` (default) or `eu`. The response never returns the key. Use the read-only `assemblyai_api_key_configured` field to check whether one is stored.

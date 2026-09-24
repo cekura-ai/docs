@@ -178,7 +178,7 @@ curl --request POST \
   "suite":    { name, description },           optional
   "defaults": {                                optional, applied to every case
     frequency, concurrency_limit, language, max_duration,
-    metrics, personality, test_profile, tags
+    metrics, personality, test_profile, tags, phone_number
   },
   "scenarios": [                               required, 1–200
     {
@@ -187,7 +187,8 @@ curl --request POST \
       instructions | conditional_actions,      one, depending on type
       expected_outcome, first_message,
       metrics, personality, test_profile,
-      tools, language, frequency, max_duration
+      tools, language, frequency, max_duration,
+      phone_number
     }
   ]
 }
@@ -221,6 +222,7 @@ Note what is *not* in there: no `agent_id`, no `channel`, no credentials, no pro
 | `language` | no | Language code, e.g. `en`. |
 | `frequency` | no | How many times to run this case. Defaults to 1. |
 | `max_duration` | no | Max call length in seconds. |
+| `phone_number` | no | E.164 number on Cekura's side of the call. See [Pinning a phone number](#pinning-a-phone-number). |
 | `type` | no | `instruction` (default) or `conditional_actions`. |
 
 \* `instructions` is required for `instruction` cases; `conditional_actions` cases need `conditional_actions` and `language` instead.
@@ -325,6 +327,16 @@ Anything repeated across cases can move up into `defaults`:
 ```
 
 A test case overrides `defaults` field by field. `metrics` lists from both are combined.
+
+### Pinning a phone number
+
+By default a voice run uses the least-used number from your pool, so the Cekura-side number can differ from run to run. Set `phone_number` when a case needs a fixed one — for example when your agent whitelists caller IDs, or when your agent places the call and must be told which number to dial (a handoff or transfer flow):
+
+```json
+{ "name": "Warm transfer", "instructions": "...", "phone_number": "+14155550123" }
+```
+
+When Cekura dials your agent, this is the caller ID it shows. When your agent dials Cekura, this is the number Cekura answers on. The number must be one available to your organization — a Cekura pool number or one you [imported](/documentation/key-concepts/phone-numbers/twilio) — in E.164 format (`+` followed by country code and digits). Anything else is rejected at `scenarios[i].phone_number` before any call is placed. Like the other case fields, `phone_number` can go in `defaults` to apply to every case in the file, and it is included when you [export existing evaluators](#starting-from-evaluators-you-already-have) that have a number configured.
 
 ### Choosing the run target
 

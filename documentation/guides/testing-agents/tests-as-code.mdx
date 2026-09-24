@@ -148,8 +148,8 @@ Authenticate with `X-CEKURA-API-KEY`. The key's own scope resolves the project, 
 | `pipecat_data` | no | Pipecat Cloud connection overrides for this run. Only valid when `channel` is `pipecat_v2`. Accepted keys: `pipecat_agent_name`, `config`, `room_properties`. |
 | `name` | no | Label for this run. Defaults to the spec's `suite.name`. |
 | `agent_number` | no | Your agent's phone number for this run, in E.164 format. Overrides the number configured on the agent. `voice` and `text` only. |
-| `outbound_phone_number` | no | For an inbound voice agent, the number Cekura dials, in E.164 format. Defaults to `agent_number`, then the agent's configured number. For `text`, the number Cekura messages from. `voice` and `text` only. |
-| `mode` | no | `same_number` (default) places every call from one Cekura number; `different_numbers` spreads calls across your pool. `voice` only. |
+| `outbound_phone_number` | no | For an inbound voice agent, the number Cekura dials, in E.164 format. Defaults to `agent_number`, then the agent's configured number. Rejected for outbound voice agents — set `phone_number` on the test case instead. For SMS and WhatsApp agents, the contact number for the conversation. `voice` and `text` only. |
+| `mode` | no | `same_number` (default) places every call from one Cekura number; `different_numbers` spreads calls across your pool and can't be combined with `phone_number` on a test case. Inbound `voice` agents only. |
 | `frequency` | no | Run every test case this many times, on top of each case's own `frequency`. Default `1`. |
 | `concurrency_limit` | no | Maximum number of runs in parallel. Overrides the spec's `defaults.concurrency_limit`. |
 | `mock_tool_names` | no | Mock tools to activate for this run. Omit or send `null` to mock every tool configured on the agent; send `[]` to mock none. |
@@ -377,14 +377,15 @@ Everything that describes a test case lives in the file: instructions, metrics, 
 These are the same run options the evaluator run endpoints accept, and they apply to every test case in the spec:
 
 - **`agent_number`** replaces the agent's configured number for this run — for example to test a staging line with the same agent. It is your agent's number; the case-level `phone_number` is Cekura's side of the call.
-- **`outbound_phone_number`** sets the number Cekura dials when your agent receives calls. If you only pass `agent_number`, Cekura dials that.
+- **`outbound_phone_number`** sets the number Cekura dials when your agent receives calls. If you only pass `agent_number`, Cekura dials that. For an agent that places calls, choose the Cekura number it dials with `phone_number` on the test case instead; `outbound_phone_number` is rejected there.
 - **`frequency`** multiplies each case's own `frequency`: a case with `"frequency": 2` run with `frequency: 3` runs 6 times. The dry run's `total_runs` and estimated cost include it.
 - **`concurrency_limit`** wins over `defaults.concurrency_limit` in the file.
-- **`mode`**, **`mock_tool_names`** and **`agent_version_id`** work as they do on evaluator runs.
+- **`mode`** applies to agents that receive calls. `different_numbers` picks the Cekura number for every call, so it can't be combined with a test case's `phone_number`.
+- **`mock_tool_names`** and **`agent_version_id`** work as they do on evaluator runs. Send `mock_tool_names: []` to mock no tools; leave it out to mock every tool configured on the agent.
 
 Personalities and test profiles are chosen per test case in the file (see [Personalities](#personalities) and [Test data](#test-data)), so `personality_ids` and `test_profile_ids` are not accepted here. Neither are `scenarios`, `tags` or `folder_path` — the spec is the list of test cases. Sending any of them returns a `400` that says where the setting belongs, rather than silently ignoring it.
 
-A dry run echoes the overrides it applied under `plan.run_overrides`, so you can confirm them before placing any calls.
+A dry run runs the same checks as the real run, so an override that would be rejected fails the dry run too. It echoes the overrides it applied under `plan.run_overrides`, and the numbers the run will use under `plan.agent_number` and `plan.outbound_phone_number`, so you can confirm them before placing any calls.
 
 ## Reading validation errors
 

@@ -153,7 +153,6 @@ Authenticate with `X-CEKURA-API-KEY`. The key's own scope resolves the project, 
 | `frequency` | no | Run every test case this many times, on top of each case's own `frequency`. Default `1`. |
 | `concurrency_limit` | no | Maximum number of runs in parallel. Overrides the spec's `defaults.concurrency_limit`. |
 | `mock_tool_names` | no | Mock tools to activate for this run. Omit or send `null` to mock every tool configured on the agent; send `[]` to mock none. |
-| `agent_version_id` | no | Run against a saved version of the agent instead of the live one, e.g. `v12`. |
 
 \* Send exactly one of `spec` or `file`.
 
@@ -368,7 +367,7 @@ For the WebRTC channels (`livekit_v2` and `pipecat_v2`), you can pass connection
 
 ### Run overrides
 
-Everything that describes a test case lives in the file: instructions, metrics, personality, test data, and the Cekura-side `phone_number`. Settings that describe *this run* go on the request instead, so one committed file can run against different numbers, versions, or load levels without edits:
+Everything that describes a test case lives in the file: instructions, metrics, personality, test data, and the Cekura-side `phone_number`. Settings that describe *this run* go on the request instead, so one committed file can run against different numbers or load levels without edits:
 
 ```bash
 --data "{\"agent_id\": 42, \"agent_number\": \"+14155550123\", \"frequency\": 3, \"concurrency_limit\": 5, \"spec\": $(cat cekura.tests.json)}"
@@ -381,11 +380,11 @@ These are the same run options the evaluator run endpoints accept, and they appl
 - **`frequency`** multiplies each case's own `frequency`: a case with `"frequency": 2` run with `frequency: 3` runs 6 times. The dry run's `total_runs` and estimated cost include it.
 - **`concurrency_limit`** wins over `defaults.concurrency_limit` in the file.
 - **`mode`** applies to agents that receive calls. `different_numbers` picks the Cekura number for every call, so it can't be combined with a test case's `phone_number`.
-- **`mock_tool_names`** and **`agent_version_id`** work as they do on evaluator runs. Send `mock_tool_names: []` to mock no tools; leave it out to mock every tool configured on the agent.
+- **`mock_tool_names`** works as it does on evaluator runs. Send `mock_tool_names: []` to mock no tools; leave it out to mock every tool configured on the agent.
 
-Personalities and test profiles are chosen per test case in the file (see [Personalities](#personalities) and [Test data](#test-data)), so `personality_ids` and `test_profile_ids` are not accepted here. Neither are `scenarios`, `tags` or `folder_path` — the spec is the list of test cases. Sending any of them returns a `400` that says where the setting belongs, rather than silently ignoring it.
+Personalities and test profiles are chosen per test case in the file (see [Personalities](#personalities) and [Test data](#test-data)), so `personality_ids` and `test_profile_ids` are not accepted here. Neither are `scenarios`, `tags` or `folder_path` — the spec is the list of test cases. Sending any of them with a value returns a `400` that says where the setting belongs, rather than silently ignoring it; empty placeholders such as `[]` or `null` are ignored.
 
-A dry run runs the same checks as the real run, so an override that would be rejected fails the dry run too. It echoes the overrides it applied under `plan.run_overrides`, and the numbers the run will use under `plan.agent_number` and `plan.outbound_phone_number`, so you can confirm them before placing any calls.
+A dry run runs the same checks as the real run, so a rejected override, missing channel credentials, or a missing LiveKit `agent_name` or Pipecat `pipecat_agent_name` fails the dry run too. It echoes the overrides it applied under `plan.run_overrides`, and the numbers the run will use under `plan.agent_number` and `plan.outbound_phone_number`, so you can confirm them before placing any calls.
 
 ## Reading validation errors
 

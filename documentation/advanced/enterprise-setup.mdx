@@ -90,19 +90,11 @@ Read-only access for stakeholders who need visibility without modification capab
 
 ## API Key Types
 
-Cekura provides three types of API keys with different permission levels for programmatic access:
+Cekura has two levels of API key, chosen when you create the key. Send the key in the `X-CEKURA-API-KEY` header on every request.
 
-### Admin API Keys
+### Organization API Keys
 
-Full API access equivalent to Admin dashboard permissions.
-
-**Capabilities:**
-- All CRUD operations across all resources
-- Access to all projects in the organization
-- User and organization management
-- Billing and usage data retrieval
-- Webhook configuration
-- Complete observability data access
+Access across every project in the organization.
 
 **Security considerations:**
 - Treat as highly sensitive credentials
@@ -113,83 +105,47 @@ Full API access equivalent to Admin dashboard permissions.
 
 **Example use cases:**
 ```bash
-# Access all projects
-curl https://api.cekura.ai/v1/projects \
-  -H "Authorization: Bearer admin_api_key_xxx"
+# List the organization's projects
+curl https://api.cekura.ai/user/v1/projects/ \
+  -H "X-CEKURA-API-KEY: $CEKURA_ORG_API_KEY"
 
-# Manage organization settings
-curl https://api.cekura.ai/v1/organization \
-  -H "Authorization: Bearer admin_api_key_xxx"
+# List test results across projects
+curl https://api.cekura.ai/test_framework/v1/results/ \
+  -H "X-CEKURA-API-KEY: $CEKURA_ORG_API_KEY"
 ```
 
 ### Project API Keys
 
-Scoped access limited to specific projects for enhanced security.
+Access limited to one project, chosen when the key is created.
 
 **Capabilities:**
-- Full access to assigned project resources only
-- Create and manage agents, evaluators, metrics within the project
+- Create and manage agents, evaluators and metrics within the project
 - Run tests and retrieve results for the project
 - Send observability data for the project
 - Access transcripts and analytics for the project
 
 **Restrictions:**
 - Cannot access other projects
-- Cannot manage users or organization settings
-- Cannot view billing information
-- Cannot create or delete projects
 
 **Security considerations:**
 - Use for development and staging environments
-- Assign minimum required project access
 - Different keys per project for isolation
 - Safe to use in CI/CD pipelines
 
 **Example use cases:**
 ```bash
-# Send observability data for specific project
-curl https://api.cekura.ai/v1/observability/observe \
-  -H "Authorization: Bearer project_api_key_xxx" \
-  -d '{"project_id": "proj_123", "transcript": [...]}'
+# Run evaluators in the project
+curl -X POST https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios/ \
+  -H "X-CEKURA-API-KEY: $CEKURA_PROJECT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agent_id": 123, "scenarios": [456, 789]}'
 
-# Run evaluator within project scope
-curl https://api.cekura.ai/v1/evaluators/{evaluator_id}/run \
-  -H "Authorization: Bearer project_api_key_xxx"
+# List the project's production call logs
+curl "https://api.cekura.ai/observability/v1/call-logs/?project_id=742" \
+  -H "X-CEKURA-API-KEY: $CEKURA_PROJECT_API_KEY"
 ```
 
-### Read-Only API Keys
-
-Limited to read operations only, ideal for analytics and monitoring.
-
-**Capabilities:**
-- Retrieve agents, evaluators, and metrics (GET only)
-- Access test results and analytics
-- Fetch call transcripts and recordings
-- Query observability data
-- Generate reports
-
-**Restrictions:**
-- No write, update, or delete operations
-- Cannot start tests or make calls
-- Cannot modify any configurations
-- Cannot access billing or user management
-
-**Security considerations:**
-- Safe for frontend applications with proper precautions
-- Suitable for monitoring and alerting systems
-- Can be shared with external analytics tools
-- Lower risk if accidentally exposed
-
-**Example use cases:**
-```bash
-# Retrieve test results for dashboards
-curl https://api.cekura.ai/v1/results \
-  -H "Authorization: Bearer readonly_api_key_xxx"
-
-# Fetch call analytics for monitoring
-curl https://api.cekura.ai/v1/calls \
-  -H "Authorization: Bearer readonly_api_key_xxx"
-```
+Running evaluators returns a result to poll — see [Result statuses and gating](/documentation/guides/testing-agents/result-statuses).
 
 ## Best Practices
 
@@ -236,9 +192,8 @@ Projects: client-acme, client-globex, internal-testing
 ### API Key Management
 
 1. **Key Rotation**
-   - Admin keys: Rotate every 90 days
+   - Organization keys: Rotate every 90 days
    - Project keys: Rotate every 180 days
-   - Read-only keys: Rotate annually or when team members leave
 
 2. **Storage**
    - Use environment variables for all API keys
@@ -251,11 +206,8 @@ Projects: client-acme, client-globex, internal-testing
    # Production: Use Project API keys
    CEKURA_API_KEY=project_api_key_xxx
 
-   # CI/CD: Use Project API keys scoped to test projects
+   # CI/CD: Use a Project API key for the test project
    CEKURA_TEST_API_KEY=project_api_key_yyy
-
-   # Monitoring: Use Read-Only keys
-   CEKURA_READONLY_KEY=readonly_api_key_zzz
    ```
 
 4. **Monitoring and Auditing**
@@ -267,9 +219,8 @@ Projects: client-acme, client-globex, internal-testing
 ### Security Checklist
 
 <Check>
-- [ ] All Admin API keys stored in secure secret management
+- [ ] All Organization API keys stored in secure secret management
 - [ ] Project API keys used for development and CI/CD
-- [ ] Read-Only keys used for monitoring and analytics
 - [ ] Regular key rotation schedule established
 - [ ] Team members have minimum required permissions
 - [ ] Viewers assigned for stakeholders without modification needs
@@ -311,11 +262,11 @@ Access to **Settings > API Keys** requires the **Admin** role. Members and Viewe
   </Step>
 
   <Step title="Generate New Key">
-    Click **Create API Key** and select the key type.
+    Click **Create API Key** and choose **Organization Level** or **Project Level**.
   </Step>
 
   <Step title="Configure Scope">
-    For Project API keys, select which projects should be accessible.
+    For a Project Level key, select the project it can access.
   </Step>
 
   <Step title="Save Securely">
@@ -336,9 +287,8 @@ If you're currently using a single API key for all purposes, follow these steps 
 1. **Audit current usage** - Identify all systems and services using your current key
 2. **Create scoped keys** - Generate Project API keys for each service/environment
 3. **Update services** - Migrate each service to use its dedicated Project key
-4. **Enable read-only keys** - Switch monitoring and analytics tools to read-only keys
-5. **Rotate admin key** - Generate a new Admin key and update only necessary systems
-6. **Revoke old key** - Once migration is complete, revoke the original key
+4. **Rotate the organization key** - Generate a new Organization key and update only the systems that need cross-project access
+5. **Revoke old key** - Once migration is complete, revoke the original key
 
 ## Support
 

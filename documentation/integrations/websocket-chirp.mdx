@@ -68,13 +68,13 @@ Cekura will:
 </Step>
 
 <Step title="View results">
-Results appear in your dashboard like any other run — status, metrics, transcripts, and audio playback are all available. Failed connections are surfaced via run status:
+Results appear in your dashboard like any other run — status, metrics, transcripts, and audio playback are all available. A run whose connection fails does not pass: its `error_message` explains the cause and `metadata.ended_reason` records it.
 
-| Run status | When you see it |
+| What happened | What the run shows |
 |------------|-----------------|
-| `REJECTED` | Server returned `401`/`403` on the WebSocket upgrade (bad Basic Auth or rejected origin). |
-| `INCOMPLETED` | Host unreachable, TLS failure, or server closed the connection before the test could complete. |
-| `COMPLETED` | Audio exchange finished cleanly. Evaluator scores are available. |
+| Server returned `401`/`403` on the WebSocket upgrade (bad Basic Auth or rejected origin) | Does not pass; `ended_reason` is `websocket-authentication-failed` and `error_message` points to the credentials in Agent Settings. |
+| Host unreachable, TLS failure, or server closed the connection before the test could complete | Does not pass; `error_message` gives the cause. |
+| Audio exchange finished cleanly | Evaluator scores are available; the run passes or fails on its evaluation. |
 
 </Step>
 </Steps>
@@ -332,7 +332,7 @@ All binary WebSocket frames carry raw audio samples at this format. There is no 
    Authorization: Basic <base64(username:password)>
    ```
 2. **Response:** Your server responds with `HTTP 101 Switching Protocols` to accept, or `HTTP 401`/`HTTP 403` to reject.
-3. **Result:** A valid handshake establishes the live connection. A rejected handshake marks the run as `REJECTED`.
+3. **Result:** A valid handshake establishes the live connection. A rejected handshake ends the run without a conversation, and the run does not pass.
 
 If you don't configure Basic Auth on the agent, no `Authorization` header is sent.
 
@@ -452,14 +452,14 @@ There is no separate "interrupt" message — `speech.started` from your side is 
 
 ### Error Handling
 
-| Scenario | Run status | Behavior |
+| Scenario | Run outcome | Behavior |
 |----------|-----------|----------|
-| `HTTP 401`/`403` on upgrade | `REJECTED` | Cekura logs the rejection and stops. |
-| Host unreachable, TCP refused, TLS failure | `INCOMPLETED` | Cekura retries 3 times with backoff before giving up. |
-| Upgrade accepted but immediately closed | `INCOMPLETED` | Close code is logged in the run details. |
+| `HTTP 401`/`403` on upgrade | Does not pass (`websocket-authentication-failed`) | Cekura logs the rejection and stops. |
+| Host unreachable, TCP refused, TLS failure | Does not pass | Cekura retries 3 times with backoff before giving up. |
+| Upgrade accepted but immediately closed | Does not pass | Close code is logged in the run details. |
 | Protocol violation (malformed JSON, missing field, odd-length audio) | session continues | Cekura sends a `session.error`, drops the offending frame. |
-| Server closes gracefully | depends on call | Status is determined by whether the test completed before close. |
-| Network drop or crash | `INCOMPLETED` | Same handling as a TCP failure. |
+| Server closes gracefully | depends on call | The outcome is determined by whether the test completed before close. |
+| Network drop or crash | Does not pass | Same handling as a TCP failure. |
 
 ### Sample Session Flow
 

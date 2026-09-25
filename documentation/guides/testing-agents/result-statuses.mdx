@@ -1,0 +1,133 @@
+---
+title: "Result Statuses and Gating"
+sidebarTitle: "Result Statuses and Gating"
+icon: "traffic-light"
+description: "When a test result is finished, and how to decide whether it passed — for CI pipelines and scripts that poll the API"
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+Every way of starting evaluators — the dashboard, the run endpoints, [Tests-as-Code](/documentation/guides/testing-agents/tests-as-code), the CLI, the SDK, the CI plugins — creates one **result** that groups the **runs** it started. Starting a run returns as soon as the runs are queued: nothing has been dialled yet. A pipeline that stops there passes while the agent is broken, so poll the result until it is finished, then decide pass or fail from its counts.
+
+This page is the reference for both steps. The [GitHub Actions](/documentation/guides/github-actions-ci-cd), [GitLab](/documentation/guides/gitlab-ci-cd) and [Bitbucket](/documentation/guides/bitbucket-pipelines-ci-cd) integrations and `cekura run start --wait` already follow it; use it when you call the API yourself.
+
+## The result ID
+
+Every run endpoint responds with the result object. Its `id` is the result ID you poll — there is no separate `result_id` or `run_id` key.
+
+```json
+{
+  "id": 9001,
+  "status": "running",
+  "runs": [{ "id": 501, "status": "pending" }, { "id": 502, "status": "pending" }],
+  "...": "..."
+}
+```
+
+## Result statuses
+
+A result stays in a non-terminal status until **every one of its runs has ended**. It then settles at exactly one terminal status and does not change again.
+
+| Status | Terminal | Meaning |
+|---|---|---|
+| `pending`, `running`, `in_queue`, `scaling_up`, `in_progress`, `evaluating` | No | Runs are waiting for capacity, dialling, in conversation, or being scored. Keep polling. |
+| `completed` | **Yes** | Every run has ended and **at least one run completed**. This says nothing about whether runs passed — some may have failed their checks, errored, or timed out. |
+| `failed` | **Yes** | Every run has ended, none completed, and not all of them timed out — typically connection or infrastructure failures, not failed metrics. |
+| `timeout` | **Yes** | Every run timed out. |
+| `cancelled` | **Yes** | The result was cancelled. |
+
+Poll until the status is one of `completed`, `failed`, `timeout` or `cancelled`. A loop that stops only on `completed` or `failed` keeps polling a timed-out result until its own deadline.
+
+## Deciding pass or fail
+
+`status` alone is not a verdict. Read these fields from the finished result:
+
+| Field | What it counts |
+|---|---|
+| `total_runs_count` | Every run in the result |
+| `success_runs_count` | Runs that completed **and** passed their evaluation |
+| `failed_runs_count` | Runs that completed but failed their evaluation |
+| `success_rate` | Percentage of runs that passed, on a **0–100** scale |
+
+A run that errored, never connected, timed out or was cancelled is counted in `total_runs_count` but in **neither** `success_runs_count` nor `failed_runs_count`. So `failed_runs_count == 0` does not mean every run passed.
+
+**A result passes when:**
+
+```text
+status == "completed"  and  total_runs_count > 0  and  success_runs_count == total_runs_count
+```
+
+To allow some failures, compare `success_rate` (0–100) against your threshold instead of requiring every run — but still fail on any status other than `completed`.
+
+Poll every 15–30 seconds. Individual runs are listed under `runs` in the result, keyed by run ID; each has `status`, `success` and, when it could not connect, `error_message`.
+
+<Note>
+The AI summary of a result's failures (`ai_summary`) is written shortly *after* the result reaches a terminal status. If you post it somewhere, wait while `ai_summary_status` is `pending`; it becomes `completed`, or `skipped_no_failures` when every run passed.
+</Note>
+
+## Examples
+
+<Tabs>
+  <Tab title="curl + jq">
+    ```bash
+    API=https://api.cekura.ai
+    AUTH="X-CEKURA-API-KEY: $CEKURA_API_KEY"
+
+    RESULT_ID=$(curl -sf -X POST "$API/test_framework/v1/scenarios/run_scenarios/" \
+      -H "$AUTH" -H "Content-Type: application/json" \
+      -d '{"agent_id": 123, "scenarios": [1, 2, 3]}' | jq -r .id)
+
+    while :; do
+      RESULT=$(curl -sf "$API/test_framework/v1/results/$RESULT_ID/" -H "$AUTH")
+      case "$(jq -r .status <<<"$RESULT")" in
+        completed|failed|timeout|cancelled) break ;;
+      esac
+      sleep 30
+    done
+
+    jq -r '"\(.success_runs_count)/\(.total_runs_count) runs passed (status: \(.status))"' <<<"$RESULT"
+    jq -e '.status == "completed" and .total_runs_count > 0
+           and .success_runs_count == .total_runs_count' <<<"$RESULT" >/dev/null
+    ```
+
+    The last command exits non-zero unless every run passed, which fails the job.
+  </Tab>
+
+  <Tab title="Python SDK">
+    ```python
+    import sys
+    import time
+
+    from cekura import Cekura
+
+    TERMINAL = {"completed", "failed", "timeout", "cancelled"}
+
+    client = Cekura()  # reads CEKURA_API_KEY
+    result_id = client.scenarios.run(agent_id=123, scenarios=[1, 2, 3])["id"]
+
+    while True:
+        result = client.results.get(result_id)
+        if result["status"] in TERMINAL:
+            break
+        time.sleep(30)
+
+    total, passed = result["total_runs_count"], result["success_runs_count"]
+    print(f"{passed}/{total} runs passed (status: {result['status']})")
+    if result["status"] != "completed" or total == 0 or passed != total:
+        sys.exit(1)
+    ```
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    cekura run start --agent-id 123 --scenario-ids 1,2,3 \
+      --wait --fail-on-threshold 1.0
+    ```
+
+    `--wait` polls to a terminal status and `--fail-on-threshold` takes a pass rate from `0.0` to `1.0`; `1.0` requires every run to pass. The command exits `1` when the threshold is not met and `2` when it cannot start the run or the wait times out (`--timeout`, default 3600 seconds).
+  </Tab>
+</Tabs>
+
+The same polling applies to a [Tests-as-Code](/documentation/guides/testing-agents/tests-as-code) run: `POST /test_framework/v1/scenarios/run_scenarios_json/` returns the same result object.

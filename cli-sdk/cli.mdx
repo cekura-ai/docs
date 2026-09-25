@@ -48,7 +48,7 @@ cekura agents get 123
 cekura scenarios list --agent-id 123
 
 # Trigger an evaluation run (text mode)
-cekura run start --agent-id 123 --scenario-ids 1,2,3
+cekura run start --agent-id 123 --scenario-ids 1,2,3 --mode text
 
 # Inspect runs
 cekura runs list --agent-id 123
@@ -107,17 +107,13 @@ This works on every list and detail command and is the recommended mode for shel
 
        ```bash
        export CEKURA_API_KEY=$CEKURA_API_KEY
-       cekura run start --agent-id 123 --scenario-ids 1,2,3 --format json | tee run.json
-       RUN_ID=$(jq -r '.run_id' run.json)
-       cekura runs get "$RUN_ID" --format json
+       cekura run start --agent-id 123 --scenario-ids 1,2,3 \
+         --wait --fail-on-threshold 1.0
        ```
 
-       Fail the pipeline on a non-passing run by parsing the JSON status field:
+       `--wait` polls the result until it is `completed`, `failed`, `timeout` or `cancelled`. `--fail-on-threshold 1.0` exits `1` unless every run passed; lower it (e.g. `0.9`) to allow some failures. The command exits `2` when it cannot start the run or the wait times out (`--timeout`, default 3600 seconds).
 
-       ```bash
-       STATUS=$(jq -r '.status' run.json)
-       [ "$STATUS" = "passed" ] || exit 1
-       ```
+       For a committed test suite, use `cekura run spec` with the same flags — see [Tests-as-Code](/documentation/guides/testing-agents/tests-as-code). [Result statuses and gating](/documentation/guides/testing-agents/result-statuses) explains what each status and count means.
   </Accordion>
 
   <Accordion title="Bulk-update scenarios from a JSON file">

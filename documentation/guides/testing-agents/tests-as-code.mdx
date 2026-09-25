@@ -334,7 +334,7 @@ Anything repeated across cases can move up into `defaults`:
 }
 ```
 
-A test case overrides `defaults` field by field. `metrics` lists from both are combined.
+A test case overrides `defaults` field by field. That includes `metrics`: a test case that sets its own `metrics` list replaces the default list rather than adding to it.
 
 ### Pinning a phone number
 
@@ -408,6 +408,8 @@ Run the dry check on every commit and you catch these before anything is spent.
 
 ## Using it in CI
 
+Runs are asynchronous: the run call returns once they are queued, before anything is dialled. A CI step has to wait for the result to finish and then fail the job unless the runs passed. `cekura run spec` does both: `--wait` polls the result until it is `completed`, `failed`, `timeout` or `cancelled`, and `--fail-on-threshold 1.0` exits non-zero unless every run passed. See [Result statuses and gating](/documentation/guides/testing-agents/result-statuses) for what each status and count means if you call the API directly instead.
+
 <CodeGroup>
 
 ```yaml GitHub Actions
@@ -417,44 +419,30 @@ on: [pull_request]
 jobs:
   cekura:
     runs-on: ubuntu-latest
+    env:
+      CEKURA_API_KEY: ${{ secrets.CEKURA_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - run: pip install "cekura[cli]"
 
       - name: Check the spec
-        run: |
-          curl --fail-with-body -sS -X POST \
-            'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true' \
-            -H 'X-CEKURA-API-KEY: ${{ secrets.CEKURA_API_KEY }}' \
-            -H 'Content-Type: application/json' \
-            -d "{\"agent_id\": ${{ vars.CEKURA_AGENT_ID }}, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
+        run: cekura run spec cekura.tests.json --agent-id ${{ vars.CEKURA_AGENT_ID }} --dry-run
 
       - name: Run the tests
         run: |
-          curl --fail-with-body -sS -X POST \
-            'https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/' \
-            -H 'X-CEKURA-API-KEY: ${{ secrets.CEKURA_API_KEY }}' \
-            -H 'Content-Type: application/json' \
-            -d "{\"agent_id\": ${{ vars.CEKURA_AGENT_ID }}, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}" \
-            | tee run.json
-          echo "RESULT_ID=$(python3 -c 'import json;print(json.load(open("run.json"))["id"])')" >> "$GITHUB_ENV"
+          cekura run spec cekura.tests.json --agent-id ${{ vars.CEKURA_AGENT_ID }} \
+            --name "PR #${{ github.event.pull_request.number }}" \
+            --wait --fail-on-threshold 1.0
 ```
 
 ```yaml GitLab CI
 agent-tests:
-  image: curlimages/curl:latest
+  image: python:3.12-slim
+  before_script:
+    - pip install "cekura[cli]"
   script:
-    - |
-      curl --fail-with-body -sS -X POST \
-        "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true" \
-        -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
-        -H "Content-Type: application/json" \
-        -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
-    - |
-      curl --fail-with-body -sS -X POST \
-        "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/" \
-        -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
-        -H "Content-Type: application/json" \
-        -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
+    - cekura run spec cekura.tests.json --agent-id "$CEKURA_AGENT_ID" --dry-run
+    - cekura run spec cekura.tests.json --agent-id "$CEKURA_AGENT_ID" --wait --fail-on-threshold 1.0
 ```
 
 ```yaml Bitbucket Pipelines
@@ -463,25 +451,16 @@ pipelines:
     '**':
       - step:
           name: Agent tests
-          image: curlimages/curl:latest
+          image: python:3.12-slim
           script:
-            - |
-              curl --fail-with-body -sS -X POST \
-                "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/?dry_run=true" \
-                -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
-                -H "Content-Type: application/json" \
-                -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
-            - |
-              curl --fail-with-body -sS -X POST \
-                "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_json/" \
-                -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
-                -H "Content-Type: application/json" \
-                -d "{\"agent_id\": $CEKURA_AGENT_ID, \"channel\": \"voice\", \"spec\": $(cat cekura.tests.json)}"
+            - pip install "cekura[cli]"
+            - cekura run spec cekura.tests.json --agent-id "$CEKURA_AGENT_ID" --dry-run
+            - cekura run spec cekura.tests.json --agent-id "$CEKURA_AGENT_ID" --wait --fail-on-threshold 1.0
 ```
 
 </CodeGroup>
 
-Runs are asynchronous: the call returns once they are queued. To gate a merge on the outcome, poll the returned result until it reaches a terminal status and then check its `success_rate`. The [GitHub Actions](/documentation/guides/github-actions-ci-cd), [GitLab CI/CD](/documentation/guides/gitlab-ci-cd), and [Bitbucket Pipelines](/documentation/guides/bitbucket-pipelines-ci-cd) tutorials cover the polling and gating pattern in full — the only difference is which endpoint starts the run.
+`--channel` picks the target (`voice` by default, `text`, or `elevenlabs`). Lower `--fail-on-threshold` (e.g. `0.9`) to allow some runs to fail; a result that ends `failed`, `timeout` or `cancelled` fails the job either way. The GitHub Actions, GitLab and Bitbucket integrations run dashboard evaluators by ID, tag or folder; for a committed spec, use the CLI as above.
 
 <Tip>
 Split it across two jobs: run the dry check on every push (free, fast, catches a broken file), and the real run only on the branches you actually want tested.

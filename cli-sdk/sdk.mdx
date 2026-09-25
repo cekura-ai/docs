@@ -116,21 +116,23 @@ Use `dir(client)` in a REPL or `help(client.agents)` to discover everything avai
     import time
     from cekura import Cekura
 
+    TERMINAL = {"completed", "failed", "timeout", "cancelled"}
+
     client = Cekura()
-    result = client.scenarios.run_text(
-        agent_id=123,
-        scenario_ids=[1, 2, 3],
-    )
-    run_id = result["run_id"]
+    result_id = client.scenarios.run_text(agent_id=123, scenarios=[1, 2, 3])["id"]
 
     while True:
-        run = client.runs.get(run_id)
-        if run["status"] in ("passed", "failed", "errored"):
+        result = client.results.get(result_id)
+        if result["status"] in TERMINAL:
             break
-        time.sleep(5)
+        time.sleep(15)
 
-    print("final status:", run["status"])
+    total, passed = result["total_runs_count"], result["success_runs_count"]
+    all_passed = result["status"] == "completed" and total > 0 and passed == total
+    print(f"{result['status']}: {passed}/{total} runs passed", "✅" if all_passed else "❌")
     ```
+
+    The run call returns the result object; poll it by `id`. `completed` does not mean every run passed — compare `success_runs_count` to `total_runs_count`. See [Result statuses and gating](/documentation/guides/testing-agents/result-statuses).
   </Accordion>
 
   <Accordion title="Bulk-update scenarios">

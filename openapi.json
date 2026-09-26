@@ -23,7 +23,7 @@
         "/app/internal/stage-datadog-alert-test/": {
             "post": {
                 "operationId": "app-internal-stage-datadog-alert-test-create",
-                "description": "Emit a plain or traceback-bearing stage error log for monitor validation.",
+                "description": "Emit stage test logs; grouping mode emits three logs in two error groups.",
                 "tags": [
                     "app"
                 ],
@@ -4731,7 +4731,8 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "deprecated": true
             }
         },
         "/observability/v1/alerts/trigger_summary/": {
@@ -25728,7 +25729,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "metrics_generate_clean_description_progress_retrieve"
+                "x-mcp-tool-name": "metrics_generate_clean_description_progress_retrieve",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/generate_evaluation_trigger/": {
@@ -25897,7 +25899,8 @@
                         "description": "Returns generation state with status and generated metrics"
                     }
                 },
-                "x-mcp-tool-name": "metrics_generate_metrics_progress_retrieve"
+                "x-mcp-tool-name": "metrics_generate_metrics_progress_retrieve",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/preview/": {
@@ -25986,7 +25989,8 @@
                         "description": "Returns preview state with status and results"
                     }
                 },
-                "x-mcp-tool-name": "metrics_preview_progress"
+                "x-mcp-tool-name": "metrics_preview_progress",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/reorder/": {
@@ -45016,7 +45020,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_generate_progress"
+                "x-mcp-tool-name": "scenarios_generate_progress",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/has_infrastructure_suite/": {
@@ -45184,7 +45189,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_instructions_progress_retrieve"
+                "x-mcp-tool-name": "scenarios_instructions_progress_retrieve",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/json_schema/": {
@@ -49053,7 +49059,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_refine_progress"
+                "x-mcp-tool-name": "scenarios_refine_progress",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/spec_from_pr/": {
@@ -63592,7 +63599,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-run-json",
-                        "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them."
+                        "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them."
                     }
                 }
             }
@@ -70877,6 +70884,93 @@
                 },
                 "description": "List your organizations (v2)"
             }
+        },
+        "/test_framework/v1/async-jobs/{job_id}/": {
+            "get": {
+                "operationId": "async-jobs-retrieve",
+                "summary": "Wait for a background job to finish",
+                "description": "Check on a background job using the `progress_id` returned by the endpoint that started it. Waits up to `wait` seconds for the job to finish, then returns its current state; while `status` is `in_progress`, call again with the same id.",
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "job_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The `progress_id` returned by the endpoint that started the job."
+                    },
+                    {
+                        "in": "query",
+                        "name": "wait",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 55.0,
+                            "default": 25.0
+                        },
+                        "description": "Seconds to wait for the job to finish. `0` returns immediately."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Current state of the job. Its fields depend on `job_type`.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobEvaluatorGenerationReply"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobInstructionGenerationReply"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobEvaluatorImprovementReply"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobMetricPreviewReply"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobMetricGenerationReply"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobMetricDescriptionReply"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobSimplifyPromptReply"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobEvaluatorsFromCallLogsReply"
+                                        },
+                                        {
+                                            "$ref": "#/components/schemas/AsyncJobAlertSummaryReply"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The job id is unknown, expired or not accessible."
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -72609,6 +72703,10 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "failure_kind": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "summary_json": {
                         "readOnly": true
                     },
@@ -72981,12 +73079,12 @@
                 "properties": {
                     "phone_number": {
                         "type": "string",
-                        "description": "E.164 phone number for inbound calls, e.g. +14155551234."
+                        "description": "The agent's own E.164 number, not a customer's: Cekura dials it for inbound tests, and the agent's outbound calls come from it. E.g. +14155551234."
                     },
                     "inbound": {
                         "type": "boolean",
                         "default": false,
-                        "description": "True = agent receives inbound calls; False = outbound only."
+                        "description": "True = agent receives inbound calls; False = outbound only. A property of the agent, not of one run: never flip it to change who dials whom. To dial a different number in a run, pass `outbound_phone_number` to the run."
                     },
                     "sip_uri": {
                         "type": [
@@ -73610,6 +73708,568 @@
                         "type": "string",
                         "x-spec-enum-id": "450cf1402ab1a3c6",
                         "description": "AssemblyAI deployment the agent lives in. Defaults to us (phone agents are US-hosted).\n\n* `us` - us\n* `eu` - eu"
+                    }
+                }
+            },
+            "AsyncJobAlertSummaryReply": {
+                "title": "Alert summary",
+                "description": "Started by the alert summarize endpoint.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "alert_review_summary"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "alert_id": {
+                        "type": "integer"
+                    },
+                    "project_id": {
+                        "type": "integer"
+                    },
+                    "output": {
+                        "type": "object",
+                        "properties": {
+                            "headline": {
+                                "type": "string"
+                            },
+                            "summary": {
+                                "type": "string"
+                            },
+                            "common_themes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why the job failed, when it did."
+                    }
+                }
+            },
+            "AsyncJobEvaluatorGenerationReply": {
+                "title": "Evaluator generation",
+                "description": "Started by the generate-evaluators endpoint.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "generate_scenarios"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "agent_id": {
+                        "type": "integer"
+                    },
+                    "total_scenarios": {
+                        "type": "integer"
+                    },
+                    "completed_scenarios": {
+                        "type": "integer"
+                    },
+                    "failed_scenarios": {
+                        "type": "integer"
+                    },
+                    "scenarios_list": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "description": "Full evaluator object, as the evaluators API returns it."
+                        },
+                        "description": "Evaluators generated so far."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "session_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "current_step": {
+                        "type": "string"
+                    },
+                    "questions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        },
+                        "description": "Only while `status` is `needs_clarification` (dashboard sessions). Answer via the generate-clarify-answer endpoint, then poll the same id."
+                    },
+                    "agent_message": {
+                        "type": "string",
+                        "description": "Only while `status` is `needs_clarification`."
+                    }
+                }
+            },
+            "AsyncJobEvaluatorImprovementReply": {
+                "title": "Evaluator improvement",
+                "description": "Started by the scenario-agent endpoint. To answer a clarification, send `session_id` and your reply to that endpoint again; it returns a new job id.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "scenario_agent"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "session_id": {
+                        "type": "integer"
+                    },
+                    "mode": {
+                        "type": "string"
+                    },
+                    "result": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "properties": {
+                            "message": {
+                                "type": "string"
+                            },
+                            "needs_clarification": {
+                                "type": "boolean"
+                            },
+                            "clarification_questions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object"
+                                }
+                            },
+                            "base_extra_instructions": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "extra_instructions_list": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "cancelled": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why the job failed, when it did."
+                    }
+                }
+            },
+            "AsyncJobEvaluatorsFromCallLogsReply": {
+                "title": "Evaluators from call logs",
+                "description": "Started by the create-evaluators-from-call-logs endpoint.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "create_scenarios"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "project_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "agent_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "total_scenarios": {
+                        "type": "integer"
+                    },
+                    "completed_scenarios": {
+                        "type": "integer"
+                    },
+                    "failed_scenarios": {
+                        "type": "integer"
+                    },
+                    "scenarios_list": {
+                        "type": "array",
+                        "items": {},
+                        "description": "Evaluator ids while running; full evaluator objects once every call log is processed."
+                    },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "call_log_id": {
+                                    "type": "integer"
+                                },
+                                "error": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "AsyncJobInstructionGenerationReply": {
+                "title": "Instruction generation",
+                "description": "Started by the generate-instructions or improve-instructions endpoint.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "generate_instructions"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "agent_id": {
+                        "type": "integer"
+                    },
+                    "instructions": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "expected_outcome_prompt": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why the job failed, when it did."
+                    }
+                }
+            },
+            "AsyncJobMetricDescriptionReply": {
+                "title": "Metric description",
+                "description": "Started by the start-async-metric-description endpoint.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "generate_clean_description"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "agent_id": {
+                        "type": "integer"
+                    },
+                    "clean_description": {
+                        "type": "string"
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why the job failed, when it did."
+                    }
+                }
+            },
+            "AsyncJobMetricGenerationReply": {
+                "title": "Metric generation",
+                "description": "Started by the generate-metrics endpoint. The metrics are not saved; pass them to Create Metrics in Bulk.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "generate_metrics"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "agent_id": {
+                        "type": "integer"
+                    },
+                    "current_step": {
+                        "type": "string"
+                    },
+                    "metrics": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why the job failed, when it did."
+                    }
+                }
+            },
+            "AsyncJobMetricPreviewReply": {
+                "title": "Metric preview",
+                "description": "Started by the metric preview endpoint.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "metric_preview"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "project_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "agent_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "completed": {
+                        "type": "integer",
+                        "description": "Items evaluated so far."
+                    },
+                    "total": {
+                        "type": "integer"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "description": "One per previewed call log (`call_log_id`, `call_id`) or run (`run_id`). The verdict is `result`, or `score` / `enum` for custom-code metrics.",
+                            "properties": {
+                                "result": {
+                                    "description": "Verdict for LLM-judge metrics."
+                                },
+                                "score": {
+                                    "type": "number"
+                                },
+                                "enum": {
+                                    "type": "string"
+                                },
+                                "explanation": {
+                                    "type": "string"
+                                },
+                                "is_relevant": {
+                                    "type": "boolean"
+                                },
+                                "call_log_id": {
+                                    "type": "integer"
+                                },
+                                "call_id": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "run_id": {
+                                    "type": "integer"
+                                },
+                                "error": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why the job failed, when it did."
+                    }
+                }
+            },
+            "AsyncJobSimplifyPromptReply": {
+                "title": "Simplify metric prompt",
+                "description": "Started by the simplify-metric-prompt endpoint.",
+                "type": "object",
+                "properties": {
+                    "job_type": {
+                        "type": "string",
+                        "enum": [
+                            "simplify_prompt"
+                        ]
+                    },
+                    "job_id": {
+                        "type": "string",
+                        "description": "The job id you polled."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "in_progress",
+                            "needs_clarification",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ],
+                        "description": "`in_progress`: still running, call again with the same id. `needs_clarification`: waiting on your answer. `completed`, `failed`, `cancelled`: finished."
+                    },
+                    "original_prompt": {
+                        "type": "string"
+                    },
+                    "metric_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "simplified_prompt": {
+                        "type": "string"
+                    },
+                    "skipped_simplification": {
+                        "type": "boolean"
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Why the job failed, when it did."
                     }
                 }
             },

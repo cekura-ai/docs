@@ -1,0 +1,109 @@
+---
+title: "Pipecat Chat Testing"
+sidebarTitle: "Pipecat Chat"
+icon: "message-lines"
+iconType: "regular"
+description: "Run text-based simulations against your Pipecat Cloud deployment using the same bot that serves voice"
+keywords:
+  - pipecat chat testing
+  - pipecat text simulation
+  - rtvi
+  - pipecat cloud
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## Overview
+
+Pipecat Chat runs your evaluators as a text conversation against an agent deployed on Pipecat Cloud. The same deployment that serves voice calls serves text, so there is nothing new to deploy. Text runs skip speech-to-text and text-to-speech, which makes them faster and cheaper than voice runs.
+
+## Requirements
+
+- A Pipecat Cloud API key and the deployed agent name, configured in Cekura
+- A bot that uses the Daily transport and has RTVI enabled (Pipecat's default)
+- Optionally, the [Cekura Python SDK](/documentation/integrations/pipecat/tracing) for SDK transcripts, logs, traces, and tool-call detail
+
+## Set up
+
+<Steps>
+  <Step title="Configure Pipecat in Cekura">
+    1. Go to **Agent Settings** → **Configuration** → **Provider** and select **Pipecat**
+    2. Under **Integration Settings**, enter the **Pipecat API Key** and **Pipecat Agent Name**
+    3. Under **Chat connections**, enable **Pipecat Chat** and click **Save Changes**
+
+    <img src="/images/pipecat/chat-agent-settings.png" alt="Pipecat Chat connection in Agent Settings" />
+  </Step>
+
+  <Step title="Keep RTVI enabled in your bot">
+    Pipecat enables RTVI by default. If you create the pipeline task yourself, do not disable it:
+
+    ```python
+    task = PipelineTask(pipeline, enable_rtvi=True)
+    ```
+
+    If you use the Cekura SDK's `track_and_create_task` or `observe_and_create_task`, nothing extra is needed.
+  </Step>
+
+  <Step title="Run a chat simulation">
+    1. Go to the **Evaluator** page and select scenarios
+    2. In the **Configure Run** dialog, select **Pipecat Chat** under Chat connections and click **Run**
+
+    <img src="/images/pipecat/configure-run-chat.png" alt="Configure Run dialog with Pipecat Chat selected" />
+
+    <Note>Mock tools are not available for Pipecat Chat runs. The bot's real tools are called, and their calls appear in the transcript.</Note>
+  </Step>
+</Steps>
+
+## How it works
+
+For each run, Cekura starts one Pipecat Cloud session with your saved session config and the scenario's dynamic variables, joins the returned Daily room, and completes the RTVI handshake. Each testing-agent turn is then sent as an RTVI text message on that same connection, with text-to-speech skipped. The session ends when the conversation completes.
+
+Cekura marks the session as a text run in the session body:
+
+```json
+{
+  "cekura_run_id": 12345,
+  "cekura_run_mode": "text"
+}
+```
+
+Voice sessions do not carry this marker, so your existing voice behaviour is unchanged. The Cekura SDK reads it from `runner_args` and adapts automatically: it records typed turns in the transcript, skips audio recording, and reports tool calls with their names, arguments, and results.
+
+## API
+
+```bash
+curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/run_scenarios_pipecat_chat/" \
+  -H "X-CEKURA-API-KEY: <your-api-key>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent": 123,
+    "scenarios": [{"scenario": 101}, {"scenario": 102}],
+    "frequency": 1
+  }'
+```
+
+Optional fields match the [Pipecat voice endpoint](/api-reference/test_framework/run-evaluator-pipecat-v2): `personality_ids`, `test_profile_ids`, `concurrency_limit`, and a per-request `pipecat_data` override. Runs are priced at the text-simulation rate. See the [API reference](/api-reference/test_framework/run-evaluator-pipecat-chat).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="The run fails before the conversation starts">
+    Cekura checks the session before sending any scenario content, and the run's ended reason names the cause. The most common ones are an invalid API key, a wrong agent name, no free capacity on the deployment, or RTVI disabled on the bot. A run that fails here is not charged.
+  </Accordion>
+
+  <Accordion title="Tool calls show no name or arguments">
+    Pipecat hides function names, arguments, and results in RTVI events by default. Use a Cekura SDK version with text-session support and let `track_and_create_task` build the task, or pass `rtvi_observer_params` to `PipelineTask` with `function_call_report_level={"*": RTVIFunctionCallReportLevel.FULL}`.
+  </Accordion>
+
+  <Accordion title="Do I need a separate deployment or a SmallWebRTC transport?">
+    No. Pipecat Cloud returns Daily room credentials, so the bot's Daily transport branch is what Cekura uses. The bot can keep SmallWebRTC for other local flows.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+- [Pipecat Automated Testing](/documentation/integrations/pipecat/automated) for voice runs
+- [Pipecat Tracing](/documentation/integrations/pipecat/tracing) for the SDK setup
+- [Chat-Based Testing](/documentation/integrations/chat-testing) for other chat providers

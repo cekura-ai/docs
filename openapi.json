@@ -23,7 +23,7 @@
         "/app/internal/stage-datadog-alert-test/": {
             "post": {
                 "operationId": "app-internal-stage-datadog-alert-test-create",
-                "description": "Emit a plain or traceback-bearing stage error log for monitor validation.",
+                "description": "Emit stage test logs; grouping mode emits three logs in two error groups.",
                 "tags": [
                     "app"
                 ],
@@ -63594,7 +63594,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-run-json",
-                        "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them."
+                        "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them."
                     }
                 }
             }
@@ -72625,6 +72625,10 @@
                         "type": "string",
                         "readOnly": true
                     },
+                    "failure_kind": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "summary_json": {
                         "readOnly": true
                     },
@@ -72998,12 +73002,12 @@
                 "properties": {
                     "phone_number": {
                         "type": "string",
-                        "description": "E.164 phone number for inbound calls, e.g. +14155551234."
+                        "description": "The agent's own E.164 number, not a customer's: Cekura dials it for inbound tests, and the agent's outbound calls come from it. E.g. +14155551234."
                     },
                     "inbound": {
                         "type": "boolean",
                         "default": false,
-                        "description": "True = agent receives inbound calls; False = outbound only."
+                        "description": "True = agent receives inbound calls; False = outbound only. A property of the agent, not of one run: never flip it to change who dials whom. To dial a different number in a run, pass `outbound_phone_number` to the run."
                     },
                     "sip_uri": {
                         "type": [

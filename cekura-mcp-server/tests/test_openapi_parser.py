@@ -97,6 +97,61 @@ def test_top_level_array_body_keeps_item_shape():
     }
 
 
+def test_nullable_any_of_array_keeps_items():
+    parser = OpenAPIParser("unused")
+    parser.spec = {}
+
+    schema = parser.build_parameter_schema(
+        _operation({
+            "type": "object",
+            "properties": {
+                "ids": {
+                    "anyOf": [
+                        {"type": "array", "items": {"type": "integer"}},
+                        {"type": "null"},
+                    ]
+                }
+            },
+        })
+    )
+
+    assert schema["properties"]["ids"]["items"] == {"type": "integer"}
+
+
+def test_array_query_parameter_keeps_items():
+    parser = OpenAPIParser("unused")
+    parser.spec = {}
+    operation = _operation({})
+    operation.parameters = [{
+        "name": "ids",
+        "in": "query",
+        "schema": {"type": "array", "items": {"type": "integer"}},
+    }]
+
+    schema = parser.build_parameter_schema(operation)
+
+    assert schema["properties"]["ids"]["items"] == {"type": "integer"}
+
+
+def test_array_without_declared_items_accepts_any_element():
+    parser = OpenAPIParser("unused")
+    parser.spec = {}
+
+    schema = parser.build_parameter_schema(
+        _operation({
+            "type": "object",
+            "properties": {
+                "tags": {"type": "array"},
+                "matrix": {"type": "array", "items": {"type": "array"}},
+            },
+        })
+    )
+
+    assert schema["properties"]["tags"]["items"] == {}
+    assert schema["properties"]["matrix"]["items"] == {"type": "array", "items": {}}
+    assert _missing_array_items(schema) == []
+
+
 def test_every_exposed_tool_array_declares_items():
     parser = load_openapi_spec(str(ROOT.parent / "openapi.json"))
     invalid = {}

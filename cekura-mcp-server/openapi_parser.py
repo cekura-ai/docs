@@ -102,6 +102,9 @@ class OpenAPIParser:
                 "description": param_description or f"Parameter: {param_name}",
             }
 
+            if properties[param_name]["type"] == "array":
+                properties[param_name]["items"] = self._array_items_for(param_schema)
+
             if "enum" in param_schema:
                 properties[param_name]["enum"] = param_schema["enum"]
 
@@ -133,7 +136,7 @@ class OpenAPIParser:
                         item_desc = f"{ref_name} object"
                     properties["items"] = {
                         "type": "array",
-                        "items": self._build_array_item_schema(item_schema),
+                        "items": self._array_items_for(resolved),
                         "description": (
                             resolved.get("description") or
                             f"List of {item_desc}s to submit. Each element has the same shape as a single create request."
@@ -201,11 +204,14 @@ class OpenAPIParser:
             # the field accepts multiple JSON types — omit the type constraint so the MCP
             # client passes values natively instead of coercing to string.
             prop_type = prop_schema.get("type")
+            # The schema the type came from; an array's `items` sit beside its type.
+            type_source = prop_schema
             if prop_type is None:
                 entries = prop_schema.get("oneOf") or prop_schema.get("anyOf") or []
                 non_null = [e for e in entries if e and e.get("type") != "null"]
                 if len(non_null) == 1 and non_null[0].get("type"):
                     prop_type = non_null[0]["type"]
+                    type_source = non_null[0]
                 # else: leave prop_type None → no type constraint (any JSON value)
 
             # Resolve allOf: [{$ref: ...}] — a property typed as a named schema object.
@@ -239,12 +245,22 @@ class OpenAPIParser:
             if "default" in prop_schema:
                 properties[prop_name]["default"] = prop_schema["default"]
 
-            if converted_type == "array" and "items" in prop_schema:
-                properties[prop_name]["items"] = self._build_array_item_schema(
-                    prop_schema["items"]
-                )
+            if converted_type == "array":
+                properties[prop_name]["items"] = self._array_items_for(type_source)
 
         return properties
+
+    def _array_items_for(self, array_schema: Dict[str, Any]) -> Dict[str, Any]:
+        """``items`` for an array-typed input schema.
+
+        MCP clients such as VS Code reject a tool whose schema has an array
+        without ``items``, and one invalid tool fails every request to the
+        server. A spec array that declares no ``items`` therefore becomes
+        ``{}`` (any element) rather than an invalid schema.
+        """
+        if "items" not in array_schema:
+            return {}
+        return self._build_array_item_schema(array_schema["items"])
 
     def _build_array_item_schema(self, item_schema: Any) -> Dict[str, Any]:
         """Convert an OpenAPI array's item schema into MCP JSON Schema.
@@ -270,8 +286,8 @@ class OpenAPIParser:
             item_entry["properties"] = self._extract_schema_properties(item_schema)
             if item_schema.get("required"):
                 item_entry["required"] = list(item_schema["required"])
-        elif item_type == "array" and "items" in item_schema:
-            item_entry["items"] = self._build_array_item_schema(item_schema["items"])
+        elif item_type == "array":
+            item_entry["items"] = self._array_items_for(item_schema)
 
         if "enum" in item_schema:
             item_entry["enum"] = item_schema["enum"]

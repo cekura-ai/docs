@@ -133,6 +133,7 @@ class OpenAPIParser:
                         item_desc = f"{ref_name} object"
                     properties["items"] = {
                         "type": "array",
+                        "items": self._build_array_item_schema(item_schema),
                         "description": (
                             resolved.get("description") or
                             f"List of {item_desc}s to submit. Each element has the same shape as a single create request."
@@ -225,8 +226,10 @@ class OpenAPIParser:
             prop_entry: Dict[str, Any] = {
                 "description": prop_description or f"Property: {prop_name}",
             }
+            converted_type = None
             if prop_type is not None:
-                prop_entry["type"] = self._convert_openapi_type(prop_type)
+                converted_type = self._convert_openapi_type(prop_type)
+                prop_entry["type"] = converted_type
 
             properties[prop_name] = prop_entry
 
@@ -236,33 +239,44 @@ class OpenAPIParser:
             if "default" in prop_schema:
                 properties[prop_name]["default"] = prop_schema["default"]
 
-            if prop_type == "array" and "items" in prop_schema:
-                items_schema = prop_schema["items"]
-                if isinstance(items_schema, dict) and "$ref" in items_schema:
-                    try:
-                        items_schema = self.resolve_schema_ref(items_schema["$ref"])
-                    except (ValueError, KeyError):
-                        items_schema = {}
-                # Preserve nested object-item shape (name/required/properties) so
-                # callers know per-item structure for array-of-object fields.
-                if (
-                    isinstance(items_schema, dict)
-                    and items_schema.get("type") == "object"
-                    and items_schema.get("properties")
-                ):
-                    nested = self._extract_schema_properties(items_schema)
-                    item_entry: Dict[str, Any] = {"type": "object", "properties": nested}
-                    if items_schema.get("required"):
-                        item_entry["required"] = list(items_schema["required"])
-                    properties[prop_name]["items"] = item_entry
-                else:
-                    properties[prop_name]["items"] = {
-                        "type": self._convert_openapi_type(items_schema.get("type", "string"))
-                        if isinstance(items_schema, dict)
-                        else "string"
-                    }
+            if converted_type == "array" and "items" in prop_schema:
+                properties[prop_name]["items"] = self._build_array_item_schema(
+                    prop_schema["items"]
+                )
 
         return properties
+
+    def _build_array_item_schema(self, item_schema: Any) -> Dict[str, Any]:
+        """Convert an OpenAPI array's item schema into MCP JSON Schema.
+
+        OpenAPI 3.1 represents nullable fields as type unions such as
+        ``["array", "null"]``. Array detection must use the converted type;
+        comparing that raw list to ``"array"`` drops ``items`` and produces a
+        tool schema rejected by MCP clients.
+        """
+        if not isinstance(item_schema, dict):
+            return {"type": "string"}
+
+        if "$ref" in item_schema:
+            try:
+                item_schema = self.resolve_schema_ref(item_schema["$ref"])
+            except (ValueError, KeyError):
+                item_schema = {}
+
+        item_type = self._convert_openapi_type(item_schema.get("type", "string"))
+        item_entry: Dict[str, Any] = {"type": item_type}
+
+        if item_type == "object" and item_schema.get("properties"):
+            item_entry["properties"] = self._extract_schema_properties(item_schema)
+            if item_schema.get("required"):
+                item_entry["required"] = list(item_schema["required"])
+        elif item_type == "array" and "items" in item_schema:
+            item_entry["items"] = self._build_array_item_schema(item_schema["items"])
+
+        if "enum" in item_schema:
+            item_entry["enum"] = item_schema["enum"]
+
+        return item_entry
 
     def _convert_openapi_type(self, openapi_type) -> str:
         if isinstance(openapi_type, list):

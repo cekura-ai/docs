@@ -69,7 +69,11 @@ Cekura marks the session as a text run in the session body:
 }
 ```
 
-Voice sessions do not carry this marker, so your existing voice behaviour is unchanged. The Cekura SDK reads it from `runner_args` and adapts automatically: it records typed turns in the transcript, skips audio recording, and reports tool calls with their names, arguments, and results.
+Voice sessions do not carry this marker, so your existing voice behaviour is unchanged. The Cekura SDK reads it from `runner_args` and adapts automatically: it records typed turns in the transcript, skips audio recording, switches off text-to-speech for the whole session, and delivers tool calls with their names, arguments, and results.
+
+<Note>
+**Text-to-speech without the SDK.** Cekura asks the bot to skip TTS on every message it sends, but Pipecat applies that per message. The bot's own greeting and any reply that follows a tool call are still spoken, so those turns run your TTS provider and may be billed by it. With the Cekura SDK installed, TTS is switched off for the entire text session and no audio is generated.
+</Note>
 
 ## API
 
@@ -94,7 +98,11 @@ Optional fields match the [Pipecat voice endpoint](/api-reference/test_framework
   </Accordion>
 
   <Accordion title="Tool calls show no name or arguments">
-    Pipecat hides function names, arguments, and results in RTVI events by default. Use a Cekura SDK version with text-session support and let `track_and_create_task` build the task, or pass `rtvi_observer_params` to `PipelineTask` with `function_call_report_level={"*": RTVIFunctionCallReportLevel.FULL}`.
+    Pipecat hides function names, arguments, and results in RTVI events by default, so without the Cekura SDK the transcript can only mark that a tool ran. With the SDK installed, the full tool call and its result are delivered with the transcript.
+  </Accordion>
+
+  <Accordion title="I see TTS activity or charges on text runs">
+    Pipecat's per-message skip does not cover the bot's greeting or replies that follow a tool call. Install the Cekura SDK and pass `runner_args` to the tracer; it switches TTS off for the whole text session.
   </Accordion>
 
   <Accordion title="Do I need a separate deployment or a SmallWebRTC transport?">

@@ -290,7 +290,7 @@ jobs:
 | `name` | Name for the result in the dashboard | No | - |
 | `api_url` | Cekura API URL | No | `https://api.cekura.ai` |
 | `frequency` | Run each scenario N times | No | `1` |
-| `concurrency_limit` | Maximum calls Cekura runs at once for this result. Defaults to your organization's limit | No | - |
+| `concurrency_limit` | Maximum calls Cekura runs at once for this result. Defaults to your organization's limit; a value above what your plan allows is lowered to that limit | No | - |
 | `timeout` | Seconds to wait for the result before failing | No | `3600` |
 
 *Provide `scenario_ids` or `tags` (or both) for `voice` and `text`; `livekit_v2` and `pipecat_v2` require `scenario_ids`.
@@ -332,7 +332,8 @@ If the result is still running after `timeout` seconds, the action ends its acti
 If the workflow is cancelled, or the job hits its `timeout-minutes`, the action:
 
 - asks Cekura to end the result's active calls, so no runs are left going in the background;
-- still writes the result ID and a shareable link to the job summary, and sets the `result_id` and `result_url` outputs, so you can open the result in Cekura.
+- still writes the result ID to the job summary and sets the `result_id` output, so you can open the result in Cekura;
+- adds a shareable link (and the `result_url` output) if Cekura answers within GitHub's few-second cancellation window.
 
 ### Example with All Options
 
@@ -376,10 +377,15 @@ To run several agents' scenarios from one step, use the `run-batch` action. It c
           scenario_ids: 3001,3002
 ```
 
-- **Single-agent group** (`agent_id` + `scenario_ids`): runs as one result and uses up to `scenarios × frequency` calls of the limit.
-- **Pair group** (`member` + `contact`): the lists are matched by position. Each pair starts its member and contact results together, in separate contexts, and counts as 2 calls. Repeat an ID to reuse a scenario.
-- **Job summary:** one row per result, with links, plus every run that did not pass and why.
-- **Cancelling or timing out:** ends every active result's calls.
+- **Single-agent group** (`agent_id` + `scenario_ids`, or only one of `member` / `contact`): runs as one result. It reserves `scenarios × frequency` calls, or the whole `concurrency` if that is smaller, and Cekura runs no more than that many at once.
+- **Pair group** (`member` + `contact`): the lists are matched by position, so member scenario *i* runs with contact scenario *i* and both lists must be the same length. Repeat an ID to reuse a scenario. Each pair starts its member and contact results together, in separate contexts, and counts as 2 calls. `frequency` repeats the whole pair rather than the runs inside each result.
+- **Scheduling:** groups start in the order listed, each one only when its calls fit in what is left of `concurrency`. A group's calls are freed when its result finishes. Set `dry_run: true` to validate the batch and print the plan without placing calls.
+- **Job summary:** one row per result, with links, plus every run that did not pass and why. The step passes only when every run in every result passed. The `passed`, `total_runs`, `passed_runs` and `result_ids` outputs carry the same totals.
+- **Cancelling or timing out:** ends every active result's calls and skips the groups that have not started.
+
+<Note>
+  Keep `concurrency` at or below your organization's Cekura concurrency limit, minus any other runs (schedules, other workflows) that share it. Above that limit Cekura queues the extra results, so calls wait in the queue and the two sides of a pair may not start at the same time.
+</Note>
 
 `batch` accepts JSON or YAML (YAML needs PyYAML on the runner), or use `batch_file`. The [run-batch README](https://github.com/cekura-ai/cekura-github-actions/blob/main/run-batch/README.md) lists every key and input.
 

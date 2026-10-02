@@ -354,6 +354,35 @@ jobs:
           api_key: ${{ secrets.CEKURA_API_KEY }}
 ```
 
+## Running Many Groups Under One Concurrency Limit
+
+To run several agents' scenarios from one step, use the `run-batch` action. It can also run member/contact pairs for 3-way calls. You set a single `concurrency`, and the action starts groups only while their calls fit under it, so you don't need a matrix or a job per batch.
+
+```yaml
+- uses: cekura-ai/cekura-github-actions/run-batch@v1.2.3
+  with:
+    api_key: ${{ secrets.CEKURA_API_KEY }}
+    concurrency: 10
+    batch: |
+      - name: inbound-smoke
+        agent_id: 123
+        scenario_ids: 1001,1002,1003
+      - name: attendant-transfer
+        member:
+          agent_id: 456
+          scenario_ids: 2001,2001
+        contact:
+          agent_id: 123
+          scenario_ids: 3001,3002
+```
+
+- **Single-agent group** (`agent_id` + `scenario_ids`): runs as one result and uses up to `scenarios × frequency` calls of the limit.
+- **Pair group** (`member` + `contact`): the lists are matched by position. Each pair starts its member and contact results together, in separate contexts, and counts as 2 calls. Repeat an ID to reuse a scenario.
+- **Job summary:** one row per result, with links, plus every run that did not pass and why.
+- **Cancelling or timing out:** ends every active result's calls.
+
+`batch` accepts JSON or YAML (YAML needs PyYAML on the runner), or use `batch_file`. The [run-batch README](https://github.com/cekura-ai/cekura-github-actions/blob/main/run-batch/README.md) lists every key and input.
+
 ## Troubleshooting
 
 <AccordionGroup>

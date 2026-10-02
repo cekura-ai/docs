@@ -13,9 +13,9 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 ## Overview
 
-Load testing validates that your voice AI agent performs reliably under concurrent call volume — not just in isolated test calls. Running multiple evaluators simultaneously reveals infrastructure bottlenecks, latency spikes, and quality degradation that single-call testing won’t surface.
+Load testing validates that your voice AI agent performs reliably under concurrent call volume — not just in isolated test calls. Running multiple evaluators simultaneously reveals infrastructure bottlenecks, latency spikes, and quality degradation that single-call testing won't surface.
 
-Cekura’s load testing works through the **frequency** parameter. When you set frequency to `N`, each evaluator runs `N` times during a single evaluation cycle. With 10 evaluators at frequency 5, that’s 50 concurrent calls hitting your agent.
+Cekura's load testing works through the **frequency** parameter. When you set frequency to `N`, each evaluator runs `N` times during a single evaluation cycle. With 10 evaluators at frequency 5, that's 50 concurrent calls hitting your agent.
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ Before starting load testing, ensure you have:
 - An active agent configured on the Cekura dashboard
 - At least 1+ evaluator(s) that **passes when run in a vaccuum** 
 - A baseline run completed for your evaluator(s), so you have a benchmark to compare your load testing results against
-- Your concurrency settings<sup>*</sup> properly configured on both Cekura (settings -> organization -> general -> **parallel call/chat limit**), as well as on your provider’s side.
+- Your concurrency settings<sup>*</sup> properly configured on both Cekura (settings -> organization -> general -> **parallel call/chat limit**), as well as on your provider's side.
 
 <Note>
   <sup>*</sup> The Developer plan has a limit of 10 concurrent calls. For higher allowances or any questions, feel free to contact us at [support@cekura.ai](mailto:support@cekura.ai).
@@ -63,7 +63,7 @@ All other metrics can be disabled for load testing runs.
   <Step title="Set the Frequency">
     In the Cekura dashboard:
 
-    1. Navigate to your agent’s **Evaluators** tab
+    1. Navigate to your agent's **Evaluators** tab
     2. Select the evaluators you want to include in the load test
     3. Set the **Frequency** field to your target number
     4. Click **Run**
@@ -71,9 +71,11 @@ All other metrics can be disabled for load testing runs.
     <img src="/images/call-limit.png" alt="Setting Frequency for Load Testing" />
 
     The frequency controls how many times each selected evaluator runs. All runs execute concurrently.
+
+    Runs start in the order the evaluators were selected (or listed in the `scenarios` field of the API request). With a frequency above 1, the whole list runs once before it repeats (A, B, A, B), so one evaluator's repeats don't all start together.
   </Step>
   <Step title="Scale Gradually">
-    Don’t jump straight to high numbers. Increase incrementally so you can identify exactly where degradation begins:
+    Don't jump straight to high numbers. Increase incrementally so you can identify exactly where degradation begins:
 
     | Step | Frequency | What to Watch |
     |------|-----------|---------------|
@@ -85,9 +87,9 @@ All other metrics can be disabled for load testing runs.
     | Peak load | 1,000–2,000+ | Maximum capacity testing |
 
     <Note>
-      By default Cekura schedules calls at a rate of **5 CPS** (calls per second). You can lower this with the `calls_per_second` parameter (accepted values: 1–5) on the run request to ramp up more gradually. At higher frequencies, ensure each call is long enough so that all scheduled calls are running concurrently. 
-      For example, at the default 5 CPS, 50 calls requires a minimum call length of 50 ÷ 5 = **10 seconds**, and 100 calls requires 100 ÷ 5 = **20 seconds**. 
-      If calls are too short, earlier calls may finish before later ones start, meaning you won’t hit true peak concurrency.
+      Cekura schedules calls at a rate of **5 CPS** (calls per second). To ramp up more gradually, set **Calls Per Second** when starting the run (`calls_per_second` on the run request) to a whole number from 1 to 4. Leave it unset to keep the normal rate. At higher frequencies, ensure each call is long enough so that all scheduled calls are running concurrently. 
+      For example, 50 calls requires a minimum call length of 50 ÷ 5 = **10 seconds**, and 100 calls requires 100 ÷ 5 = **20 seconds**. 
+      If calls are too short, earlier calls may finish before later ones start, meaning you won't hit true peak concurrency.
     </Note>
 
     After each step, compare results against your baseline before increasing further.
@@ -96,7 +98,7 @@ All other metrics can be disabled for load testing runs.
     After each run completes, compare the three default metrics against your baseline:
 
     - **Latency** — A consistent 1–2 second increase is a yellow flag. Spikes above 5 seconds mean your infrastructure is under strain.
-    - **Infrastructure Issues** — Any non-zero count at low frequency is a bug, not a load problem. At higher frequencies, these indicate you’ve hit a concurrency ceiling.
+    - **Infrastructure Issues** — Any non-zero count at low frequency is a bug, not a load problem. At higher frequencies, these indicate you've hit a concurrency ceiling.
     - **Talk Ratio** — Significant shifts from baseline suggest the agent is behaving differently under load (longer pauses, repeated phrases, or truncated responses).
     - **Expected Outcome Pass Rate** — If evaluators that pass at frequency 1 start failing at higher frequencies, conversation quality is degrading under load.
   </Step>
@@ -110,7 +112,7 @@ All other metrics can be disabled for load testing runs.
 | Custom | Configurable based on your plan — the platform supports **2,000+ concurrent calls** |
 
 <Note>
-  If your current plan’s concurrent call limit is lower than what your load test requires, reach out to [support@cekura.ai](mailto:support@cekura.ai) to discuss upgrading your concurrency allowance.
+  If your current plan's concurrent call limit is lower than what your load test requires, reach out to [support@cekura.ai](mailto:support@cekura.ai) to discuss upgrading your concurrency allowance.
 </Note>
 
 ## Best Practices
@@ -121,7 +123,7 @@ Load testing should surface infrastructure problems, not prompt issues. If an ev
 
 ### Isolate Variables
 
-Don’t change your agent’s prompt and run a load test at the same time. You won’t know whether failures are from the prompt change or the increased load.
+Don't change your agent's prompt and run a load test at the same time. You won't know whether failures are from the prompt change or the increased load.
 
 ### Test at Realistic Peaks
 
@@ -133,7 +135,7 @@ A single run can be noisy. Run the same frequency 2–3 times and look for consi
 
 ### Monitor Downstream Systems
 
-Cekura tests the agent, but if your internal and/or external systems that the agent depends on (i.e. toolcalls, for example) can’t handle the load, you’ll see failures that look like agent problems. Check your backend logs alongside Cekura results.
+Cekura tests the agent, but if your internal and/or external systems that the agent depends on (i.e. toolcalls, for example) can't handle the load, you'll see failures that look like agent problems. Check your backend logs alongside Cekura results.
 
 ## Related Resources
 

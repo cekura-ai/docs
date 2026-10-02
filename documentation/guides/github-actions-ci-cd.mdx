@@ -55,7 +55,7 @@ You can run tests in two ways:
     Run specific scenarios by their IDs. Use this when you want to test exact scenarios.
 
     ```yaml
-    - uses: cekura-ai/cekura-github-actions@v1.2.1
+    - uses: cekura-ai/cekura-github-actions@v1.2.3
       with:
         agent_id: ${{ vars.AGENT_ID }}
         scenario_ids: ${{ vars.SCENARIO_IDS }}
@@ -67,7 +67,7 @@ You can run tests in two ways:
     Run all scenarios with specific tags. Use this when you want to test groups of scenarios (e.g., `smoke-test`, `critical`).
 
     ```yaml
-    - uses: cekura-ai/cekura-github-actions@v1.2.1
+    - uses: cekura-ai/cekura-github-actions@v1.2.3
       with:
         agent_id: ${{ vars.AGENT_ID }}
         tags: ${{ vars.TAGS }}
@@ -112,7 +112,7 @@ You can run tests in two ways:
         runs-on: ubuntu-latest
         steps:
           - name: Cekura Run Tests
-            uses: cekura-ai/cekura-github-actions@v1.2.1
+            uses: cekura-ai/cekura-github-actions@v1.2.3
             with:
               agent_id: ${{ inputs.agent_id || vars.AGENT_ID }}
               scenario_ids: ${{ inputs.scenario_ids || vars.SCENARIO_IDS }}
@@ -204,7 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Test Staging
-        uses: cekura-ai/cekura-github-actions@v1.2.1
+        uses: cekura-ai/cekura-github-actions@v1.2.3
         with:
           agent_id: ${{ vars.STAGING_AGENT_ID }}
           tags: ${{ vars.STAGING_TAGS }}
@@ -216,7 +216,7 @@ jobs:
     needs: staging-tests
     steps:
       - name: Test Production
-        uses: cekura-ai/cekura-github-actions@v1.2.1
+        uses: cekura-ai/cekura-github-actions@v1.2.3
         with:
           agent_id: ${{ vars.PROD_AGENT_ID }}
           tags: ${{ vars.PROD_TAGS }}
@@ -233,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run Cekura Tests
-        uses: cekura-ai/cekura-github-actions@v1.2.1
+        uses: cekura-ai/cekura-github-actions@v1.2.3
         with:
           agent_id: ${{ vars.AGENT_ID }}
           scenario_ids: ${{ vars.SCENARIO_IDS }}
@@ -254,7 +254,7 @@ jobs:
 
 ```yaml
 - name: Run text tests
-  uses: cekura-ai/cekura-github-actions@v1.2.1
+  uses: cekura-ai/cekura-github-actions@v1.2.3
   with:
     agent_id: ${{ vars.AGENT_ID }}
     tags: ${{ vars.TAGS }}
@@ -262,7 +262,7 @@ jobs:
     api_key: ${{ secrets.CEKURA_API_KEY }}
 
 - name: Run LiveKit tests
-  uses: cekura-ai/cekura-github-actions@v1.2.1
+  uses: cekura-ai/cekura-github-actions@v1.2.3
   with:
     agent_id: ${{ vars.AGENT_ID }}
     scenario_ids: ${{ vars.SCENARIO_IDS }}
@@ -290,6 +290,7 @@ jobs:
 | `name` | Name for the result in the dashboard | No | - |
 | `api_url` | Cekura API URL | No | `https://api.cekura.ai` |
 | `frequency` | Run each scenario N times | No | `1` |
+| `concurrency_limit` | Maximum calls Cekura runs at once for this result. Defaults to your organization's limit | No | - |
 | `timeout` | Seconds to wait for the result before failing | No | `3600` |
 
 *Provide `scenario_ids` or `tags` (or both) for `voice` and `text`; `livekit_v2` and `pipecat_v2` require `scenario_ids`.
@@ -304,7 +305,7 @@ jobs:
 ```yaml
 - name: Run Cekura Tests
   id: cekura
-  uses: cekura-ai/cekura-github-actions@v1.2.1
+  uses: cekura-ai/cekura-github-actions@v1.2.3
   with:
     agent_id: ${{ vars.AGENT_ID }}
     tags: smoke-test
@@ -322,7 +323,16 @@ The action polls the result every 30 seconds until it is `completed`, `failed`, 
 - **passes** when the result is `completed` and every run passed;
 - **fails** otherwise — a run that failed its checks, errored, never connected or timed out counts as not passed, and so does a result that ends `failed`, `timeout` or `cancelled`.
 
-If the result is still running after `timeout` seconds, the step fails. [Result statuses and gating](/documentation/guides/testing-agents/result-statuses) explains each status and count.
+The job summary shows the result's counts and one row per run, with the scenario, the outcome and, for a run that did not pass, why (the failed metrics or the error).
+
+If the result is still running after `timeout` seconds, the action ends its active calls, writes the result ID and a shareable link to the job summary, and fails the step. [Result statuses and gating](/documentation/guides/testing-agents/result-statuses) explains each status and count.
+
+### Cancelling and job timeouts
+
+If the workflow is cancelled, or the job hits its `timeout-minutes`, the action:
+
+- asks Cekura to end the result's active calls, so no runs are left going in the background;
+- still writes the result ID and a shareable link to the job summary, and sets the `result_id` and `result_url` outputs, so you can open the result in Cekura.
 
 ### Example with All Options
 
@@ -332,7 +342,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run Cekura Tests
-        uses: cekura-ai/cekura-github-actions@v1.2.1
+        uses: cekura-ai/cekura-github-actions@v1.2.3
         with:
           agent_id: ${{ vars.AGENT_ID }}
           scenario_ids: ${{ vars.SCENARIO_IDS }}

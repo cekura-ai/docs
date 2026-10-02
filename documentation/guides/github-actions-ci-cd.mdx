@@ -357,7 +357,7 @@ jobs:
 
 ## Running Many Groups Under One Concurrency Limit
 
-To run several agents' scenarios from one step, use the `run-batch` action. It can also run member/contact pairs for 3-way calls. You set a single `concurrency`, and the action starts groups only while their calls fit under it, so you don't need a matrix or a job per batch.
+To run several agents' scenarios from one step, use the `run-batch` action. A group can also have several legs that must run at the same time, each as its own result, such as the caller and the transfer target of a warm transfer, or the parties of a 3-way call. You set a single `concurrency`, and the action starts groups only while their calls fit under it, so you don't need a matrix or a job per batch.
 
 ```yaml
 - uses: cekura-ai/cekura-github-actions/run-batch@v1.2.3
@@ -368,23 +368,24 @@ To run several agents' scenarios from one step, use the `run-batch` action. It c
       - name: inbound-smoke
         agent_id: 123
         scenario_ids: 1001,1002,1003
-      - name: attendant-transfer
-        member:
-          agent_id: 456
-          scenario_ids: 2001,2001
-        contact:
-          agent_id: 123
-          scenario_ids: 3001,3002
+      - name: warm-transfer
+        legs:
+          - name: caller
+            agent_id: 456
+            scenario_ids: 2001,2001
+          - name: transfer-target
+            agent_id: 123
+            scenario_ids: 3001,3002
 ```
 
-- **Single-agent group** (`agent_id` + `scenario_ids`, or only one of `member` / `contact`): runs as one result. It reserves `scenarios × frequency` calls, or the whole `concurrency` if that is smaller, and Cekura runs no more than that many at once.
-- **Pair group** (`member` + `contact`): the lists are matched by position, so member scenario *i* runs with contact scenario *i* and both lists must be the same length. Repeat an ID to reuse a scenario. Each pair starts its member and contact results together, in separate contexts, and counts as 2 calls. `frequency` repeats the whole pair rather than the runs inside each result.
+- **Single-agent group** (`agent_id` + `scenario_ids`): runs as one result. It reserves `scenarios × frequency` calls, or the whole `concurrency` if that is smaller, and Cekura runs no more than that many at once.
+- **Group with `legs`** (two or more): the legs are matched by position, so scenario *i* of every leg forms set *i*, and every leg needs the same number of scenarios. Repeat an ID to reuse a scenario. Each set starts one result per leg together, in separate contexts, and counts as one call per leg. `frequency` repeats the whole set rather than the runs inside each result. A leg's optional `name` labels it in the summary; keys set on the group, such as `agent_id`, are defaults for every leg.
 - **Scheduling:** groups start in the order listed, each one only when its calls fit in what is left of `concurrency`. A group's calls are freed when its result finishes. Set `dry_run: true` to validate the batch and print the plan without placing calls.
 - **Job summary:** one row per result, with links, plus every run that did not pass and why. The step passes only when every run in every result passed. The `passed`, `total_runs`, `passed_runs` and `result_ids` outputs carry the same totals.
 - **Cancelling or timing out:** ends every active result's calls and skips the groups that have not started.
 
 <Note>
-  Keep `concurrency` at or below your organization's Cekura concurrency limit, minus any other runs (schedules, other workflows) that share it. Above that limit Cekura queues the extra results, so calls wait in the queue and the two sides of a pair may not start at the same time.
+  Keep `concurrency` at or below your organization's Cekura concurrency limit, minus any other runs (schedules, other workflows) that share it. Above that limit Cekura queues the extra results, so calls wait in the queue and the legs of a set may not start at the same time.
 </Note>
 
 `batch` accepts JSON or YAML (YAML needs PyYAML on the runner), or use `batch_file`. The [run-batch README](https://github.com/cekura-ai/cekura-github-actions/blob/main/run-batch/README.md) lists every key and input.

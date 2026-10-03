@@ -1412,6 +1412,18 @@
                             "type": "integer"
                         },
                         "description": "Filter by project ID. Strongly recommended — omitting returns all dashboards across every project."
+                    },
+                    {
+                        "in": "query",
+                        "name": "source",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "call_logs",
+                                "runs"
+                            ]
+                        },
+                        "description": "Dataset of the dashboards to list: `call_logs` (default) or `runs`."
                     }
                 ],
                 "tags": [
@@ -1930,6 +1942,20 @@
             "get": {
                 "operationId": "dashboards-predefined-widgets",
                 "description": "Return a list of predefined widget configurations for quick-add.\nResolves project-specific details like metric IDs for latency.",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "source",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "call_logs",
+                                "runs"
+                            ]
+                        },
+                        "description": "Dashboard dataset the presets are for: `call_logs` (default) or `runs`."
+                    }
+                ],
                 "tags": [
                     "dashboards"
                 ],
@@ -15459,6 +15485,112 @@
                 }
             }
         },
+        "/test_framework/billing/unit-usage-report/": {
+            "get": {
+                "operationId": "billing-unit-usage-report-retrieve",
+                "description": "Returns an organization's usage per billable unit (voice and text simulations, monitored calls, metric evaluations, triage, insights, Labs and AI metric building) with the credits billed for each, one column per calendar month (UTC) plus a total. The range may span at most 12 months. Each row's `values` maps a month (`YYYY-MM`) to a number; `other_credits` covers any remaining billed item and refunds are a negative row, so credit rows sum to `total_credits`. With an organization-scoped API key the organization comes from the key; with a user session pass `organization_id` (organization admins only). Pass `format=csv` to download the same table as CSV. Results may lag usage by up to 30 minutes.",
+                "summary": "Get monthly usage and credits per billable unit",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "format",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "csv",
+                                "json"
+                            ]
+                        },
+                        "description": "Response format. Default: json."
+                    },
+                    {
+                        "in": "query",
+                        "name": "organization_id",
+                        "schema": {
+                            "type": "integer"
+                        },
+                        "description": "Organization ID. Required for user sessions; ignored for organization-scoped API keys."
+                    },
+                    {
+                        "in": "query",
+                        "name": "start_date",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        },
+                        "description": "First day of the range (YYYY-MM-DD), inclusive.",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "end_date",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        },
+                        "description": "Last day of the range (YYYY-MM-DD), inclusive. At most 12 calendar months after `start_date`.",
+                        "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "group_by",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "month"
+                            ]
+                        },
+                        "description": "Period to group by. Default: month."
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnitUsageReportResponse"
+                                }
+                            },
+                            "text/csv": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UnitUsageReportResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid parameters"
+                    },
+                    "404": {
+                        "description": "Billing information not found"
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "billing_unit_usage_report_retrieve",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "billing-unit-usage-report-retrieve",
+                        "description": "Returns an organization's usage per billable unit (voice and text simulations, monitored calls, metric evaluations, triage, insights, Labs and AI metric building) with the credits billed for each, one column per calendar month (UTC) plus a total. The range may span at most 12 months. Each row's `values` maps a month (`YYYY-MM`) to a number; `other_credits` covers any remaining billed item and refunds are a negative row, so credit rows sum to `total_credits`. With an organization-scoped API key the organization comes from the key; with a user session pass `organization_id` (organization admins only). Pass `format=csv` to download the same table as CSV. Results may lag usage by up to 30 minutes."
+                    }
+                }
+            }
+        },
         "/test_framework/billing/usage-history/": {
             "get": {
                 "operationId": "test-framework-billing-usage-history-retrieve",
@@ -17198,7 +17330,7 @@
             },
             "post": {
                 "operationId": "aiagents-v1-create",
-                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (Retell uses that field for voice too when it is set).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex. Dial over SIP (`sip_endpoint`) or phone; connect Webex Contact Center (OAuth via the dashboard, or `cisco_client_secret` + `cisco_data`) to fetch the Cisco transcript and interaction id after each run.\n- `gemini_cx` — Gemini Enterprise CX (Google CX Agent Studio). Requires `gemini_cx_data` with `service_account_email` (your reader service account, which Cekura's per-project identity impersonates) and `location` (project_id defaults from the email; a phone number is optional); the CX agent id goes in `assistant_id`. Voice runs dial the agent by phone, text runs are not supported.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*`, `gemini_cx_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | gemini_cx | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell/ElevenLabs/Bland).\n- `auto_sync_prompt_enabled` — one-way prompt sync from the provider to Cekura on a schedule; Cekura updates its agent description and does not push changes back to the provider. Supported for VAPI, Retell, ElevenLabs, Synthflow, Telnyx, and Bland.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
+                "description": "aiagents_create: Register a new AI voice agent with Cekura for testing / observability. Required: `agent_name`, `project` (project ID), `assistant_provider`. Other fields depend on the provider (see below).\n\n**Most common case:** you already have an agent running on your own provider stack with a dedicated phone number. Pass `agent_name`, `description`, `inbound`, `project`, `contact_number` (E.164 format, e.g. `+14155551234`), and `language` — Cekura observes that number without needing provider credentials. Set `assistant_provider=\"self_hosted\"` (optionally `websocket_url` for text-mode runs).\n\n**Provider integrations:** set `assistant_provider` to one of the valid values below and pass the matching credentials. `assistant_id` alone does NOT substitute for provider credentials — providers like VAPI, Retell, and Bland validate their api_key on create.\n\n**Valid `assistant_provider` values** (live enum — superset of prose docs you may see elsewhere):\n- `self_hosted` — websocket or observation-only; no api_key needed. Use `websocket_url` + `websocket_headers` for text-mode runs.\n- `vapi` — requires `vapi_api_key`; optional `assistant_id`, `vapi_data.public_key`.\n- `retell` — requires `retell_api_key`; `chat_assistant_id` is optional (Retell uses that field for voice too when it is set).\n- `bland` — requires `bland_api_key` AND `chat_assistant_id` (Bland internally calls this `pathway_id`); `bland_data.encrypted_key` for Twilio.\n- `livekit` — requires `livekit_api_key` + `livekit_data.url`; `livekit_data.api_secret` is needed at run time for WebRTC.\n- `elevenlabs` — requires `elevenlabs_api_key`.\n- `agentforce` — Salesforce Agentforce; needs `agentforce_client_secret` + `agentforce_data` (client_id, domain, agent_id).\n- `cisco` — Cisco Webex. Dial over SIP (`sip_endpoint`) or phone; connect Webex Contact Center (OAuth via the dashboard, or `cisco_client_secret` + `cisco_data`) to fetch the Cisco transcript and interaction id after each run.\n- `gemini_cx` — Gemini Enterprise CX (Google CX Agent Studio). Requires `gemini_cx_data` with `service_account_email` (your reader service account, which Cekura's per-agent identity impersonates) and `location` (project_id defaults from the email; a phone number is optional); the CX agent id goes in `assistant_id`. Voice runs dial the agent by phone, text runs are not supported.\n- `vocera` — Cekura-hosted agent.\n- `sms` — text-only SMS channel; use `chat_assistant_id`.\n- `whatsapp` — text-only WhatsApp channel; use `chat_assistant_id`.\n- `\"\"` (empty string) — unset; agent is not runnable until a provider is configured.\n\n**Note:** the `pipecat_*`, `synthflow_*`, `koreai_*`, `genesys_*`, `cisco_*`, `gemini_cx_*` and `custom_provider_*` credential fields are set alongside the matching `assistant_provider` / `transcript_provider` value.\n\n**Outbound agents:** set `inbound=false`. Actual call placement uses the scenario's configured phone number or a number from the org's provisioned pool — `outbound_numbers` is not required for calls to be placed (it is used for webhook validation only).\n\n**Other fields to know:**\n- `language` — BCP-47 locale (`en`, `es`, `fr`, …). Must match the personalities used for evaluators.\n- `transcript_provider` — STT vendor (`vapi | retell | synthflow | elevenlabs | bland | livekit | pipecat | koreai | custom | cisco | gemini_cx | genesys`). Does NOT auto-pair with `assistant_provider`; set both independently when needed.\n- `llm_model`, `llm_temperature`, `llm_max_tokens`, `llm_system_prompt` — simulation LLM settings (used by Cekura when simulating callers in test runs; NOT your agent's own LLM).\n- `auto_fetch_calls_enabled` — auto-import calls from the provider every 30s (VAPI/Retell/ElevenLabs/Bland).\n- `auto_sync_prompt_enabled` — one-way prompt sync from the provider to Cekura on a schedule; Cekura updates its agent description and does not push changes back to the provider. Supported for VAPI, Retell, ElevenLabs, Synthflow, Telnyx, and Bland.\n\n**Read-only status fields** like `vapi_api_key_configured`, `retell_api_key_configured` appear in the response to indicate which provider credentials are stored (credentials themselves are masked).",
                 "summary": "Create an AI voice agent",
                 "tags": [
                     "AI Agents"
@@ -20975,7 +21107,25 @@
         "/test_framework/v1/gemini-cx/identity/": {
             "get": {
                 "operationId": "gemini-cx-identity-retrieve",
-                "description": "Which Cekura identity the customer must grant, created on first use for the project.",
+                "description": "Which Cekura identity the customer must grant.\n\n``POST {project_id, agent_name?}`` mints a new one before the agent exists (create form); the\nform saves the returned address with the agent. The name only labels it in Google's console. ``GET ?agent_id=`` returns the address stamped\non a saved agent, minting and stamping one for agents saved without it.",
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            },
+            "post": {
+                "operationId": "gemini-cx-identity-create",
+                "description": "Which Cekura identity the customer must grant.\n\n``POST {project_id, agent_name?}`` mints a new one before the agent exists (create form); the\nform saves the returned address with the agent. The name only labels it in Google's console. ``GET ?agent_id=`` returns the address stamped\non a saved agent, minting and stamping one for agents saved without it.",
                 "tags": [
                     "test_framework"
                 ],
@@ -20995,7 +21145,7 @@
         "/test_framework/v1/gemini-cx/test-connection/": {
             "post": {
                 "operationId": "gemini-cx-test-connection-create",
-                "description": "Mint a token as the customer's reader account and report whether the grant works.\n\nBody: ``project_id`` plus either the form values (``service_account_email``, optional\n``gcp_project_id``) or ``agent_id`` (uses the agent's stored reader and records the outcome on\nit). A customer-side problem is a 200 with ``ok: false`` and a message; only Cekura-side\nproblems are error statuses.\n\nTwo different projects appear in the body on purpose: ``project_id`` is the *Cekura* project\nthe agent belongs to (used for access scoping and to pick the Cekura identity), while\n``gcp_project_id`` is the customer's *Google Cloud* project the form shows (only checked to\nagree with the reader address). The scoped Cekura project is what the token chain uses.",
+                "description": "Mint a token as the customer's reader account and report whether the grant works.\n\nTwo shapes. Saved agent: ``{agent_id}`` uses the identity stamped on the agent and its stored\nreader (``service_account_email`` / ``gcp_project_id`` may override with unsaved form values)\nand records the outcome on the agent. Before save: ``{project_id, cekura_identity,\nservice_account_email, gcp_project_id?}``; the identity must have been minted for that project.\nA customer-side problem is a 200 with ``ok: false`` and a message; only Cekura-side problems\nare error statuses.",
                 "tags": [
                     "test_framework"
                 ],
@@ -32656,6 +32806,14 @@
                     },
                     {
                         "in": "query",
+                        "name": "filters_v2",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Runs dashboard filter JSON (same format as dashboard filters). Requires `project_id` and a timestamp lower bound within the last 30 days; only completed and failed runs are returned."
+                    },
+                    {
+                        "in": "query",
                         "name": "ordering",
                         "schema": {
                             "type": "string"
@@ -33067,6 +33225,14 @@
                             "type": "integer"
                         },
                         "description": "Filter runs by result ID"
+                    },
+                    {
+                        "in": "query",
+                        "name": "filters_v2",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Runs dashboard filter JSON (same format as dashboard filters). Requires `project_id` and a timestamp lower bound within the last 30 days; only completed and failed runs are returned."
                     },
                     {
                         "in": "query",
@@ -40066,7 +40232,7 @@
         "/test_framework/v1/scenarios-external/run_scenarios_json/": {
             "post": {
                 "operationId": "scenarios-run-json",
-                "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them.",
+                "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection, or `chirp` for a raw-PCM WebSocket endpoint — so one file runs unchanged against any agent or environment. LiveKit, Pipecat and CHIRP connection overrides belong in the request's `livekit_data`, `pipecat_data` or `chirp_data` (`websocket_url`), never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them.",
                 "summary": "Run test cases from a JSON spec file",
                 "parameters": [
                     {
@@ -41148,7 +41314,7 @@
         "/test_framework/v1/scenarios-external/run_scenarios_retell_webrtc/": {
             "post": {
                 "operationId": "scenarios-run-retell-webrtc",
-                "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (Retell v3 gateway). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (Retell v3 gateway). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators against a Retell agent over WebRTC",
                 "tags": [
                     "Evaluators"
@@ -41157,7 +41323,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             },
                             "examples": {
                                 "RetellWebRTCRun": {
@@ -41175,16 +41341,15 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -41845,7 +42010,7 @@
         "/test_framework/v1/scenarios-external/run_scenarios_vapi_webrtc/": {
             "post": {
                 "operationId": "scenarios-run-vapi-webrtc",
-                "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. Required: `vapi_assistant_id` (the VAPI assistant). The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured. `vapi_assistant_id` is optional and defaults to `agent.assistant_id`.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators against a VAPI WebRTC agent",
                 "tags": [
                     "Evaluators"
@@ -41854,7 +42019,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             },
                             "examples": {
                                 "VAPIWebRTCRun": {
@@ -41873,16 +42038,15 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -46644,7 +46808,7 @@
         "/test_framework/v1/scenarios/run_scenarios_json/": {
             "post": {
                 "operationId": "scenarios-run-json_2",
-                "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them.",
+                "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection, or `chirp` for a raw-PCM WebSocket endpoint — so one file runs unchanged against any agent or environment. LiveKit, Pipecat and CHIRP connection overrides belong in the request's `livekit_data`, `pipecat_data` or `chirp_data` (`websocket_url`), never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them.",
                 "summary": "Run test cases from a JSON spec file",
                 "parameters": [
                     {
@@ -47726,7 +47890,7 @@
         "/test_framework/v1/scenarios/run_scenarios_retell_webrtc/": {
             "post": {
                 "operationId": "scenarios-run-retell-webrtc_2",
-                "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (Retell v3 gateway). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (Retell v3 gateway). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators against a Retell agent over WebRTC",
                 "tags": [
                     "Evaluators"
@@ -47735,7 +47899,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             },
                             "examples": {
                                 "RetellWebRTCRun": {
@@ -47753,16 +47917,15 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -48423,7 +48586,7 @@
         "/test_framework/v1/scenarios/run_scenarios_vapi_webrtc/": {
             "post": {
                 "operationId": "scenarios-run-vapi-webrtc_2",
-                "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. Required: `vapi_assistant_id` (the VAPI assistant). The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured. `vapi_assistant_id` is optional and defaults to `agent.assistant_id`.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators against a VAPI WebRTC agent",
                 "tags": [
                     "Evaluators"
@@ -48432,7 +48595,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             },
                             "examples": {
                                 "VAPIWebRTCRun": {
@@ -48451,16 +48614,15 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -57691,6 +57853,14 @@
                     },
                     {
                         "in": "query",
+                        "name": "filters_v2",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Runs dashboard filter JSON (same format as dashboard filters). Requires `project_id` and a timestamp lower bound within the last 30 days; only completed and failed runs are returned."
+                    },
+                    {
+                        "in": "query",
                         "name": "ordering",
                         "schema": {
                             "type": "string"
@@ -63319,7 +63489,7 @@
         "/test_framework/v2/scenarios/run_scenarios_json/": {
             "post": {
                 "operationId": "scenarios-run-json_3",
-                "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them.",
+                "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection, or `chirp` for a raw-PCM WebSocket endpoint — so one file runs unchanged against any agent or environment. LiveKit, Pipecat and CHIRP connection overrides belong in the request's `livekit_data`, `pipecat_data` or `chirp_data` (`websocket_url`), never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them.",
                 "summary": "Run test cases from a JSON spec file",
                 "parameters": [
                     {
@@ -63594,7 +63764,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-run-json",
-                        "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, or `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection — so one file runs unchanged against any agent or environment. LiveKit and Pipecat connection overrides belong in the request's `livekit_data` or `pipecat_data`, never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them."
+                        "description": "Run agent test cases straight from a JSON spec, without creating evaluators. Keep the spec in your repository and post it from CI.\n\nThe spec describes only what to test. Pick the target with `agent_id` and `channel` on the request — `voice` for a phone call (default), `text` for chat, `elevenlabs`, `livekit_v2`, or `pipecat_v2` for the matching WebRTC connection, or `chirp` for a raw-PCM WebSocket endpoint — so one file runs unchanged against any agent or environment. LiveKit, Pipecat and CHIRP connection overrides belong in the request's `livekit_data`, `pipecat_data` or `chirp_data` (`websocket_url`), never in the spec.\n\n**Run overrides:** the request accepts the same run-level overrides as `scenarios_run_voice`, applied to every test case in the spec — `frequency` (multiplies each case's own `frequency`), `agent_number` and `outbound_phone_number` (`voice` and `text`; on `voice`, `outbound_phone_number` is for inbound agents only), `mode` (inbound `voice` agents), `concurrency_limit` (overrides the spec's `defaults.concurrency_limit`) and `mock_tool_names`. Personalities, test profiles and the Cekura-side `phone_number` are set per test case in the spec.\n\nPass `dry_run=true` to validate only: the response describes the run that would happen (test cases, total runs, estimated cost) and nothing is created or charged. Use that on every commit, and the real call on the branches you want tested.\n\nEvery problem in a spec is reported at once, keyed by its location in the file (for example `scenarios[3].metrics[1]`). Metrics must already exist and be enabled for the target agent; personalities and test profiles can be referenced by ID or defined inline.\n\nFetch the schema this endpoint accepts from `scenarios_json_schema`.\n\n**Cost:** voice- or text-simulation rate per run. Test cases from a spec are removed automatically once no run needs them."
                     }
                 }
             }
@@ -64434,7 +64604,7 @@
         "/test_framework/v2/scenarios/run_scenarios_retell_webrtc/": {
             "post": {
                 "operationId": "scenarios-run-retell-webrtc_3",
-                "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (Retell v3 gateway). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (Retell v3 gateway). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators against a Retell agent over WebRTC",
                 "tags": [
                     "Evaluators"
@@ -64443,7 +64613,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             },
                             "examples": {
                                 "RetellWebRTCRun": {
@@ -64461,16 +64631,15 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosRetellWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosRetellWebRTC"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -64660,7 +64829,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-run-retell-webrtc",
-                        "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (Retell v3 gateway). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
+                        "description": "RETELL WEBRTC VOICE RUN: Execute evaluators against a Retell agent over WebRTC (Retell v3 gateway). The agent must have Retell credentials configured. `retell_agent_id` is optional and defaults to `agent.assistant_id` if not provided.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_vapi_webrtc` — VAPI agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
                     }
                 }
             }
@@ -65155,7 +65324,7 @@
         "/test_framework/v2/scenarios/run_scenarios_vapi_webrtc/": {
             "post": {
                 "operationId": "scenarios-run-vapi-webrtc_3",
-                "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. Required: `vapi_assistant_id` (the VAPI assistant). The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
+                "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured. `vapi_assistant_id` is optional and defaults to `agent.assistant_id`.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)",
                 "summary": "Run evaluators against a VAPI WebRTC agent",
                 "tags": [
                     "Evaluators"
@@ -65164,7 +65333,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             },
                             "examples": {
                                 "VAPIWebRTCRun": {
@@ -65183,16 +65352,15 @@
                         },
                         "application/x-www-form-urlencoded": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             }
                         },
                         "multipart/form-data": {
                             "schema": {
-                                "$ref": "#/components/schemas/RunScenariosVapiWebRTCRequest"
+                                "$ref": "#/components/schemas/SchemaPostRunScenariosVapiWebRTC"
                             }
                         }
-                    },
-                    "required": true
+                    }
                 },
                 "security": [
                     {
@@ -65382,7 +65550,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "scenarios-run-vapi-webrtc",
-                        "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. Required: `vapi_assistant_id` (the VAPI assistant). The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
+                        "description": "VAPI WEBRTC VOICE RUN: Execute evaluators against a VAPI agent over WebRTC. The agent (looked up via `agent_id` or inferred from the first scenario) must have VAPI credentials configured. `vapi_assistant_id` is optional and defaults to `agent.assistant_id`.\n\n**Cost:** voice-simulation rate per run.\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`.\n\n**When to use this vs others** (pick the endpoint matching the agent's configured connection — check `aiagents_retrieve`):\n- `scenarios_run_voice` — phone / SIP voice run (no provider WebRTC needed)\n- `scenarios_run_text` — text/SMS/chat (cheaper)\n- `scenarios_run_retell_webrtc` — Retell agents over WebRTC\n- `scenarios_run_elevenlabs` — ElevenLabs Conversational agents\n- `scenarios_run_pipecat_v2` — Pipecat Cloud (project credentials, v2)\n- `scenarios_run_livekit_v2` — LiveKit (project credentials, v2)"
                     }
                 }
             }
@@ -71259,7 +71427,7 @@
                     },
                     "gemini_cx_data": {
                         "type": "string",
-                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-project identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
+                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-agent identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). Optional `cekura_identity`: the Cekura identity address the customer granted (obtained from the dashboard's setup card; must have been issued for this project). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
                     },
                     "gemini_cx_connection": {
                         "type": "string",
@@ -75000,7 +75168,6 @@
                             "elevenlabs",
                             "livekit",
                             "agora",
-                            "pipecat",
                             "sms",
                             "whatsapp",
                             "self_hosted",
@@ -75011,8 +75178,8 @@
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "b896c086cc3529ef",
-                        "description": "Chat provider type. Must be compatible with the voice provider.type. Valid values: retell, bland, vapi, elevenlabs, livekit, agora, sms, whatsapp, self_hosted, agentforce, amazon_connect, koreai, sierra. Pass an empty string \"\" (or send chat_agent_details: null) to clear the chat overlay.\n\n* `retell` - retell\n* `bland` - bland\n* `vapi` - vapi\n* `elevenlabs` - elevenlabs\n* `livekit` - livekit\n* `agora` - agora\n* `pipecat` - pipecat\n* `sms` - sms\n* `whatsapp` - whatsapp\n* `self_hosted` - self_hosted\n* `agentforce` - agentforce\n* `amazon_connect` - amazon_connect\n* `koreai` - koreai\n* `sierra` - sierra"
+                        "x-spec-enum-id": "4bb6f6bcfa9e6240",
+                        "description": "Chat provider type. Must be compatible with the voice provider.type. Valid values: retell, bland, vapi, elevenlabs, livekit, agora, sms, whatsapp, self_hosted, agentforce, amazon_connect, koreai, sierra. Pass an empty string \"\" (or send chat_agent_details: null) to clear the chat overlay.\n\n* `retell` - retell\n* `bland` - bland\n* `vapi` - vapi\n* `elevenlabs` - elevenlabs\n* `livekit` - livekit\n* `agora` - agora\n* `sms` - sms\n* `whatsapp` - whatsapp\n* `self_hosted` - self_hosted\n* `agentforce` - agentforce\n* `amazon_connect` - amazon_connect\n* `koreai` - koreai\n* `sierra` - sierra"
                     },
                     "config": {
                         "oneOf": [
@@ -76079,6 +76246,20 @@
                         ],
                         "description": "Project this dashboard belongs to"
                     },
+                    "source": {
+                        "enum": [
+                            "call_logs",
+                            "runs"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "ddad6ce3969c508d",
+                        "description": "Dataset the widgets plot: `call_logs` (production calls, the default) or `runs` (simulation test runs). Set on create; it cannot be changed afterwards.\n\n* `call_logs` - Call Logs\n* `runs` - Runs"
+                    },
+                    "is_default": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Whether this is the project's default dashboard for its source."
+                    },
                     "filters": {
                         "type": [
                             "object",
@@ -76211,6 +76392,20 @@
                             "null"
                         ],
                         "description": "Project this dashboard belongs to"
+                    },
+                    "source": {
+                        "enum": [
+                            "call_logs",
+                            "runs"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "ddad6ce3969c508d",
+                        "description": "Dataset the widgets plot: `call_logs` (production calls, the default) or `runs` (simulation test runs). Set on create; it cannot be changed afterwards.\n\n* `call_logs` - Call Logs\n* `runs` - Runs"
+                    },
+                    "is_default": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Whether this is the project's default dashboard for its source."
                     },
                     "filters": {
                         "type": [
@@ -77006,7 +77201,7 @@
                 "properties": {
                     "service_account_email": {
                         "type": "string",
-                        "description": "Your reader service account (name@project.iam.gserviceaccount.com) that Cekura's per-project identity is allowed to act as."
+                        "description": "Your reader service account (name@project.iam.gserviceaccount.com) that Cekura's per-agent identity is allowed to act as."
                     },
                     "project_id": {
                         "type": "string",
@@ -82889,6 +83084,20 @@
                         ],
                         "description": "Project this dashboard belongs to"
                     },
+                    "source": {
+                        "enum": [
+                            "call_logs",
+                            "runs"
+                        ],
+                        "type": "string",
+                        "x-spec-enum-id": "ddad6ce3969c508d",
+                        "description": "Dataset the widgets plot: `call_logs` (production calls, the default) or `runs` (simulation test runs). Set on create; it cannot be changed afterwards.\n\n* `call_logs` - Call Logs\n* `runs` - Runs"
+                    },
+                    "is_default": {
+                        "type": "boolean",
+                        "readOnly": true,
+                        "description": "Whether this is the project's default dashboard for its source."
+                    },
                     "filters": {
                         "type": [
                             "object",
@@ -86299,7 +86508,7 @@
                     },
                     "gemini_cx_data": {
                         "type": "string",
-                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-project identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
+                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-agent identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). Optional `cekura_identity`: the Cekura identity address the customer granted (obtained from the dashboard's setup card; must have been issued for this project). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
                     },
                     "gemini_cx_connection": {
                         "type": "string",
@@ -90158,93 +90367,6 @@
                     "scenarios"
                 ]
             },
-            "RunScenariosRetellWebRTCRequest": {
-                "type": "object",
-                "properties": {
-                    "scenarios": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        },
-                        "description": "List of scenario IDs to run"
-                    },
-                    "agent_id": {
-                        "type": "integer",
-                        "description": "Agent ID (optional if scenarios all belong to one agent)"
-                    },
-                    "project_id": {
-                        "type": "integer"
-                    },
-                    "retell_agent_id": {
-                        "type": "string",
-                        "description": "Retell agent ID; defaults to agent.assistant_id"
-                    },
-                    "frequency": {
-                        "type": "integer",
-                        "default": 1
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "concurrency_limit": {
-                        "type": "integer"
-                    },
-                    "mock_tool_names": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "Names of mock tools to activate for this run. Omit (or send null) to mock every tool configured on the agent; send an empty list to mock none so every tool keeps its original endpoint; send specific names to mock only those."
-                    }
-                },
-                "required": [
-                    "scenarios"
-                ]
-            },
-            "RunScenariosVapiWebRTCRequest": {
-                "type": "object",
-                "properties": {
-                    "scenarios": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer"
-                        },
-                        "description": "List of scenario IDs to run"
-                    },
-                    "vapi_assistant_id": {
-                        "type": "string",
-                        "description": "The VAPI assistant ID to test against"
-                    },
-                    "agent_id": {
-                        "type": "integer",
-                        "description": "Agent ID (optional if scenarios all belong to one agent)"
-                    },
-                    "project_id": {
-                        "type": "integer"
-                    },
-                    "frequency": {
-                        "type": "integer",
-                        "default": 1
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "concurrency_limit": {
-                        "type": "integer"
-                    },
-                    "mock_tool_names": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": "Names of mock tools to activate for this run. Omit (or send null) to mock every tool configured on the agent; send an empty list to mock none so every tool keeps its original endpoint; send specific names to mock only those."
-                    }
-                },
-                "required": [
-                    "scenarios",
-                    "vapi_assistant_id"
-                ]
-            },
             "RunScenariosWithWebsockets": {
                 "type": "object",
                 "properties": {
@@ -93605,6 +93727,107 @@
                     "scenarios"
                 ]
             },
+            "SchemaPostRunScenariosRetellWebRTC": {
+                "type": "object",
+                "description": "Schema for the run_scenarios_retell_webrtc endpoint.",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "ID of the agent to run evaluators for"
+                    },
+                    "assistant_id": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAlternative to agent ID - the assistant ID to use for this scenario\nExample: `\"asst_1234567890\"`\n"
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nList of tags to filter evaluators to run. Either evaluators or tags must be provided.\nExample: `[\"tag1\", \"tag2\", \"tag3\"]`\n"
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "description": "\nDot-separated folder path to select evaluators from (e.g. `\"Sales.Inbound\"`).\nMutually exclusive with `scenarios` and `tags`. Requires `project_id`.\n"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "description": "\nProject ID. Required when using `folder_path` (or when passing a folder path string via `scenarios`).\nExample: `1376`\n"
+                    },
+                    "frequency": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1,
+                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Label text for result"
+                    },
+                    "personality_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of personality IDs to override for this run. If not provided, uses the scenario's default personality.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "test_profile_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of test profile IDs to override for this run. If not provided, uses the scenario's default test profile.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "personality_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single personality ID override. Merged into personality_ids; prefer personality_ids for multiple."
+                    },
+                    "test_profile_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single test profile ID override. Merged into test_profile_ids; prefer test_profile_ids for multiple."
+                    },
+                    "concurrency_limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nNames of mock tools to activate for this run. Cekura swaps those tools' URLs to mock endpoints while the\nrun is active and restores the originals when it finishes. Omit (or send null) to mock every tool\nconfigured on the agent; send an empty list to mock none so every tool keeps its original endpoint.\nExample: `[\"get_appointments\", \"cancel_booking\"]`\n"
+                    },
+                    "agent_version_id": {
+                        "type": "string",
+                        "description": "\nRun against a stored version of the agent instead of the agent as it is live. Cekura makes a\nprivate copy of the agent in your provider account, puts that version's prompt on it, and\nruns against the copy — voice, model and tools stay as the agent is configured now, and the\nlive agent is never changed. Accepts the version label shown in the agent's version history\n(`v12`, or `p1` for a version an improvement run proposed) or its numeric `history_id`.\nList them with `GET /test_framework/v1/aiagents/{id}/history/`; a version is usable when its\n`is_runnable` is true. Available for VAPI, Retell, ElevenLabs and Bland agents that are\noutbound and have a single prompt.\nExample: `\"v12\"`\n"
+                    },
+                    "retell_agent_id": {
+                        "type": "string",
+                        "description": "Retell agent ID to test against. Overrides the agent's stored assistant_id for this run."
+                    }
+                }
+            },
             "SchemaPostRunScenariosSip": {
                 "type": "object",
                 "description": "Schema for the run_scenarios_sip endpoint.",
@@ -93821,6 +94044,107 @@
                     "agent_version_id": {
                         "type": "string",
                         "description": "\nRun against a stored version of the agent instead of the agent as it is live. Cekura makes a\nprivate copy of the agent in your provider account, puts that version's prompt on it, and\nruns against the copy — voice, model and tools stay as the agent is configured now, and the\nlive agent is never changed. Accepts the version label shown in the agent's version history\n(`v12`, or `p1` for a version an improvement run proposed) or its numeric `history_id`.\nList them with `GET /test_framework/v1/aiagents/{id}/history/`; a version is usable when its\n`is_runnable` is true. Available for VAPI, Retell, ElevenLabs and Bland agents that are\noutbound and have a single prompt.\nExample: `\"v12\"`\n"
+                    }
+                }
+            },
+            "SchemaPostRunScenariosVapiWebRTC": {
+                "type": "object",
+                "description": "Schema for the run_scenarios_vapi_webrtc endpoint.",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "ID of the agent to run evaluators for"
+                    },
+                    "assistant_id": {
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "\nAlternative to agent ID - the assistant ID to use for this scenario\nExample: `\"asst_1234567890\"`\n"
+                    },
+                    "scenarios": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nList of tags to filter evaluators to run. Either evaluators or tags must be provided.\nExample: `[\"tag1\", \"tag2\", \"tag3\"]`\n"
+                    },
+                    "folder_path": {
+                        "type": "string",
+                        "description": "\nDot-separated folder path to select evaluators from (e.g. `\"Sales.Inbound\"`).\nMutually exclusive with `scenarios` and `tags`. Requires `project_id`.\n"
+                    },
+                    "project_id": {
+                        "type": "integer",
+                        "description": "\nProject ID. Required when using `folder_path` (or when passing a folder path string via `scenarios`).\nExample: `1376`\n"
+                    },
+                    "frequency": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 1,
+                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Label text for result"
+                    },
+                    "personality_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of personality IDs to override for this run. If not provided, uses the scenario's default personality.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "test_profile_ids": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "\nList of test profile IDs to override for this run. If not provided, uses the scenario's default test profile.\nExample: `[123, 456, 789]`\n"
+                    },
+                    "personality_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single personality ID override. Merged into personality_ids; prefer personality_ids for multiple."
+                    },
+                    "test_profile_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "description": "Single test profile ID override. Merged into test_profile_ids; prefer test_profile_ids for multiple."
+                    },
+                    "concurrency_limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "mock_tool_names": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "\nNames of mock tools to activate for this run. Cekura swaps those tools' URLs to mock endpoints while the\nrun is active and restores the originals when it finishes. Omit (or send null) to mock every tool\nconfigured on the agent; send an empty list to mock none so every tool keeps its original endpoint.\nExample: `[\"get_appointments\", \"cancel_booking\"]`\n"
+                    },
+                    "agent_version_id": {
+                        "type": "string",
+                        "description": "\nRun against a stored version of the agent instead of the agent as it is live. Cekura makes a\nprivate copy of the agent in your provider account, puts that version's prompt on it, and\nruns against the copy — voice, model and tools stay as the agent is configured now, and the\nlive agent is never changed. Accepts the version label shown in the agent's version history\n(`v12`, or `p1` for a version an improvement run proposed) or its numeric `history_id`.\nList them with `GET /test_framework/v1/aiagents/{id}/history/`; a version is usable when its\n`is_runnable` is true. Available for VAPI, Retell, ElevenLabs and Bland agents that are\noutbound and have a single prompt.\nExample: `\"v12\"`\n"
+                    },
+                    "vapi_assistant_id": {
+                        "type": "string",
+                        "description": "VAPI assistant ID to test against. Overrides the agent's stored assistant_id for this run."
                     }
                 }
             },
@@ -94674,7 +94998,7 @@
                     },
                     "gemini_cx_data": {
                         "type": "string",
-                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-project identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
+                        "description": "\nGemini Enterprise CX (Google CX Agent Studio) access - service_account_email (the customer's reader service account, which they have allowed Cekura's per-agent identity to act as), project_id (GCP project; defaults to the one in that email) and location (agent region, e.g. us-central1). Optional `cekura_identity`: the Cekura identity address the customer granted (obtained from the dashboard's setup card; must have been issued for this project). No key of any kind is stored; the CX agent id goes in `assistant_id` like every other provider. Set on the agent only.\n"
                     },
                     "gemini_cx_connection": {
                         "type": "string",
@@ -95550,11 +95874,12 @@
                             "text",
                             "elevenlabs",
                             "livekit_v2",
-                            "pipecat_v2"
+                            "pipecat_v2",
+                            "chirp"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "3bf42909f82c4c98",
-                        "description": "How to reach the agent: 'voice' for a phone call (the default), 'text' for chat, 'elevenlabs' for an ElevenLabs WebRTC session, or 'livekit_v2' or 'pipecat_v2' for their respective WebRTC sessions.\n\n* `voice` - voice\n* `text` - text\n* `elevenlabs` - elevenlabs\n* `livekit_v2` - livekit_v2\n* `pipecat_v2` - pipecat_v2"
+                        "x-spec-enum-id": "f3792208475360d6",
+                        "description": "How to reach the agent: 'voice' for a phone call (the default), 'text' for chat, 'elevenlabs' for an ElevenLabs WebRTC session, 'livekit_v2' or 'pipecat_v2' for their respective WebRTC sessions, or 'chirp' for the agent's raw-PCM WebSocket endpoint (CHIRP protocol).\n\n* `voice` - voice\n* `text` - text\n* `elevenlabs` - elevenlabs\n* `livekit_v2` - livekit_v2\n* `pipecat_v2` - pipecat_v2\n* `chirp` - chirp"
                     },
                     "frequency": {
                         "type": "integer",
@@ -95602,6 +95927,11 @@
                         "type": "object",
                         "additionalProperties": {},
                         "description": "Optional Pipecat Cloud overrides. These apply only to this run and are not part of the portable test-suite spec."
+                    },
+                    "chirp_data": {
+                        "type": "object",
+                        "additionalProperties": {},
+                        "description": "Optional CHIRP overrides. 'websocket_url' replaces the agent's stored raw-PCM WebSocket endpoint for this run only — for example a tunnel URL that changes on every CI run. Not part of the portable test-suite spec."
                     }
                 }
             },
@@ -95709,6 +96039,119 @@
                         ]
                     }
                 }
+            },
+            "UnitUsageReportResponse": {
+                "type": "object",
+                "properties": {
+                    "organization_id": {
+                        "type": "integer"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "group_by": {
+                        "type": "string"
+                    },
+                    "timezone": {
+                        "type": "string",
+                        "description": "Timezone of the month boundaries (UTC)."
+                    },
+                    "untyped_scheme": {
+                        "type": "boolean",
+                        "description": "True when the organization's charges in this range weren't recorded per unit; per-unit credit rows are then null and only counts and totals apply."
+                    },
+                    "old_text_pricing": {
+                        "type": "boolean",
+                        "description": "True when text simulations are billed at a flat rate, so `#Responses` is null."
+                    },
+                    "periods": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Month keys (`YYYY-MM`) in order."
+                    },
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UnitUsageReportRow"
+                        }
+                    }
+                },
+                "required": [
+                    "end_date",
+                    "group_by",
+                    "old_text_pricing",
+                    "organization_id",
+                    "periods",
+                    "rows",
+                    "start_date",
+                    "timezone",
+                    "untyped_scheme"
+                ]
+            },
+            "UnitUsageReportRow": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "Stable row identifier, e.g. `voice_credits`."
+                    },
+                    "group": {
+                        "type": "string",
+                        "description": "Section, e.g. Simulations or Monitoring."
+                    },
+                    "unit": {
+                        "type": "string",
+                        "description": "Billable unit, e.g. Voice Simulations."
+                    },
+                    "field": {
+                        "type": "string",
+                        "description": "Measure, e.g. #Minutes or Credits."
+                    },
+                    "kind": {
+                        "enum": [
+                            "count",
+                            "number",
+                            "credits"
+                        ],
+                        "type": "string",
+                        "description": "* `count` - count\n* `number` - number\n* `credits` - credits",
+                        "x-spec-enum-id": "54fad001ba9172b8"
+                    },
+                    "values": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": [
+                                "number",
+                                "null"
+                            ],
+                            "format": "double"
+                        },
+                        "description": "Value per month key; null when not recoverable."
+                    },
+                    "total": {
+                        "type": [
+                            "number",
+                            "null"
+                        ],
+                        "format": "double"
+                    }
+                },
+                "required": [
+                    "field",
+                    "group",
+                    "key",
+                    "kind",
+                    "total",
+                    "unit",
+                    "values"
+                ]
             },
             "UsageChartResponse": {
                 "type": "object",

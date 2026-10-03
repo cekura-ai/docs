@@ -136,8 +136,21 @@ Sectioned example:
 **Both sections are optional.** Set only the ones you need:
 - If your agent has no registered [dynamic variables](/documentation/key-concepts/evaluators/dynamic-variables), omit `main_agent_variables` (or leave it `{}`) — there's nothing for it to deliver. Put persona/context for the simulated caller in `testing_agent_variables` only.
 - If you only need to send dynamic-variable values and don't need to brief the simulated caller separately, populate `main_agent_variables` and leave `testing_agent_variables` empty (or omit it).
-- Both empty / both missing is also valid — the profile then has no information payload but can still be attached to a scenario for naming purposes.
+- Both sections empty is also valid — the profile then has no information payload but can still be attached to a scenario for naming purposes.
 </Note>
+
+### Sectioned vs Legacy Flat Profiles
+
+Cekura looks at the shape of `information` to decide what the agent under test receives. The same rule applies to every provider (VAPI, Retell, ElevenLabs, Bland, Pipecat, LiveKit, SIP, WebSocket, chat, and outbound calls):
+
+| `information` shape | Agent under test receives | Simulated caller receives |
+|---|---|---|
+| **Sectioned**: contains a `main_agent_variables` or `testing_agent_variables` key | Only `main_agent_variables` | Only `testing_agent_variables` |
+| **Legacy flat**: a plain key/value object with neither section key | The whole object | The whole object |
+
+For a sectioned profile, `testing_agent_variables` are never used to fill gaps in `main_agent_variables`. If `main_agent_variables` is empty or missing a key your agent's prompt references (for example, a `{{first_name}}` placeholder on Retell or VAPI), that placeholder is left unfilled, even when the same key exists in `testing_agent_variables`. Put every value your agent needs to read at call start in `main_agent_variables`.
+
+Legacy flat profiles are still supported, but each value goes to both sides. Use the sectioned shape for new profiles so caller-only details, like the answers the simulated caller should give, don't reach your agent.
 
 ### Custom Headers for SIP and WebSocket Runs
 

@@ -143,9 +143,10 @@ Authenticate with `X-CEKURA-API-KEY`. The key's own scope resolves the project, 
 | `agent_id` | yes | The agent to test. |
 | `spec` | yes* | The spec, as a JSON object. |
 | `file` | yes* | A `.json` spec file, as `multipart/form-data`. Use instead of `spec`. |
-| `channel` | no | `voice` (default), `text`, `elevenlabs`, `livekit_v2`, or `pipecat_v2`. |
+| `channel` | no | `voice` (default), `text`, `elevenlabs`, `livekit_v2`, `pipecat_v2`, or `chirp`. |
 | `livekit_data` | no | LiveKit connection overrides for this run. Only valid when `channel` is `livekit_v2`. Accepted keys: `agent_name`, `config`, `url`. |
 | `pipecat_data` | no | Pipecat Cloud connection overrides for this run. Only valid when `channel` is `pipecat_v2`. Accepted keys: `pipecat_agent_name`, `config`, `room_properties`. |
+| `chirp_data` | no | CHIRP connection overrides for this run. Only valid when `channel` is `chirp`. Accepted key: `websocket_url`, which replaces the agent's saved WebSocket URL for this run only. |
 | `name` | no | Label for this run. Defaults to the spec's `suite.name`. |
 | `agent_number` | no | Your agent's phone number for this run, in E.164 format. Overrides the number configured on the agent. `voice` and `text` only. |
 | `outbound_phone_number` | no | For an inbound voice agent, the number Cekura dials, in E.164 format. Defaults to `agent_number`, then the agent's configured number. Rejected for outbound voice agents — set `phone_number` on the test case instead. For SMS and WhatsApp agents, the contact number for the conversation. `voice` and `text` only. |
@@ -353,7 +354,7 @@ Two request parameters decide where and how a spec runs — neither belongs in t
 | Parameter | Description |
 |---|---|
 | `agent_id` | **Required.** The agent to test. |
-| `channel` | `voice` for a phone call (the default), `text` for chat, `elevenlabs` for an ElevenLabs WebRTC session, `livekit_v2` for a LiveKit WebRTC session, or `pipecat_v2` for a Pipecat Cloud WebRTC session. |
+| `channel` | `voice` for a phone call (the default), `text` for chat, `elevenlabs` for an ElevenLabs WebRTC session, `livekit_v2` for a LiveKit WebRTC session, `pipecat_v2` for a Pipecat Cloud WebRTC session, or `chirp` for a raw-PCM [WebSocket (CHIRP)](/documentation/integrations/websocket-chirp) endpoint. |
 
 ```bash
 --data "{\"agent_id\": 42, \"channel\": \"text\", \"spec\": $(cat cekura.tests.json)}"
@@ -361,9 +362,19 @@ Two request parameters decide where and how a spec runs — neither belongs in t
 
 Because the target lives in the request, the same committed file runs against staging and production, or across several agents, without edits. Use metric **slugs** rather than numeric IDs to make that fully portable, since IDs are project-specific.
 
-Anything the channel needs beyond that comes from the agent's own configuration: a phone number for voice, a chat provider for text, ElevenLabs credentials and agent id for `elevenlabs`, LiveKit credentials for `livekit_v2`, or Pipecat Cloud credentials for `pipecat_v2`. If the agent isn't configured for the channel you pick, the run is rejected with a message naming what's missing.
+Anything the channel needs beyond that comes from the agent's own configuration: a phone number for voice, a chat provider for text, ElevenLabs credentials and agent id for `elevenlabs`, LiveKit credentials for `livekit_v2`, Pipecat Cloud credentials for `pipecat_v2`, or a WebSocket URL (and optional Basic Auth) for `chirp`. If the agent isn't configured for the channel you pick, the run is rejected with a message naming what's missing.
 
-For the WebRTC channels (`livekit_v2` and `pipecat_v2`), you can pass connection overrides in the request via `livekit_data` or `pipecat_data` respectively. These overrides apply only to the current run and are not part of the portable spec — keeping the committed file environment-agnostic while letting you target a specific agent deployment at request time.
+For `livekit_v2`, `pipecat_v2` and `chirp`, you can pass connection overrides in the request via `livekit_data`, `pipecat_data` or `chirp_data` respectively. These overrides apply only to the current run and are not part of the portable spec — keeping the committed file environment-agnostic while letting you target a specific agent deployment at request time.
+
+#### Running against a CHIRP WebSocket agent
+
+A `chirp` run needs no phone number, so it works for an agent that is reachable only over its WebSocket endpoint. If the endpoint changes between runs — for example a tunnel (Cloudflare Tunnel, ngrok) started fresh in each CI job — pass the current URL in `chirp_data.websocket_url` instead of updating the agent:
+
+```bash
+--data "{\"agent_id\": 42, \"channel\": \"chirp\", \"chirp_data\": {\"websocket_url\": \"$TUNNEL_URL\"}, \"spec\": $(cat cekura.tests.json)}"
+```
+
+Without `chirp_data`, the run uses the WebSocket URL saved on the agent. Basic Auth credentials always come from the agent. If the agent has Basic Auth set, the URL must be `wss://`. Both the dry run and the validate endpoint reject a missing URL, or Basic Auth over plain `ws://`, before any call is placed.
 
 ### Run overrides
 

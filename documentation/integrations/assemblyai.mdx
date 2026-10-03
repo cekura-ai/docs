@@ -94,11 +94,33 @@ In the result, agent turns are labeled **Main Agent** and caller turns are label
 If Cekura cannot find a matching call, the result keeps Cekura's own transcript of the call. See the troubleshooting section below.
 </Note>
 
+## Mock tools
+
+Your agent's HTTP tools can be replaced with Cekura mock endpoints for a test, so the agent gets predictable answers and never touches your real systems.
+
+<Steps>
+  <Step title="Fetch the agent's tools">
+    Open the agent's **Mock Tools** section and click **Fetch from AssemblyAI**. Cekura reads the tools defined on your AssemblyAI agent and creates a mock for each, with generated example inputs and outputs you can edit.
+  </Step>
+
+  <Step title="Run with mocks">
+    In **Configure Run**, select the mock tools to use. For the duration of the run, Cekura routes your phone number to a temporary copy of the agent whose tools point at the mocks; when the run finishes, the number is routed back to your agent and the copy is deleted.
+  </Step>
+</Steps>
+
+Your own agent is never modified: AssemblyAI does not return tool authentication headers, so instead of editing the agent in place Cekura works on a copy. Two consequences of that:
+
+- Tools that send authentication headers must **all** be mocked together. A run that mocks only some of them is refused, because the unmocked ones could not carry their headers on the copy.
+- Agents using a **connected LLM** (your own OpenAI-compatible endpoint) cannot be mocked, since that endpoint's key is not readable either.
+
+Learn more in [Mock Tools](/documentation/key-concepts/evaluators/mock-tools).
+
 ## Troubleshooting
 
 - **Authentication fails**: check that the API key has Voice Agent API access and that the selected **Region** matches where the agent was created. A key is valid in both regions, but an agent created in one region does not exist in the other.
 - **No AssemblyAI transcript on the result**: confirm the **AssemblyAI Agent ID** is the agent bound to the number under **Telephony Settings**. Cekura only considers calls answered by that agent.
 - **Call not matched**: Cekura matches on the phone number it dialed from and the call's start time. Make sure the run used the **Telephony** connection and that the number under **Telephony Settings** is the one bound to the agent on AssemblyAI.
+- **Mock tools refused**: the message names the tools involved. Either select every tool that uses authentication headers, or run without mocks. If the number "rings a different agent", the agent id in Cekura does not match the agent your AssemblyAI number is bound to.
 - **Number never connects**: AssemblyAI answers the call, not Cekura, so a number that does not reach the agent when dialed by hand will not work in a test either. Re-check the SIP trunk routing and the number's agent binding on AssemblyAI, in the same region as the agent.
 
 ## Configure through the API

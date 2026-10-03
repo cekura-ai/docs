@@ -154,10 +154,6 @@ Watch this video to see the Pipecat tracing integration in action:
 - A Cekura account with an API key
 - A Pipecat agent project
 
-<Note>
-Text-based (chat) testing against the same deployment is handled by the SDK automatically. See [Automatic Chat Mode Support](#automatic-chat-mode-support).
-</Note>
-
 ## Setup
 
 <Tabs>
@@ -240,6 +236,7 @@ async def run_bot(transport, runner_args):
 - Captures transcripts and tool calls
 - Captures session logs (INFO+)
 - Exports OpenTelemetry traces (conversation, turn, STT/LLM/TTS spans)
+- Automatically configures chat/text mode when running text-based tests
 - Sends data to Cekura's simulation webhook for test analysis
 - No audio recording — lightweight for testing
 
@@ -272,9 +269,7 @@ Configure at least one connection type for voice-based testing:
 - **Telephony**: Phone-based testing if your Pipecat agent is connected to a phone system (requires Contact Number)
 
 For text-based testing:
-- **Pipecat Chat**: Enable **Pipecat Chat** under Chat connections. It uses the same API key and agent name, no additional setup required.
-
-<img src="/images/pipecat/chat-agent-settings.png" alt="Pipecat Chat connection in Agent Settings" />
+- **Pipecat Chat**: Enable Pipecat Chat under Chat connections for chat-based testing (uses the same Pipecat credentials, no additional setup required)
 
 See the [Pipecat Automated Testing](/documentation/integrations/pipecat/automated) guide for details on all configuration fields including Agent Configuration JSON and Room Properties.
 
@@ -287,8 +282,6 @@ Run tests using your preferred connection type:
 - **WebRTC**: Select WebRTC under Voice connections in the Configure Run dialog for WebRTC-based testing
 - **Telephony**: Select Telephony under Voice connections for phone-based testing
 - **Pipecat Chat**: Select Pipecat Chat under Chat connections for text-based testing
-
-<img src="/images/pipecat/configure-run-chat.png" alt="Configure Run dialog with Pipecat Chat selected" />
 
 Test results will appear in the Runs section with enhanced data including transcripts, tool calls, logs, and OTel traces.
 
@@ -617,20 +610,15 @@ task = cekura.observe_and_create_task(
 
 ## Automatic Chat Mode Support
 
-The SDK automatically handles chat/text mode when you run scenarios with the **Pipecat Chat** connection, **no code changes required**. Cekura starts your Pipecat Cloud deployment the same way it does for a WebRTC voice run, joins the Daily room, and exchanges turns over RTVI text messages instead of audio.
+The SDK automatically handles chat/text mode when you run scenarios with the **Pipecat Chat** connection — **no code changes required**.
 
-When the session is a text run, the SDK:
+When you run a text-based test, the SDK switches the session to pure text, so the conversation is exchanged as typed turns with no audio processing. This provides:
 
-- captures the typed turns in the transcript alongside the assistant replies and tool calls
-- skips audio buffering and recording; the session reports `recording_unavailable_reason: "text_session"`
-- switches text-to-speech off for the whole session, so nothing is spoken or billed to your TTS provider
-- delivers tool calls with their names, arguments and results
+- **Targeted testing** of your agent's conversational logic without audio overhead
+- **Cost savings** by eliminating STT/TTS provider costs
+- **Faster simulations** compared to voice-based tests
 
-Voice sessions are unchanged. The same `track_and_create_task()` / `observe_and_create_task()` call serves both, as long as `runner_args` is passed to the tracer: that is where the SDK reads the text-run marker Cekura places in the session body. RTVI must be enabled on the pipeline task, which is Pipecat's default. Any Pipecat 1.x release (1.0 and later) is supported.
-
-<Note>
-Without the SDK, Pipecat Chat still works, but the bot's greeting and any reply that follows a tool call are spoken, since Pipecat applies the per-message text-only option only to the message that triggered it. Tool calls also appear without names or arguments. Integrate the SDK to get the complete text-mode behaviour above.
-</Note>
+Your `track_and_create_task()` / `observe_and_create_task()` integration works seamlessly for both voice and text modes. Pass `runner_args` to the tracer so it can detect the run mode.
 
 ## Best Practices
 
@@ -818,9 +806,9 @@ pipeline = Pipeline([
 ])
 ```
 
-### Chat runs are spoken or show no typed turns
+### Chat runs behave like voice runs
 
-The SDK detects a text run from `runner_args`. If `runner_args` is not passed to `track_and_create_task()`, `observe_and_create_task()`, `track_pipeline()` or `observe_pipeline()`, the session is treated as voice: TTS runs, and typed turns are missing from the SDK transcript. Pass it through from your bot entry point:
+The SDK needs `runner_args` to detect a text run. If it is not passed to the tracer, the session is treated as voice. Pass it through from your bot entry point:
 
 ```python
 async def bot(runner_args: RunnerArguments):

@@ -137,7 +137,7 @@ The backend enforces the following constraints on all Structured Tests evaluator
     // ❌ Invalid — conditions[0].when: is required.
     { "say": "Hi there" }
 
-    // ❌ Invalid — empty say
+    // ❌ Invalid — conditions[0] has an empty step
     { "when": "The agent greets you", "say": "" }
     ```
   </Accordion>
@@ -999,12 +999,13 @@ curl -X DELETE "https://api.cekura.ai/test_framework/v1/scenarios/39001/conditio
 
 </CodeGroup>
 
-The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry looks like:
+The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry — from the list, upload and replace responses — looks like:
 
 ```json
 {
   "audio_id": "greeting",
   "condition_ids": [2, 5],
+  "steps": ["conditions[0].then[0]", "conditions[2]"],
   "tag": "<audio id=\"greeting\"/>",
   "status": "ready",
   "transcript": "Hello, thanks for calling.",
@@ -1014,7 +1015,9 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
 }
 ```
 
-The scenario's GET response also includes a read-only `condition_audio` summary with every clip's tag and where it is used, so an author editing `instructions` directly can discover which clip ids exist. Its `steps` field lists each place by path:
+`steps` lists every place the clip is used, as paths into the evaluator (`first_message`, `conditions[1]`, `conditions[0].then[0]`), alongside the numeric `condition_ids`.
+
+The scenario's GET response also includes a read-only `condition_audio` summary with every clip's tag and where it is used, so an author editing `instructions` directly can discover which clip ids exist:
 
 ```json
 "condition_audio": {
@@ -1471,7 +1474,7 @@ Use `then` to deliver an exact sequence of messages across turns, with no condit
   <Accordion title="Attach audio option is missing on a step" icon="microphone-slash">
     **Issue**: A step has no way to attach a recording.
 
-    **Solution**: Audio attaches only to **verbatim** steps. Remove the `<ai_generated>` wrapper from the step first.
+    **Solution**: Audio attaches only to **verbatim** steps — uploading to an `<ai_generated>` step returns `Audio can only be attached to a verbatim step, not one wrapped in <ai_generated>`. Remove the `<ai_generated>` wrapper from the step first.
   </Accordion>
 </AccordionGroup>
 

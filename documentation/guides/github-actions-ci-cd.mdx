@@ -55,7 +55,7 @@ You can run tests in two ways:
     Run specific scenarios by their IDs. Use this when you want to test exact scenarios.
 
     ```yaml
-    - uses: cekura-ai/cekura-github-actions@v1.2.1
+    - uses: cekura-ai/cekura-github-actions@v1.2.3
       with:
         agent_id: ${{ vars.AGENT_ID }}
         scenario_ids: ${{ vars.SCENARIO_IDS }}
@@ -67,7 +67,7 @@ You can run tests in two ways:
     Run all scenarios with specific tags. Use this when you want to test groups of scenarios (e.g., `smoke-test`, `critical`).
 
     ```yaml
-    - uses: cekura-ai/cekura-github-actions@v1.2.1
+    - uses: cekura-ai/cekura-github-actions@v1.2.3
       with:
         agent_id: ${{ vars.AGENT_ID }}
         tags: ${{ vars.TAGS }}
@@ -112,7 +112,7 @@ You can run tests in two ways:
         runs-on: ubuntu-latest
         steps:
           - name: Cekura Run Tests
-            uses: cekura-ai/cekura-github-actions@v1.2.1
+            uses: cekura-ai/cekura-github-actions@v1.2.3
             with:
               agent_id: ${{ inputs.agent_id || vars.AGENT_ID }}
               scenario_ids: ${{ inputs.scenario_ids || vars.SCENARIO_IDS }}
@@ -204,7 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Test Staging
-        uses: cekura-ai/cekura-github-actions@v1.2.1
+        uses: cekura-ai/cekura-github-actions@v1.2.3
         with:
           agent_id: ${{ vars.STAGING_AGENT_ID }}
           tags: ${{ vars.STAGING_TAGS }}
@@ -216,7 +216,7 @@ jobs:
     needs: staging-tests
     steps:
       - name: Test Production
-        uses: cekura-ai/cekura-github-actions@v1.2.1
+        uses: cekura-ai/cekura-github-actions@v1.2.3
         with:
           agent_id: ${{ vars.PROD_AGENT_ID }}
           tags: ${{ vars.PROD_TAGS }}
@@ -233,7 +233,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run Cekura Tests
-        uses: cekura-ai/cekura-github-actions@v1.2.1
+        uses: cekura-ai/cekura-github-actions@v1.2.3
         with:
           agent_id: ${{ vars.AGENT_ID }}
           scenario_ids: ${{ vars.SCENARIO_IDS }}
@@ -254,7 +254,7 @@ jobs:
 
 ```yaml
 - name: Run text tests
-  uses: cekura-ai/cekura-github-actions@v1.2.1
+  uses: cekura-ai/cekura-github-actions@v1.2.3
   with:
     agent_id: ${{ vars.AGENT_ID }}
     tags: ${{ vars.TAGS }}
@@ -262,7 +262,7 @@ jobs:
     api_key: ${{ secrets.CEKURA_API_KEY }}
 
 - name: Run LiveKit tests
-  uses: cekura-ai/cekura-github-actions@v1.2.1
+  uses: cekura-ai/cekura-github-actions@v1.2.3
   with:
     agent_id: ${{ vars.AGENT_ID }}
     scenario_ids: ${{ vars.SCENARIO_IDS }}
@@ -290,6 +290,7 @@ jobs:
 | `name` | Name for the result in the dashboard | No | - |
 | `api_url` | Cekura API URL | No | `https://api.cekura.ai` |
 | `frequency` | Run each scenario N times | No | `1` |
+| `concurrency_limit` | Maximum calls Cekura runs at once for this result. Defaults to your organization's limit; a value above what your plan allows is lowered to that limit | No | - |
 | `timeout` | Seconds to wait for the result before failing | No | `3600` |
 
 *Provide `scenario_ids` or `tags` (or both) for `voice` and `text`; `livekit_v2` and `pipecat_v2` require `scenario_ids`.
@@ -304,7 +305,7 @@ jobs:
 ```yaml
 - name: Run Cekura Tests
   id: cekura
-  uses: cekura-ai/cekura-github-actions@v1.2.1
+  uses: cekura-ai/cekura-github-actions@v1.2.3
   with:
     agent_id: ${{ vars.AGENT_ID }}
     tags: smoke-test
@@ -322,7 +323,17 @@ The action polls the result every 30 seconds until it is `completed`, `failed`, 
 - **passes** when the result is `completed` and every run passed;
 - **fails** otherwise — a run that failed its checks, errored, never connected or timed out counts as not passed, and so does a result that ends `failed`, `timeout` or `cancelled`.
 
-If the result is still running after `timeout` seconds, the step fails. [Result statuses and gating](/documentation/guides/testing-agents/result-statuses) explains each status and count.
+The job summary shows the result's counts and one row per run, with the scenario, the outcome and, for a run that did not pass, why (the failed metrics or the error).
+
+If the result is still running after `timeout` seconds, the action ends its active calls, writes the result ID and a shareable link to the job summary, and fails the step. [Result statuses and gating](/documentation/guides/testing-agents/result-statuses) explains each status and count.
+
+### Cancelling and job timeouts
+
+If the workflow is cancelled, or the job hits its `timeout-minutes`, the action:
+
+- asks Cekura to end the result's active calls, so no runs are left going in the background;
+- still writes the result ID to the job summary and sets the `result_id` output, so you can open the result in Cekura;
+- adds a shareable link (and the `result_url` output) if Cekura answers within GitHub's few-second cancellation window.
 
 ### Example with All Options
 
@@ -332,7 +343,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run Cekura Tests
-        uses: cekura-ai/cekura-github-actions@v1.2.1
+        uses: cekura-ai/cekura-github-actions@v1.2.3
         with:
           agent_id: ${{ vars.AGENT_ID }}
           scenario_ids: ${{ vars.SCENARIO_IDS }}
@@ -343,6 +354,41 @@ jobs:
           timeout: '7200'     # 2 hour timeout
           api_key: ${{ secrets.CEKURA_API_KEY }}
 ```
+
+## Running Many Groups Under One Concurrency Limit
+
+To run several agents' scenarios from one step, use the `run-batch` action. A group can also have several legs that must run at the same time, each as its own result, such as the caller and the transfer target of a warm transfer, or the parties of a 3-way call. You set a single `concurrency`, and the action starts groups only while their calls fit under it, so you don't need a matrix or a job per batch.
+
+```yaml
+- uses: cekura-ai/cekura-github-actions/run-batch@v1.2.3
+  with:
+    api_key: ${{ secrets.CEKURA_API_KEY }}
+    concurrency: 10
+    batch: |
+      - name: inbound-smoke
+        agent_id: 123
+        scenario_ids: 1001,1002,1003
+      - name: warm-transfer
+        legs:
+          - name: caller
+            agent_id: 456
+            scenario_ids: 2001,2001
+          - name: transfer-target
+            agent_id: 123
+            scenario_ids: 3001,3002
+```
+
+- **Single-agent group** (`agent_id` + `scenario_ids`): runs as one result. It reserves `scenarios × frequency` calls, or the whole `concurrency` if that is smaller, and Cekura runs no more than that many at once.
+- **Group with `legs`** (two or more): the legs are matched by position, so scenario *i* of every leg forms set *i*, and every leg needs the same number of scenarios. Repeat an ID to reuse a scenario. Each set starts one result per leg together, in separate contexts, and counts as one call per leg. `frequency` repeats the whole set rather than the runs inside each result. A leg's optional `name` labels it in the summary; keys set on the group, such as `agent_id`, are defaults for every leg.
+- **Scheduling:** groups start in the order listed, each one only when its calls fit in what is left of `concurrency`. A group's calls are freed when its result finishes. Set `dry_run: true` to validate the batch and print the plan without placing calls.
+- **Job summary:** one row per result, with links, plus every run that did not pass and why. The step passes only when every run in every result passed. The `passed`, `total_runs`, `passed_runs` and `result_ids` outputs carry the same totals.
+- **Cancelling or timing out:** ends every active result's calls and skips the groups that have not started.
+
+<Note>
+  Keep `concurrency` at or below your organization's Cekura concurrency limit, minus any other runs (schedules, other workflows) that share it. Above that limit Cekura queues the extra results, so calls wait in the queue and the legs of a set may not start at the same time.
+</Note>
+
+`batch` accepts JSON or YAML (YAML needs PyYAML on the runner), or use `batch_file`. The [run-batch README](https://github.com/cekura-ai/cekura-github-actions/blob/main/run-batch/README.md) lists every key and input.
 
 ## Troubleshooting
 

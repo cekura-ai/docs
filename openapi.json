@@ -4606,7 +4606,7 @@
         "/observability/v1/alerts/{id}/summarize/": {
             "post": {
                 "operationId": "alerts-summarize-create",
-                "description": "Kick off an LLM summary of the last N hours of fires for this alert.\n\nReturns a progress_id. Frontend polls `summarize_progress` until status\nis 'completed' or 'error'. Cached for 1 hour keyed on (alert, hours,\nlatest fire id) — re-invocations within that window return the same\nprogress_id.",
+                "description": "Kick off an LLM summary of the last N hours of fires for this alert.\n\nReturns a progress_id. Frontend polls `summarize_progress` until status\nis 'completed' or 'error'. Cached for 1 hour keyed on (alert, hours,\nlatest fire id) — re-invocations within that window return the same\nprogress_id.\n\nDeprecated: `POST /observability/v3/alerts/{id}/summarize/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "path",
@@ -4666,7 +4666,8 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "deprecated": true
             }
         },
         "/observability/v1/alerts/review/": {
@@ -4728,7 +4729,7 @@
         "/observability/v1/alerts/summarize_progress/": {
             "get": {
                 "operationId": "alerts-summarize-progress-retrieve",
-                "description": "Manage alerts that fire when metric thresholds are crossed.",
+                "description": "Manage alerts that fire when metric thresholds are crossed.\n\nDeprecated: `POST /observability/v3/alerts/{id}/summarize/` does this in one call and returns the result.",
                 "tags": [
                     "observability"
                 ],
@@ -4757,7 +4758,8 @@
                         },
                         "description": ""
                     }
-                }
+                },
+                "deprecated": true
             }
         },
         "/observability/v1/alerts/trigger_summary/": {
@@ -7257,7 +7259,7 @@
         "/observability/v1/call-logs/create_scenarios/": {
             "post": {
                 "operationId": "call-logs-create-scenarios_2",
-                "description": "Generate test scenarios from real production call logs.\n\nReturns a `progress_id` immediately — the actual scenario creation runs in the background.\nPoll `GET /observability/v1/call-logs/create_scenarios_progress?progress_id=<id>` until\n`completed_scenarios + failed_scenarios >= total_scenarios`. The `scenarios_list` field\n(full Scenario objects) is populated only once processing is complete.\n\n**`call_logs` accepts:** a list of IDs `[1, 2, 3]` or `\"all\"` for every call log on the agent.\n\n**`copy_to_agent`:** optionally copy the generated scenarios to a different agent —\nuseful when your observation agent and your test agent are separate.\n\n**Prerequisite:** call logs must have a transcript (uploaded via `transcript_json`).\nAudio-only logs without a transcript cannot produce scenarios.",
+                "description": "Generate test scenarios from real production call logs.\n\nReturns a `progress_id` immediately — the actual scenario creation runs in the background.\nPoll `GET /observability/v1/call-logs/create_scenarios_progress?progress_id=<id>` until\n`completed_scenarios + failed_scenarios >= total_scenarios`. The `scenarios_list` field\n(full Scenario objects) is populated only once processing is complete.\n\n**`call_logs` accepts:** a list of IDs `[1, 2, 3]` or `\"all\"` for every call log on the agent.\n\n**`copy_to_agent`:** optionally copy the generated scenarios to a different agent —\nuseful when your observation agent and your test agent are separate.\n\n**Prerequisite:** call logs must have a transcript (uploaded via `transcript_json`).\nAudio-only logs without a transcript cannot produce scenarios.\n\nDeprecated: `POST /observability/v3/call-logs/create_scenarios/` does this in one call and returns the result.",
                 "tags": [
                     "observability"
                 ],
@@ -7379,13 +7381,14 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "call_logs_create_scenarios"
+                "x-mcp-tool-name": "call_logs_create_scenarios",
+                "deprecated": true
             }
         },
         "/observability/v1/call-logs/create_scenarios_progress/": {
             "get": {
                 "operationId": "call-logs-create-scenarios-progress_2",
-                "description": "Call logs create scenarios progress",
+                "description": "Call logs create scenarios progress\n\nDeprecated: `POST /observability/v3/call-logs/create_scenarios/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "query",
@@ -7628,7 +7631,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "call_logs_create_scenarios_progress"
+                "x-mcp-tool-name": "call_logs_create_scenarios_progress",
+                "deprecated": true
             }
         },
         "/observability/v1/call-logs/delete_call_logs/": {
@@ -12375,6 +12379,269 @@
                         "enabled": true,
                         "name": "call-logs-rerun-evaluation-create",
                         "description": "Trigger metric re-evaluation on one or more existing call logs. Provide either `agent_id` or `assistant_id` (not both) to identify the agent, then specify which call logs to re-evaluate.\n\n**`call_logs` accepts:**\n- A list of call log IDs: `[1, 2, 3]`\n- The string `\"all\"` to re-evaluate every call log for the agent\n\n**Side effect:** for non-reviewed call logs, `success` is reset to `null` before re-evaluation begins. Reviewed call logs retain their human-approved outcome.\n\n**Rate limited.** If the limit is exceeded you will receive a 429 response — wait for the `Retry-After` duration before retrying."
+                    }
+                }
+            }
+        },
+        "/observability/v3/alerts/{id}/summarize/": {
+            "post": {
+                "operationId": "alerts-v3-summarize",
+                "description": "Summarize what the alert's fires over the last `hours` have in common and return the summary. Returns 400 when the alert did not fire in that window. Usually takes under 30 seconds.",
+                "summary": "Summarize alert",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SummarizeAlertV3Request"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SummarizeAlertV3Request"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SummarizeAlertV3Request"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "alert_id": {
+                                            "type": "integer"
+                                        },
+                                        "project_id": {
+                                            "type": "integer"
+                                        },
+                                        "output": {
+                                            "type": "object",
+                                            "properties": {
+                                                "headline": {
+                                                    "type": "string"
+                                                },
+                                                "summary": {
+                                                    "type": "string"
+                                                },
+                                                "common_themes": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/observability/v3/call-logs/create_scenarios/": {
+            "post": {
+                "operationId": "call-logs-v3-create-scenarios",
+                "description": "Turn up to 50 call logs (a list of ids, or a number of call logs) into evaluators and return them once every call log is processed. Call logs need a transcript. Usually takes 1–3 minutes.",
+                "summary": "Create evaluators from call logs",
+                "tags": [
+                    "observability"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostCreateScenarios"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "project_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "agent_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "total_scenarios": {
+                                            "type": "integer"
+                                        },
+                                        "completed_scenarios": {
+                                            "type": "integer"
+                                        },
+                                        "failed_scenarios": {
+                                            "type": "integer"
+                                        },
+                                        "scenarios_list": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "description": "Full evaluator object, as the evaluators API returns it."
+                                            },
+                                            "description": "The created evaluators."
+                                        },
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "call_log_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "error": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "description": "Call logs that could not become an evaluator, with the reason."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
                     }
                 }
             }
@@ -25110,7 +25377,7 @@
         "/test_framework/v1/metrics/{id}/run_reviews/": {
             "post": {
                 "operationId": "metrics-run-reviews-create_2",
-                "description": "Run metric reviews to identify improvement opportunities",
+                "description": "Run metric reviews to identify improvement opportunities\n\nDeprecated: `POST /test_framework/v3/metrics/{id}/run_reviews/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "path",
@@ -25163,7 +25430,8 @@
                         "description": "Returns progress_id for tracking progress"
                     }
                 },
-                "x-mcp-tool-name": "metrics_run_reviews_create"
+                "x-mcp-tool-name": "metrics_run_reviews_create",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/{id}/variables/": {
@@ -25779,7 +26047,7 @@
         "/test_framework/v1/metrics/generate_clean_description_bg/": {
             "post": {
                 "operationId": "metrics-generate-clean-description-bg-create_2",
-                "description": "Start async clean description generation",
+                "description": "Start async clean description generation\n\nDeprecated: `POST /test_framework/v3/metrics/generate_clean_description/` does this in one call and returns the result.",
                 "summary": "Start async clean description generation",
                 "tags": [
                     "test_framework"
@@ -25830,13 +26098,14 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "metrics_generate_clean_description_bg_create"
+                "x-mcp-tool-name": "metrics_generate_clean_description_bg_create",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/generate_clean_description_progress/": {
             "get": {
                 "operationId": "metrics-generate-clean-description-progress-retrieve_2",
-                "description": "Poll async clean description generation",
+                "description": "Poll async clean description generation\n\nDeprecated: `POST /test_framework/v3/metrics/generate_clean_description/` does this in one call and returns the result.",
                 "summary": "Poll async clean description generation",
                 "parameters": [
                     {
@@ -25878,7 +26147,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "metrics_generate_clean_description_progress_retrieve"
+                "x-mcp-tool-name": "metrics_generate_clean_description_progress_retrieve",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/generate_evaluation_trigger/": {
@@ -25940,7 +26210,7 @@
         "/test_framework/v1/metrics/generate_metrics/": {
             "post": {
                 "operationId": "metrics-generate_2",
-                "description": "Generates suggested metrics for an AI agent. Returns a `progress_id` to poll via `generate_metrics_progress`. Results appear in the progress response but are not saved automatically — pass them to the metrics bulk create endpoint to persist. The agent must have a description of at least 100 characters.",
+                "description": "Generates suggested metrics for an AI agent. Returns a `progress_id` to poll via `generate_metrics_progress`. Results appear in the progress response but are not saved automatically — pass them to the metrics bulk create endpoint to persist. The agent must have a description of at least 100 characters.\n\nDeprecated: `POST /test_framework/v3/metrics/generate_metrics/` does this in one call and returns the result.",
                 "tags": [
                     "test_framework"
                 ],
@@ -26007,13 +26277,14 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "metrics_generate"
+                "x-mcp-tool-name": "metrics_generate",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/generate_metrics_progress/": {
             "get": {
                 "operationId": "metrics-generate-metrics-progress-retrieve_2",
-                "description": "Metrics generate metrics progress",
+                "description": "Metrics generate metrics progress\n\nDeprecated: `POST /test_framework/v3/metrics/generate_metrics/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "query",
@@ -26047,13 +26318,14 @@
                         "description": "Returns generation state with status and generated metrics"
                     }
                 },
-                "x-mcp-tool-name": "metrics_generate_metrics_progress_retrieve"
+                "x-mcp-tool-name": "metrics_generate_metrics_progress_retrieve",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/preview/": {
             "post": {
                 "operationId": "metrics-preview-create_2",
-                "description": "Preview metric evaluation against sample transcripts",
+                "description": "Preview metric evaluation against sample transcripts\n\nDeprecated: `POST /test_framework/v3/metrics/preview/` does this in one call and returns the result.",
                 "tags": [
                     "test_framework"
                 ],
@@ -26096,13 +26368,14 @@
                         "description": "Returns progress_id for tracking progress"
                     }
                 },
-                "x-mcp-tool-name": "metrics_preview_create"
+                "x-mcp-tool-name": "metrics_preview_create",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/preview-progress/": {
             "get": {
                 "operationId": "metrics-preview-progress_2",
-                "description": "Metrics preview progress",
+                "description": "Metrics preview progress\n\nDeprecated: `POST /test_framework/v3/metrics/preview/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "query",
@@ -26136,7 +26409,8 @@
                         "description": "Returns preview state with status and results"
                     }
                 },
-                "x-mcp-tool-name": "metrics_preview_progress"
+                "x-mcp-tool-name": "metrics_preview_progress",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/reorder/": {
@@ -26197,7 +26471,7 @@
         "/test_framework/v1/metrics/run_reviews_progress/": {
             "get": {
                 "operationId": "metrics-run-reviews-progress_2",
-                "description": "Metrics run reviews progress",
+                "description": "Metrics run reviews progress\n\nDeprecated: `POST /test_framework/v3/metrics/{id}/run_reviews/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "query",
@@ -26247,7 +26521,8 @@
                         "description": "Returns progress state with completed/failed counts and metric data when finished"
                     }
                 },
-                "x-mcp-tool-name": "metrics_run_reviews_progress"
+                "x-mcp-tool-name": "metrics_run_reviews_progress",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/save_result/": {
@@ -26299,7 +26574,7 @@
         "/test_framework/v1/metrics/simplify_prompt/": {
             "post": {
                 "operationId": "metrics-simplify-prompt-create_2",
-                "description": "Metrics simplify prompt",
+                "description": "Metrics simplify prompt\n\nDeprecated: `POST /test_framework/v3/metrics/simplify_prompt/` does this in one call and returns the result.",
                 "tags": [
                     "test_framework"
                 ],
@@ -26349,13 +26624,14 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "metrics_simplify_prompt_create"
+                "x-mcp-tool-name": "metrics_simplify_prompt_create",
+                "deprecated": true
             }
         },
         "/test_framework/v1/metrics/simplify_prompt_progress/": {
             "get": {
                 "operationId": "metrics-simplify-prompt-progress-retrieve_2",
-                "description": "Metrics simplify prompt progress",
+                "description": "Metrics simplify prompt progress\n\nDeprecated: `POST /test_framework/v3/metrics/simplify_prompt/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "query",
@@ -26396,7 +26672,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "metrics_simplify_prompt_progress_retrieve"
+                "x-mcp-tool-name": "metrics_simplify_prompt_progress_retrieve",
+                "deprecated": true
             }
         },
         "/test_framework/v1/personalities/": {
@@ -30026,8 +30303,8 @@
         "/test_framework/v1/results-external/{id}/ask_about_failures/": {
             "post": {
                 "operationId": "results-ask-about-failures-create",
-                "description": "Query failed runs chatbot",
-                "summary": "Query failed runs chatbot",
+                "description": "Queue failed-run analysis",
+                "summary": "Queue failed-run analysis",
                 "parameters": [
                     {
                         "in": "path",
@@ -30080,15 +30357,15 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/FailureAnalysisQueuedResponse"
                                 }
                             }
                         },
-                        "description": "Streaming AI-generated analysis of test failures"
+                        "description": "Failure analysis queued; poll the progress endpoint with progress_id."
                     },
                     "400": {
                         "description": "Invalid request (missing or invalid question)"
@@ -30768,6 +31045,64 @@
                 }
             }
         },
+        "/test_framework/v1/results-external/failure-analysis-progress/": {
+            "get": {
+                "operationId": "results-failure-analysis-progress",
+                "description": "Get failed-run analysis progress",
+                "summary": "Get failed-run analysis progress",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Progress ID returned when the failure analysis was queued.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Results"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "shareable_link": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FailureAnalysisProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid progress ID"
+                    },
+                    "404": {
+                        "description": "Failure analysis was not found"
+                    }
+                },
+                "x-mcp-tool-name": "results_failure_analysis_progress"
+            }
+        },
         "/test_framework/v1/results-external/reports/": {
             "get": {
                 "operationId": "results-reports-retrieve",
@@ -30857,8 +31192,8 @@
         "/test_framework/v1/results-external/reports/ask-about-failures/": {
             "post": {
                 "operationId": "results-reports-ask-about-failures-create",
-                "description": "Query failed runs chatbot for combined reports",
-                "summary": "Query failed runs chatbot for combined reports",
+                "description": "Queue combined failed-run analysis",
+                "summary": "Queue combined failed-run analysis",
                 "tags": [
                     "Results"
                 ],
@@ -30900,15 +31235,15 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/CombinedFailureAnalysisQueuedResponse"
                                 }
                             }
                         },
-                        "description": "Streaming AI-generated analysis of test failures across combined results"
+                        "description": "Failure analysis queued; poll the progress endpoint with progress_id."
                     },
                     "400": {
                         "description": "Invalid request (missing result_ids or question)"
@@ -31434,8 +31769,8 @@
         "/test_framework/v1/results/{id}/ask_about_failures/": {
             "post": {
                 "operationId": "results-ask-about-failures-create_2",
-                "description": "Query failed runs chatbot",
-                "summary": "Query failed runs chatbot",
+                "description": "Queue failed-run analysis",
+                "summary": "Queue failed-run analysis",
                 "parameters": [
                     {
                         "in": "path",
@@ -31488,15 +31823,15 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/FailureAnalysisQueuedResponse"
                                 }
                             }
                         },
-                        "description": "Streaming AI-generated analysis of test failures"
+                        "description": "Failure analysis queued; poll the progress endpoint with progress_id."
                     },
                     "400": {
                         "description": "Invalid request (missing or invalid question)"
@@ -32176,6 +32511,64 @@
                 }
             }
         },
+        "/test_framework/v1/results/failure-analysis-progress/": {
+            "get": {
+                "operationId": "results-failure-analysis-progress_2",
+                "description": "Get failed-run analysis progress",
+                "summary": "Get failed-run analysis progress",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Progress ID returned when the failure analysis was queued.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Results"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "shareable_link": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FailureAnalysisProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid progress ID"
+                    },
+                    "404": {
+                        "description": "Failure analysis was not found"
+                    }
+                },
+                "x-mcp-tool-name": "results_failure_analysis_progress"
+            }
+        },
         "/test_framework/v1/results/reports/": {
             "get": {
                 "operationId": "results-reports-retrieve_2",
@@ -32265,8 +32658,8 @@
         "/test_framework/v1/results/reports/ask-about-failures/": {
             "post": {
                 "operationId": "results-reports-ask-about-failures-create_2",
-                "description": "Query failed runs chatbot for combined reports",
-                "summary": "Query failed runs chatbot for combined reports",
+                "description": "Queue combined failed-run analysis",
+                "summary": "Queue combined failed-run analysis",
                 "tags": [
                     "Results"
                 ],
@@ -32308,15 +32701,15 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/CombinedFailureAnalysisQueuedResponse"
                                 }
                             }
                         },
-                        "description": "Streaming AI-generated analysis of test failures across combined results"
+                        "description": "Failure analysis queued; poll the progress endpoint with progress_id."
                     },
                     "400": {
                         "description": "Invalid request (missing result_ids or question)"
@@ -44152,7 +44545,7 @@
         "/test_framework/v1/scenarios/create-from-transcript-bg/": {
             "post": {
                 "operationId": "scenarios-create-from-transcript-bg_2",
-                "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, Returns a `progress_id`immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until",
+                "description": "Create a new evaluator from a call transcript. Analyzes the transcript to extract caller behavior, expected outcomes, and conversation flow.\n\n**`transcript_json` format:** array of message objects. Each object requires:\n- `role` — must be one of: `\"Main Agent\"`, `\"Testing Agent\"`, `\"Function Call\"`, `\"Function Call Result\"`\n- `content` — the message text\n- `start_time` (optional) — seconds from call start as a float\n\nNote: this endpoint accepts only the above role names. The role names used in the observability transcript ingestion API (\"agent\", \"user\", etc.) are not valid here.\n\nExample `transcript_json`:\n```json\n[\n  {\"role\": \"Main Agent\", \"content\": \"Hello, how can I help?\", \"start_time\": 0.0},\n  {\"role\": \"Testing Agent\", \"content\": \"I need to reschedule.\", \"start_time\": 2.1},\n  {\"role\": \"Main Agent\", \"content\": \"Sure, what date works?\", \"start_time\": 3.5}\n]\n```\n\n**Agent lookup:** the `agent` field looks up agents scoped to the project associated with your API key. If the agent belongs to a different project, use `assistant_id` instead, Returns a `progress_id`immediately; poll GET /scenarios/create-from-transcript-progress/?progress_id={id} until\n\nDeprecated: `POST /test_framework/v3/scenarios/create-from-transcript/` does this in one call and returns the result.",
                 "tags": [
                     "test_framework"
                 ],
@@ -44222,13 +44615,14 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_create_from_transcript_bg"
+                "x-mcp-tool-name": "scenarios_create_from_transcript_bg",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/create-from-transcript-progress/": {
             "get": {
                 "operationId": "scenarios-create-from-transcript-progress_2",
-                "description": "Scenarios create from transcript progress",
+                "description": "Scenarios create from transcript progress\n\nDeprecated: `POST /test_framework/v3/scenarios/create-from-transcript/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "query",
@@ -44309,7 +44703,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_create_from_transcript_progress"
+                "x-mcp-tool-name": "scenarios_create_from_transcript_progress",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/create_folder/": {
@@ -44785,7 +45180,7 @@
         "/test_framework/v1/scenarios/generate-bg/": {
             "post": {
                 "operationId": "scenarios-generate-bg_2",
-                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- When the agent has mock tools attached, each generated scenario also gets `generated_mock_tool_entries` — the expected mock tool calls for that scenario, shaped `[{tool_id, tool_name, new_entry: {input, output}}]`. These are returned on scenario reads and can be edited later via `scenarios_partial_update`.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.",
+                "description": "Generate scenarios for a given agent in the background. Returns a `progress_id` immediately; poll GET /scenarios/generate-progress/?progress_id={id} until `total_scenarios == completed_scenarios`.\n\n**What happens automatically on generation:**\n- A scenario-specific test profile is created and its `information` is populated using the sectioned shape: `main_agent_variables` (dynamic-variable values that reach the agent under test at call time — e.g. `user_id`, `account_id`) and `testing_agent_variables` (persona/context used by the simulated caller — e.g. `customer_name`, `date_of_birth`). Section values are kept consistent with any generated mock-tool data.\n- When the agent has mock tools attached, each generated scenario also gets `generated_mock_tool_entries` — the expected mock tool calls for that scenario, shaped `[{tool_id, tool_name, new_entry: {input, output}}]`. These are returned on scenario reads and can be edited later via `scenarios_partial_update`.\n- 10 project-level evaluation metrics are attached to every generated scenario automatically (e.g. Latency, Pitch, Interruption Score). Scenarios created manually via `scenarios_create` start with no metrics attached.\n\n**Response fields:** `progress_id` (UUID string) for polling; `session_id` is always null.\n\nDeprecated: `POST /test_framework/v3/scenarios/generate/` does this in one call and returns the result.",
                 "tags": [
                     "test_framework"
                 ],
@@ -44855,7 +45250,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_generate_bg"
+                "x-mcp-tool-name": "scenarios_generate_bg",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/generate-clarify-answer/": {
@@ -44919,7 +45315,7 @@
         "/test_framework/v1/scenarios/generate-instructions/": {
             "post": {
                 "operationId": "scenarios-generate-instructions-create_2",
-                "description": "Scenarios generate instructions",
+                "description": "Scenarios generate instructions\n\nDeprecated: `POST /test_framework/v3/scenarios/generate-instructions/` does this in one call and returns the result.",
                 "tags": [
                     "test_framework"
                 ],
@@ -44966,13 +45362,14 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_generate_instructions_create"
+                "x-mcp-tool-name": "scenarios_generate_instructions_create",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/generate-progress/": {
             "get": {
                 "operationId": "scenarios-generate-progress_2",
-                "description": "Scenarios generate progress",
+                "description": "Scenarios generate progress\n\nDeprecated: `POST /test_framework/v3/scenarios/generate/` does this in one call and returns the result.",
                 "parameters": [
                     {
                         "in": "query",
@@ -45195,7 +45592,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_generate_progress"
+                "x-mcp-tool-name": "scenarios_generate_progress",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/has_infrastructure_suite/": {
@@ -45233,7 +45631,7 @@
         "/test_framework/v1/scenarios/improve_instructions/": {
             "post": {
                 "operationId": "scenarios-improve-instructions-create_2",
-                "description": "Scenarios improve instructions",
+                "description": "Scenarios improve instructions\n\nDeprecated: `POST /test_framework/v3/scenarios/improve_instructions/` does this in one call and returns the result.",
                 "tags": [
                     "test_framework"
                 ],
@@ -45298,7 +45696,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_improve_instructions_create"
+                "x-mcp-tool-name": "scenarios_improve_instructions_create",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/infrastructure_suite_preview/": {
@@ -45336,7 +45735,7 @@
         "/test_framework/v1/scenarios/instructions-progress/": {
             "get": {
                 "operationId": "scenarios-instructions-progress-retrieve_2",
-                "description": "Scenarios instructions progress",
+                "description": "Scenarios instructions progress\n\nDeprecated: `POST /test_framework/v3/scenarios/improve_instructions/` does this in one call and returns the result.",
                 "tags": [
                     "test_framework"
                 ],
@@ -45363,7 +45762,8 @@
                         "description": ""
                     }
                 },
-                "x-mcp-tool-name": "scenarios_instructions_progress_retrieve"
+                "x-mcp-tool-name": "scenarios_instructions_progress_retrieve",
+                "deprecated": true
             }
         },
         "/test_framework/v1/scenarios/json_schema/": {
@@ -56459,8 +56859,8 @@
         "/test_framework/v2/results/{id}/ask_about_failures/": {
             "post": {
                 "operationId": "results-ask-about-failures-create_3",
-                "description": "Query failed runs chatbot",
-                "summary": "Query failed runs chatbot",
+                "description": "Queue failed-run analysis",
+                "summary": "Queue failed-run analysis",
                 "parameters": [
                     {
                         "in": "path",
@@ -56513,15 +56913,15 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/FailureAnalysisQueuedResponse"
                                 }
                             }
                         },
-                        "description": "Streaming AI-generated analysis of test failures"
+                        "description": "Failure analysis queued; poll the progress endpoint with progress_id."
                     },
                     "400": {
                         "description": "Invalid request (missing or invalid question)"
@@ -56539,7 +56939,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "results-ask-about-failures-create",
-                        "description": "Query failed runs chatbot"
+                        "description": "Queue failed-run analysis"
                     }
                 }
             }
@@ -57250,6 +57650,72 @@
                 }
             }
         },
+        "/test_framework/v2/results/failure-analysis-progress/": {
+            "get": {
+                "operationId": "results-failure-analysis-progress_3",
+                "description": "Get failed-run analysis progress",
+                "summary": "Get failed-run analysis progress",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "progress_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Progress ID returned when the failure analysis was queued.",
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Results"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "shareable_link": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FailureAnalysisProgressResponse"
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "description": "Invalid progress ID"
+                    },
+                    "404": {
+                        "description": "Failure analysis was not found"
+                    }
+                },
+                "x-mcp-expose": true,
+                "x-mcp-tool-name": "results_failure_analysis_progress",
+                "x-mint": {
+                    "mcp": {
+                        "enabled": true,
+                        "name": "results-failure-analysis-progress",
+                        "description": "Get failed-run analysis progress"
+                    }
+                }
+            }
+        },
         "/test_framework/v2/results/reports/": {
             "get": {
                 "operationId": "results-reports-retrieve_3",
@@ -57374,8 +57840,8 @@
         "/test_framework/v2/results/reports/ask-about-failures/": {
             "post": {
                 "operationId": "results-reports-ask-about-failures-create_3",
-                "description": "Query failed runs chatbot for combined reports",
-                "summary": "Query failed runs chatbot for combined reports",
+                "description": "Queue combined failed-run analysis",
+                "summary": "Queue combined failed-run analysis",
                 "tags": [
                     "Results"
                 ],
@@ -57417,15 +57883,15 @@
                     }
                 ],
                 "responses": {
-                    "200": {
+                    "202": {
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "string"
+                                    "$ref": "#/components/schemas/CombinedFailureAnalysisQueuedResponse"
                                 }
                             }
                         },
-                        "description": "Streaming AI-generated analysis of test failures across combined results"
+                        "description": "Failure analysis queued; poll the progress endpoint with progress_id."
                     },
                     "400": {
                         "description": "Invalid request (missing result_ids or question)"
@@ -57443,7 +57909,7 @@
                     "mcp": {
                         "enabled": true,
                         "name": "results-reports-ask-about-failures-create",
-                        "description": "Query failed runs chatbot for combined reports"
+                        "description": "Queue combined failed-run analysis"
                     }
                 }
             }
@@ -66244,6 +66710,1238 @@
                         "enabled": true,
                         "name": "scenarios-validate-json",
                         "description": "Check a spec against the agent it targets: metric slugs, personalities, test profiles, channel support and every tag. Returns the plan a run would follow, with case count and estimated cost. Creates nothing and places no calls. Use this before committing a suite or opening a pull request; use `scenarios_run_json` to execute one."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/aiagents/{id}/auto-fetch/": {
+            "post": {
+                "operationId": "aiagents-v3-auto-fetch",
+                "description": "Re-fetch the agent's configuration from its connected provider (Retell, VAPI, ElevenLabs, Synthflow, Bland) — system prompt, call settings, phone number, tools with mock data, dynamic variables and knowledge base — and return the import result. Updates the agent in place. Usually takes under 2 minutes.",
+                "summary": "Auto-fetch agent from provider",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "current_stage": {
+                                            "type": "string"
+                                        },
+                                        "stages": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "label": {
+                                                        "type": "string"
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "pending",
+                                                            "in_progress",
+                                                            "completed",
+                                                            "failed",
+                                                            "skipped"
+                                                        ]
+                                                    },
+                                                    "detail": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/metrics/{id}/run_reviews/": {
+            "post": {
+                "operationId": "metrics-v3-run-reviews",
+                "description": "Re-evaluate every review of the metric, optionally with overridden settings, and return each verdict next to its expected value. With `skip_save` the reviews are left unchanged. Each review is billed as a metric evaluation. Usually takes under a minute.",
+                "summary": "Run metric reviews",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunReviewsRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunReviewsRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RunReviewsRequest"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "metric_id": {
+                                            "type": "integer"
+                                        },
+                                        "agent_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "project_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "total_reviews": {
+                                            "type": "integer"
+                                        },
+                                        "completed_reviews": {
+                                            "type": "integer"
+                                        },
+                                        "failed_reviews": {
+                                            "type": "integer"
+                                        },
+                                        "reviews_list": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "integer"
+                                            },
+                                            "description": "Ids of the reviews evaluated."
+                                        },
+                                        "failed_reviews_list": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "integer"
+                                            },
+                                            "description": "Ids of the reviews that could not be evaluated."
+                                        },
+                                        "metric": {
+                                            "type": "object",
+                                            "description": "The metric, as the metrics API returns it."
+                                        },
+                                        "output": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "review_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "expected_value": {},
+                                                    "actual_value": {},
+                                                    "explanation": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "feedback": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "description": "The metric's verdict next to the expected value, one per evaluated review."
+                                        },
+                                        "computed_results": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            },
+                                            "description": "Only with `skip_save`: the same items as `output`."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/metrics/generate_clean_description/": {
+            "post": {
+                "operationId": "metrics-v3-generate-clean-description",
+                "description": "Turn a rough metric description into a clean one suited to the agent, and return it. Usually takes under 30 seconds.",
+                "summary": "Generate clean metric description",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CleanMetricDescriptionRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "clean_description": {
+                                            "type": "string"
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/metrics/generate_metrics/": {
+            "post": {
+                "operationId": "metrics-v3-generate",
+                "description": "Suggest metrics for an agent and return them. The metrics are not saved; pass them to Create Metrics in Bulk to keep them. The agent needs a description of at least 100 characters. Usually takes under a minute.",
+                "summary": "Generate metrics",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaGenerateMetricsMetricCreate"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaGenerateMetricsMetricCreate"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaGenerateMetricsMetricCreate"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "current_step": {
+                                            "type": "string"
+                                        },
+                                        "metrics": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            },
+                                            "description": "Suggested metrics. They are not saved; pass them to Create Metrics in Bulk."
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/metrics/preview/": {
+            "post": {
+                "operationId": "metrics-v3-preview",
+                "description": "Evaluate a metric configuration on up to 10 call logs or runs and return the verdicts, without saving the metric. Use it to check a metric before creating or updating it. Usually 30 seconds to 3 minutes; custom-code metrics can take longer.",
+                "summary": "Preview metric",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricPreview"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricPreview"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MetricPreview"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "project_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "agent_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "completed": {
+                                            "type": "integer",
+                                            "description": "Items evaluated."
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "results": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "description": "One per previewed call log (`call_log_id`, `call_id`) or run (`run_id`). The verdict is `result`, or `score` / `enum` for custom-code metrics.",
+                                                "properties": {
+                                                    "result": {
+                                                        "description": "Verdict for LLM-judge metrics."
+                                                    },
+                                                    "score": {
+                                                        "type": "number"
+                                                    },
+                                                    "enum": {
+                                                        "type": "string"
+                                                    },
+                                                    "explanation": {
+                                                        "type": "string"
+                                                    },
+                                                    "is_relevant": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "call_log_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "call_id": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    },
+                                                    "run_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "error": {
+                                                        "type": [
+                                                            "string",
+                                                            "null"
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/metrics/simplify_prompt/": {
+            "post": {
+                "operationId": "metrics-v3-simplify-prompt",
+                "description": "Rewrite a verbose metric prompt into a minimal version focused on its decision logic. When `metric_id` names an already-optimized metric whose prompt is unchanged, the stored prompt comes back at once. Usually takes under 30 seconds.",
+                "summary": "Simplify metric prompt with AI",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptV3Request"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptV3Request"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SimplifyPromptV3Request"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "embedded_session": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "original_prompt": {
+                                            "type": "string"
+                                        },
+                                        "metric_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "simplified_prompt": {
+                                            "type": "string"
+                                        },
+                                        "skipped_simplification": {
+                                            "type": "boolean",
+                                            "description": "True when the metric was already optimized and the stored prompt is returned."
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/scenarios/create-from-transcript/": {
+            "post": {
+                "operationId": "scenarios-v3-create-from-transcript",
+                "description": "Create an evaluator from a call transcript and return it once it is ready. `transcript_json` is a list of `{role, content, start_time}` messages, where `role` is `Main Agent`, `Testing Agent`, `Function Call` or `Function Call Result`. Usually takes under 2 minutes.",
+                "summary": "Create evaluator from transcript",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaPostSimulateScenario"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "scenario_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "scenario": {
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "description": "The created evaluator."
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/scenarios/generate/": {
+            "post": {
+                "operationId": "scenarios-v3-generate",
+                "description": "Generate evaluators for an agent and return them once generation finishes. Generation never pauses for clarification questions. Usually takes 1–4 minutes.",
+                "summary": "Generate evaluator",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaGenerateScenarios"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaGenerateScenarios"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SchemaGenerateScenarios"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "total_scenarios": {
+                                            "type": "integer"
+                                        },
+                                        "completed_scenarios": {
+                                            "type": "integer"
+                                        },
+                                        "failed_scenarios": {
+                                            "type": "integer"
+                                        },
+                                        "scenarios_list": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "description": "Full evaluator object, as the evaluators API returns it."
+                                            },
+                                            "description": "The generated evaluators."
+                                        },
+                                        "errors": {
+                                            "type": "array",
+                                            "items": {},
+                                            "description": "Why individual evaluators failed."
+                                        },
+                                        "warnings": {
+                                            "type": "array",
+                                            "items": {}
+                                        },
+                                        "session_id": {
+                                            "type": [
+                                                "integer",
+                                                "null"
+                                            ]
+                                        },
+                                        "current_step": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/scenarios/generate-instructions/": {
+            "post": {
+                "operationId": "scenarios-v3-generate-instructions",
+                "description": "Write caller instructions and an expected outcome for a new evaluator of the agent, guided by `extra_instructions`, and return them. Nothing is saved. Usually takes under a minute.",
+                "summary": "Generate scenario instructions with AI",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateInstructionsV3Request"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateInstructionsV3Request"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenerateInstructionsV3Request"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "instructions": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "expected_outcome_prompt": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
+                    }
+                }
+            }
+        },
+        "/test_framework/v3/scenarios/improve_instructions/": {
+            "post": {
+                "operationId": "scenarios-v3-improve-instructions",
+                "description": "Rewrite `current_instructions`, or write new ones, following `extra_instructions`, and return the result. Nothing is saved; apply it with the evaluator update endpoint. Usually takes under a minute.",
+                "summary": "Improve scenario instructions with AI",
+                "tags": [
+                    "test_framework"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScenarioInstructionsRequest"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScenarioInstructionsRequest"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ScenarioInstructionsRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "security": [
+                    {
+                        "api_key": []
+                    },
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "failed"
+                                            ],
+                                            "description": "`failed` when the job could not produce its result; see `error` / `errors`."
+                                        },
+                                        "agent_id": {
+                                            "type": "integer"
+                                        },
+                                        "instructions": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "expected_outcome_prompt": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ]
+                                        },
+                                        "error": {
+                                            "type": [
+                                                "string",
+                                                "null"
+                                            ],
+                                            "description": "Why the job failed, when it did."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field_name": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    },
+                    "403": {
+                        "description": "No access to the agent, project or metric the job runs on."
+                    },
+                    "504": {
+                        "description": "The job did not finish within 15 minutes. It may still complete in the background."
                     }
                 }
             }
@@ -75259,6 +76957,7 @@
                             "elevenlabs",
                             "livekit",
                             "agora",
+                            "pipecat",
                             "sms",
                             "whatsapp",
                             "self_hosted",
@@ -75269,8 +76968,8 @@
                             ""
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "4bb6f6bcfa9e6240",
-                        "description": "Chat provider type. Must be compatible with the voice provider.type. Valid values: retell, bland, vapi, elevenlabs, livekit, agora, sms, whatsapp, self_hosted, agentforce, amazon_connect, koreai, sierra. Pass an empty string \"\" (or send chat_agent_details: null) to clear the chat overlay.\n\n* `retell` - retell\n* `bland` - bland\n* `vapi` - vapi\n* `elevenlabs` - elevenlabs\n* `livekit` - livekit\n* `agora` - agora\n* `sms` - sms\n* `whatsapp` - whatsapp\n* `self_hosted` - self_hosted\n* `agentforce` - agentforce\n* `amazon_connect` - amazon_connect\n* `koreai` - koreai\n* `sierra` - sierra"
+                        "x-spec-enum-id": "b896c086cc3529ef",
+                        "description": "Chat provider type. Must be compatible with the voice provider.type. Valid values: retell, bland, vapi, elevenlabs, livekit, agora, sms, whatsapp, self_hosted, agentforce, amazon_connect, koreai, sierra. Pass an empty string \"\" (or send chat_agent_details: null) to clear the chat overlay.\n\n* `retell` - retell\n* `bland` - bland\n* `vapi` - vapi\n* `elevenlabs` - elevenlabs\n* `livekit` - livekit\n* `agora` - agora\n* `pipecat` - pipecat\n* `sms` - sms\n* `whatsapp` - whatsapp\n* `self_hosted` - self_hosted\n* `agentforce` - agentforce\n* `amazon_connect` - amazon_connect\n* `koreai` - koreai\n* `sierra` - sierra"
                     },
                     "config": {
                         "oneOf": [
@@ -75348,6 +77047,22 @@
                     "agent",
                     "eval_type",
                     "metric_description"
+                ]
+            },
+            "CombinedFailureAnalysisQueuedResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    },
+                    "progress_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "progress_id",
+                    "status"
                 ]
             },
             "Condition": {
@@ -76196,7 +77911,7 @@
                                 "type": "null"
                             }
                         ],
-                        "description": "\nConnection overrides applied on every scheduled run. Keys must match what the\nmatching run endpoint accepts, and depend on execution_mode:\n- voice: `mode`, `outbound_phone_number`, `agent_number`\n- text: `websocket_url`, `outbound_phone_number`, `agent_number`\n- sip: `sip_endpoint`\n- vapi_webrtc: `vapi_assistant_id`\n- retell_webrtc: `retell_agent_id`\n- elevenlabs: `elevenlabs_agent_id`, `elevenlabs_data`\n- livekit_v2: `livekit_data`\n- pipecat_v2: `pipecat_data`\nExample: `{\"livekit_data\": {\"agent_name\": \"support-agent\", \"config\": {\"greeting\": \"hi\"}}}`\n"
+                        "description": "\nConnection overrides applied on every scheduled run. Keys must match what the\nmatching run endpoint accepts, and depend on execution_mode:\n- voice: `mode`, `outbound_phone_number`, `agent_number`\n- text: `websocket_url`, `outbound_phone_number`, `agent_number`\n- sip: `sip_endpoint`\n- vapi_webrtc: `vapi_assistant_id`\n- retell_webrtc: `retell_agent_id`\n- elevenlabs: `elevenlabs_agent_id`, `elevenlabs_data`\n- livekit_v2: `livekit_data`\n- pipecat_v2: `pipecat_data`\n- every mode: `calls_per_second` (most calls started per second, a whole number from 1 to 4; unset means no limit)\nExample: `{\"livekit_data\": {\"agent_name\": \"support-agent\", \"config\": {\"greeting\": \"hi\"}}}`\n"
                     },
                     "run_as_text": {
                         "type": "boolean",
@@ -77121,6 +78836,62 @@
                     "score"
                 ]
             },
+            "FailureAnalysisProgressResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "enum": [
+                            "queued",
+                            "running",
+                            "completed",
+                            "failed"
+                        ],
+                        "type": "string",
+                        "description": "* `queued` - queued\n* `running` - running\n* `completed` - completed\n* `failed` - failed",
+                        "x-spec-enum-id": "ec827c196b86408c"
+                    },
+                    "answer": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cited_run_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        }
+                    },
+                    "error": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "answer",
+                    "cited_run_ids",
+                    "error",
+                    "status"
+                ]
+            },
+            "FailureAnalysisQueuedResponse": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string"
+                    },
+                    "progress_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                },
+                "required": [
+                    "progress_id",
+                    "status"
+                ]
+            },
             "FailureCategoryCallsResponse": {
                 "type": "object",
                 "properties": {
@@ -77357,6 +79128,23 @@
                 },
                 "required": [
                     "status"
+                ]
+            },
+            "GenerateInstructionsV3Request": {
+                "type": "object",
+                "properties": {
+                    "agent_id": {
+                        "type": "integer",
+                        "description": "Agent the evaluator will test."
+                    },
+                    "extra_instructions": {
+                        "type": "string",
+                        "description": "What the evaluator should test, in plain language."
+                    }
+                },
+                "required": [
+                    "agent_id",
+                    "extra_instructions"
                 ]
             },
             "GenesysConfig": {
@@ -86011,7 +87799,7 @@
                         "description": "\nExecution mode for the cron job. Choices: voice, text, sip\nExample: `\"voice\"`, `\"text\"`, or `\"sip\"`\n\n\n* `voice` - Voice\n* `text` - Text\n* `sip` - SIP\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `ello` - Ello\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat\n* `agora` - Agora"
                     },
                     "run_settings": {
-                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Unsupported keys are rejected.\n"
+                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Every mode also takes\n`calls_per_second`: the most calls each scheduled run starts per second, a whole\nnumber from 1 to 4; leave it out for no limit. Unsupported keys are rejected.\n"
                     }
                 }
             },
@@ -90320,6 +92108,15 @@
                         ],
                         "description": "Optional cap on how many of this run's calls execute concurrently."
                     },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                    },
                     "personality_id": {
                         "type": [
                             "integer",
@@ -90545,6 +92342,15 @@
                         "minimum": 1,
                         "description": "Number of times to run each scenario."
                     },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                    },
                     "agent_email": {
                         "type": [
                             "string",
@@ -90581,6 +92387,15 @@
                         "maximum": 100,
                         "minimum": 1,
                         "description": "Frequency to run"
+                    },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": [
@@ -93162,7 +94977,7 @@
                         "description": "\nExecution mode for the cron job. Choices: voice, text, sip\nExample: `\"voice\"`, `\"text\"`, or `\"sip\"`\n\n\n* `voice` - Voice\n* `text` - Text\n* `sip` - SIP\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `ello` - Ello\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat\n* `agora` - Agora"
                     },
                     "run_settings": {
-                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Unsupported keys are rejected.\n"
+                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Every mode also takes\n`calls_per_second`: the most calls each scheduled run starts per second, a whole\nnumber from 1 to 4; leave it out for no limit. Unsupported keys are rejected.\n"
                     }
                 },
                 "required": [
@@ -93380,7 +95195,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nRuns start in the order given.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
                     },
                     "tags": {
                         "type": "array",
@@ -93401,7 +95216,7 @@
                         "type": "integer",
                         "minimum": 1,
                         "default": 1,
-                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                        "description": "\nThe number of times each evaluator will run. Each repeat runs the whole list in order\nbefore the next one starts (A, B, A, B), rather than grouping repeats of one evaluator.\nExample: `1`\n"
                     },
                     "name": {
                         "type": "string",
@@ -93464,6 +95279,15 @@
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
                     },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                    },
                     "mock_tool_names": {
                         "type": "array",
                         "items": {
@@ -93499,7 +95323,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nRuns start in the order given.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
                     },
                     "tags": {
                         "type": "array",
@@ -93520,7 +95344,7 @@
                         "type": "integer",
                         "minimum": 1,
                         "default": 1,
-                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                        "description": "\nThe number of times each evaluator will run. Each repeat runs the whole list in order\nbefore the next one starts (A, B, A, B), rather than grouping repeats of one evaluator.\nExample: `1`\n"
                     },
                     "personality_ids": {
                         "type": [
@@ -93575,7 +95399,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nRuns start in the order given.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
                     },
                     "tags": {
                         "type": "array",
@@ -93596,7 +95420,7 @@
                         "type": "integer",
                         "minimum": 1,
                         "default": 1,
-                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                        "description": "\nThe number of times each evaluator will run. Each repeat runs the whole list in order\nbefore the next one starts (A, B, A, B), rather than grouping repeats of one evaluator.\nExample: `1`\n"
                     },
                     "name": {
                         "type": "string",
@@ -93658,6 +95482,15 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -93694,7 +95527,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nRuns start in the order given.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
                     },
                     "tags": {
                         "type": "array",
@@ -93715,7 +95548,7 @@
                         "type": "integer",
                         "minimum": 1,
                         "default": 1,
-                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                        "description": "\nThe number of times each evaluator will run. Each repeat runs the whole list in order\nbefore the next one starts (A, B, A, B), rather than grouping repeats of one evaluator.\nExample: `1`\n"
                     },
                     "name": {
                         "type": "string",
@@ -93777,6 +95610,15 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -93817,6 +95659,15 @@
                     "agent": {
                         "type": "integer",
                         "description": "Agent ID to run the scenarios against. If omitted, the agent is derived from the first scenario's configured agent."
+                    },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": [
@@ -93923,6 +95774,15 @@
                             "null"
                         ],
                         "description": "Optional cap on how many of this run's calls execute concurrently."
+                    },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
                     }
                 },
                 "required": [
@@ -93947,7 +95807,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nRuns start in the order given.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
                     },
                     "tags": {
                         "type": "array",
@@ -93968,7 +95828,7 @@
                         "type": "integer",
                         "minimum": 1,
                         "default": 1,
-                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                        "description": "\nThe number of times each evaluator will run. Each repeat runs the whole list in order\nbefore the next one starts (A, B, A, B), rather than grouping repeats of one evaluator.\nExample: `1`\n"
                     },
                     "name": {
                         "type": "string",
@@ -94013,6 +95873,15 @@
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
                     },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                    },
                     "mock_tool_names": {
                         "type": "array",
                         "items": {
@@ -94048,7 +95917,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nRuns start in the order given.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
                     },
                     "tags": {
                         "type": "array",
@@ -94069,7 +95938,7 @@
                         "type": "integer",
                         "minimum": 1,
                         "default": 1,
-                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                        "description": "\nThe number of times each evaluator will run. Each repeat runs the whole list in order\nbefore the next one starts (A, B, A, B), rather than grouping repeats of one evaluator.\nExample: `1`\n"
                     },
                     "name": {
                         "type": "string",
@@ -94132,6 +96001,15 @@
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
                     },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                    },
                     "mock_tool_names": {
                         "type": "array",
                         "items": {
@@ -94171,7 +96049,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nRuns start in the order given.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
                     },
                     "tags": {
                         "type": "array",
@@ -94192,7 +96070,7 @@
                         "type": "integer",
                         "minimum": 1,
                         "default": 1,
-                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                        "description": "\nThe number of times each evaluator will run. Each repeat runs the whole list in order\nbefore the next one starts (A, B, A, B), rather than grouping repeats of one evaluator.\nExample: `1`\n"
                     },
                     "websocket_url": {
                         "type": "string",
@@ -94236,6 +96114,15 @@
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
                     },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                    },
                     "mock_tool_names": {
                         "type": "array",
                         "items": {
@@ -94267,7 +96154,7 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
+                        "description": "\nList of evaluator IDs to run. Either scenarios, tags, or folder_path must be provided.\nRuns start in the order given.\nExample: `[11, 22, 33]`\n\nTo run evaluators by tag or folder, use the `tags` or `folder_path` fields instead.\n"
                     },
                     "tags": {
                         "type": "array",
@@ -94288,7 +96175,7 @@
                         "type": "integer",
                         "minimum": 1,
                         "default": 1,
-                        "description": "\nThe number of times each evaluator will run\nExample: `1`\n"
+                        "description": "\nThe number of times each evaluator will run. Each repeat runs the whole list in order\nbefore the next one starts (A, B, A, B), rather than grouping repeats of one evaluator.\nExample: `1`\n"
                     },
                     "name": {
                         "type": "string",
@@ -94332,6 +96219,15 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "\nCap on the number of evaluator runs executed in parallel. Default: unbounded (subject to your provider's rate limits).\nUse this to avoid hitting provider rate limits on large frequency or folder runs.\nExample: `5`\n"
+                    },
+                    "calls_per_second": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -95553,6 +97449,22 @@
                     }
                 }
             },
+            "SimplifyPromptV3Request": {
+                "type": "object",
+                "properties": {
+                    "original_prompt": {
+                        "type": "string",
+                        "description": "The verbose prompt to simplify."
+                    },
+                    "metric_id": {
+                        "type": "integer",
+                        "description": "Metric the prompt belongs to. Optional."
+                    }
+                },
+                "required": [
+                    "original_prompt"
+                ]
+            },
             "SimulateScenarioTranscriptMessage": {
                 "type": "object",
                 "properties": {
@@ -95865,6 +97777,15 @@
                     "subscription_overage"
                 ]
             },
+            "SummarizeAlertV3Request": {
+                "type": "object",
+                "properties": {
+                    "hours": {
+                        "type": "integer",
+                        "description": "Look-back window in hours, 1–168. Defaults to 24."
+                    }
+                }
+            },
             "SynthflowConfig": {
                 "type": "object",
                 "description": "Synthflow provider configuration.",
@@ -96110,6 +98031,12 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "Cap on the number of runs executed in parallel. Overrides the spec's 'defaults.concurrency_limit'."
+                    },
+                    "calls_per_second": {
+                        "type": "integer",
+                        "maximum": 4,
+                        "minimum": 1,
+                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Overrides the spec's 'defaults.calls_per_second'. Leave both unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": [

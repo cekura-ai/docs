@@ -81,11 +81,12 @@ When Auto-Fetch generates mock data for scenarios whose agent has mock tools att
 - **Tool Name**: The name of the tool being mocked
 - **Expected Input**: The input parameters the tool expects
 - **Expected Output**: The response the tool will return
+- **Response** (optional): The status code, headers and delay the tool responds with, when the matching mock entry [simulates a failing or slow tool](#simulating-failing-or-slow-tools)
 
 You can view this data in two ways:
 
 1. **Via the Evaluator UI**: When viewing a scenario in the Cekura dashboard, the generated mock tool entries are displayed so you can see what tool calls the evaluator will make during testing
-2. **Via the API**: Retrieve a scenario with [Get Evaluator](/api-reference/test_framework/get-evaluator) to access the `generated_mock_tool_entries` field programmatically. The field is also writable — set it when creating an evaluator via [Create Evaluator](/api-reference/test_framework/create-evaluator) or edit it later via [Update Evaluator](/api-reference/test_framework/update-evaluator). Each entry has the shape `{tool_id, tool_name, new_entry: {input, output}}`.
+2. **Via the API**: Retrieve a scenario with [Get Evaluator](/api-reference/test_framework/get-evaluator) to access the `generated_mock_tool_entries` field programmatically. The field is also writable — set it when creating an evaluator via [Create Evaluator](/api-reference/test_framework/create-evaluator) or edit it later via [Update Evaluator](/api-reference/test_framework/update-evaluator). Each entry has the shape `{tool_id, tool_name, new_entry: {input, output, response?}}`.
 
 This visibility helps you understand exactly what mock tool interactions will occur during each test run, making it easier to debug and validate your agent's tool-calling behavior.
 
@@ -219,6 +220,38 @@ If you prefer to manually configure your mock tools, or need more control over t
 ```
 
 </CodeGroup>
+
+#### Simulating failing or slow tools
+
+To test how your agent handles tool errors, add an optional `response` to a mock entry. It sets the status code, headers and delay the mock answers with:
+
+```json
+[
+  {
+    "input": {"date": "2026-07-10"},
+    "output": {"slots": ["10:00", "14:30"]}
+  },
+  {
+    "input": {"date": "2026-07-11"},
+    "output": {"detail": "Service temporarily unavailable"},
+    "response": {"status_code": 503, "headers": {"Retry-After": "30"}, "delay_ms": 2000}
+  }
+]
+```
+
+| Field | Allowed values | Default |
+|---|---|---|
+| `status_code` | 200–299 (except 204 and 205) or 400–599 | 200 |
+| `headers` | Up to 20 string headers. `Content-Type`, `Content-Length`, `Content-Encoding`, `Transfer-Encoding`, `Connection`, `Set-Cookie` and `Strict-Transport-Security` cannot be set | none |
+| `delay_ms` | 0–30000 | 0 |
+
+How the failure reaches your agent depends on how the tool is called:
+
+- **Webhook tools** (Retell, ElevenLabs, Bland, custom webhooks) receive the configured HTTP status and headers, with `output` as the body.
+- **VAPI function tools** always receive HTTP 200, as VAPI requires. For a status of 400 or above, the result is the text `Error 503: {"detail":"Service temporarily unavailable"}`.
+- **MCP tools** receive a normal tool result with `isError: true` and the same error text.
+
+The delay applies on every transport. Entries with a `response` are matched like any other entry, and entries without one behave exactly as before. One input can map to only one outcome: two entries with the same `input` and `output` but a different `response` are rejected.
 
 ### Step 2: Create New Evaluators
 

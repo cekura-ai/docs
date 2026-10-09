@@ -33,334 +33,260 @@ Use Structured Tests evaluators when you need to:
 
 ## Structure
 
-A Structured Tests evaluator consists of two main components:
-
-### 1. Role
-
-The `role` defines who the testing agent is pretending to be.
-
-```json
-{
-  "role": "You are a customer calling to cancel an appointment"
-}
-```
-
-<Note>
-Keep the role concise and clear. It sets the context for the entire conversation.
-</Note>
-
-### 2. Conditions
-
-The `conditions` array defines the rules and actions for the evaluator. Each condition specifies:
-
-- **When** a certain situation occurs (the condition)
-- **What** the testing agent should do (the action)
+A Structured Tests evaluator has three main parts:
 
 ```json
 {
   "role": "You are a customer calling to cancel an appointment",
+  "first_message": "Hi, I need to cancel my appointment",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "Hi, I need to cancel my appointment",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks for your name",
+      "say": "John Smith"
     },
     {
-      "id": 1,
-      "condition": "The agent asks for your name",
-      "action": "Provide your name as John Smith",
-      "type": "standard",
-      "fixed_message": false
-    },
-    {
-      "id": 2,
-      "condition": "The agent asks for a reason",
-      "action": "Say you have a scheduling conflict",
-      "type": "standard",
-      "fixed_message": false
+      "when": "The agent asks for a reason",
+      "say": "<ai_generated>Say you have a scheduling conflict</ai_generated>"
     }
   ]
 }
 ```
 
-## Condition Fields
+### 1. Role
 
-Each condition object has the following fields:
+The `role` defines who the testing agent is pretending to be.
 
-<ParamField path="id" type="integer" required>
-  Unique identifier for the condition. The first condition must use `id: 0`. Each ID must be unique — duplicate IDs are rejected.
+<Note>
+Keep the role concise and clear. It sets the context for the entire conversation.
+</Note>
+
+### 2. First message
+
+`first_message` is what the testing agent says to open the call. It is always spoken word-for-word. Leave it empty (`""`) when the main agent speaks first.
+
+### 3. Conditions
+
+The `conditions` array defines the rules for the rest of the conversation. Each condition specifies:
+
+- **When** a certain situation occurs (`when`)
+- **What** the testing agent says (`say`)
+- Optionally, what it says on the **following turns** (`then`)
+
+<Note>
+Evaluators written in the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) are still accepted when you create or update an evaluator. Responses return the format described on this page.
+</Note>
+
+## Fields
+
+<ParamField path="role" type="string" required>
+  Who the testing agent is pretending to be.
 </ParamField>
 
-<ParamField path="condition" type="string | integer" required>
-  The trigger condition that determines when this action should be taken.
+<ParamField path="first_message" type="string | object">
+  What the testing agent says first, always word-for-word. Empty (or omitted) means the testing agent waits for the main agent to speak.
 
-  **Special cases**:
-  - When `id` is 0, the condition must be the string `"FIRST_MESSAGE"` (represents the first message)
-  - When `type` is `action_followup`, the condition should be an integer referencing the previous condition ID
-  - For standard conditions, the condition is a string describing the trigger
+  To add steps after the opening line, pass an object instead: `{"say": "...", "then": ["...", "..."]}`. `<ai_generated>` is not allowed in the first message.
 </ParamField>
 
-<ParamField path="action" type="string" required>
-  What the testing agent should say or do when the condition is met. Cannot be empty or whitespace-only. The interpretation depends on the `fixed_message` field:
-  - When `fixed_message` is `false`: Contains instructions for the testing agent to interpret
-  - When `fixed_message` is `true`: Contains the exact message to send word-for-word
+<ParamField path="conditions" type="array">
+  The ordered list of conditions. Each condition has:
 
-  **Exception**: The `FIRST_MESSAGE` condition (id: 0) may have an empty action when the main agent speaks first.
+  <Expandable title="condition fields">
+    <ParamField path="when" type="string" required>
+      A third-person description of what the main agent does that triggers this condition — for example, `"The agent asks for your date of birth"`. Matched by meaning against the conversation.
+    </ParamField>
+
+    <ParamField path="say" type="string" required>
+      The step the testing agent delivers when the condition matches. Spoken **word-for-word** by default. Wrap the whole step in `<ai_generated>...</ai_generated>` to have the testing agent improvise from it instead. Cannot be empty.
+    </ParamField>
+
+    <ParamField path="then" type="string[]">
+      Optional follow-up steps, in order. Each one fires on the testing agent's **next turn**, after one reply from the main agent — whatever that reply is. Each step follows the same rules as `say`.
+    </ParamField>
+  </Expandable>
 </ParamField>
 
-<ParamField path="type" type="string" required>
-  The condition type. Must be explicitly provided — there is no default. Options:
-  - `standard`: Normal condition triggered by the conversation context
-  - `action_followup`: Fires on the **next turn** after the referenced condition — the testing agent sends the referenced condition's message, waits for the main agent to reply, then sends this message
-</ParamField>
-
-<ParamField path="fixed_message" type="boolean" required>
-  Must be explicitly set to `true` or `false` on every condition — omitting it returns a validation error.
-  - `true`: The `action` field contains the exact message to send word-for-word
-  - `false`: The `action` field contains instructions for the testing agent to interpret naturally
-
-  **Note**: The FIRST_MESSAGE condition (id: 0) must have `fixed_message: true`.
+<ParamField path="functions" type="array">
+  Optional custom functions the testing agent can call during the conversation. See [Custom Functions](#custom-functions).
 </ParamField>
 
 ## Validation Rules
 
-The backend enforces the following constraints on all Structured Tests evaluators. Violations return a validation error.
+The backend enforces the following constraints on all Structured Tests evaluators. Violations return a validation error that names the exact place in your payload, such as `first_message`, `conditions[2].say` or `conditions[0].then[1]`.
 
 <AccordionGroup>
-  <Accordion title="1. FIRST_MESSAGE required" icon="circle-1" defaultOpen>
-    The first condition in the `conditions` array must satisfy all three requirements:
-    - `condition` must equal `"FIRST_MESSAGE"` (not empty, not any other string)
-    - `id` must be `0`
-    - `fixed_message` must be `true`
+  <Accordion title="1. The first message is verbatim" icon="circle-1" defaultOpen>
+    `first_message` (and `first_message.say`) is always spoken word-for-word, so it cannot contain `<ai_generated>`. Its `then` steps can.
 
     ```json
     // ✅ Valid
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello", "type": "standard", "fixed_message": true }
+    { "first_message": { "say": "Hello", "then": ["<ai_generated>Ask about your order</ai_generated>"] } }
 
-    // ❌ Invalid — condition is empty
-    { "id": 0, "condition": "", "action": "Hello", "type": "standard", "fixed_message": true }
-
-    // ❌ Invalid — fixed_message is missing
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello", "type": "standard" }
+    // ❌ Invalid — first_message: the first message is always said verbatim; <ai_generated> is not allowed.
+    { "first_message": "<ai_generated>Greet the agent</ai_generated>" }
     ```
   </Accordion>
 
-  <Accordion title="2. Non-empty actions" icon="circle-2">
-    The `action` field cannot be empty or whitespace-only. This rule applies to all conditions except FIRST_MESSAGE (id: 0), which may have an empty action when the main agent speaks first.
-
-    ```json
-    // ✅ Valid — FIRST_MESSAGE may have empty action
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "", "type": "standard", "fixed_message": true }
-
-    // ❌ Invalid — non-FIRST_MESSAGE condition has empty action
-    { "id": 1, "condition": "The agent greets you", "action": "", "type": "standard", "fixed_message": false }
-    ```
-  </Accordion>
-
-  <Accordion title="3. type is required" icon="circle-3">
-    Every condition must include a `type` field. There is no default — omitting `type` returns a validation error.
+  <Accordion title="2. Every condition needs `when` and a non-empty `say`" icon="circle-2">
+    `when` is required, and `say` cannot be empty or whitespace-only. Only `first_message` may be empty.
 
     ```json
     // ✅ Valid
-    { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard", "fixed_message": false }
+    { "when": "The agent greets you", "say": "Hi there" }
 
-    // ❌ Invalid — type is missing
-    { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "fixed_message": false }
+    // ❌ Invalid — conditions[0].when: is required.
+    { "say": "Hi there" }
+
+    // ❌ Invalid — conditions[0] has an empty step
+    { "when": "The agent greets you", "say": "" }
     ```
   </Accordion>
 
-  <Accordion title="4. fixed_message is required" icon="circle-4">
-    Every condition must include a `fixed_message` field set to `true` or `false`. Omitting it returns a validation error.
+  <Accordion title="3. `<ai_generated>` wraps the whole step" icon="circle-3">
+    `<ai_generated>` must wrap the entire step. It cannot be partial, nested, or empty.
 
     ```json
     // ✅ Valid
-    { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard", "fixed_message": false }
+    { "when": "The agent asks about pricing", "say": "<ai_generated>Ask whether there is a student discount</ai_generated>" }
 
-    // ❌ Invalid — fixed_message is missing
-    { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard" }
+    // ❌ Invalid — conditions[0].say: <ai_generated> must wrap the whole step
+    { "when": "The agent asks about pricing", "say": "Sure. <ai_generated>Ask about discounts</ai_generated>" }
     ```
   </Accordion>
 
-  <Accordion title="5. Unique condition IDs" icon="circle-5">
-    Every condition must have a unique `id`. Duplicate IDs are rejected.
-
-    ```json
-    // ❌ Invalid — id 1 appears twice
-    [
-      { "id": 0, "condition": "FIRST_MESSAGE", "action": "Hello", "type": "standard", "fixed_message": true },
-      { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard", "fixed_message": false },
-      { "id": 1, "condition": "Agent asks for email", "action": "Provide email", "type": "standard", "fixed_message": false }
-    ]
-    ```
+  <Accordion title="4. Only known fields" icon="circle-4">
+    A condition accepts only `when`, `say` and `then`; `first_message` as an object accepts only `say` and `then`. Unknown fields are rejected — for example, `conditions[0]: unknown field(s) fixed. Allowed: when, say, then.`
   </Accordion>
 
-  <Accordion title="6. Language required" icon="circle-6">
+  <Accordion title="5. Language required" icon="circle-5">
     Structured Tests evaluators require a `scenario_language`. Set it by assigning a personality with a language configured. If you provide a personality, the language is inferred automatically; if no personality is set, `scenario_language` must be explicitly provided.
 
     This also applies when changing an existing evaluator's type to Structured Tests.
   </Accordion>
 </AccordionGroup>
 
-## First Message (id: 0)
+## First Message
 
-The condition with `id: 0` is special—it represents the **first message** the testing agent sends to start the conversation. Three rules apply to this condition:
+`first_message` is the line the testing agent opens the call with:
 
-1. `condition` must be the string `"FIRST_MESSAGE"`
-2. `fixed_message` must be `true`
-3. `action` may be empty if the main agent speaks first
+```json
+{ "first_message": "Hi, I need to cancel my appointment" }
+```
+
+**When the main agent speaks first**, leave it empty:
+
+```json
+{ "first_message": "" }
+```
+
+To keep talking after the opening line — whatever the main agent replies — add `then` steps:
 
 ```json
 {
-  "id": 0,
-  "condition": "FIRST_MESSAGE",
-  "action": "Hi, I need to cancel my appointment",
-  "type": "standard",
-  "fixed_message": true
+  "first_message": {
+    "say": "Hi, I need help with my order",
+    "then": [
+      "<ai_generated>Mention you haven't received a confirmation email</ai_generated>",
+      "Can I also get expedited shipping?"
+    ]
+  }
 }
 ```
-
-**When the main agent speaks first**, set `action` to an empty string:
-
-```json
-{
-  "id": 0,
-  "condition": "FIRST_MESSAGE",
-  "action": "",
-  "type": "standard",
-  "fixed_message": true
-}
-```
-
-<Warning>
-The `condition` field for the first message must be `"FIRST_MESSAGE"` exactly. An empty string or any other value will fail validation.
-</Warning>
 
 <Note>
-The first message is sent **once** and is never retried. If the main agent's speech cuts it off, whatever had not played yet is dropped and never spoken later. A `<silence>` always gives way when the main agent starts talking, so a greeting that arrives during a leading `<silence>` drops the whole line; spoken text gives way according to the personality's interruption settings. The conversation then continues through the other conditions as usual. To let the main agent greet first and then say an exact line, leave `id: 0` empty and put the line on a `standard` condition with `id: 1` that matches the greeting:
+The first message is sent **once** and is never retried. If the main agent's speech cuts it off, whatever had not played yet is dropped and never spoken later. A `<silence>` always gives way when the main agent starts talking, so a greeting that arrives during a leading `<silence>` drops the whole line; spoken text gives way according to the personality's interruption settings. The conversation then continues through the other conditions as usual. To let the main agent greet first and then say an exact line, leave `first_message` empty and put the line on a condition that matches the greeting:
 
 ```json
-[
-  { "id": 0, "condition": "FIRST_MESSAGE", "action": "", "type": "standard", "fixed_message": true },
-  { "id": 1, "condition": "The agent greets the caller", "action": "Hi, I'm calling because my fare came out higher than the estimate.", "type": "standard", "fixed_message": true }
-]
+{
+  "first_message": "",
+  "conditions": [
+    { "when": "The agent greets the caller", "say": "Hi, I'm calling because my fare came out higher than the estimate." }
+  ]
+}
 ```
 </Note>
 
-## Condition Types
+## Follow-up Steps (`then`)
 
-### Standard Conditions
+A `then` step fires on the **next turn** after the step before it. It does not fire immediately. The sequence is:
 
-Standard conditions are evaluated based on the conversation context. They trigger when the specified condition is met.
+1. The testing agent delivers the condition's `say`
+2. The main agent receives it and replies
+3. The first `then` step fires — the testing agent delivers it
+4. The main agent replies, and the next `then` step fires, and so on
 
-```json
-{
-  "id": 1,
-  "type": "standard",
-  "condition": "The agent asks for your account number",
-  "action": "Provide your account number",
-  "fixed_message": false
-}
-```
-
-### Action Followup Conditions
-
-An `action_followup` fires on the **next turn** after the condition it references. It does not fire immediately. The sequence is:
-
-1. Testing agent sends the message from condition X
-2. Main agent receives it and replies
-3. `action_followup` (with `condition: X`) fires — testing agent sends this message
-
-The main agent's reply is received but does not affect whether the followup fires. Because of this, `action_followup` has two key uses:
+The main agent's reply is received but does not affect whether the follow-up fires. Because of this, `then` has two key uses:
 
 - **Multi-part responses**: send several messages across consecutive turns after a single trigger
-- **Scripted sequences**: chain followups to deliver an exact sequence of messages from the testing agent, turn by turn, without needing any conditions to match — the sequence fires automatically regardless of what the main agent says
-
-The `condition` field must be an integer referencing the `id` of the previous condition.
+- **Scripted sequences**: deliver an exact sequence of messages from the testing agent, turn by turn, without needing any conditions to match — the sequence fires automatically regardless of what the main agent says
 
 ```json
 {
-  "id": 2,
-  "type": "action_followup",
-  "condition": 1,
-  "action": "Also mention that you need a confirmation email",
-  "fixed_message": false
+  "when": "The agent asks how they can help",
+  "say": "I need to change my booking",
+  "then": [
+    "It's under the name Jordan Avery",
+    "<ai_generated>Ask whether there is a change fee</ai_generated>"
+  ]
 }
 ```
 
 <Note>
-`action_followup` does **not** fire immediately after condition X — it fires on the **next turn**, after the main agent has replied to condition X. The `condition` field holds the `id` (integer) of the condition whose turn triggers this followup.
+Each condition has a single, linear list of `then` steps. A `then` step never fires in the same turn as the step before it — one reply from the main agent always comes in between.
 </Note>
 
-## Action vs Fixed Message
+## Verbatim vs AI-generated steps
 
-The `action` field can be used in two ways, controlled by the `fixed_message` boolean:
+Every step (`say` or a `then` entry) is one of two kinds:
 
-### Using `action` with `fixed_message: false`
+### Verbatim (default)
 
-When `fixed_message` is `false`, the `action` field provides instructions that the testing agent interprets to generate a natural response.
-
-```json
-{
-  "id": 1,
-  "type": "standard",
-  "condition": "The agent asks for your name",
-  "action": "Provide your name as John Smith",
-  "fixed_message": false
-}
-```
-
-The testing agent might say: "My name is John Smith" or "Sure, it's John Smith" or "John Smith"
-
-### Using `action` with `fixed_message: true`
-
-When `fixed_message` is `true`, the `action` field contains the exact text that the testing agent will say, word-for-word.
+The testing agent says the text exactly as written.
 
 ```json
-{
-  "id": 1,
-  "type": "standard",
-  "condition": "The agent asks for your name",
-  "action": "My name is John Smith",
-  "fixed_message": true
-}
+{ "when": "The agent asks for your name", "say": "My name is John Smith" }
 ```
 
 The testing agent will say exactly: "My name is John Smith"
 
+### AI-generated
+
+Wrap the whole step in `<ai_generated>...</ai_generated>` and the text becomes an instruction the testing agent interprets to produce a natural reply.
+
+```json
+{ "when": "The agent asks for your name", "say": "<ai_generated>Provide your name as John Smith</ai_generated>" }
+```
+
+The testing agent might say: "My name is John Smith" or "Sure, it's John Smith" or "John Smith"
+
 ### When to Use Each
 
 <CardGroup cols={2}>
-  <Card title="Use fixed_message: false" icon="wand-magic-sparkles">
+  <Card title="Use <ai_generated>" icon="wand-magic-sparkles">
     - Natural, varied responses
     - Testing agent adaptability
     - When exact wording doesn't matter
   </Card>
 
-  <Card title="Use fixed_message: true" icon="lock">
+  <Card title="Use verbatim (default)" icon="lock">
     - Exact phrases required
     - Testing specific keywords
     - Compliance testing
     - Reproducible test cases
-    - First message (id: 0) — always required
-    - Actions containing XML tags
+    - The first message — always verbatim
+    - Steps containing tags
   </Card>
 </CardGroup>
 
-<Note>
-`fixed_message` is required on every condition and must be explicitly set to `true` or `false`. It determines how `action` is interpreted: as instructions (`false`) or as the exact message to send (`true`).
-</Note>
-
 ## Supported Tags
 
-Conditional Actions supports a variety of special tags in the `action` field to control conversation flow and behavior.
+Structured Tests supports a variety of special tags inside a step (`first_message`, `say`, or a `then` entry) to control conversation flow and behavior.
 
 <Warning>
-**Important**: Tags are only supported when `fixed_message` is set to `true`. They will not work with `fixed_message: false` (instruction-based actions).
+**Important**: Tags only work in **verbatim** steps. A step wrapped in `<ai_generated>` cannot contain tags — it is rejected at save time.
 </Warning>
 
-Tags can be combined with text and other sibling tags. They run from left to right; do not nest tags inside one another, except inside a regional `<voice ...>...</voice>` block. `<ivr>` and `<voicemail>` remain whole-action tags.
+Tags can be combined with text and other sibling tags. They run from left to right; do not nest tags inside one another, except inside a regional `<voice ...>...</voice>` block. `<ivr>` and `<voicemail>` must be the whole step.
 
 ### Communication Tags
 
@@ -370,22 +296,19 @@ Tags can be combined with text and other sibling tags. They run from left to rig
 
     ```json
     {
-      "id": 1,
-      "type": "standard",
-      "condition": "The call is answered",
-      "action": "<ivr text=\"Press 1 for sales, press 2 for support\" />",
-      "fixed_message": true
+      "when": "The call is answered",
+      "say": "<ivr text=\"Press 1 for sales, press 2 for support\" />"
     }
     ```
 
     The agent cannot interrupt while this message plays.
 
     <Warning>
-    `<ivr>` must be the **entire action** — it cannot be combined with other text or tags in the same action string.
+    `<ivr>` must be the **entire step** — it cannot be combined with other text or tags in the same step.
     </Warning>
 
     <Note>
-    **DTMF digits appear in the transcript when using `<ivr>`.** When a scenario contains the `<ivr>` tag, any DTMF digits pressed by the main agent (the agent being tested) are captured and appear in the transcript. This lets you write conditions that detect the exact digit pressed — for example, `"The main agent pressed 1"` — rather than relying on speech detection alone. Both `<ivr>` and `<dtmf>` can appear in any condition, not just `id: 0`.
+    **DTMF digits appear in the transcript when using `<ivr>`.** When a scenario contains the `<ivr>` tag, any DTMF digits pressed by the main agent (the agent being tested) are captured and appear in the transcript. This lets you write conditions that detect the exact digit pressed — for example, `"The main agent pressed 1"` — rather than relying on speech detection alone. Both `<ivr>` and `<dtmf>` can appear in any step, not just the first message.
     </Note>
 
     **Attributes:**
@@ -397,19 +320,20 @@ Tags can be combined with text and other sibling tags. They run from left to rig
   </Accordion>
 
   <Accordion title="<ignore_interruptions> - Protected Playback Span" icon="shield">
-    Wrap a span of the action so everything inside plays to completion — nothing the main agent says can interrupt it. Content is unrestricted: spoken text, `<audio>` clips, `<hold>`/`<silence>` pauses, or any mix. The typical use is a multi-part IVR menu of clips and pauses.
+    Wrap a span of the step so everything inside plays to completion — nothing the main agent says can interrupt it. Content is unrestricted: spoken text, `<audio>` clips, `<hold>`/`<silence>` pauses, or any mix. The typical use is a multi-part IVR menu of clips and pauses.
 
     ```json
     {
-      "id": 1,
-      "type": "action_followup",
-      "condition": 0,
-      "action": "<ignore_interruptions> <audio id=\"2eeb6544\"/> <hold time=\"5s\" /> <audio id=\"f0c5cdfe\"/> <hold time=\"5s\" /> <audio id=\"1bfc2ad2\"/> </ignore_interruptions> <endcall />",
-      "fixed_message": true
+      "first_message": {
+        "say": "",
+        "then": [
+          "<ignore_interruptions> <audio id=\"2eeb6544\"/> <hold time=\"5s\" /> <audio id=\"f0c5cdfe\"/> <hold time=\"5s\" /> <audio id=\"1bfc2ad2\"/> </ignore_interruptions> <endcall />"
+        ]
+      }
     }
     ```
 
-    Unlike `<ivr>`, this is a **block tag scoped to a span**: content goes between the opening and closing tags, it can appear more than once per action, and normal text or tags can come before and after it.
+    Unlike `<ivr>`, this is a **block tag scoped to a span**: content goes between the opening and closing tags, it can appear more than once per step, and normal text or tags can come before and after it.
 
     **What the main agent's speech does during the span:**
     - It does **not** interrupt playback or abort the remaining clips.
@@ -426,7 +350,7 @@ Tags can be combined with text and other sibling tags. They run from left to rig
 
     ```json
     {
-      "action": "<voicemail text=\"Hi, you've reached John. Leave a message.\" />"
+      "first_message": "<voicemail text=\"Hi, you've reached John. Leave a message.\" />"
     }
     ```
 
@@ -434,12 +358,12 @@ Tags can be combined with text and other sibling tags. They run from left to rig
 
     ```json
     {
-      "action": "<voicemail />"
+      "first_message": "<voicemail />"
     }
     ```
 
     <Warning>
-    `<voicemail>` must be the **entire action** — it cannot be combined with other text or tags in the same action string.
+    `<voicemail>` must be the **entire step** — it cannot be combined with other text or tags in the same step.
     </Warning>
 
     **Attributes:**
@@ -451,7 +375,7 @@ Tags can be combined with text and other sibling tags. They run from left to rig
 
     ```json
     {
-      "action": "Thank you for your help <endcall />"
+      "say": "Thank you for your help <endcall />"
     }
     ```
 
@@ -480,11 +404,8 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "id": 3,
-      "type": "standard",
-      "condition": "The agent offers time slots",
-      "action": "Let me think <silence time=\"2s\" /> I'll take the 3pm slot",
-      "fixed_message": true
+      "when": "The agent offers time slots",
+      "say": "Let me think <silence time=\"2s\" /> I'll take the 3pm slot"
     }
     ```
 
@@ -497,7 +418,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "Please wait <hold time=\"5s\" /> Are you still there?"
+      "say": "Please wait <hold time=\"5s\" /> Are you still there?"
     }
     ```
 
@@ -505,7 +426,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "First part <hold time=\"2s\" /> Second part <hold time=\"3s\" /> Final part"
+      "say": "First part <hold time=\"2s\" /> Second part <hold time=\"3s\" /> Final part"
     }
     ```
 
@@ -518,7 +439,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "My reference code is <spell>ABC123</spell>"
+      "say": "My reference code is <spell>ABC123</spell>"
     }
     ```
 
@@ -530,17 +451,17 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "<speed ratio=\"1.2\" /> I need to talk quickly about this"
+      "say": "<speed ratio=\"1.2\" /> I need to talk quickly about this"
     }
     ```
 
-    The tag may appear anywhere in the action, and applies from that point until the
-    next `<speed>` tag or the end of the action. Add `text` to scope it to just those
+    The tag may appear anywhere in the step, and applies from that point until the
+    next `<speed>` tag or the end of the step. Add `text` to scope it to just those
     words instead — the previous speed resumes afterwards:
 
     ```json
     {
-      "action": "My date of birth is <speed ratio=\"1.8\" text=\"August fifth, nineteen seventy-nine\" />, got it?"
+      "say": "My date of birth is <speed ratio=\"1.8\" text=\"August fifth, nineteen seventy-nine\" />, got it?"
     }
     ```
 
@@ -559,16 +480,16 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "<volume ratio=\"1.5\" /> This is important!"
+      "say": "<volume ratio=\"1.5\" /> This is important!"
     }
     ```
 
     Like `<speed>`, it may appear anywhere and holds until the next `<volume>` tag or
-    the end of the action, and `text` scopes it to just those words:
+    the end of the step, and `text` scopes it to just those words:
 
     ```json
     {
-      "action": "My card number is <volume ratio=\"0.3\" text=\"four two one nine\" /> — did you catch that?"
+      "say": "My card number is <volume ratio=\"0.3\" text=\"four two one nine\" /> — did you catch that?"
     }
     ```
 
@@ -585,7 +506,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
   <Accordion title="<voice> - Switch the Testing Agent's Voice" icon="user-group">
     Switch the testing agent's TTS voice mid-call. A self-closing tag without `text` changes
-    every later utterance — including later conditions — until another persistent `<voice>` tag
+    every later utterance — including later steps and conditions — until another persistent `<voice>` tag
     changes it. This is the **persistent** form.
 
     This is how you put more than one speaker in a single simulated call: a caller handing the
@@ -595,11 +516,8 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
     {
       "conditions": [
         {
-          "id": 2,
-          "condition": "agent asks to speak to the account holder",
-          "action": "Hold on, let me get my husband. <voice provider=\"11labs\" id=\"21m00Tcm4TlvDq8ikWAM\" /> Hi, this is Mark speaking.",
-          "type": "standard",
-          "fixed_message": true
+          "when": "The agent asks to speak to the account holder",
+          "say": "Hold on, let me get my husband. <voice provider=\"11labs\" id=\"21m00Tcm4TlvDq8ikWAM\" /> Hi, this is Mark speaking."
         }
       ]
     }
@@ -613,8 +531,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "<voice provider=\"cartesia\" id=\"b7d50908-b17c-442d-ad8d-810c63997ed9\" text=\"Hi, this is the manager.\" /> How can I help?",
-      "fixed_message": true
+      "say": "<voice provider=\"cartesia\" id=\"b7d50908-b17c-442d-ad8d-810c63997ed9\" text=\"Hi, this is the manager.\" /> How can I help?"
     }
     ```
 
@@ -623,13 +540,12 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "<voice provider=\"cartesia\" id=\"b7d50908-b17c-442d-ad8d-810c63997ed9\">Hi, this is the manager. <silence time=\"1s\" /> How can I help?</voice>",
-      "fixed_message": true
+      "say": "<voice provider=\"cartesia\" id=\"b7d50908-b17c-442d-ad8d-810c63997ed9\">Hi, this is the manager. <silence time=\"1s\" /> How can I help?</voice>"
     }
     ```
 
     Do not combine `text` with the opening/closing form. All `<voice>` tags require
-    `fixed_message: true`.
+    a verbatim step.
 
     **Attributes:**
     - `provider`: Voice provider (required) - `cartesia` or `11labs`. Must be the **same provider
@@ -661,11 +577,8 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "id": 2,
-      "type": "standard",
-      "condition": "The agent asks for account number",
-      "action": "<dtmf digits=\"123\" /> I've entered my account number",
-      "fixed_message": true
+      "when": "The agent asks for your account number",
+      "say": "<dtmf digits=\"123\" /> I've entered my account number"
     }
     ```
 
@@ -685,7 +598,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "<send_sms text=\"Confirmation code: 123456\" /> I've sent the code"
+      "say": "<send_sms text=\"Confirmation code: 123456\" /> I've sent the code"
     }
     ```
 
@@ -701,16 +614,13 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "id": 2,
-      "type": "standard",
-      "condition": "The agent asks for the job number",
-      "action": "<client_message t=\"get_session_args\" d='{\"job_number\":\"JB-42\"}' />",
-      "fixed_message": true
+      "when": "The agent asks for the job number",
+      "say": "<client_message t=\"get_session_args\" d='{\"job_number\":\"JB-42\"}' />"
     }
     ```
 
     The tag is silent: any text before or after it is spoken separately. Client
-    messages are sent in the order they appear in the action.
+    messages are sent in the order they appear in the step.
 
     **Attributes:**
     - `t`: App-defined RTVI message type (required). Use the exact type your
@@ -721,7 +631,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     <Warning>
     This tag is available for Pipecat agents that receive RTVI client messages.
-    It requires `fixed_message: true`, like all tags in conditional actions.
+    It requires a verbatim step, like all tags in Structured Tests.
     </Warning>
   </Accordion>
 
@@ -730,11 +640,9 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "id": 2,
-      "type": "action_followup",
-      "condition": 1,
-      "action": "<interruption time=\"3s\" /> Please listen carefully to these instructions",
-      "fixed_message": true
+      "when": "The agent starts explaining the cancellation policy",
+      "say": "Okay.",
+      "then": ["<interruption time=\"3s\" /> Please listen carefully to these instructions"]
     }
     ```
 
@@ -742,8 +650,8 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     <Warning>
     `<interruption>` has three requirements:
-    1. The condition must have `type: "action_followup"`
-    2. The tag must appear at the **very start** of the action string
+    1. It can only be used in a `then` step (including `first_message.then`) — not in `first_message` or a condition's `say`
+    2. The tag must appear at the **very start** of the step
     3. Something audible must follow it: spoken text, or a sound clip (`<noise>` or `<audio>`). A bare tag, or one followed only by `<silence>` or `<hold>`, is rejected
     </Warning>
 
@@ -751,11 +659,9 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "id": 3,
-      "type": "action_followup",
-      "condition": 2,
-      "action": "<interruption time=\"1.2s\" /> <noise sound=\"cough1\" />",
-      "fixed_message": true
+      "when": "The agent starts reading the terms",
+      "say": "Sure, go ahead.",
+      "then": ["<interruption time=\"1.2s\" /> <noise sound=\"cough1\" />"]
     }
     ```
 
@@ -772,7 +678,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "<background_noise sound=\"coffee-shop\" volume=\"0.3\">Hi, I'm calling about my order</background_noise>"
+      "say": "<background_noise sound=\"coffee-shop\" volume=\"0.3\">Hi, I'm calling about my order</background_noise>"
     }
     ```
 
@@ -816,7 +722,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
     | `holding-on-song` | Hold music |
 
     <Note>
-      The sounds above are available via the `<background_noise>` tag in evaluator actions. To use a **custom audio file URL** as background noise (e.g., `https://your-domain.com/noise.mp3`), use the **Custom URL** option in the Background Noise dropdown when [creating or editing a personality](/documentation/advanced/creating-custom-personalities) — no tag required.
+      The sounds above are available via the `<background_noise>` tag in evaluator steps. To use a **custom audio file URL** as background noise (e.g., `https://your-domain.com/noise.mp3`), use the **Custom URL** option in the Background Noise dropdown when [creating or editing a personality](/documentation/advanced/creating-custom-personalities) — no tag required.
     </Note>
   </Accordion>
 
@@ -825,7 +731,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "Hold on <noise sound=\"beep\" /> one moment"
+      "say": "Hold on <noise sound=\"beep\" /> one moment"
     }
     ```
 
@@ -840,7 +746,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "<noise sound=\"female-crying\" time=\"6000\" /> Sorry... I just got some bad news."
+      "say": "<noise sound=\"female-crying\" time=\"6000\" /> Sorry... I just got some bad news."
     }
     ```
   </Accordion>
@@ -850,7 +756,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
     ```json
     {
-      "action": "<network_simulation packet_loss=\"5\" /> Testing under poor network"
+      "say": "<network_simulation packet_loss=\"5\" /> Testing under poor network"
     }
     ```
 
@@ -861,7 +767,7 @@ Use `<silence>` when you want the conversation to feel natural and allow the mai
 
 ## Custom Functions
 
-Functions let the testing agent fetch **live data from your systems during the call** and use it in what it says — look up an order, pull an account record, then respond with the real values instead of invented ones. Declare functions once in a top-level `functions` array (a sibling of `role` and `conditions`), then use them from any condition's `action`.
+Functions let the testing agent fetch **live data from your systems during the call** and use it in what it says — look up an order, pull an account record, then respond with the real values instead of invented ones. Declare functions once in a top-level `functions` array (a sibling of `role` and `conditions`), then use them from any step after the first message.
 
 ```json
 {
@@ -934,28 +840,28 @@ Functions let the testing agent fetch **live data from your systems during the c
 | Trigger | Runs | Choose it when |
 |---------|------|----------------|
 | `auto_run: true` (default) | Once, at the start of the call, in the background | The data will be needed at some point in the call — it's fetched before any turn waits on it |
-| `<function name="lookup_order"/>` tag in an action | The moment that condition fires | The call must happen at a specific point in the flow (e.g. only after the agent asks), or you need to **re-fetch** — a tag always makes a fresh request |
+| `<function name="lookup_order"/>` tag in a step | The moment that condition fires | The call must happen at a specific point in the flow (e.g. only after the agent asks), or you need to **re-fetch** — a tag always makes a fresh request |
 
-The tag is allowed on any condition except the First Message (`id: 0`), on both `standard` and `action_followup` conditions, fixed or non-fixed.
+The tag is allowed in any step except the first message itself — a condition's `say` or any `then` step (including `first_message.then`), verbatim or `<ai_generated>`.
 
 ### Using the response
 
 Two ways to get fetched values into the testing agent's replies:
 
-- **Value placeholder — `{{function.lookup_order.status}}`** (fixed messages only). Substitutes one mapped output into the exact spoken text:
+- **Value placeholder — `{{function.lookup_order.status}}`** (verbatim steps only). Substitutes one mapped output into the exact spoken text:
 
   ```json
-  { "id": 2, "condition": 1, "action": "My order shows as {{function.lookup_order.status}}.", "type": "action_followup", "fixed_message": true }
+  { "when": "The agent asks about your order", "say": "My order shows as {{function.lookup_order.status}}." }
   ```
 
-- **Non-fixed actions — no placeholder needed.** When `fixed_message` is `false`, the testing agent is automatically given the function's results (your named outputs plus the response) and phrases its reply from them:
+- **AI-generated steps — no placeholder needed.** In an `<ai_generated>` step, the testing agent is automatically given the function's results (your named outputs plus the response) and phrases its reply from them:
 
   ```json
-  { "id": 2, "condition": 1, "action": "Ask about the order and mention its real status.", "type": "action_followup", "fixed_message": false }
+  { "when": "The agent asks about your order", "say": "<ai_generated>Ask about the order and mention its real status.</ai_generated>" }
   ```
 
 <Note>
-A single fixed action can both invoke and use a function — put the tag **before** the placeholder. The function completes before the text is spoken:
+A single verbatim step can both invoke and use a function — put the tag **before** the placeholder. The function completes before the text is spoken:
 
 `"Let me check. <function name=\"lookup_order\"/> It shows as {{function.lookup_order.status}}."`
 </Note>
@@ -1002,23 +908,23 @@ Make sure the referenced function has already run — via `auto_run` or a tag on
 A failed function never breaks the conversation. On a timeout, an error response, or an unreachable URL:
 
 - Mapped outputs fall back to their declared `default`.
-- A placeholder with **no** default is spoken as-is (`"...status is {{function.lookup_order.status}}"`) — declare defaults for anything a fixed message references.
-- On non-fixed actions, the testing agent is told the lookup failed, so it doesn't invent values.
+- A placeholder with **no** default is spoken as-is (`"...status is {{function.lookup_order.status}}"`) — declare defaults for anything a verbatim step references.
+- In `<ai_generated>` steps, the testing agent is told the lookup failed, so it doesn't invent values.
 
 ### Rules
 
 - Function `name`s must be unique; `<function>` tags and `{{function.*}}` placeholders must reference a declared function.
-- Placeholders require `fixed_message: true`, and the key must be an output declared in that function's `response_mapping`.
-- Neither tags nor placeholders may appear on the First Message (`id: 0`) — use `auto_run` and reference the values from a later condition.
+- Placeholders require a verbatim step, and the key must be an output declared in that function's `response_mapping`.
+- Neither tags nor placeholders may appear in the first message itself — use `auto_run` and reference the values from a later step.
 
-For a full scenario showing both flows — a fixed-message placeholder and a non-fixed grounded reply from one `auto_run` function — see [Example 5](#example-5-live-data-via-a-custom-function) below.
+For a full scenario showing both flows — a verbatim-step placeholder and an AI-generated grounded reply from one `auto_run` function — see [Example 5](#example-5-live-data-via-a-custom-function) below.
 
 ## Attached Audio
 
-Attach a pre-recorded audio clip to a scenario and the testing agent **plays the recording instead of speaking the text with TTS** when a referencing condition fires. A single clip can be referenced from any number of conditions and even multiple times within one action. Use it when the exact voice, accent, tone, or non-speech sound matters — reproducing a real caller's recording, a specific IVR prompt, background audio a synthetic voice can't recreate, or a regression case captured from a live call.
+Attach a pre-recorded audio clip to a scenario and the testing agent **plays the recording instead of speaking the text with TTS** when a referencing condition fires. A single clip can be referenced from any number of conditions and even multiple times within one step. Use it when the exact voice, accent, tone, or non-speech sound matters — reproducing a real caller's recording, a specific IVR prompt, background audio a synthetic voice can't recreate, or a regression case captured from a live call.
 
 <Note>
-Audio can only be attached to a **fixed-message** condition (`fixed_message: true`). It is not available on instruction-based (`fixed_message: false`) conditions — those are meant to vary, and a recording is fixed by definition.
+Audio can only be used in a **verbatim** step. It is not available in `<ai_generated>` steps — those are meant to vary, and a recording is fixed by definition.
 </Note>
 
 <Tip>
@@ -1029,7 +935,7 @@ If you only need a **second speaker** rather than a specific recording, use the 
 
 1. You upload an audio file to the scenario, optionally attaching it to a condition (from the editor UI or the API). Each clip gets a human-readable **name** that becomes its id — for example, `greeting` or `hold-music`.
 2. Cekura **transcribes it automatically** in the background — this is why a clip is briefly *processing* before it's ready to use.
-3. Reference the clip from any number of fixed-message actions by pasting its tag: `<audio id="greeting"/>`. You can write this tag by hand, or let the upload endpoint insert it for you when you pass `condition_id`.
+3. Reference the clip from any number of verbatim steps by pasting its tag: `<audio id="greeting"/>`. You can write this tag by hand, or let the upload endpoint insert it for you when you pass `condition_id`.
 4. When the condition fires, text, recordings, and tags run from left to right. The same clip plays wherever it is referenced.
 
 <Warning>
@@ -1038,9 +944,9 @@ The transcript is **derived from the recording** and is read-only.
 
 ### Attaching audio (UI)
 
-In the Conditional Actions editor, each fixed-message condition has an **Attach audio at cursor** control:
+In the Structured Tests editor, each verbatim step has an **Attach audio at cursor** control:
 
-1. Place the cursor where the recording should play, click **Attach audio at cursor**, and pick a file. You can attach more than one recording to the same action.
+1. Place the cursor where the recording should play, click **Attach audio at cursor**, and pick a file. You can attach more than one recording to the same step.
 2. When processing finishes, each recording shows its **read-only transcript** and an audio player. **Replace** or **Remove** affects only that recording; surrounding text and tags stay in place.
 3. While any attached clip is still processing (or has failed), **runs are blocked** for that scenario until it resolves — see [Statuses & run gating](#statuses-run-gating).
 
@@ -1051,7 +957,7 @@ Four endpoints on the scenario manage attached audio. Clips are uploaded as `mul
 <CodeGroup>
 
 ```bash Upload (with condition)
-# Attach a clip named "greeting" to condition 2 of scenario 39001
+# Attach a clip named "greeting" to step 2 of scenario 39001
 curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
   -H "Authorization: Bearer $CEKURA_API_KEY" \
   -F "name=greeting" \
@@ -1062,12 +968,12 @@ curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-
 ```
 
 ```bash Upload (without condition)
-# Add a clip to the scenario without touching any action
+# Add a clip to the scenario without touching any step
 curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
   -H "Authorization: Bearer $CEKURA_API_KEY" \
   -F "name=hold-music" \
   -F "file=@hold-music.wav"
-# Then reference it from any action: <audio id="hold-music"/>
+# Then reference it from any verbatim step: <audio id="hold-music"/>
 ```
 
 ```bash List
@@ -1088,17 +994,18 @@ curl -X PUT "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-a
 # Delete a clip and remove every <audio> reference to it
 curl -X DELETE "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
   -H "Authorization: Bearer $CEKURA_API_KEY"
-# Returns 409 if deleting would leave a non-opening action empty
+# Returns 409 if deleting would leave a step other than the first message empty
 ```
 
 </CodeGroup>
 
-The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry looks like:
+The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry — from the list, upload and replace responses — looks like:
 
 ```json
 {
   "audio_id": "greeting",
   "condition_ids": [2, 5],
+  "steps": ["conditions[0].then[0]", "conditions[2]"],
   "tag": "<audio id=\"greeting\"/>",
   "status": "ready",
   "transcript": "Hello, thanks for calling.",
@@ -1108,14 +1015,29 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
 }
 ```
 
-The scenario's GET response also includes a read-only `condition_audio` summary with every clip's tag and referencing conditions, so an author editing `instructions` directly can discover which clip ids exist.
+`steps` lists every place the clip is used, as paths into the evaluator (`first_message`, `conditions[1]`, `conditions[0].then[0]`), alongside the numeric `condition_ids`.
+
+The scenario's GET response also includes a read-only `condition_audio` summary with every clip's tag and where it is used, so an author editing `instructions` directly can discover which clip ids exist:
+
+```json
+"condition_audio": {
+  "greeting": {
+    "tag": "<audio id=\"greeting\"/>",
+    "status": "ready",
+    "condition_ids": [0, 3],
+    "steps": ["first_message", "conditions[1].then[0]"]
+  }
+}
+```
+
+`condition_ids` (and the upload's `condition_id`) number the steps from 0 in reading order: `first_message` is 0, followed by its `then` steps, then each condition's `say` followed by its `then` steps.
 
 <ParamField path="name" type="string">
   The clip's id, used in its `<audio>` tag and as its stored object name. Letters, digits, underscores and hyphens, max 64 characters; must be unique within the scenario (case-insensitive). Omit to derive a readable name from the filename (lowercased, hyphenated, trimmed to 32 characters).
 </ParamField>
 
 <ParamField path="condition_id" type="integer">
-  The `id` of the condition to attach the clip to. The condition must already exist and have `fixed_message: true`. Omit to add the clip to the scenario without touching any action — then reference it yourself with `<audio id="..."/>` from as many actions as needed.
+  The number of the step to attach the clip to, counted from 0 in reading order (see above). The step must already exist and be verbatim. Omit to add the clip to the scenario without touching any step — then reference it yourself with `<audio id="..."/>` from as many steps as needed.
 </ParamField>
 
 <ParamField path="file" type="file" required>
@@ -1123,11 +1045,11 @@ The scenario's GET response also includes a read-only `condition_audio` summary 
 </ParamField>
 
 <ParamField path="action_template" type="string">
-  Requires `condition_id`. The complete action with one `<audio />` marker where the new recording should be inserted. Existing managed audio tags must remain in the template.
+  Requires `condition_id`. The complete step text with one `<audio />` marker where the new recording should be inserted. Existing managed audio tags must remain in the template.
 </ParamField>
 
 <ParamField path="replace_audio_id" type="string">
-  Requires `condition_id`. Points that condition's existing tag at the new clip. To swap a clip's audio while keeping every reference to it, PUT to `condition-audio/{audio_id}/` instead.
+  Requires `condition_id`. Points that step's existing tag at the new clip. To swap a clip's audio while keeping every reference to it, PUT to `condition-audio/{audio_id}/` instead.
 </ParamField>
 
 ### Statuses & run gating
@@ -1152,34 +1074,19 @@ A scenario **cannot be run while any attached clip is not `ready`** — the run 
 ```json Basic Cancellation
 {
   "role": "You are a patient calling to cancel your appointment",
+  "first_message": "Hello, I need to cancel my appointment",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "Hello, I need to cancel my appointment",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks for your name",
+      "say": "<ai_generated>Provide your name</ai_generated>"
     },
     {
-      "id": 1,
-      "condition": "The agent asks for your name",
-      "action": "Provide your name",
-      "type": "standard",
-      "fixed_message": false
+      "when": "The agent asks for your date of birth",
+      "say": "<ai_generated>Provide your date of birth</ai_generated>"
     },
     {
-      "id": 2,
-      "condition": "The agent asks for your date of birth",
-      "action": "Provide your date of birth",
-      "type": "standard",
-      "fixed_message": false
-    },
-    {
-      "id": 3,
-      "condition": "The agent confirms the cancellation",
-      "action": "Thank them and end the call",
-      "type": "standard",
-      "fixed_message": false
+      "when": "The agent confirms the cancellation",
+      "say": "<ai_generated>Thank them and say goodbye</ai_generated>"
     }
   ]
 }
@@ -1188,34 +1095,19 @@ A scenario **cannot be run while any attached clip is not `ready`** — the run 
 ```json With Reschedule Option
 {
   "role": "You are a patient calling to cancel your appointment",
+  "first_message": "Hi, I need to cancel my appointment on Tuesday",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "Hi, I need to cancel my appointment on Tuesday",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent offers to reschedule",
+      "say": "<ai_generated>Accept and say you prefer next week</ai_generated>"
     },
     {
-      "id": 1,
-      "condition": "The agent offers to reschedule",
-      "action": "Accept and say you prefer next week",
-      "type": "standard",
-      "fixed_message": false
+      "when": "The agent provides available time slots",
+      "say": "<ai_generated>Select the first available option</ai_generated>"
     },
     {
-      "id": 2,
-      "condition": "The agent provides available time slots",
-      "action": "Select the first available option",
-      "type": "standard",
-      "fixed_message": false
-    },
-    {
-      "id": 3,
-      "condition": "The agent asks if anything else is needed",
-      "action": "No, that's all. Thank you for your help. <endcall />",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks if anything else is needed",
+      "say": "No, that's all. Thank you for your help. <endcall />"
     }
   ]
 }
@@ -1230,34 +1122,19 @@ A scenario **cannot be run while any attached clip is not `ready`** — the run 
 ```json Inbound IVR (main agent is the IVR)
 {
   "role": "You are a customer calling support",
+  "first_message": "",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The IVR plays the menu options",
+      "say": "<dtmf digits=\"2\" />"
     },
     {
-      "id": 1,
-      "condition": "The IVR plays the menu options",
-      "action": "<dtmf digits=\"2\" />",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks how they can help",
+      "say": "<ai_generated>Explain your billing issue</ai_generated>"
     },
     {
-      "id": 2,
-      "condition": "The agent asks how they can help",
-      "action": "Explain your billing issue",
-      "type": "standard",
-      "fixed_message": false
-    },
-    {
-      "id": 3,
-      "condition": "The agent asks for account number",
-      "action": "<dtmf digits=\"123456#\" />",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks for your account number",
+      "say": "<dtmf digits=\"123456#\" />"
     }
   ]
 }
@@ -1266,34 +1143,19 @@ A scenario **cannot be run while any attached clip is not `ready`** — the run 
 ```json Outbound IVR (testing agent simulates an external IVR)
 {
   "role": "You are simulating a third-party IVR that the agent will call into",
+  "first_message": "<ivr text=\"Thank you for calling Acme Corp. Press 1 for sales, press 2 for support.\" />",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "<ivr text=\"Thank you for calling Acme Corp. Press 1 for sales, press 2 for support.\" />",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The main agent pressed 1",
+      "say": "Connecting you to sales now. Please hold."
     },
     {
-      "id": 1,
-      "condition": "The main agent pressed 1",
-      "action": "Connecting you to sales now. Please hold.",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The main agent pressed 2",
+      "say": "Connecting you to support now. Please hold."
     },
     {
-      "id": 2,
-      "condition": "The main agent pressed 2",
-      "action": "Connecting you to support now. Please hold.",
-      "type": "standard",
-      "fixed_message": true
-    },
-    {
-      "id": 3,
-      "condition": "The agent states their reason for calling",
-      "action": "Thank you. Routing your call now. <endcall />",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent states their reason for calling",
+      "say": "Thank you. Routing your call now. <endcall />"
     }
   ]
 }
@@ -1303,82 +1165,53 @@ A scenario **cannot be run while any attached clip is not `ready`** — the run 
 
 <Note>
 **Inbound vs outbound IVR patterns differ:**
-- **Inbound** (main agent IS the IVR): Use `<dtmf>` to navigate the IVR menu played by the main agent. `<dtmf>` can appear in any condition.
-- **Outbound** (testing agent simulates an external IVR): Use `<ivr text="..." />` to play the IVR menu. `<ivr>` can appear in any condition. When the scenario contains `<ivr>`, DTMF digits pressed by the main agent appear in the transcript — write your conditions using the specific digit (e.g., `"The main agent pressed 1"`).
+- **Inbound** (main agent IS the IVR): Use `<dtmf>` to navigate the IVR menu played by the main agent. `<dtmf>` can appear in any verbatim step.
+- **Outbound** (testing agent simulates an external IVR): Use `<ivr text="..." />` to play the IVR menu. `<ivr>` can appear in any verbatim step. When the scenario contains `<ivr>`, DTMF digits pressed by the main agent appear in the transcript — write your conditions using the specific digit (e.g., `"The main agent pressed 1"`).
 </Note>
 
-### Example 3: Multi-Part Response with Followup
+### Example 3: Multi-Part Response with Follow-ups
 
 ```json
 {
   "role": "You are a customer with a complex request",
+  "first_message": {
+    "say": "Hi, I need help with my order",
+    "then": [
+      "<ai_generated>Also mention you haven't received a confirmation email</ai_generated>",
+      "<ai_generated>And ask if you can get expedited shipping</ai_generated>"
+    ]
+  },
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "Hi, I need help with my order",
-      "type": "standard",
-      "fixed_message": true
-    },
-    {
-      "id": 1,
-      "type": "action_followup",
-      "condition": 0,
-      "action": "Also mention you haven't received a confirmation email",
-      "fixed_message": false
-    },
-    {
-      "id": 2,
-      "type": "action_followup",
-      "condition": 1,
-      "action": "And ask if you can get expedited shipping",
-      "fixed_message": false
-    },
-    {
-      "id": 3,
-      "condition": "The agent responds to your requests",
-      "action": "Thank them and confirm the details",
-      "type": "standard",
-      "fixed_message": false
+      "when": "The agent responds to your requests",
+      "say": "<ai_generated>Thank them and confirm the details</ai_generated>"
     }
   ]
 }
 ```
 
 **Turn-by-turn flow for Example 3:**
-1. Testing agent sends condition 0: "Hi, I need help with my order"
+1. Testing agent sends the first message: "Hi, I need help with my order"
 2. Main agent replies
-3. Action followup (condition: 0) fires — testing agent: "Also mention you haven't received a confirmation email"
+3. The first `then` step fires — testing agent mentions the missing confirmation email
 4. Main agent replies
-5. Action followup (condition: 1) fires — testing agent: "And ask if you can get expedited shipping"
-6. Main agent replies — condition 3 (standard) matches and fires
+5. The second `then` step fires — testing agent asks about expedited shipping
+6. Main agent replies — the condition matches and fires
 
 ### Example 4: Using Advanced Tags
 
 ```json
 {
   "role": "You are a customer in a noisy environment",
+  "first_message": "<background_noise sound=\"coffee-shop\" volume=\"0.3\">Hi, I'm calling about my order</background_noise>",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "<background_noise sound=\"coffee-shop\" volume=\"0.3\">Hi, I'm calling about my order</background_noise>",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks you to repeat",
+      "say": "<volume ratio=\"1.5\" />I said I'm calling about my order, <spell>ABC</spell> 123"
     },
     {
-      "id": 1,
-      "condition": "The agent asks you to repeat",
-      "action": "<volume ratio=\"1.5\" />I said I'm calling about my order, <spell>ABC</spell> 123",
-      "type": "standard",
-      "fixed_message": true
-    },
-    {
-      "id": 2,
-      "condition": "The agent asks for more information",
-      "action": "Let me check <silence time=\"2s\" /> here's the reference number",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks for more information",
+      "say": "Let me check <silence time=\"2s\" /> here's the reference number"
     }
   ]
 }
@@ -1386,7 +1219,7 @@ A scenario **cannot be run while any attached clip is not `ready`** — the run 
 
 ### Example 5: Live Data via a Custom Function
 
-One `auto_run` function feeding both flows: condition 1 drops a fetched value into a **fixed message** with a `{{function.*}}` placeholder, and condition 2 lets the testing agent phrase a **non-fixed** reply from the same response — no placeholder needed.
+One `auto_run` function feeding both kinds of step: the first condition drops a fetched value into a **verbatim** step with a `{{function.*}}` placeholder, and its `then` step lets the testing agent phrase an **AI-generated** reply from the same response — no placeholder needed.
 
 ```json
 {
@@ -1407,34 +1240,18 @@ One `auto_run` function feeding both flows: condition 1 drops a fetched value in
       }
     }
   ],
+  "first_message": "Hi, I'd like to check on my order.",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "Hi, I'd like to check on my order.",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks for the name on the order",
+      "say": "It's under {{function.lookup.customer}}.",
+      "then": [
+        "<ai_generated>Ask whether the order status they see matches yours, mentioning the real status from the lookup.</ai_generated>"
+      ]
     },
     {
-      "id": 1,
-      "condition": "The agent asks for the name on the order",
-      "action": "It's under {{function.lookup.customer}}.",
-      "type": "standard",
-      "fixed_message": true
-    },
-    {
-      "id": 2,
-      "condition": 1,
-      "action": "Ask whether the order status they see matches yours, mentioning the real status from the lookup.",
-      "type": "action_followup",
-      "fixed_message": false
-    },
-    {
-      "id": 3,
-      "condition": "The agent confirms the order status",
-      "action": "Great, that's all I needed. Thanks! <endcall />",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent confirms the order status",
+      "say": "Great, that's all I needed. Thanks! <endcall />"
     }
   ]
 }
@@ -1442,51 +1259,54 @@ One `auto_run` function feeding both flows: condition 1 drops a fetched value in
 
 **Turn-by-turn flow for Example 5:**
 1. As the call connects, `lookup` runs once in the background (`auto_run`) — say it returns `{"status": "shipped", "customer_name": "Jane Doe"}`
-2. Testing agent sends condition 0: "Hi, I'd like to check on my order."
-3. The agent asks for the name — condition 1 (**fixed**) fires with the placeholder substituted verbatim: "It's under Jane Doe."
-4. The agent replies — condition 2 (**non-fixed**) fires; the testing agent is given the lookup results automatically and phrases them naturally: e.g. "On my side it shows as shipped — is that what you see?"
-5. The agent confirms — condition 3 closes the call
+2. Testing agent sends the first message: "Hi, I'd like to check on my order."
+3. The agent asks for the name — the first condition's **verbatim** `say` fires with the placeholder substituted: "It's under Jane Doe."
+4. The agent replies — the **AI-generated** `then` step fires; the testing agent is given the lookup results automatically and phrases them naturally: e.g. "On my side it shows as shipped — is that what you see?"
+5. The agent confirms — the second condition closes the call
 
-If the API call fails, the declared `default`s take over: condition 1 speaks "It's under unknown." and the testing agent in condition 2 is told the lookup failed rather than inventing a status.
+If the API call fails, the declared `default`s take over: the first condition speaks "It's under unknown." and the testing agent in the `then` step is told the lookup failed rather than inventing a status.
 
-**On-demand variant (`auto_run: false`):** to run the lookup only at a specific point in the flow instead of at call start, turn off `auto_run` and invoke it with a tag — the function completes before the rest of the action is spoken:
+**On-demand variant (`auto_run: false`):** to run the lookup only at a specific point in the flow instead of at call start, turn off `auto_run` and invoke it with a tag — the function completes before the rest of the step is spoken:
 
 ```json
-"functions": [
-  { "name": "lookup", "type": "rest_api", "auto_run": false,
-    "config": { "method": "GET", "url": "https://api.example.com/orders/{{test_profile.order_id}}",
-      "response_mapping": { "customer": { "path": "$.customer_name", "default": "unknown" } } } }
-],
-"conditions": [
-  { "id": 1, "condition": "The agent asks for the name on the order",
-    "action": "One moment. <function name=\"lookup\"/> It's under {{function.lookup.customer}}.",
-    "type": "standard", "fixed_message": true }
-]
+{
+  "role": "You are a customer checking on an order",
+  "functions": [
+    { "name": "lookup", "type": "rest_api", "auto_run": false,
+      "config": { "method": "GET", "url": "https://api.example.com/orders/{{test_profile.order_id}}",
+        "response_mapping": { "customer": { "path": "$.customer_name", "default": "unknown" } } } }
+  ],
+  "first_message": "Hi, I'd like to check on my order.",
+  "conditions": [
+    { "when": "The agent asks for the name on the order",
+      "say": "One moment. <function name=\"lookup\"/> It's under {{function.lookup.customer}}." }
+  ]
+}
 ```
 
-Nothing runs at call start; the request fires the moment condition 1 executes, and the same fixed/non-fixed usage rules apply from there.
+Nothing runs at call start; the request fires the moment that step executes, and the same verbatim / AI-generated rules apply from there.
 
 ## Best Practices
 
 <CardGroup cols={2}>
   <Card title="Clear Conditions" icon="check">
-    Write conditions that clearly describe **when** they should trigger.
+    Write `when` so it clearly describes **what the agent does** to trigger it.
 
     - ✅ "The agent asks for your email"
     - ❌ "Email"
   </Card>
 
-  <Card title="Specific Actions" icon="bullseye">
-    Make actions specific and actionable.
+  <Card title="Specific Steps" icon="bullseye">
+    Make steps specific and actionable.
 
-    - ✅ "Provide your email address"
-    - ❌ "Answer the question"
+    - ✅ "<ai_generated>Provide your email address</ai_generated>"
+    - ❌ "<ai_generated>Answer the question</ai_generated>"
   </Card>
 
   <Card title="Logical Flow" icon="arrow-right">
     Order conditions in a logical conversation flow.
 
-    Start with `id: 0` (FIRST_MESSAGE), then follow natural conversation progression.
+    Start with `first_message`, then follow natural conversation progression.
   </Card>
 </CardGroup>
 
@@ -1498,27 +1318,16 @@ Handle different paths based on agent response:
 
 ```json
 {
+  "role": "You are a customer requesting a refund",
+  "first_message": "I would like to request a refund for my order",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "I would like to request a refund for my order",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent approves the refund",
+      "say": "<ai_generated>Thank them and confirm the details</ai_generated>"
     },
     {
-      "id": 1,
-      "condition": "The agent approves the refund",
-      "action": "Thank them and confirm the details",
-      "type": "standard",
-      "fixed_message": false
-    },
-    {
-      "id": 2,
-      "condition": "The agent denies the refund",
-      "action": "Ask to speak with a manager",
-      "type": "standard",
-      "fixed_message": false
+      "when": "The agent denies the refund",
+      "say": "<ai_generated>Ask to speak with a manager</ai_generated>"
     }
   ]
 }
@@ -1530,75 +1339,40 @@ Progressively provide information as requested:
 
 ```json
 {
+  "role": "You are a customer calling about your account",
+  "first_message": "Hi, I'm calling about my account",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "Hi, I'm calling about my account",
-      "type": "standard",
-      "fixed_message": true
+      "when": "The agent asks for your name",
+      "say": "<ai_generated>Provide your name</ai_generated>"
     },
     {
-      "id": 1,
-      "condition": "The agent asks for your name",
-      "action": "Provide your name",
-      "type": "standard",
-      "fixed_message": false
+      "when": "The agent asks for your account number",
+      "say": "<ai_generated>Provide your account number</ai_generated>"
     },
     {
-      "id": 2,
-      "condition": "The agent asks for your account number",
-      "action": "Provide your account number",
-      "type": "standard",
-      "fixed_message": false
-    },
-    {
-      "id": 3,
-      "condition": "The agent asks for verification",
-      "action": "Provide your date of birth",
-      "type": "standard",
-      "fixed_message": false
+      "when": "The agent asks for verification",
+      "say": "<ai_generated>Provide your date of birth</ai_generated>"
     }
   ]
 }
 ```
 
-### Pattern 3: Scripted Sequence with action_followup
+### Pattern 3: Scripted Sequence with `then`
 
-Chain `action_followup` conditions to deliver an exact sequence of messages across turns, with no conditions to match — each followup fires automatically on the next turn after the main agent replies, regardless of what the main agent says:
+Use `then` to deliver an exact sequence of messages across turns, with no conditions to match — each step fires automatically on the next turn after the main agent replies, regardless of what the main agent says:
 
 ```json
 {
-  "conditions": [
-    {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "Hi, I need to update my address",
-      "type": "standard",
-      "fixed_message": true
-    },
-    {
-      "id": 1,
-      "type": "action_followup",
-      "condition": 0,
-      "action": "My new street is 123 Main Street",
-      "fixed_message": true
-    },
-    {
-      "id": 2,
-      "type": "action_followup",
-      "condition": 1,
-      "action": "City is Springfield",
-      "fixed_message": true
-    },
-    {
-      "id": 3,
-      "type": "action_followup",
-      "condition": 2,
-      "action": "Zip code is 62701",
-      "fixed_message": true
-    }
-  ]
+  "role": "You are a customer updating your address",
+  "first_message": {
+    "say": "Hi, I need to update my address",
+    "then": [
+      "My new street is 123 Main Street",
+      "City is Springfield",
+      "Zip code is 62701"
+    ]
+  }
 }
 ```
 
@@ -1609,7 +1383,7 @@ Chain `action_followup` conditions to deliver an exact sequence of messages acro
 </Tip>
 
 <Tip>
-  **Use Descriptive IDs**: While IDs must be integers, use sequential numbering (0, 1, 2, ...) for clarity. IDs must be unique across all conditions.
+  **Default to verbatim**: Exact wording makes runs reproducible. Reach for `<ai_generated>` only where the reply should vary.
 </Tip>
 
 <Tip>
@@ -1619,42 +1393,38 @@ Chain `action_followup` conditions to deliver an exact sequence of messages acro
 ## Troubleshooting
 
 <AccordionGroup>
-  <Accordion title="Validation error: first condition must have condition='FIRST_MESSAGE'" icon="triangle-exclamation">
-    **Issue**: The API returns a validation error about the first condition.
+  <Accordion title="Validation error: <ai_generated> is not allowed in the first message" icon="triangle-exclamation">
+    **Issue**: `first_message: the first message is always said verbatim; <ai_generated> is not allowed.`
 
-    **Solution**: Ensure the first element in your `conditions` array has all three:
+    **Solution**: Write the opening line out word-for-word. If you want an improvised step right after it, put it in `first_message.then`:
     ```json
-    { "id": 0, "condition": "FIRST_MESSAGE", "action": "...", "type": "standard", "fixed_message": true }
-    ```
-    Previously `condition` was left empty (`""`); it must now be the exact string `"FIRST_MESSAGE"`.
-  </Accordion>
-
-  <Accordion title="Validation error: type is required" icon="triangle-exclamation">
-    **Issue**: The API returns a validation error about a missing `type` field.
-
-    **Solution**: Add `type` explicitly to every condition. There is no default:
-    ```json
-    { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard", "fixed_message": false }
+    { "first_message": { "say": "Hi there", "then": ["<ai_generated>Explain why you are calling</ai_generated>"] } }
     ```
   </Accordion>
 
-  <Accordion title="Validation error: fixed_message is required" icon="triangle-exclamation">
-    **Issue**: The API returns a validation error about a missing `fixed_message` field.
+  <Accordion title="Validation error: <ai_generated> must wrap the whole step" icon="triangle-exclamation">
+    **Issue**: A step mixes verbatim text with an `<ai_generated>` part, or nests one inside another.
 
-    **Solution**: Add `fixed_message` explicitly to every condition set to `true` or `false`:
+    **Solution**: A step is either entirely verbatim or entirely AI-generated. Split mixed content into two steps using `then`:
     ```json
-    { "id": 1, "condition": "Agent asks for name", "action": "Provide name", "type": "standard", "fixed_message": false }
+    { "when": "The agent asks about pricing", "say": "Sure.", "then": ["<ai_generated>Ask about discounts</ai_generated>"] }
     ```
   </Accordion>
 
-  <Accordion title="Validation error: duplicate condition ID" icon="copy">
-    **Issue**: Two or more conditions share the same `id`.
+  <Accordion title="Validation error: a tag in an <ai_generated> step" icon="triangle-exclamation">
+    **Issue**: For example, `conditions[0]: action contains <endcall> tag but the step is wrapped in <ai_generated>.`
 
-    **Solution**: Ensure every condition has a unique integer `id`. Use sequential numbering (0, 1, 2, ...) to avoid collisions.
+    **Solution**: Tags only work in verbatim steps. Remove the `<ai_generated>` wrapper, or move the tag into its own verbatim `then` step.
+  </Accordion>
+
+  <Accordion title="Validation error: <interruption> must be a then step" icon="triangle-exclamation">
+    **Issue**: `<interruption>` was used in `first_message` or a condition's `say`.
+
+    **Solution**: Move it into a `then` step, at the very start of that step.
   </Accordion>
 
   <Accordion title="Validation error: scenario_language is required" icon="language">
-    **Issue**: Creating a Conditional Actions evaluator fails with a language error.
+    **Issue**: Creating a Structured Tests evaluator fails with a language error.
 
     **Solution**: Assign a personality to the evaluator — the language is inferred automatically from the personality. Alternatively, set `scenario_language` explicitly in the request.
   </Accordion>
@@ -1663,19 +1433,19 @@ Chain `action_followup` conditions to deliver an exact sequence of messages acro
     **Issue**: A condition isn't triggering when expected.
 
     **Solutions**:
-    - Make the condition more specific
+    - Make `when` more specific
     - Check if a previous condition is matching instead
-    - Verify the condition describes what the agent says, not what the evaluator should do
+    - Verify `when` describes what the agent does, not what the evaluator should do
   </Accordion>
 
-  <Accordion title="action_followup firing unexpectedly or not at all" icon="triangle-exclamation">
-    **Issue**: An `action_followup` fires at the wrong time or doesn't fire.
+  <Accordion title="A then step fires earlier or later than expected" icon="triangle-exclamation">
+    **Issue**: A `then` step fires at the wrong time.
 
-    **Explanation**: `action_followup` fires on the **next turn** after the referenced condition — after the testing agent sends condition X and the main agent replies. It does not fire in the same turn as condition X.
+    **Explanation**: Each `then` step fires on the **next turn** after the step before it — after the testing agent delivers that step and the main agent replies. It never fires in the same turn, and it does not wait for any particular reply.
 
     **Solutions**:
-    - Ensure `condition` points to the correct ID of the preceding condition
-    - If chaining multiple followups, each one references the ID of the previous followup (not the original condition)
+    - If a step should only fire after a specific reply, make it its own condition with a matching `when` instead of a `then` step
+    - Keep `then` for messages that should follow regardless of what the agent says
   </Accordion>
 
   <Accordion title="Tags Not Working" icon="tag">
@@ -1683,18 +1453,16 @@ Chain `action_followup` conditions to deliver an exact sequence of messages acro
 
     **Solutions**:
     - Check tag syntax (spelling, attributes, closing format)
-    - Check tag placement (some tags must be at the start or span the entire action)
-    - Confirm `fixed_message: true` is set — tags don't work with instruction-based actions
+    - Check tag placement (some tags must be at the start or span the entire step)
+    - Confirm the step is verbatim — tags don't work in `<ai_generated>` steps
   </Accordion>
 
   <Accordion title="First Message Not Sending" icon="message">
     **Issue**: The conversation doesn't start.
 
     **Solutions**:
-    - Ensure you have a condition with `id: 0` and `condition: "FIRST_MESSAGE"`
-    - Verify `fixed_message: true` is set on the first condition
+    - Check that `first_message` is set — an empty `first_message` means the testing agent waits for the main agent to speak first
     - Check that the role is defined
-    - If the agent speaks first, set `action` to `""` (empty string is allowed for FIRST_MESSAGE only)
   </Accordion>
 
   <Accordion title="Can't run — an attached audio clip is still transcribing / failed" icon="waveform">
@@ -1703,10 +1471,10 @@ Chain `action_followup` conditions to deliver an exact sequence of messages acro
     **Solution**: A scenario can't run while any [attached audio](#attached-audio) clip is not `ready`. Wait for transcription to finish (`pending`/`processing`), or if a clip `failed`, re-upload it or remove it. Check clip statuses via `GET scenarios/{id}/condition-audio/`.
   </Accordion>
 
-  <Accordion title="Attach audio option is missing on a condition" icon="microphone-slash">
-    **Issue**: A condition has no way to attach a recording.
+  <Accordion title="Attach audio option is missing on a step" icon="microphone-slash">
+    **Issue**: A step has no way to attach a recording.
 
-    **Solution**: Audio attaches only to **fixed-message** conditions. Set `fixed_message: true` on the condition first.
+    **Solution**: Audio attaches only to **verbatim** steps — uploading to an `<ai_generated>` step returns `Audio can only be attached to a verbatim step, not one wrapped in <ai_generated>`. Remove the `<ai_generated>` wrapper from the step first.
   </Accordion>
 </AccordionGroup>
 

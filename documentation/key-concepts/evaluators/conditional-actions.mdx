@@ -72,9 +72,41 @@ The `conditions` array defines the rules for the rest of the conversation. Each 
 - **What** the testing agent says (`say`)
 - Optionally, what it says on the **following turns** (`then`)
 
-<Note>
-Evaluators written in the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) are still accepted when you create or update an evaluator. Responses return the format described on this page.
-</Note>
+## Changes from the earlier format
+
+Structured tests used to be written as id-based rows. Responses now return the format on this page. The earlier format is still accepted when you create or update an evaluator, so existing integrations keep working.
+
+| Earlier format | Current format |
+|---|---|
+| Row with `"condition": "FIRST_MESSAGE"` (`id` 0) | `first_message` |
+| `condition` | `when` |
+| `action` | `say` |
+| `action_followup` rows linked by `id` | `then` list on the condition |
+| `fixed_message: true` | Plain step (spoken word-for-word) |
+| `fixed_message: false` | Step wrapped in `<ai_generated>...</ai_generated>` |
+
+<CodeGroup>
+```json Earlier
+{
+  "role": "You are a patient calling to book an appointment",
+  "conditions": [
+    {"id": 0, "condition": "FIRST_MESSAGE", "action": "Hi, I need an appointment", "type": "standard", "fixed_message": true},
+    {"id": 1, "condition": "The agent asks for your name", "action": "John Smith", "type": "standard", "fixed_message": true},
+    {"id": 2, "condition": 1, "action": "<endcall />", "type": "action_followup", "fixed_message": true}
+  ]
+}
+```
+
+```json Current
+{
+  "role": "You are a patient calling to book an appointment",
+  "first_message": "Hi, I need an appointment",
+  "conditions": [
+    {"when": "The agent asks for your name", "say": "John Smith", "then": ["<endcall />"]}
+  ]
+}
+```
+</CodeGroup>
 
 ## Fields
 

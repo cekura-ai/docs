@@ -51,6 +51,7 @@ When writing your custom code, you have access to different variables depending 
 | <span title="Audio metadata and analysis results">**recording_data**</span> | ✅ | ✅ |
 | <span title="Provider execution logs as list of entries">**logs**</span> | ✅ | ✅ |
 | <span title="Results from evaluated metrics">**Metric Results**</span> | ✅ | ✅ |
+| <span title="Prerequisite results keyed by slug">**metrics**</span> | ✅ | ✅ |
 | <span title="Call topic/subject (Observability only)">**topic**</span> | ❌ | ✅ |
 | <span title="Average latency and detailed latency data">**Latency Metrics**</span> | ✅ | ✅ |
 | <span title="Dynamic variables from API (Observability only)">**dynamic_variables**</span> | ❌ | ✅ |
@@ -694,16 +695,27 @@ Here's the complete structure of data available to your custom Python code:
 
 ### Data Flow and Execution Order
 
-**Important:** Custom Python code metrics execute **after** all other metrics (Basic, Advanced, and pre-defined metrics). This means:
+Metrics are evaluated in dependency levels. A metric that reads another metric's result runs after that metric has finished; metrics with no prerequisites run in parallel in the first level, and user-defined Python metrics with no prerequisites run after the LLM-judge and predefined metrics of the same level, so they still receive every earlier result.
 
-1. Non-custom metrics evaluate first
-2. Results are structured and merged into the `data` dictionary
-3. Custom code receives ALL previous results via direct dictionary access
-4. Custom code can build upon or combine existing metric results
+1. Declare prerequisites with `configuration.metric_dependencies` (a list of metric IDs; names or slugs are also accepted), or leave the key out and the prerequisites are inferred from literal `data["Metric Name"]` reads in your code.
+2. Each level runs in parallel. The next level starts once every metric in the previous level has a result.
+3. If a prerequisite has no real result (its trigger skipped it, it timed out, or it returned `None`), the dependent metric is not scored: it is saved with `extra.dependency_failed`, `extra.missing_metric_ids` and `extra.missing_metric_names`, and is not charged.
+4. Cycles, more than 10 prerequisites on one metric, and chains deeper than 5 levels are rejected when the metric is saved.
+
+Prerequisites must be enabled for the same source as the dependent metric: a metric that is observability-only cannot be satisfied on simulation runs.
 
 ### Using Metric Results
 
 You can access the results of other metrics that were evaluated for the same call directly by metric name using `data["Metric Name"]`. You can also access their explanations using `data["explanation"]["Metric Name"]`.
+
+Prerequisites are also available under `data["metrics"]`, keyed by metric slug and by name. Each entry has `id`, `name`, `slug`, `score`, `enum`, `value` (the score or enum, whichever is set) and `explanation`:
+
+```python
+classification = data["metrics"]["customer_classification"]
+if classification["value"] == "existing":
+    _result = data["Upsell offered"] is True
+    _explanation = classification["explanation"]
+```
 
 Example usage:
 

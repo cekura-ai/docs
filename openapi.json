@@ -521,6 +521,30 @@
                 "x-docs-exclude": true
             }
         },
+        "/app/v2/product-chat/conversations/pending-optimizer-count/": {
+            "get": {
+                "operationId": "app-v2-product-chat-conversations-pending-optimizer-count-retrie",
+                "description": "Number of visible conversations with an unanswered optimiser round.",
+                "summary": "Count chats awaiting metric optimiser answers",
+                "tags": [
+                    "app"
+                ],
+                "security": [
+                    {
+                        "oauth2": []
+                    },
+                    {
+                        "supabase_session": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                },
+                "x-docs-exclude": true
+            }
+        },
         "/app/v2/product-chat/messages/{message_id}/cancel/": {
             "post": {
                 "operationId": "app-v2-product-chat-messages-cancel-create",
@@ -37331,6 +37355,19 @@
                             "minLength": 1
                         },
                         "description": "\nSort evaluators by a field. Prefix with `-` for descending. Defaults to newest first.\nAllowed: `id`, `name`, `created_at`, `updated_at`, `personality_name`, `agent_name`, `test_profile_name`, `scenario_language`\nExample: `-updated_at`\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "conditional_actions_format",
+                        "schema": {
+                            "enum": [
+                                "legacy"
+                            ],
+                            "type": "string",
+                            "x-spec-enum-id": "6ce7d2b00233f18d",
+                            "minLength": 1
+                        },
+                        "description": "Set to `legacy` to return conditional-action `instructions` in the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`).\n\n* `legacy` - legacy"
                     }
                 ],
                 "tags": [
@@ -37574,6 +37611,19 @@
                             "minLength": 1
                         },
                         "description": "\nSort evaluators by a field. Prefix with `-` for descending. Defaults to newest first.\nAllowed: `id`, `name`, `created_at`, `updated_at`, `personality_name`, `agent_name`, `test_profile_name`, `scenario_language`\nExample: `-updated_at`\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "conditional_actions_format",
+                        "schema": {
+                            "enum": [
+                                "legacy"
+                            ],
+                            "type": "string",
+                            "x-spec-enum-id": "6ce7d2b00233f18d",
+                            "minLength": 1
+                        },
+                        "description": "Set to `legacy` to return conditional-action `instructions` in the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`).\n\n* `legacy` - legacy"
                     }
                 ],
                 "tags": [
@@ -37741,6 +37791,17 @@
                         },
                         "description": "A unique integer value identifying this scenario.",
                         "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "conditional_actions_format",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "legacy"
+                            ]
+                        },
+                        "description": "Set to `legacy` to return conditional-action `instructions` in the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`)."
                     }
                 ],
                 "tags": [
@@ -38611,43 +38672,6 @@
                 }
             }
         },
-        "/test_framework/v1/scenarios-external/{id}/transcript_embeddings/": {
-            "get": {
-                "operationId": "scenarios-external-transcript-embeddings-retrieve",
-                "description": "Fetches the pre-calculated transcript embeddings for a specific scenario.\nCalled by Pipecat service.\nIncludes audio sample metadata if available.\nApplies test_profile variable substitution to transcript messages.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this scenario.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "pipecat_agent_token": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/test_framework/v1/scenarios-external/{id}/update_conditional_actions/": {
             "post": {
                 "operationId": "scenarios-external-update-conditional-actions-create",
@@ -38709,70 +38733,6 @@
                         "description": ""
                     }
                 }
-            }
-        },
-        "/test_framework/v1/scenarios-external/{id}/update_scenario_with_transcript/": {
-            "post": {
-                "operationId": "scenarios-update-scenario-with-transcript-create",
-                "description": "Update a scenario with transcript-based simulation data.\nTakes a transcript in JSON format and processes it for simulation testing,\nsaving the processed data to the specified scenario including embeddings and\nformatted simulation description.\n\nURL parameter:\n    - pk: ID of the scenario to update (from URL)\n\nRequest body:\n    - transcript_json: List of transcript message objects with format:\n        [\n            {\"role\": \"Main Agent\", \"content\": \"Hello\"},\n            {\"role\": \"Testing Agent\", \"content\": \"Hi\"},\n            ...\n        ]\n\nReturns:\n    - Scenario data with updated transcript simulation data\n\nUpdates:\n    - transcript_embeddings: Embeddings for Main Agent responses\n    - simulation_description: Formatted transcript description",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this scenario.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    },
-                    {
-                        "oauth2": []
-                    },
-                    {
-                        "supabase_session": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mcp-tool-name": "scenarios_update_scenario_with_transcript_create"
             }
         },
         "/test_framework/v1/scenarios-external/add_infrastructure_suite/": {
@@ -44354,6 +44314,17 @@
                         },
                         "description": "A unique integer value identifying this scenario.",
                         "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "conditional_actions_format",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "legacy"
+                            ]
+                        },
+                        "description": "Set to `legacy` to return conditional-action `instructions` in the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`)."
                     }
                 ],
                 "tags": [
@@ -45224,43 +45195,6 @@
                 }
             }
         },
-        "/test_framework/v1/scenarios/{id}/transcript_embeddings/": {
-            "get": {
-                "operationId": "scenarios-v1-transcript-embeddings-retrieve",
-                "description": "Fetches the pre-calculated transcript embeddings for a specific scenario.\nCalled by Pipecat service.\nIncludes audio sample metadata if available.\nApplies test_profile variable substitution to transcript messages.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this scenario.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "pipecat_agent_token": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/test_framework/v1/scenarios/{id}/update_conditional_actions/": {
             "post": {
                 "operationId": "scenarios-v1-update-conditional-actions-create",
@@ -45322,70 +45256,6 @@
                         "description": ""
                     }
                 }
-            }
-        },
-        "/test_framework/v1/scenarios/{id}/update_scenario_with_transcript/": {
-            "post": {
-                "operationId": "scenarios-update-scenario-with-transcript-create_2",
-                "description": "Update a scenario with transcript-based simulation data.\nTakes a transcript in JSON format and processes it for simulation testing,\nsaving the processed data to the specified scenario including embeddings and\nformatted simulation description.\n\nURL parameter:\n    - pk: ID of the scenario to update (from URL)\n\nRequest body:\n    - transcript_json: List of transcript message objects with format:\n        [\n            {\"role\": \"Main Agent\", \"content\": \"Hello\"},\n            {\"role\": \"Testing Agent\", \"content\": \"Hi\"},\n            ...\n        ]\n\nReturns:\n    - Scenario data with updated transcript simulation data\n\nUpdates:\n    - transcript_embeddings: Embeddings for Main Agent responses\n    - simulation_description: Formatted transcript description",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this scenario.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Scenario"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    },
-                    {
-                        "oauth2": []
-                    },
-                    {
-                        "supabase_session": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Scenario"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mcp-tool-name": "scenarios_update_scenario_with_transcript_create"
             }
         },
         "/test_framework/v1/scenarios/add_infrastructure_suite/": {
@@ -61284,6 +61154,19 @@
                             "minLength": 1
                         },
                         "description": "\nSort evaluators by a field. Prefix with `-` for descending. Defaults to newest first.\nAllowed: `id`, `name`, `created_at`, `updated_at`, `personality_name`, `agent_name`, `test_profile_name`, `scenario_language`\nExample: `-updated_at`\n"
+                    },
+                    {
+                        "in": "query",
+                        "name": "conditional_actions_format",
+                        "schema": {
+                            "enum": [
+                                "legacy"
+                            ],
+                            "type": "string",
+                            "x-spec-enum-id": "6ce7d2b00233f18d",
+                            "minLength": 1
+                        },
+                        "description": "Set to `legacy` to return conditional-action `instructions` in the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`).\n\n* `legacy` - legacy"
                     }
                 ],
                 "tags": [
@@ -61467,6 +61350,17 @@
                         },
                         "description": "A unique integer value identifying this scenario.",
                         "required": true
+                    },
+                    {
+                        "in": "query",
+                        "name": "conditional_actions_format",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "legacy"
+                            ]
+                        },
+                        "description": "Set to `legacy` to return conditional-action `instructions` in the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`)."
                     }
                 ],
                 "tags": [
@@ -62361,43 +62255,6 @@
                 }
             }
         },
-        "/test_framework/v2/scenarios/{id}/transcript_embeddings/": {
-            "get": {
-                "operationId": "scenarios-transcript-embeddings-retrieve",
-                "description": "Fetches the pre-calculated transcript embeddings for a specific scenario.\nCalled by Pipecat service.\nIncludes audio sample metadata if available.\nApplies test_profile variable substitution to transcript messages.",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this scenario.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "security": [
-                    {
-                        "pipecat_agent_token": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ScenarioSerializerV2"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                }
-            }
-        },
         "/test_framework/v2/scenarios/{id}/update_conditional_actions/": {
             "post": {
                 "operationId": "scenarios-update-conditional-actions-create",
@@ -62457,79 +62314,6 @@
                             }
                         },
                         "description": ""
-                    }
-                }
-            }
-        },
-        "/test_framework/v2/scenarios/{id}/update_scenario_with_transcript/": {
-            "post": {
-                "operationId": "scenarios-update-scenario-with-transcript-create_3",
-                "description": "Update a scenario with transcript-based simulation data.\nTakes a transcript in JSON format and processes it for simulation testing,\nsaving the processed data to the specified scenario including embeddings and\nformatted simulation description.\n\nURL parameter:\n    - pk: ID of the scenario to update (from URL)\n\nRequest body:\n    - transcript_json: List of transcript message objects with format:\n        [\n            {\"role\": \"Main Agent\", \"content\": \"Hello\"},\n            {\"role\": \"Testing Agent\", \"content\": \"Hi\"},\n            ...\n        ]\n\nReturns:\n    - Scenario data with updated transcript simulation data\n\nUpdates:\n    - transcript_embeddings: Embeddings for Main Agent responses\n    - simulation_description: Formatted transcript description",
-                "parameters": [
-                    {
-                        "in": "path",
-                        "name": "id",
-                        "schema": {
-                            "type": "integer"
-                        },
-                        "description": "A unique integer value identifying this scenario.",
-                        "required": true
-                    }
-                ],
-                "tags": [
-                    "test_framework"
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
-                            }
-                        },
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
-                            }
-                        },
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/ScenarioSerializerV2"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "security": [
-                    {
-                        "api_key": []
-                    },
-                    {
-                        "oauth2": []
-                    },
-                    {
-                        "supabase_session": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ScenarioSerializerV2"
-                                }
-                            }
-                        },
-                        "description": ""
-                    }
-                },
-                "x-mcp-expose": true,
-                "x-mcp-tool-name": "scenarios_update_scenario_with_transcript_create",
-                "summary": "Update a scenario from a transcript",
-                "x-mint": {
-                    "mcp": {
-                        "enabled": true,
-                        "name": "scenarios-update-scenario-with-transcript-create",
-                        "description": "Update a scenario with transcript-based simulation data.\nTakes a transcript in JSON format and processes it for simulation testing,\nsaving the processed data to the specified scenario including embeddings and\nformatted simulation description.\n\nURL parameter:\n    - pk: ID of the scenario to update (from URL)\n\nRequest body:\n    - transcript_json: List of transcript message objects with format:\n        [\n            {\"role\": \"Main Agent\", \"content\": \"Hello\"},\n            {\"role\": \"Testing Agent\", \"content\": \"Hi\"},\n            ...\n        ]\n\nReturns:\n    - Scenario data with updated transcript simulation data\n\nUpdates:\n    - transcript_embeddings: Embeddings for Main Agent responses\n    - simulation_description: Formatted transcript description"
                     }
                 }
             }
@@ -79694,7 +79478,7 @@
                                 "type": "null"
                             }
                         ],
-                        "description": "\nConnection overrides applied on every scheduled run. Keys must match what the\nmatching run endpoint accepts, and depend on execution_mode:\n- voice: `mode`, `outbound_phone_number`, `agent_number`\n- text: `websocket_url`, `outbound_phone_number`, `agent_number`\n- sip: `sip_endpoint`\n- vapi_webrtc: `vapi_assistant_id`\n- retell_webrtc: `retell_agent_id`\n- elevenlabs: `elevenlabs_agent_id`, `elevenlabs_data`\n- livekit_v2: `livekit_data`\n- pipecat_v2: `pipecat_data`\n- every mode: `calls_per_second` (most calls started per second, a whole number from 1 to 4; unset means no limit)\nExample: `{\"livekit_data\": {\"agent_name\": \"support-agent\", \"config\": {\"greeting\": \"hi\"}}}`\n"
+                        "description": "\nConnection overrides applied on every scheduled run. Keys must match what the\nmatching run endpoint accepts, and depend on execution_mode:\n- voice: `mode`, `outbound_phone_number`, `agent_number`\n- text: `websocket_url`, `outbound_phone_number`, `agent_number`\n- sip: `sip_endpoint`\n- vapi_webrtc: `vapi_assistant_id`\n- retell_webrtc: `retell_agent_id`\n- elevenlabs: `elevenlabs_agent_id`, `elevenlabs_data`\n- livekit_v2: `livekit_data`\n- pipecat_v2: `pipecat_data`\n- every mode: `calls_per_second` (most calls started per second, a number from 0.1 to 4, e.g. 0.5 for one call every 2 seconds; unset means no limit)\nExample: `{\"livekit_data\": {\"agent_name\": \"support-agent\", \"config\": {\"greeting\": \"hi\"}}}`\n"
                     },
                     "run_as_text": {
                         "type": "boolean",
@@ -89650,7 +89434,7 @@
                         "description": "\nExecution mode for the cron job. Choices: voice, text, sip\nExample: `\"voice\"`, `\"text\"`, or `\"sip\"`\n\n\n* `voice` - Voice\n* `text` - Text\n* `sip` - SIP\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `ello` - Ello\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat\n* `agora` - Agora"
                     },
                     "run_settings": {
-                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Every mode also takes\n`calls_per_second`: the most calls each scheduled run starts per second, a whole\nnumber from 1 to 4; leave it out for no limit. Unsupported keys are rejected.\n"
+                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Every mode also takes\n`calls_per_second`: the most calls each scheduled run starts per second, a number\nfrom 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds); leave it out for no limit. Unsupported keys are rejected.\n"
                     }
                 }
             },
@@ -89846,7 +89630,7 @@
                                 "$ref": "#/components/schemas/ConditionalActions"
                             }
                         ],
-                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`: `{\"role\": str, \"first_message\": str | {\"say\": str, \"then\": [str]}, \"conditions\": [{\"when\": str, \"say\": str, \"then\": [str]}]}`. Steps are spoken verbatim unless wrapped whole in `<ai_generated>...</ai_generated>`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. Responses return this format. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is deprecated: still accepted on writes, but write this format."
+                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`: `{\"role\": str, \"first_message\": str | {\"say\": str, \"then\": [str]}, \"conditions\": [{\"when\": str, \"say\": str, \"then\": [str]}]}`. Steps are spoken verbatim unless wrapped whole in `<ai_generated>...</ai_generated>`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. Responses return this format unless `conditional_actions_format=legacy` is passed. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is also accepted."
                     },
                     "expected_outcome_prompt": {
                         "type": "string",
@@ -94101,12 +93885,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "personality_id": {
                         "type": [
@@ -94335,12 +94120,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "agent_email": {
                         "type": [
@@ -94381,12 +94167,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": [
@@ -94516,7 +94303,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. `first_message` is what the caller says first (empty means wait for the agent). Each condition's `say` is spoken verbatim; wrap a whole step in `<ai_generated>...</ai_generated>` to let the caller improvise from it. `then` steps fire in order, one per caller turn, after the agent replies. Responses return this format. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is deprecated: still accepted on writes, but write this format.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"first_message\": \"Hi, I need to schedule an appointment\",\n  \"conditions\": [\n    {\"when\": \"the agent asks for your name\", \"say\": \"John Smith\",\n     \"then\": [\"<ai_generated>Confirm whichever details the agent reads back</ai_generated>\"]}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. `first_message` is what the caller says first (empty means wait for the agent). Each condition's `say` is spoken verbatim; wrap a whole step in `<ai_generated>...</ai_generated>` to let the caller improvise from it. `then` steps fire in order, one per caller turn, after the agent replies. Responses return this format unless `conditional_actions_format=legacy` is passed. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is also accepted.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"first_message\": \"Hi, I need to schedule an appointment\",\n  \"conditions\": [\n    {\"when\": \"the agent asks for your name\", \"say\": \"John Smith\",\n     \"then\": [\"<ai_generated>Confirm whichever details the agent reads back</ai_generated>\"]}\n  ]\n}\n```"
                     },
                     "condition_audio": {
                         "type": "object",
@@ -94526,7 +94313,7 @@
                     },
                     "simulation_description": {
                         "type": "string",
-                        "description": "Simulation Description"
+                        "readOnly": true
                     },
                     "information_fields": {
                         "description": "\nInformation fields associated with the scenario\nExample: `{\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\", \"order_id\": \"1234567890\"}`\n"
@@ -94590,14 +94377,12 @@
                     "scenario_type": {
                         "enum": [
                             "instruction",
-                            "real_world_smart",
-                            "real_world_fixed",
                             "conditional_actions"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "db62e37bb530b602",
+                        "x-spec-enum-id": "97f8e4b948b4e205",
                         "default": "instruction",
-                        "description": "\nType of scenario. Defaults to `instruction`. Must be sent as `conditional_actions` when the\nrequest includes the `conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario. Defaults to `instruction`. Must be sent as `conditional_actions` when the\nrequest includes the `conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
                     },
                     "suite_type": {
                         "enum": [
@@ -95023,13 +94808,11 @@
                     "scenario_type": {
                         "enum": [
                             "instruction",
-                            "real_world_smart",
-                            "real_world_fixed",
                             "conditional_actions"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "db62e37bb530b602",
-                        "description": "Type of scenario\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
+                        "x-spec-enum-id": "97f8e4b948b4e205",
+                        "description": "Type of scenario\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
                     },
                     "suite_type": {
                         "enum": [
@@ -95326,7 +95109,7 @@
                     },
                     "instructions": {
                         "type": "string",
-                        "description": "\nScenario Instructions - format depends on scenario_type:\n\n**For scenario_type=\"instruction\":**\nPlain text describing the caller's behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you must send via this field, pass the same object as a JSON-formatted string. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is deprecated: still accepted on writes, but write this format. Responses return it in this shape:\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"first_message\": \"Hi, I'd like to check on my upcoming appointment <silence time=\\\"1.5s\\\" />\",\n  \"conditions\": [\n    {\"when\": \"The agent asks for your name\", \"say\": \"My name is Sarah Johnson\"},\n    {\"when\": \"The agent asks for your date of birth\", \"say\": \"January first, nineteen ninety\"},\n    {\n      \"when\": \"The agent confirms your identity and provides appointment details\",\n      \"say\": \"Thank you, that's all I needed\",\n      \"then\": [\"<endcall />\"]\n    }\n  ]\n}\n```\n\n**Structure:**\n- `role`: Personality/role description\n- `first_message`: What the caller says first; empty means wait for the agent. Use `{\"say\": \"...\", \"then\": [...]}` to add follow-ups.\n- `conditions[].when`: A third-person description of the agent's observable action, matched semantically against the conversation\n- `conditions[].say`: The caller's reply, spoken verbatim. Wrap the whole step in `<ai_generated>...</ai_generated>` to let the caller improvise from it instead\n- `conditions[].then`: Optional follow-up steps, each fired on the caller's next turn after one agent reply, in order\n- Steps support SSML `<silence time=\"1.5s\" />` (interruptible), `<hold time=\"2s\" />` (not interruptible), `[laughter]` and `<endcall />` in verbatim steps\n"
+                        "description": "\nScenario Instructions - format depends on scenario_type:\n\n**For scenario_type=\"instruction\":**\nPlain text describing the caller's behavior.\nExample: `\"You are a customer calling to inquire about your order status. Be polite and provide order number 12345 when asked.\"`\n\n**For scenario_type=\"conditional_actions\":**\nUse the structured `conditional_actions` field instead. If you must send via this field, pass the same object as a JSON-formatted string. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is still accepted on writes. Responses return this shape unless `conditional_actions_format=legacy` is passed:\n```json\n{\n  \"role\": \"A friendly customer calling about an appointment\",\n  \"first_message\": \"Hi, I'd like to check on my upcoming appointment <silence time=\\\"1.5s\\\" />\",\n  \"conditions\": [\n    {\"when\": \"The agent asks for your name\", \"say\": \"My name is Sarah Johnson\"},\n    {\"when\": \"The agent asks for your date of birth\", \"say\": \"January first, nineteen ninety\"},\n    {\n      \"when\": \"The agent confirms your identity and provides appointment details\",\n      \"say\": \"Thank you, that's all I needed\",\n      \"then\": [\"<endcall />\"]\n    }\n  ]\n}\n```\n\n**Structure:**\n- `role`: Personality/role description\n- `first_message`: What the caller says first; empty means wait for the agent. Use `{\"say\": \"...\", \"then\": [...]}` to add follow-ups.\n- `conditions[].when`: A third-person description of the agent's observable action, matched semantically against the conversation\n- `conditions[].say`: The caller's reply, spoken verbatim. Wrap the whole step in `<ai_generated>...</ai_generated>` to let the caller improvise from it instead\n- `conditions[].then`: Optional follow-up steps, each fired on the caller's next turn after one agent reply, in order\n- Steps support SSML `<silence time=\"1.5s\" />` (interruptible), `<hold time=\"2s\" />` (not interruptible), `[laughter]` and `<endcall />` in verbatim steps\n"
                     },
                     "scenario_language": {
                         "enum": [
@@ -95387,14 +95170,12 @@
                     "scenario_type": {
                         "enum": [
                             "instruction",
-                            "real_world_smart",
-                            "real_world_fixed",
                             "conditional_actions"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "db62e37bb530b602",
+                        "x-spec-enum-id": "97f8e4b948b4e205",
                         "default": "instruction",
-                        "description": "\nType of scenario:\n- `instruction`: Standard instruction-based scenario where instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where instructions field contains JSON\n- `real_world_smart`: Real world smart scenario\n- `real_world_fixed`: Real world fixed scenario\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario:\n- `instruction`: Standard instruction-based scenario where instructions field contains plain text\n- `conditional_actions`: Conditional action-based scenario where instructions field contains JSON\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
                     },
                     "tags": {
                         "description": "\nList of tags associated with this scenario for categorization\nExample: `[\"tag1\", \"tag2\", \"tag3\"]`\n"
@@ -95604,7 +95385,7 @@
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. `first_message` is what the caller says first (empty means wait for the agent). Each condition's `say` is spoken verbatim; wrap a whole step in `<ai_generated>...</ai_generated>` to let the caller improvise from it. `then` steps fire in order, one per caller turn, after the agent replies. Responses return this format. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is deprecated: still accepted on writes, but write this format.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"first_message\": \"Hi, I need to schedule an appointment\",\n  \"conditions\": [\n    {\"when\": \"the agent asks for your name\", \"say\": \"John Smith\",\n     \"then\": [\"<ai_generated>Confirm whichever details the agent reads back</ai_generated>\"]}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. `first_message` is what the caller says first (empty means wait for the agent). Each condition's `say` is spoken verbatim; wrap a whole step in `<ai_generated>...</ai_generated>` to let the caller improvise from it. `then` steps fire in order, one per caller turn, after the agent replies. Responses return this format unless `conditional_actions_format=legacy` is passed. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is also accepted.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"first_message\": \"Hi, I need to schedule an appointment\",\n  \"conditions\": [\n    {\"when\": \"the agent asks for your name\", \"say\": \"John Smith\",\n     \"then\": [\"<ai_generated>Confirm whichever details the agent reads back</ai_generated>\"]}\n  ]\n}\n```"
                     },
                     "condition_audio": {
                         "type": "object",
@@ -95614,7 +95395,7 @@
                     },
                     "simulation_description": {
                         "type": "string",
-                        "description": "Simulation Description"
+                        "readOnly": true
                     },
                     "information_fields": {
                         "description": "\nInformation fields associated with the scenario\nExample: `{\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\", \"order_id\": \"1234567890\"}`\n"
@@ -95678,14 +95459,12 @@
                     "scenario_type": {
                         "enum": [
                             "instruction",
-                            "real_world_smart",
-                            "real_world_fixed",
                             "conditional_actions"
                         ],
                         "type": "string",
-                        "x-spec-enum-id": "db62e37bb530b602",
+                        "x-spec-enum-id": "97f8e4b948b4e205",
                         "default": "instruction",
-                        "description": "\nType of scenario. Defaults to `instruction`. Must be sent as `conditional_actions` when the\nrequest includes the `conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `real_world_smart` - Real World Smart\n* `real_world_fixed` - Real World Fixed\n* `conditional_actions` - Conditional Actions"
+                        "description": "\nType of scenario. Defaults to `instruction`. Must be sent as `conditional_actions` when the\nrequest includes the `conditional_actions` field.\n\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
                     },
                     "suite_type": {
                         "enum": [
@@ -96984,7 +96763,7 @@
                         "description": "\nExecution mode for the cron job. Choices: voice, text, sip\nExample: `\"voice\"`, `\"text\"`, or `\"sip\"`\n\n\n* `voice` - Voice\n* `text` - Text\n* `sip` - SIP\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `ello` - Ello\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat\n* `agora` - Agora"
                     },
                     "run_settings": {
-                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Every mode also takes\n`calls_per_second`: the most calls each scheduled run starts per second, a whole\nnumber from 1 to 4; leave it out for no limit. Unsupported keys are rejected.\n"
+                        "description": "\nConnection overrides applied on every scheduled run, keyed as the matching run\nendpoint accepts them. Accepted keys depend on execution_mode: voice takes\n`mode`, `outbound_phone_number`, `agent_number`; text takes `websocket_url`,\n`outbound_phone_number`, `agent_number`; sip takes `sip_endpoint`;\nvapi_webrtc takes `vapi_assistant_id`; retell_webrtc takes `retell_agent_id`;\nelevenlabs takes `elevenlabs_agent_id` and `elevenlabs_data`; livekit_v2 takes\n`livekit_data`; pipecat_v2 takes `pipecat_data`. Every mode also takes\n`calls_per_second`: the most calls each scheduled run starts per second, a number\nfrom 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds); leave it out for no limit. Unsupported keys are rejected.\n"
                     }
                 },
                 "required": [
@@ -97288,12 +97067,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -97492,12 +97272,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -97620,12 +97401,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -97669,12 +97451,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": [
@@ -97784,12 +97567,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     }
                 },
                 "required": [
@@ -97882,12 +97666,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -98010,12 +97795,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -98123,12 +97909,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -98229,12 +98016,13 @@
                     },
                     "calls_per_second": {
                         "type": [
-                            "integer",
+                            "number",
                             "null"
                         ],
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Leave unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": "array",
@@ -98304,7 +98092,7 @@
                                 "$ref": "#/components/schemas/ConditionalActions"
                             }
                         ],
-                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`: `{\"role\": str, \"first_message\": str | {\"say\": str, \"then\": [str]}, \"conditions\": [{\"when\": str, \"say\": str, \"then\": [str]}]}`. Steps are spoken verbatim unless wrapped whole in `<ai_generated>...</ai_generated>`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. Responses return this format. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is deprecated: still accepted on writes, but write this format."
+                        "description": "Structured conditional-actions object for `scenario_type=\"conditional_actions\"`: `{\"role\": str, \"first_message\": str | {\"say\": str, \"then\": [str]}, \"conditions\": [{\"when\": str, \"say\": str, \"then\": [str]}]}`. Steps are spoken verbatim unless wrapped whole in `<ai_generated>...</ai_generated>`. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. Responses return this format unless `conditional_actions_format=legacy` is passed. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is also accepted."
                     },
                     "expected_outcome_prompt": {
                         "type": "string",
@@ -98608,11 +98396,11 @@
                     },
                     "instructions": {
                         "type": "string",
-                        "description": "\nScenario Instructions - format depends on scenario_type:\n- For `instruction` type: Plain text instructions\n- For `conditional_actions` type: JSON string with `role`, `first_message` and a `conditions` array. Each condition has `when` (a natural-language third-person description of the main agent's observable action — e.g. `\"The agent asks for your date of birth\"`, matched semantically), `say` (spoken verbatim, with optional `<silence time=\"1.5s\" />` (interruptible) or `<hold time=\"2s\" />` (not interruptible) and `[laughter]` tags; wrap the whole step in `<ai_generated>...</ai_generated>` to improvise instead) and optional `then` follow-up steps. Responses return this format. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is deprecated: still accepted on writes, but write this format.\n"
+                        "description": "\nScenario Instructions - format depends on scenario_type:\n- For `instruction` type: Plain text instructions\n- For `conditional_actions` type: JSON string with `role`, `first_message` and a `conditions` array. Each condition has `when` (a natural-language third-person description of the main agent's observable action — e.g. `\"The agent asks for your date of birth\"`, matched semantically), `say` (spoken verbatim, with optional `<silence time=\"1.5s\" />` (interruptible) or `<hold time=\"2s\" />` (not interruptible) and `[laughter]` tags; wrap the whole step in `<ai_generated>...</ai_generated>` to improvise instead) and optional `then` follow-up steps. Responses return this format unless `conditional_actions_format=legacy` is passed. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is still accepted on writes.\n"
                     },
                     "conditional_actions": {
                         "writeOnly": true,
-                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. `first_message` is what the caller says first (empty means wait for the agent). Each condition's `say` is spoken verbatim; wrap a whole step in `<ai_generated>...</ai_generated>` to let the caller improvise from it. `then` steps fire in order, one per caller turn, after the agent replies. Responses return this format; the earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is still accepted on writes.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"first_message\": \"Hi, I need to schedule an appointment\",\n  \"conditions\": [\n    {\"when\": \"the agent asks for your name\", \"say\": \"John Smith\",\n     \"then\": [\"<ai_generated>Confirm whichever details the agent reads back</ai_generated>\"]}\n  ]\n}\n```"
+                        "description": "Structured conditional-actions object. Requires `scenario_type=\"conditional_actions\"` in the same request, unless the scenario already has that type. Use either `conditional_actions` (structured) or `instructions` (plain text) — not both. `first_message` is what the caller says first (empty means wait for the agent). Each condition's `say` is spoken verbatim; wrap a whole step in `<ai_generated>...</ai_generated>` to let the caller improvise from it. `then` steps fire in order, one per caller turn, after the agent replies. Responses return this format unless `conditional_actions_format=legacy` is passed. The earlier id-based format (`id`, `condition`, `action`, `type`, `fixed_message`) is also accepted.\n\nExample:\n```json\n{\n  \"role\": \"You are a patient calling to schedule an appointment\",\n  \"first_message\": \"Hi, I need to schedule an appointment\",\n  \"conditions\": [\n    {\"when\": \"the agent asks for your name\", \"say\": \"John Smith\",\n     \"then\": [\"<ai_generated>Confirm whichever details the agent reads back</ai_generated>\"]}\n  ]\n}\n```"
                     },
                     "condition_audio": {
                         "type": "object",
@@ -98622,7 +98410,7 @@
                     },
                     "simulation_description": {
                         "type": "string",
-                        "description": "Simulation Description"
+                        "readOnly": true
                     },
                     "information_fields": {
                         "type": "object",
@@ -98687,7 +98475,7 @@
                     },
                     "scenario_type": {
                         "type": "string",
-                        "description": "\nType of scenario:\n- `instruction`: Standard instruction-based scenario (plain text instructions)\n- `conditional_actions`: Conditional action-based scenario (JSON with role, conditions, SSML tags, emotion markers)\n- `real_world_smart`: Real world smart scenario\n- `real_world_fixed`: Real world fixed scenario\n"
+                        "description": "\nType of scenario:\n- `instruction`: Standard instruction-based scenario (plain text instructions)\n- `conditional_actions`: Conditional action-based scenario (JSON with role, conditions, SSML tags, emotion markers)\n"
                     },
                     "suite_type": {
                         "enum": [
@@ -100126,10 +99914,11 @@
                         "description": "Cap on the number of runs executed in parallel. Overrides the spec's 'defaults.concurrency_limit'."
                     },
                     "calls_per_second": {
-                        "type": "integer",
+                        "type": "number",
+                        "format": "double",
                         "maximum": 4,
-                        "minimum": 1,
-                        "description": "Most calls started per second for this run, a whole number from 1 to 4. Overrides the spec's 'defaults.calls_per_second'. Leave both unset for no limit."
+                        "minimum": 0.1,
+                        "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Overrides the spec's 'defaults.calls_per_second'. Leave both unset for no limit."
                     },
                     "mock_tool_names": {
                         "type": [

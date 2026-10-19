@@ -72,6 +72,17 @@ Define when the metric should run under the **Evaluation Trigger** section.
 - **Always:** Runs on every call (default).
 - **Custom:** Use logic to run metrics only in specific scenarios. You can write a trigger prompt in natural language, or write Python code that decides when the metric should run. Trigger code receives the same [`data`](/documentation/key-concepts/metrics/python-metric#evaluation-trigger-custom-code) dictionary as a Python metric and sets `_result` (a bool — `True` to run, `False` to skip) and `_explanation`. See [Evaluation Trigger (Custom Code)](/documentation/key-concepts/metrics/python-metric#evaluation-trigger-custom-code) for the contract and an example.
 
+#### Use Results of Other Metrics
+
+Under **Uses results from**, pick the metrics this one should read. They are evaluated first, and their results are added to the judge's prompt automatically. To place a result exactly where you need it, reference it in the description:
+
+```text
+Only applies when {{metrics.customer_classification.score}} is "existing".
+Context from the classifier: {{metrics.customer_classification.explanation}}
+```
+
+`{{metrics.<slug>.score}}`, `{{metrics.<slug>.enum}}`, `{{metrics.<slug>.explanation}}` and `{{metrics["Metric Name"].score}}` are all supported. A reference in the description or in a trigger prompt is enough on its own; the metric is scheduled after the one it reads. If a prerequisite has no result for a call (its trigger skipped it, it timed out, or it returned nothing), this metric is not scored and shows **Input not scored** with the missing prerequisite. Cycles and chains deeper than 5 levels are rejected on save.
+
 ### Testing Your Metrics
 
 Before saving, validate your logic immediately within the builder.

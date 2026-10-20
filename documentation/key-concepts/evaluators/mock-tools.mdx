@@ -249,6 +249,89 @@ How the agent sees a status of 400 or above:
 
 The delay applies to all of them. Entries without `response` work as before.
 
+#### Per-call state: retries and changes that later calls see
+
+By default every mock call is answered on its own. To test a flow where an earlier tool call changes what a later one returns (a booking that fails once and succeeds on retry, then a lookup that shows the new appointment), add `state` and `then` to entries:
+
+| Key | Meaning |
+|---|---|
+| `state` | The call state the entry answers in: a name, or a list of names. Every call starts in `"start"`. An entry without `state` answers in any state. |
+| `then` | The state the call moves to after the entry replies. |
+
+A call has one state, shared by all of the agent's mock tools, so a booking tool's `then` changes what a lookup tool returns later in the same call. Every call starts fresh in `"start"`. State names can be up to 64 characters.
+
+<CodeGroup>
+
+```json book_appointment
+[
+  {
+    "input": {"patient_id": "P-1001", "slot_id": "SLOT-9"},
+    "state": "start",
+    "output": {"detail": "Scheduling system busy, please retry"},
+    "response": {"status_code": 503},
+    "then": "retried"
+  },
+  {
+    "input": {"patient_id": "P-1001", "slot_id": "SLOT-9"},
+    "state": ["retried", "booked"],
+    "output": {"status": "booked", "appointment_id": "APT-2"},
+    "then": "booked"
+  }
+]
+```
+
+```json get_appointments
+[
+  {
+    "input": {"patient_id": "P-1001"},
+    "output": {"appointments": [{"appointment_id": "APT-1"}]}
+  },
+  {
+    "input": {"patient_id": "P-1001"},
+    "state": "booked",
+    "output": {"appointments": [{"appointment_id": "APT-1"}, {"appointment_id": "APT-2"}]}
+  }
+]
+```
+
+</CodeGroup>
+
+Within one call, these entries answer as follows:
+
+| Tool call | Call state | Reply |
+|---|---|---|
+| `get_appointments` | `start` | APT-1 only |
+| `book_appointment` | `start` → `retried` | 503 |
+| `book_appointment` | `retried` → `booked` | booked APT-2 |
+| `get_appointments` | `booked` | APT-1 and APT-2 |
+
+The next call starts in `"start"` again.
+
+Entries are tried in order. When several entries match the input, one whose `state` matches the call's current state wins over one without `state`.
+
+##### How Cekura tells calls apart
+
+- **Retell**: uses the call or chat ID Retell sends with each tool request. When Cekura points Retell tools at the mock (the **Mock** toggle, or the test copy made for a run), it turns off the tool's **Args only** setting so that the ID is included. Disabling mock mode restores the original setting.
+- **VAPI**: uses the call ID in the tool-calls message.
+- **LiveKit with the Cekura SDK**: handled automatically, using the room name. See [Using Mock Tools with LiveKit Tracing](/documentation/integrations/livekit/tracing#using-mock-tools-with-livekit-tracing).
+- **Anything else** (LiveKit without the SDK, custom agents, MCP clients): send an `X-Cekura-Mock-Session` header with a value that is unique to the call and stays the same for the whole call.
+
+<Warning>
+  Without a call ID, the call stays in `"start"`: entries for other states never answer and `then` is ignored. A retry-then-success test would get the first reply every time.
+</Warning>
+
+#### Exact matching
+
+Add `"match": "exact"` to an entry when a near match must not count, for example an identity check where a wrong date of birth should fail. Every key in the entry's `input` must then be present in the call with an equal value. Values compare the same way as normal matching (`"750"` equals `750.00`, and text is case-insensitive), and extra keys in the call are ignored. An exact entry is never chosen as a [best match](#handling-dynamic-input-parameters).
+
+To control what a wrong input gets, add an exact entry with an empty `input` last. It matches any call that no earlier entry matched:
+
+```json
+{"input": {}, "match": "exact", "output": {"detail": "No patient matches those details"}, "response": {"status_code": 404}}
+```
+
+Entries without `match`, `state` or `then` work exactly as before.
+
 ### Step 2: Create New Evaluators
 
 After setting up your mock tools, create evaluators to test your agent:
@@ -273,7 +356,7 @@ Execute your evaluators to test the agent with mock tools:
 
 ## Handling Dynamic Input Parameters
 
-When a mock tool is called during a test run, Cekura selects the variation whose `input` **best matches** the actual input the agent sends — it does not require an exact match. If you define multiple variations (for example, five entries for a `make_payment` tool with `{"amount": 1}` through `{"amount": 5}`), the one whose input is closest to what the agent sends at runtime is returned automatically.
+When a mock tool is called during a test run, Cekura selects the variation whose `input` **best matches** the actual input the agent sends — it does not require an exact match, unless the entry sets [`"match": "exact"`](#exact-matching). If you define multiple variations (for example, five entries for a `make_payment` tool with `{"amount": 1}` through `{"amount": 5}`), the one whose input is closest to what the agent sends at runtime is returned automatically.
 
 To get reliable, predictable results across a range of input values:
 

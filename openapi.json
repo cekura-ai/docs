@@ -847,6 +847,14 @@
               "type": "object"
             },
             "description": "filter JSON object to override widget filters for this request. Must include a timestamp constraint. Example: `{\"operator\": \"and\", \"conditions\": [{\"field\": \"timestamp\", \"op\": \"gte\", \"value\": \"now-7d\"}]}`"
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string"
+            },
+            "description": "IANA timezone name, e.g. `America/Chicago`. Day, week and month buckets and `today` filters use this timezone. Defaults to UTC when omitted or not recognized."
           }
         ],
         "tags": [
@@ -914,6 +922,14 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string"
+            },
+            "description": "IANA timezone name, e.g. `America/Chicago`. Day, week and month buckets and `today` filters use this timezone. Defaults to UTC when omitted or not recognized."
           }
         ],
         "tags": [
@@ -984,6 +1000,16 @@
       "post": {
         "operationId": "dashboards-widgets-preview-data-create",
         "description": "Preview widget data without saving.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string"
+            },
+            "description": "IANA timezone name, e.g. `America/Chicago`. Day, week and month buckets and `today` filters use this timezone. Defaults to UTC when omitted or not recognized."
+          }
+        ],
         "tags": [
           "dashboards"
         ],
@@ -5553,7 +5579,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -5686,7 +5712,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -8638,7 +8664,7 @@
     "/test_framework/v1/results/{id}/ask_about_failures/": {
       "post": {
         "operationId": "results-ask-about-failures-create_2",
-        "description": "Queue failed-run analysis\n\nDeprecated: `POST /test_framework/v3/results/{id}/ask_about_failures/` does this in one call and returns the result.",
+        "description": "Queue failed-run analysis",
         "summary": "Queue failed-run analysis",
         "parameters": [
           {
@@ -8712,8 +8738,7 @@
             "description": "Rate limit exceeded"
           }
         },
-        "x-mcp-tool-name": "results_ask_about_failures_create",
-        "deprecated": true
+        "x-mcp-tool-name": "results_ask_about_failures_create"
       }
     },
     "/test_framework/v1/results/{id}/create_shareable_link_token/": {
@@ -9224,7 +9249,7 @@
     "/test_framework/v1/results/failure-analysis-progress/": {
       "get": {
         "operationId": "results-failure-analysis-progress_2",
-        "description": "Get failed-run analysis progress\n\nDeprecated: `POST /test_framework/v3/results/{id}/ask_about_failures/` does this in one call and returns the result.",
+        "description": "Get failed-run analysis progress",
         "summary": "Get failed-run analysis progress",
         "parameters": [
           {
@@ -9276,8 +9301,7 @@
             "description": "Failure analysis was not found"
           }
         },
-        "x-mcp-tool-name": "results_failure_analysis_progress",
-        "deprecated": true
+        "x-mcp-tool-name": "results_failure_analysis_progress"
       }
     },
     "/test_framework/v1/runs/{id}/chat/": {
@@ -26142,234 +26166,6 @@
         }
       }
     },
-    "/test_framework/v3/aiagents/": {
-      "post": {
-        "operationId": "aiagents-v3-create",
-        "description": "Create an agent and return it once it is ready. Takes the same fields as Create Agent (`POST /v2/aiagents/`). With `provider.configure_from_provider: true` the agent is first imported from its cloud provider, usually within 2 minutes; 409 when that assistant is already imported into the project.",
-        "summary": "Create agent",
-        "tags": [
-          "test_framework"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SchemaPostAIAgentV2"
-              },
-              "examples": {
-                "ImportAVAPIAssistant": {
-                  "value": {
-                    "project": 123,
-                    "provider": {
-                      "type": "vapi",
-                      "configure_from_provider": true,
-                      "agent_id": "asst_abc123",
-                      "credentials": {
-                        "api_key": "your-vapi-private-key"
-                      }
-                    }
-                  },
-                  "summary": "Import a VAPI assistant"
-                }
-              }
-            },
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/SchemaPostAIAgentV2"
-              }
-            },
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/SchemaPostAIAgentV2"
-              }
-            }
-          },
-          "required": true
-        },
-        "security": [
-          {
-            "api_key": []
-          },
-          {
-            "oauth2": []
-          },
-          {
-            "supabase_session": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "completed",
-                        "failed"
-                      ],
-                      "description": "`failed` when the job could not produce its result; see `error` / `errors`."
-                    },
-                    "agent_id": {
-                      "type": "integer"
-                    },
-                    "current_stage": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "Null when the agent was created without an import."
-                    },
-                    "stages": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "key": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "completed",
-                              "failed",
-                              "skipped"
-                            ]
-                          },
-                          "detail": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    "error": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "Why the job failed, when it did."
-                    },
-                    "agent": {
-                      "type": "object",
-                      "description": "The created agent, as the agents API returns it. When the import failed, it holds what was configured before the failure."
-                    }
-                  }
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "field_name": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "description": ""
-          },
-          "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
-          },
-          "504": {
-            "description": "The job did not finish within 15 minutes. It may still complete in the background."
-          },
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "completed",
-                        "failed"
-                      ],
-                      "description": "`failed` when the job could not produce its result; see `error` / `errors`."
-                    },
-                    "agent_id": {
-                      "type": "integer"
-                    },
-                    "current_stage": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "Null when the agent was created without an import."
-                    },
-                    "stages": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "key": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "pending",
-                              "in_progress",
-                              "completed",
-                              "failed",
-                              "skipped"
-                            ]
-                          },
-                          "detail": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          }
-                        }
-                      }
-                    },
-                    "error": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "Why the job failed, when it did."
-                    },
-                    "agent": {
-                      "type": "object",
-                      "description": "The created agent, as the agents API returns it. When the import failed, it holds what was configured before the failure."
-                    }
-                  }
-                }
-              }
-            },
-            "description": "Created without an import: `stages` is empty."
-          },
-          "409": {
-            "description": "The assistant is already imported into this project."
-          }
-        }
-      }
-    },
     "/test_framework/v3/aiagents/{id}/auto-fetch/": {
       "post": {
         "operationId": "aiagents-v3-auto-fetch",
@@ -26483,7 +26279,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -26658,7 +26454,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -26761,7 +26557,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -26870,7 +26666,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -27028,7 +26824,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -27141,141 +26937,10 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
-          }
-        }
-      }
-    },
-    "/test_framework/v3/results/{id}/ask_about_failures/": {
-      "post": {
-        "operationId": "results-v3-ask-about-failures",
-        "description": "Ask a question about a result's failed runs and return an evidence-grounded answer together with the runs it cites.",
-        "summary": "Ask about failed runs",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d+$"
-            },
-            "required": true
-          }
-        ],
-        "tags": [
-          "test_framework"
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AskAboutFailuresV3Request"
-              }
-            },
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "$ref": "#/components/schemas/AskAboutFailuresV3Request"
-              }
-            },
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/AskAboutFailuresV3Request"
-              }
-            }
-          },
-          "required": true
-        },
-        "security": [
-          {
-            "api_key": []
-          },
-          {
-            "oauth2": []
-          },
-          {
-            "embedded_session": []
-          },
-          {
-            "shareable_link": []
-          },
-          {
-            "supabase_session": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "completed",
-                        "failed"
-                      ],
-                      "description": "`failed` when the job could not produce its result; see `error` / `errors`."
-                    },
-                    "answer": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "The answer to the question."
-                    },
-                    "cited_run_ids": {
-                      "type": "array",
-                      "items": {
-                        "type": "integer"
-                      },
-                      "description": "Runs the answer cites as evidence."
-                    },
-                    "error": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
-                      "description": "Why the job failed, when it did."
-                    }
-                  }
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "field_name": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "description": ""
-          },
-          "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
-          },
-          "504": {
-            "description": "The job did not finish within 15 minutes. It may still complete in the background."
-          },
-          "404": {
-            "description": "Result not found."
-          },
-          "429": {
-            "description": "Rate limit exceeded."
           }
         }
       }
@@ -27382,7 +27047,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -27507,7 +27172,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -27616,7 +27281,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -27725,7 +27390,7 @@
             "description": ""
           },
           "403": {
-            "description": "No access to the agent, project, metric or result the job runs on."
+            "description": "No access to the agent, project or metric the job runs on."
           },
           "504": {
             "description": "The job did not finish within 15 minutes. It may still complete in the background."
@@ -29316,7 +28981,7 @@
             "type": "string"
           },
           "mock_data": {
-            "description": "List of {input, output, response?} mappings returned when the tool is called in mock mode. Optional `response` ({status_code, headers, delay_ms}) simulates a failing or slow tool; `headers` apply to webhook-style tools only. Optional `match` (\"exact\"), `state` and `then` make a mapping strict or depend on earlier calls in the same call; see the tool's `information` field."
+            "description": "List of {input, output, response?} mappings returned when the tool is called in mock mode. Optional `response` ({status_code, headers, delay_ms}) simulates a failing or slow tool; `headers` apply to webhook-style tools only."
           },
           "served_via": {
             "$ref": "#/components/schemas/AgentMockToolServedVia"
@@ -29413,7 +29078,7 @@
             "description": "What the tool does."
           },
           "mock_data": {
-            "description": "List of {input, output, response?} mappings returned when the tool is called in mock mode. Optional `response` ({status_code, headers, delay_ms}) simulates a failing or slow tool; `headers` apply to webhook-style tools only. Optional `match` (\"exact\"), `state` and `then` make a mapping strict or depend on earlier calls in the same call; see the tool's `information` field."
+            "description": "List of {input, output, response?} mappings returned when the tool is called in mock mode. Optional `response` ({status_code, headers, delay_ms}) simulates a failing or slow tool; `headers` apply to webhook-style tools only."
           },
           "freetext_params": {
             "type": "array",
@@ -30195,19 +29860,6 @@
           "question": {
             "type": "string",
             "description": "Natural language question about test failures",
-            "maxLength": 2000
-          }
-        },
-        "required": [
-          "question"
-        ]
-      },
-      "AskAboutFailuresV3Request": {
-        "type": "object",
-        "properties": {
-          "question": {
-            "type": "string",
-            "description": "Question about the result's failed runs, in plain language.",
             "maxLength": 2000
           }
         },
@@ -45819,7 +45471,7 @@
             "description": "\nDescription of the mock tool.\nExample: \"This tool retrieves user data from the database based on user ID\"\n"
           },
           "information": {
-            "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_ms}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_ms up to 5000.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\n\nMappings may also follow the call's progress: `state` (the call state(s) a mapping answers in,\na name or a list; every call starts in \"start\") and `then` (the state the call moves to after the\nmapping replies). `match` \"exact\" requires every input key to be present and equal (default\n\"flexible\"). The call is identified by the `X-Cekura-Mock-Session` header, or by the provider's\ncall id; without one the call stays in \"start\".\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_ms\": 2000}\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"start\",\n        \"output\": {\"detail\": \"busy\"},\n        \"response\": {\"status_code\": 503},\n        \"then\": \"retried\"\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"retried\",\n        \"output\": {\"status\": \"active\"}\n    }\n]\n```\n"
+            "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_ms}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_ms up to 5000.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_ms\": 2000}\n    }\n]\n```\n"
           },
           "freetext_params": {
             "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"

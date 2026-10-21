@@ -221,6 +221,21 @@ If you prefer to manually configure your mock tools, or need more control over t
 
 </CodeGroup>
 
+#### Mock entry format
+
+Each entry in a tool's mock data is one JSON object. A simple mock needs only `input` and `output`, like the examples above. The other keys are optional; leave them out and the entry keeps its default behavior.
+
+| Key | Required | What it does |
+|---|---|---|
+| `input` | Yes | The arguments this entry answers. Arguments that appear in both the entry and the call must match; arguments only one side has are not compared. |
+| `output` | Yes | What the tool returns. |
+| `response` | No | The reply's status code, headers and delay. See [Simulating failing or slow tools](#simulating-failing-or-slow-tools). |
+| `match` | No | `"exact"` to require every argument in `input`. See [Exact matching](#exact-matching). |
+| `state` | No | The call state(s) in which the entry answers. See [Stateful mocks](#stateful-mocks). |
+| `then` | No | The state the call moves to after the entry replies. See [Stateful mocks](#stateful-mocks). |
+
+Leave free-text arguments such as notes or a reason out of `input`. They vary from call to call, and an argument the entry does not list is never compared.
+
 #### Simulating failing or slow tools
 
 To test how your agent handles a tool error or a slow tool, add an optional `response` to a mock entry:
@@ -237,9 +252,9 @@ To test how your agent handles a tool error or a slow tool, add an optional `res
 |---|---|---|
 | `status_code` | 200–299 (except 204 and 205) or 400–599 | 200 |
 | `headers` | Up to 20 headers with string values | none |
-| `delay_ms` | 0–30000 | 0 |
+| `delay_ms` | 0–5000 | 0 |
 
-`Content-Type`, `Content-Length`, `Content-Encoding`, `Transfer-Encoding`, `Connection`, `Set-Cookie` and `Strict-Transport-Security` cannot be set in `headers`.
+`Content-Type`, `Content-Length`, `Content-Encoding`, `Transfer-Encoding`, `Connection`, `Set-Cookie`, `Strict-Transport-Security`, `Location`, and any `Access-Control-*` or `X-Accel-*` header cannot be set in `headers`.
 
 How the agent sees a status of 400 or above:
 
@@ -249,16 +264,40 @@ How the agent sees a status of 400 or above:
 
 The delay applies to all of them. Entries without `response` work as before.
 
-#### Per-call state: retries and changes that later calls see
+#### Stateful mocks
 
-By default every mock call is answered on its own. To test a flow where an earlier tool call changes what a later one returns (a booking that fails once and succeeds on retry, then a lookup that shows the new appointment), add `state` and `then` to entries:
+Most tools don't need state: a lookup that always returns the same record for the same input is a plain entry. Use state only when an earlier tool call in the same call must change a later reply, for example:
 
-| Key | Meaning |
-|---|---|
-| `state` | The call state the entry answers in: a name, or a list of names. Every call starts in `"start"`. An entry without `state` answers in any state. |
-| `then` | The state the call moves to after the entry replies. |
+- a booking that fails once and succeeds when the agent retries
+- a lookup that shows the appointment the agent booked earlier in the call
+- a cancellation that can't be made twice
 
-A call has one state, shared by all of the agent's mock tools, so a booking tool's `then` changes what a lookup tool returns later in the same call. Every call starts fresh in `"start"`. State names can be up to 64 characters.
+##### Before you start: Cekura must tell calls apart
+
+State is kept per call, so every mock request has to say which call it belongs to:
+
+- **Retell**: uses the call or chat ID Retell sends with each tool request. When Cekura points Retell tools at the mock (the **Mock** toggle, or the test copy made for a run), it turns off the tool's **Args only** setting so that the ID is included. Disabling mock mode restores the original setting.
+- **VAPI**: uses the call ID in the tool-calls message.
+- **LiveKit with the Cekura SDK**: handled automatically, using the room name. See [Using Mock Tools with LiveKit Tracing](/documentation/integrations/livekit/tracing#using-mock-tools-with-livekit-tracing).
+- **Anything else** (LiveKit without the SDK, custom agents, MCP clients): send an `X-Cekura-Mock-Session` header on every mock request. Its value must be unique to the call and stay the same for the whole call, such as your own call ID or the LiveKit room name.
+
+<Warning>
+  Without a call ID, the call stays in `"start"`: entries for other states never answer and `then` is ignored, so a retry-then-success test gets the first reply every time. On Retell, if mock mode was already enabled before stateful mocks were available, turn the **Mock** toggle off and on again so that Retell sends the call ID.
+</Warning>
+
+##### Format
+
+Add two optional keys to an entry:
+
+| Key | Value | Meaning |
+|---|---|---|
+| `state` | A state name, or a list of names | The entry answers only while the call is in one of these states. An entry without `state` answers in any state. |
+| `then` | A state name | After the entry replies, the call moves to this state. Without `then`, the state doesn't change. |
+
+- Every call starts in `"start"`. Other state names are yours to choose, up to 64 characters each.
+- A call has one state, shared by all of the agent's mock tools, so a booking tool's `then` changes what a lookup tool returns later in the same call.
+- `then` applies to error replies too, which is how a failed first attempt leads to a successful retry.
+- The next call starts in `"start"` again.
 
 <CodeGroup>
 
@@ -305,20 +344,14 @@ Within one call, these entries answer as follows:
 | `book_appointment` | `retried` → `booked` | booked APT-2 |
 | `get_appointments` | `booked` | APT-1 and APT-2 |
 
-The next call starts in `"start"` again.
+The second `book_appointment` entry lists both `retried` and `booked`, so booking the same slot again later in the call returns the same confirmation instead of no match. The first `get_appointments` entry has no `state`, so it answers in every state except `booked`, where the stateful entry takes over.
 
-Entries are tried in order. When several entries match the input, one whose `state` matches the call's current state wins over one without `state`.
+##### Which entry answers
 
-##### How Cekura tells calls apart
-
-- **Retell**: uses the call or chat ID Retell sends with each tool request. When Cekura points Retell tools at the mock (the **Mock** toggle, or the test copy made for a run), it turns off the tool's **Args only** setting so that the ID is included. Disabling mock mode restores the original setting.
-- **VAPI**: uses the call ID in the tool-calls message.
-- **LiveKit with the Cekura SDK**: handled automatically, using the room name. See [Using Mock Tools with LiveKit Tracing](/documentation/integrations/livekit/tracing#using-mock-tools-with-livekit-tracing).
-- **Anything else** (LiveKit without the SDK, custom agents, MCP clients): send an `X-Cekura-Mock-Session` header with a value that is unique to the call and stays the same for the whole call.
-
-<Warning>
-  Without a call ID, the call stays in `"start"`: entries for other states never answer and `then` is ignored. A retry-then-success test would get the first reply every time.
-</Warning>
+1. Cekura looks for entries whose `input` matches the call, in list order.
+2. Among those, an entry whose `state` includes the call's current state wins over an entry without `state`.
+3. If none matches, Cekura falls back to the closest match among entries that have neither `state` nor `"match": "exact"`. Stateful entries never answer by closest match, so give them the exact values your test uses.
+4. If nothing qualifies, the tool returns its no-match reply.
 
 #### Exact matching
 
@@ -330,7 +363,7 @@ To control what a wrong input gets, add an exact entry with an empty `input` las
 {"input": {}, "match": "exact", "output": {"detail": "No patient matches those details"}, "response": {"status_code": 404}}
 ```
 
-Entries without `match`, `state` or `then` work exactly as before.
+`match` works with or without `state`. An exact entry with a `state` answers only in that state.
 
 ### Step 2: Create New Evaluators
 
@@ -356,7 +389,7 @@ Execute your evaluators to test the agent with mock tools:
 
 ## Handling Dynamic Input Parameters
 
-When a mock tool is called during a test run, Cekura selects the variation whose `input` **best matches** the actual input the agent sends — it does not require an exact match, unless the entry sets [`"match": "exact"`](#exact-matching). If you define multiple variations (for example, five entries for a `make_payment` tool with `{"amount": 1}` through `{"amount": 5}`), the one whose input is closest to what the agent sends at runtime is returned automatically.
+When a mock tool is called during a test run, Cekura selects the variation whose `input` **best matches** the actual input the agent sends — it does not require an exact match, unless the entry sets [`"match": "exact"`](#exact-matching) or a [`state`](#stateful-mocks). If you define multiple variations (for example, five entries for a `make_payment` tool with `{"amount": 1}` through `{"amount": 5}`), the one whose input is closest to what the agent sends at runtime is returned automatically.
 
 To get reliable, predictable results across a range of input values:
 
@@ -422,7 +455,6 @@ For programmatic access to mock tools — they are managed directly on the agent
 - [Get Agent](/api-reference/test_framework/get-agent) — read the agent's `mock_tools` (each entry includes its mock data and runtime access URL)
 - [Update Agent](/api-reference/test_framework/update-agent-partial) — create, update, or delete mock tools via the `mock_tools` field
 - [Auto-Fetch Agent from Provider](/api-reference/test_framework/auto-fetch-agent) — re-fetch the agent's full configuration (including tools + mock data) from its provider
-- [Toggle Mock Tools](/api-reference/test_framework/toggle-mock-tools) — enable or disable mock mode on the provider
 
 Per-scenario expected mock tool calls live on the evaluator as `generated_mock_tool_entries`:
 

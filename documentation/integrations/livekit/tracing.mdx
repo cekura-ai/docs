@@ -575,7 +575,7 @@ The SDK supports mock tools, allowing you to test your agent with predictable to
 
 How the Python SDK serves mock tools:
 
-- **Per call.** Each mock tool call is sent to Cekura with the room name as the call ID, so [per-call state](/documentation/key-concepts/evaluators/mock-tools#per-call-state-retries-and-changes-that-later-calls-see) works: a booking that fails once and then succeeds, followed by a lookup that shows it.
+- **Per call.** Each mock tool call is sent to Cekura with the room name as the call ID, so [per-call state](/documentation/key-concepts/evaluators/mock-tools#stateful-mocks) works: a booking that fails once and then succeeds, followed by a lookup that shows it.
 - **Configured failures.** An entry with an error `response` (status 400 or above) reaches the model as a `ToolError` that carries the configured `output`, the way a real tool reports an upstream error.
 - **Handoffs.** Every agent the session switches to (a tool that returns an `Agent`, `update_agent`, or an `AgentTask`) gets its tools mocked as it becomes active, not only the agent passed to `track_session()`.
 - **If Cekura can't be reached,** the SDK answers from the mock data it fetched at the start of the session, with the call in its first state, and tries Cekura again after 60 seconds.
@@ -608,6 +608,11 @@ async def call_cekura_mock(mock_url: str, arguments: dict) -> dict:
 ```
 
 Use a timeout of at least 10 seconds, because a mock entry can delay its reply. Without the header, mock replies still work, but every call stays in its first state.
+
+The mock only answers your tools. It does not tell Cekura what your agent said or which tools it called, and evaluators and the [Mock Tool Call Accuracy](/documentation/key-concepts/evaluators/mock-tools#verifying-tool-calls-the-mock-tool-call-accuracy-metric) metric need both. Send your agent's side of the call in one of two ways:
+
+- Call `track_session()` with `CEKURA_MOCK_TOOLS_ENABLED="false"`. The SDK sends the transcript and tool calls at the end of each call and leaves your tool code unchanged.
+- Post the transcript, with each tool call as a `function_call` message, through the [Custom Integration webhook](/documentation/integrations/custom-integration#report-the-tool-call-in-your-transcript).
 
 ## Best Practices
 

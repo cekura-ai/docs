@@ -971,7 +971,7 @@ If you only need a **second speaker** rather than a specific recording, use the 
 4. When the condition fires, text, recordings, and tags run from left to right. The same clip plays wherever it is referenced.
 
 <Warning>
-The transcript is **derived from the recording** and is read-only.
+The transcript is **derived from the recording** automatically. In the editor UI it is read-only; to correct a misheard word through the API, see [Attaching audio (API)](#attaching-audio-api).
 </Warning>
 
 ### Attaching audio (UI)
@@ -984,7 +984,7 @@ In the Structured Tests editor, each verbatim step has an **Attach audio at curs
 
 ### Attaching audio (API)
 
-Four endpoints on the scenario manage attached audio. Clips are uploaded as `multipart/form-data`.
+Five endpoints on the scenario manage attached audio. Clips are uploaded as `multipart/form-data`.
 
 <CodeGroup>
 
@@ -1022,6 +1022,14 @@ curl -X PUT "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-a
 # Pass name=new-name to rename the clip at the same time
 ```
 
+```bash Edit transcript
+# Correct a ready clip's transcript; the audio is untouched
+curl -X PATCH "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
+  -H "Authorization: Bearer $CEKURA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"transcript": "Hello, John Smith."}'
+```
+
 ```bash Delete
 # Delete a clip and remove every <audio> reference to it
 curl -X DELETE "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
@@ -1031,7 +1039,7 @@ curl -X DELETE "https://api.cekura.ai/test_framework/v1/scenarios/39001/conditio
 
 </CodeGroup>
 
-The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry — from the list, upload and replace responses — looks like:
+The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry — from the list, upload, replace and edit responses — looks like:
 
 ```json
 {
@@ -1042,10 +1050,22 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
   "status": "ready",
   "transcript": "Hello, thanks for calling.",
   "duration": 1.78,
+  "words": [{"word": "Hello,", "start": 0.3, "end": 0.6}],
   "filename": "greeting.mp3",
   "playback_url": "https://…/greeting.wav"
 }
 ```
+
+### Editing a clip's transcript
+
+`PATCH` on a clip corrects its `transcript` and, optionally, its word timings (`words`). The testing agent records the corrected text as what it said when the clip plays.
+
+- **`words` sent**: stored as given. They must spell out the transcript (case, spacing and punctuation are ignored), be in playback order, have each `end` at or after its `start`, and end within the clip's duration. At most 5,000 words of up to 100 characters each; otherwise the request returns 400.
+- **`words` omitted, same word count**: every word keeps its current timing.
+- **`words` omitted, different word count**: the new words are spread across the span the old ones covered.
+- Only a `ready` clip can be edited. A pending, processing or failed clip returns 409.
+- Replacing the clip's audio transcribes it again and discards the edit.
+- Runs already in progress are unaffected; the edit applies from the next run.
 
 `steps` lists every place the clip is used, as paths into the evaluator (`first_message`, `conditions[1]`, `conditions[0].then[0]`), alongside the numeric `condition_ids`.
 

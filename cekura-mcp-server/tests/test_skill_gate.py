@@ -51,8 +51,8 @@ JSON_ARRAY_BODY = {"content": {"application/json": {"schema": {"type": "array", 
 # ── family / tool table ──────────────────────────────────────────────────────
 
 class TestFamilyTable:
-    def test_exactly_thirteen_gated_tools(self):
-        assert len(skill_gate.GATED_TOOLS) == 13
+    def test_exactly_twelve_gated_tools(self):
+        assert len(skill_gate.GATED_TOOLS) == 12
 
     def test_every_gated_tool_maps_to_a_family(self):
         for tool in skill_gate.GATED_TOOLS:

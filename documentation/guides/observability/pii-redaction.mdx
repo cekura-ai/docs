@@ -119,21 +119,17 @@ Redaction can be configured at two levels:
   When `redact_fields` is omitted from a per-call request, the agent's configured redaction fields apply. If the agent has no redaction fields configured either, no redaction occurs.
 </Note>
 
-`redact_fields` applies to `transcript_json` and the audio recording. When an agent has `redact_fields` configured, values in `metadata` and `dynamic_variables` are redacted as well, including on call log updates, so the raw values are not stored. `customer_number` is stored exactly as you send it because it is used for phone matching and frequent-call alerts — scrub it [before sending](/documentation/guides/observability/client-side-redaction) if needed.
+`redact_fields` applies to `transcript_json`, the audio recording, and the values in `metadata` and `dynamic_variables`. `customer_number` is stored exactly as you send it — scrub it [before sending](/documentation/guides/observability/client-side-redaction).
 
-## Redacting Call Log Webhooks Only
+### Redacting only outgoing webhooks
 
-To redact only the payload of call log webhooks while leaving stored call logs unchanged, set `call_log_webhook_redact_fields` on the project. It accepts the same values as `redact_fields` (see [Available Fields](#available-fields)) and defaults to an empty list, which sends payloads unredacted.
+To redact PII from outgoing call log webhook payloads (including `metadata` and `dynamic_variables`) while leaving stored call logs unchanged, set `call_log_webhook_redact_fields` on the project. It accepts the same field names as `redact_fields`; an empty list disables it. Unless the agent also redacts its stored recordings, `voice_recording_url` is sent as `null` in the webhook.
 
 ```json
 {
   "call_log_webhook_redact_fields": ["ssn", "dob", "email_address"]
 }
 ```
-
-- Applies only to call log webhooks; result, cronjob and daily report webhooks are not affected.
-- If redaction fails, the webhook is not sent, so unredacted data is never delivered.
-- If the agent has no `redact_fields` configured, `voice_recording_url` is sent as `null` in redacted webhooks, because the stored recording is not redacted.
 
 ## Available Fields
 

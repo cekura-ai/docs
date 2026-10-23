@@ -847,6 +847,14 @@
               "type": "object"
             },
             "description": "filter JSON object to override widget filters for this request. Must include a timestamp constraint. Example: `{\"operator\": \"and\", \"conditions\": [{\"field\": \"timestamp\", \"op\": \"gte\", \"value\": \"now-7d\"}]}`"
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string"
+            },
+            "description": "IANA timezone name, e.g. `America/Chicago`. Day, week and month buckets and `today` filters use this timezone. Defaults to UTC when omitted or not recognized."
           }
         ],
         "tags": [
@@ -914,6 +922,14 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string"
+            },
+            "description": "IANA timezone name, e.g. `America/Chicago`. Day, week and month buckets and `today` filters use this timezone. Defaults to UTC when omitted or not recognized."
           }
         ],
         "tags": [
@@ -984,6 +1000,16 @@
       "post": {
         "operationId": "dashboards-widgets-preview-data-create",
         "description": "Preview widget data without saving.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "type": "string"
+            },
+            "description": "IANA timezone name, e.g. `America/Chicago`. Day, week and month buckets and `today` filters use this timezone. Defaults to UTC when omitted or not recognized."
+          }
+        ],
         "tags": [
           "dashboards"
         ],
@@ -2403,10 +2429,10 @@
                                               "type": "string"
                                             }
                                           },
-                                          "delay_ms": {
+                                          "delay_seconds": {
                                             "type": "integer",
                                             "minimum": 0,
-                                            "maximum": 5000
+                                            "maximum": 300
                                           }
                                         }
                                       }
@@ -5167,10 +5193,10 @@
                                               "type": "string"
                                             }
                                           },
-                                          "delay_ms": {
+                                          "delay_seconds": {
                                             "type": "integer",
                                             "minimum": 0,
-                                            "maximum": 5000
+                                            "maximum": 300
                                           }
                                         }
                                       }
@@ -11595,10 +11621,10 @@
                                             "type": "string"
                                           }
                                         },
-                                        "delay_ms": {
+                                        "delay_seconds": {
                                           "type": "integer",
                                           "minimum": 0,
-                                          "maximum": 5000
+                                          "maximum": 300
                                         }
                                       }
                                     }
@@ -22167,10 +22193,10 @@
                                             "type": "string"
                                           }
                                         },
-                                        "delay_ms": {
+                                        "delay_seconds": {
                                           "type": "integer",
                                           "minimum": 0,
-                                          "maximum": 5000
+                                          "maximum": 300
                                         }
                                       }
                                     }
@@ -28888,7 +28914,7 @@
           "api_key": {
             "type": "string",
             "writeOnly": true,
-            "description": "API key or client secret for the provider (write-only — never returned). Required for: vapi, retell, elevenlabs, bland, livekit, pipecat, synthflow, telnyx, assemblyai. koreai and genesys use their client secret (passed as api_key); cisco only when using a customer-owned Service App. Not needed for: self_hosted, gemini_cx (Cekura impersonates config.service_account_email; no key)."
+            "description": "API key or client secret for the provider (write-only — never returned). Required for: vapi, retell, elevenlabs, bland, livekit, pipecat, synthflow, telnyx, assemblyai, smallest. koreai and genesys use their client secret (passed as api_key); cisco only when using a customer-owned Service App. Not needed for: self_hosted, gemini_cx (Cekura impersonates config.service_account_email; no key)."
           },
           "config": {
             "oneOf": [
@@ -29316,7 +29342,7 @@
             "type": "string"
           },
           "mock_data": {
-            "description": "List of {input, output, response?} mappings returned when the tool is called in mock mode. Optional `response` ({status_code, headers, delay_ms}) simulates a failing or slow tool; `headers` apply to webhook-style tools only. Optional `match` (\"exact\"), `state` and `then` make a mapping strict or depend on earlier calls in the same call; see the tool's `information` field."
+            "description": "List of {input, output, response?} mappings returned when the tool is called in mock mode. Optional `response` ({status_code, headers, delay_seconds}) simulates a failing or slow tool; `headers` apply to webhook-style tools only. Optional `match` (\"exact\"), `state` and `then` make a mapping strict or depend on earlier calls in the same call; see the tool's `information` field."
           },
           "served_via": {
             "$ref": "#/components/schemas/AgentMockToolServedVia"
@@ -29413,7 +29439,7 @@
             "description": "What the tool does."
           },
           "mock_data": {
-            "description": "List of {input, output, response?} mappings returned when the tool is called in mock mode. Optional `response` ({status_code, headers, delay_ms}) simulates a failing or slow tool; `headers` apply to webhook-style tools only. Optional `match` (\"exact\"), `state` and `then` make a mapping strict or depend on earlier calls in the same call; see the tool's `information` field."
+            "description": "List of {input, output, response?} mappings returned when the tool is called in mock mode. Optional `response` ({status_code, headers, delay_seconds}) simulates a failing or slow tool; `headers` apply to webhook-style tools only. Optional `match` (\"exact\"), `state` and `then` make a mapping strict or depend on earlier calls in the same call; see the tool's `information` field."
           },
           "freetext_params": {
             "type": "array",
@@ -29453,19 +29479,20 @@
               "telnyx",
               "gemini_cx",
               "assemblyai",
+              "smallest",
               "custom",
               ""
             ],
             "type": "string",
-            "x-spec-enum-id": "8e55ed6a62d00075",
-            "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, assemblyai, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `custom` - Custom (chat-only, no voice provider)"
+            "x-spec-enum-id": "344119656d78c0bb",
+            "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, assemblyai, smallest, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `smallest` - Smallest AI\n* `custom` - Custom (chat-only, no voice provider)"
           },
           "agent_id": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, telnyx, assemblyai, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
+            "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, telnyx, assemblyai, smallest, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
           },
           "credentials": {
             "oneOf": [
@@ -31288,7 +31315,7 @@
       },
       "ConditionAudioEntry": {
         "type": "object",
-        "description": "Read serializer for one Scenario.condition_audio entry (a plain dict).\n\nThe caller passes each entry dict with `audio_id` injected; fields are\ntolerant of missing keys. `words` is intentionally not exposed (runtime-only\nplayback timing data), and neither is `previous_action` (internal undo state\nfor a clip that replaced a whole action).",
+        "description": "Read serializer for one Scenario.condition_audio entry (a plain dict).\n\nThe caller passes each entry dict with `audio_id` injected; fields are\ntolerant of missing keys. `previous_action` is intentionally not exposed\n(internal undo state for a clip that replaced a whole action).",
         "properties": {
           "audio_id": {
             "type": [
@@ -31336,6 +31363,13 @@
               "null"
             ]
           },
+          "words": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConditionAudioWord"
+            },
+            "description": "The transcript's words with the time each is spoken in the clip. Absent until the clip has been transcribed."
+          },
           "duration": {
             "type": [
               "number",
@@ -31353,7 +31387,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Where the word timings came from: `deepgram` (measured), `interpolated` (spread evenly), or `manual` (sent with a transcript edit)."
           },
           "error": {
             "type": [
@@ -31373,6 +31408,33 @@
             "description": "S3 URL of the recorded audio clip"
           }
         }
+      },
+      "ConditionAudioWord": {
+        "type": "object",
+        "description": "One timed word of a clip.",
+        "properties": {
+          "word": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "start": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "description": "Seconds from the start of the clip."
+          },
+          "end": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "description": "Seconds from the start of the clip."
+          }
+        },
+        "required": [
+          "end",
+          "start",
+          "word"
+        ]
       },
       "ConditionalActions": {
         "type": "object",
@@ -37404,6 +37466,50 @@
             "type": "boolean",
             "description": "\nNotify call log webhook success\nExample: `true` or `false`\n"
           },
+          "call_log_webhook_redact_fields": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "person_name",
+                "age",
+                "phone_number",
+                "email_address",
+                "date",
+                "time",
+                "location",
+                "origin",
+                "gender_sexuality",
+                "physical_attribute",
+                "occupation",
+                "username",
+                "password",
+                "ip_address",
+                "url",
+                "filename",
+                "event",
+                "vehicle_id",
+                "dob",
+                "healthcare_number",
+                "medical_professional",
+                "credit_card",
+                "account_number",
+                "bank_account",
+                "money",
+                "ssn",
+                "passport_number",
+                "driver_license",
+                "numerical_pii"
+              ],
+              "type": "string",
+              "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
+              "x-spec-enum-id": "99d2b7efd95189c4"
+            },
+            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\n`voice_recording_url` is sent as null unless the agent's own `redact_fields` include every field listed here\n(recordings ingested before the agent enabled redaction are not redacted), and provider recording/log links in\n`metadata` are removed. Forwarded raw provider webhooks (`forward_vapi_webhook`, `forward_retell_webhook`) are not redacted.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+          },
+          "skip_call_log_webhook_no_content": {
+            "type": "boolean",
+            "description": "\nSkip call log webhooks for calls with no conversation content: no spoken transcript, or a busy / no-answer ended reason\nExample: `true` or `false`\n"
+          },
           "notify_frequent_calls_for_number": {
             "type": "boolean"
           },
@@ -39448,6 +39554,50 @@
             "type": "boolean",
             "description": "\nNotify call log webhook success\nExample: `true` or `false`\n"
           },
+          "call_log_webhook_redact_fields": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "person_name",
+                "age",
+                "phone_number",
+                "email_address",
+                "date",
+                "time",
+                "location",
+                "origin",
+                "gender_sexuality",
+                "physical_attribute",
+                "occupation",
+                "username",
+                "password",
+                "ip_address",
+                "url",
+                "filename",
+                "event",
+                "vehicle_id",
+                "dob",
+                "healthcare_number",
+                "medical_professional",
+                "credit_card",
+                "account_number",
+                "bank_account",
+                "money",
+                "ssn",
+                "passport_number",
+                "driver_license",
+                "numerical_pii"
+              ],
+              "type": "string",
+              "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
+              "x-spec-enum-id": "99d2b7efd95189c4"
+            },
+            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\n`voice_recording_url` is sent as null unless the agent's own `redact_fields` include every field listed here\n(recordings ingested before the agent enabled redaction are not redacted), and provider recording/log links in\n`metadata` are removed. Forwarded raw provider webhooks (`forward_vapi_webhook`, `forward_retell_webhook`) are not redacted.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+          },
+          "skip_call_log_webhook_no_content": {
+            "type": "boolean",
+            "description": "\nSkip call log webhooks for calls with no conversation content: no spoken transcript, or a busy / no-answer ended reason\nExample: `true` or `false`\n"
+          },
           "notify_frequent_calls_for_number": {
             "type": "boolean"
           },
@@ -41222,7 +41372,7 @@
             "type": "object",
             "additionalProperties": {},
             "readOnly": true,
-            "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of verbatim steps by pasting its `tag`; `steps` lists where it is used (e.g. `conditions[1].then[0]`).\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"steps\": [\"first_message\", \"conditions[1]\"]}\n}\n```"
+            "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload, replace and delete clips, and correct a transcript, through `condition-audio/`. Reference a clip from any number of verbatim steps by pasting its `tag`; `steps` lists where it is used (e.g. `conditions[1].then[0]`).\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"steps\": [\"first_message\", \"conditions[1]\"]}\n}\n```"
           },
           "simulation_description": {
             "type": "string",
@@ -42040,7 +42190,7 @@
             "type": "object",
             "additionalProperties": {},
             "readOnly": true,
-            "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of verbatim steps by pasting its `tag`; `steps` lists where it is used (e.g. `conditions[1].then[0]`).\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"steps\": [\"first_message\", \"conditions[1]\"]}\n}\n```"
+            "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload, replace and delete clips, and correct a transcript, through `condition-audio/`. Reference a clip from any number of verbatim steps by pasting its `tag`; `steps` lists where it is used (e.g. `conditions[1].then[0]`).\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"steps\": [\"first_message\", \"conditions[1]\"]}\n}\n```"
           },
           "simulation_description": {
             "type": "string",
@@ -42318,19 +42468,20 @@
               "telnyx",
               "gemini_cx",
               "assemblyai",
+              "smallest",
               "custom",
               ""
             ],
             "type": "string",
-            "x-spec-enum-id": "8e55ed6a62d00075",
-            "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, assemblyai, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `custom` - Custom (chat-only, no voice provider)"
+            "x-spec-enum-id": "344119656d78c0bb",
+            "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, assemblyai, smallest, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `smallest` - Smallest AI\n* `custom` - Custom (chat-only, no voice provider)"
           },
           "agent_id": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, telnyx, assemblyai, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
+            "description": "Agent ID for voice/inbound runs on the provider's platform. For vapi, elevenlabs, retell, synthflow, telnyx, assemblyai, smallest, and bland this is the voice agent ID (for bland it's the persona_id). Bland's pathway_id and retell's chat agent ID go in chat_agent_details.config.agent_id."
           },
           "credentials": {
             "oneOf": [
@@ -45033,7 +45184,7 @@
             "type": "object",
             "additionalProperties": {},
             "readOnly": true,
-            "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload and delete clips through `condition-audio/`. Reference a clip from any number of verbatim steps by pasting its `tag`; `steps` lists where it is used (e.g. `conditions[1].then[0]`).\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"steps\": [\"first_message\", \"conditions[1]\"]}\n}\n```"
+            "description": "Pre-recorded clips available to this scenario's conditional actions, keyed by clip id. Read-only: upload, replace and delete clips, and correct a transcript, through `condition-audio/`. Reference a clip from any number of verbatim steps by pasting its `tag`; `steps` lists where it is used (e.g. `conditions[1].then[0]`).\n\nExample:\n```json\n{\n  \"greeting\": {\"tag\": \"<audio id=\\\"greeting\\\"/>\", \"filename\": \"greeting.wav\",\n               \"status\": \"ready\", \"duration\": 2.4, \"transcript\": \"Hi, is this the clinic?\",\n               \"steps\": [\"first_message\", \"conditions[1]\"]}\n}\n```"
           },
           "simulation_description": {
             "type": "string",
@@ -45819,7 +45970,7 @@
             "description": "\nDescription of the mock tool.\nExample: \"This tool retrieves user data from the database based on user ID\"\n"
           },
           "information": {
-            "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_ms}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_ms up to 5000.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\n\nMappings may also follow the call's progress: `state` (the call state(s) a mapping answers in,\na name or a list; every call starts in \"start\") and `then` (the state the call moves to after the\nmapping replies). `match` \"exact\" requires every input key to be present and equal (default\n\"flexible\"). The call is identified by the `X-Cekura-Mock-Session` header, or by the provider's\ncall id; without one the call stays in \"start\".\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_ms\": 2000}\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"start\",\n        \"output\": {\"detail\": \"busy\"},\n        \"response\": {\"status_code\": 503},\n        \"then\": \"retried\"\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"retried\",\n        \"output\": {\"status\": \"active\"}\n    }\n]\n```\n"
+            "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_seconds}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_seconds up to 300.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\n\nMappings may also follow the call's progress: `state` (the call state(s) a mapping answers in,\na name or a list; every call starts in \"start\") and `then` (the state the call moves to after the\nmapping replies). `match` \"exact\" requires every input key to be present and equal (default\n\"flexible\"). The call is identified by the `X-Cekura-Mock-Session` header, or by the provider's\ncall id; without one the call stays in \"start\".\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_seconds\": 2}\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"start\",\n        \"output\": {\"detail\": \"busy\"},\n        \"response\": {\"status_code\": 503},\n        \"then\": \"retried\"\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"retried\",\n        \"output\": {\"status\": \"active\"}\n    }\n]\n```\n"
           },
           "freetext_params": {
             "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"
@@ -46509,6 +46660,14 @@
                 "description": "Denominator used for enum daily shares."
               }
             }
+          },
+          "warning": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WidgetDataWarning"
+              }
+            ],
+            "description": "Present instead of plot data when the widget cannot be computed for the requested range, e.g. `metadata_retention` when a metadata.* widget asks for days older than the metadata retention window. `data` is then empty."
           }
         },
         "required": [
@@ -46520,6 +46679,21 @@
           "metadata",
           "time_period",
           "widget_id"
+        ]
+      },
+      "WidgetDataWarning": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
         ]
       }
     },

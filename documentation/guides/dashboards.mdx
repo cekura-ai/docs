@@ -85,32 +85,32 @@ fields like `success` or `duration` don't show it.
 
 ## Time range
 
-A dashboard's **date range** controls the window every widget plots. The window
-can start at any point in the past, but it **cannot span more than 30 days**.
-This limit applies both to the dashboard UI and to the widget data API
-endpoints (`GET /dashboards/widgets/{id}/data/` and
-`POST /dashboards/widgets/preview_data/`):
+A dashboard's **date range** controls the window every widget plots. A range
+can span at most **30 days**, but it can sit anywhere in the past. This applies
+both to the dashboard UI and to the widget data API endpoints
+(`GET /dashboards/widgets/{id}/data/` and `POST /dashboards/widgets/preview_data/`):
 
-- You can select any window up to 30 days wide, using the quick ranges
-  (Last 1 hour, Last 24 hours, Last 7 days, Last 30 days, …) or a custom
-  from/to range. A lower bound (`timestamp_gte`) is required; a missing upper
-  bound runs to now.
-- A range wider than 30 days returns `400` with `"Date range cannot exceed 30
-  days."` To view a longer period, use several ≤30-day ranges.
-
-<Note>
-This limit is by design: long-range aggregation queries impose significant
-server load. It applies to **both the UI and the widget data API endpoints**.
-</Note>
+- You can select any window of up to 30 days, using the quick ranges (Last 1 hour,
+  Last 24 hours, Last 7 days, Last 30 days, …) or a custom from/to range.
+- A custom range **cannot span more than 30 days**, measured in calendar days in
+  your timezone. A lower bound (`timestamp_gte`) is required. A request whose range
+  is longer returns `400` with `"Date range cannot exceed 30 days."`
+- To view an older period, pick a window of up to 30 days that ends in the past
+  (for example, 60 to 30 days ago).
 
 <Warning>
-Call-log widgets that plot, group by, or filter on a top-level `metadata.*` key
-only have metadata for the **last 30 days**. If the range starts earlier than
-30 days ago, the widget returns `data: []` with a `warning` object
-(`{"code": "metadata_retention", "message": "..."}`) and a `200` status instead
-of results. Choose a range within the last 30 days to see these widgets. Run
-dashboards are not affected.
+Call-log widgets that plot, group by, or filter on a `metadata.*` key only have
+metadata available for the last 30 days. If the range starts earlier, the widget
+data response returns `data: []` with a `warning` object
+(`{"code": "metadata_retention", "message": "..."}`) instead of misleading numbers.
+Widgets that don't use `metadata.*` fields, and runs dashboards, are unaffected.
 </Warning>
+
+<Note>
+The call logs list API (`GET /observability/v1/call-logs/`) defaults to 30 days and
+caps at 31 days per request — paginate with consecutive 31-day windows to
+cover longer periods.
+</Note>
 
 This range is part of the dashboard's saved [filters](#filters) — it persists
 with the dashboard and is applied to every widget. The per-widget **time period**

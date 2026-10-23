@@ -18,7 +18,7 @@ PII redaction automatically detects and removes sensitive information from both 
 This page covers **server-side** redaction: you send the call to Cekura with `redact_fields`, and Cekura detects and removes the entities from the stored transcript and recording. It is the option to use for audio, and for open-vocabulary entities such as names and locations that need model-based detection.
 
 <Note>
-  If raw PII must never leave your network, or your organization requires that its own model providers do the detection, see [Client-Side Redaction](/documentation/guides/observability/client-side-redaction) — a script that detects and removes PII from both the transcript and the recording, using your own LLM and speech-to-text providers, before anything is sent. It also covers `metadata`, `dynamic_variables` and `customer_number`, which `redact_fields` does not reach. The two approaches can be combined.
+  If raw PII must never leave your network, or your organization requires that its own model providers do the detection, see [Client-Side Redaction](/documentation/guides/observability/client-side-redaction) — a script that detects and removes PII from both the transcript and the recording, using your own LLM and speech-to-text providers, before anything is sent. It also covers `customer_number`, which `redact_fields` does not reach. The two approaches can be combined.
 </Note>
 
 ### Example
@@ -119,7 +119,17 @@ Redaction can be configured at two levels:
   When `redact_fields` is omitted from a per-call request, the agent's configured redaction fields apply. If the agent has no redaction fields configured either, no redaction occurs.
 </Note>
 
-`redact_fields` applies to `transcript_json` and the audio recording. Values in `metadata`, `dynamic_variables` and `customer_number` are stored exactly as you send them — scrub those [before sending](/documentation/guides/observability/client-side-redaction).
+`redact_fields` applies to `transcript_json`, the audio recording, and the values in `metadata` and `dynamic_variables`. `customer_number` is stored exactly as you send it — scrub it [before sending](/documentation/guides/observability/client-side-redaction).
+
+### Redacting only outgoing webhooks
+
+To redact PII from outgoing call log webhook payloads (including `metadata` and `dynamic_variables`) while leaving stored call logs unchanged, set `call_log_webhook_redact_fields` on the project. It accepts the same field names as `redact_fields`; an empty list disables it. Unless the agent also redacts its stored recordings, `voice_recording_url` is sent as `null` in the webhook.
+
+```json
+{
+  "call_log_webhook_redact_fields": ["ssn", "dob", "email_address"]
+}
+```
 
 ## Available Fields
 

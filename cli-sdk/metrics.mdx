@@ -79,12 +79,22 @@ These are read-only and shared across the platform.
     client.metrics.create(
         agents=[123],
         name="Hold duration > 30s",
-        type="python",
-        eval_type="boolean",
-        code="""
-def evaluate(call):
-    return any(seg['duration'] > 30 for seg in call.get('hold_segments', []))
+        type="custom_code",
+        eval_type="binary",
+        custom_code="""
+_result = any(entry.get("duration", 0) > 30 for entry in data.get("metadata", {}).get("hold_segments", []))
+_explanation = "Checked hold segments from call metadata"
 """,
+    )
+
+    # A metric that reads another metric's result runs after it
+    client.metrics.create(
+        agents=[123],
+        name="Upsell offered",
+        type="llm_judge",
+        eval_type="binary",
+        description="Only when {{metrics.customer_classification.score}} is existing: did the agent offer the premium plan?",
+        configuration={"metric_dependencies": [metric["id"]]},
     )
     ```
   </Tab>

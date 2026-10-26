@@ -81,11 +81,12 @@ When Auto-Fetch generates mock data for scenarios whose agent has mock tools att
 - **Tool Name**: The name of the tool being mocked
 - **Expected Input**: The input parameters the tool expects
 - **Expected Output**: The response the tool will return
+- **Response** (optional): The [`response`](#simulating-failing-or-slow-tools) of the matching mock entry, if it has one
 
 You can view this data in two ways:
 
 1. **Via the Evaluator UI**: When viewing a scenario in the Cekura dashboard, the generated mock tool entries are displayed so you can see what tool calls the evaluator will make during testing
-2. **Via the API**: Retrieve a scenario with [Get Evaluator](/api-reference/test_framework/get-evaluator) to access the `generated_mock_tool_entries` field programmatically. The field is also writable — set it when creating an evaluator via [Create Evaluator](/api-reference/test_framework/create-evaluator) or edit it later via [Update Evaluator](/api-reference/test_framework/update-evaluator). Each entry has the shape `{tool_id, tool_name, new_entry: {input, output}}`.
+2. **Via the API**: Retrieve a scenario with [Get Evaluator](/api-reference/test_framework/get-evaluator) to access the `generated_mock_tool_entries` field programmatically. The field is also writable — set it when creating an evaluator via [Create Evaluator](/api-reference/test_framework/create-evaluator) or edit it later via [Update Evaluator](/api-reference/test_framework/update-evaluator). Each entry has the shape `{tool_id, tool_name, new_entry: {input, output, response?}}`.
 
 This visibility helps you understand exactly what mock tool interactions will occur during each test run, making it easier to debug and validate your agent's tool-calling behavior.
 
@@ -219,6 +220,34 @@ If you prefer to manually configure your mock tools, or need more control over t
 ```
 
 </CodeGroup>
+
+#### Simulating failing or slow tools
+
+To test how your agent handles a tool error or a slow tool, add an optional `response` to a mock entry:
+
+```json
+{
+  "input": {"date": "2026-07-11"},
+  "output": {"detail": "Service temporarily unavailable"},
+  "response": {"status_code": 503, "headers": {"Retry-After": "30"}, "delay_ms": 2000}
+}
+```
+
+| Field | Allowed values | Default |
+|---|---|---|
+| `status_code` | 200–299 (except 204 and 205) or 400–599 | 200 |
+| `headers` | Up to 20 headers with string values | none |
+| `delay_ms` | 0–30000 | 0 |
+
+`Content-Type`, `Content-Length`, `Content-Encoding`, `Transfer-Encoding`, `Connection`, `Set-Cookie` and `Strict-Transport-Security` cannot be set in `headers`.
+
+How the agent sees a status of 400 or above:
+
+- **Webhook tools** get that HTTP status and the headers, with `output` as the body.
+- **VAPI function tools** get HTTP 200 with the result `Error 503: {"detail":"Service temporarily unavailable"}`.
+- **MCP tools** get a tool result with `isError: true` and the same text.
+
+The delay applies to all of them. Entries without `response` work as before.
 
 ### Step 2: Create New Evaluators
 

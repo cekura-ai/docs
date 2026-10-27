@@ -373,7 +373,7 @@ async def run_bot(transport, runner_args):
 - Exports data to Cekura observability endpoint
 
 <Note>
-  `observe_pipeline()` registers its own audio frame processor and performs a parallel recording independently of any audio capture you already have in your pipeline. The two recordings are completely separate — the SDK's recording is asynchronous and does not add latency. If you already record audio and want to understand the impact, see [Will the Cekura SDK record audio again if I already capture it?](/documentation/FAQ#if-i-already-capture-and-store-audio-in-my-own-pipecat-pipeline-will-the-cekura-sdk-record-it-again) in the FAQ. To avoid recording entirely or control it per call, see [Can I disable or selectively control audio recording?](/documentation/FAQ#can-i-disable-or-selectively-control-audio-recording-in-the-pipecat-sdk).
+  `observe_pipeline()` registers its own audio frame processor and performs a parallel recording independently of any audio capture you already have in your pipeline. The two recordings are completely separate. If you already record audio and want to understand the impact, see [Will the Cekura SDK record audio again if I already capture it?](/documentation/FAQ#if-i-already-capture-and-store-audio-in-my-own-pipecat-pipeline-will-the-cekura-sdk-record-it-again) in the FAQ. To avoid recording entirely or control it per call, see [Can I disable or selectively control audio recording?](/documentation/FAQ#can-i-disable-or-selectively-control-audio-recording-in-the-pipecat-sdk).
 </Note>
 
 For simpler setups, you can combine all steps into one call:
@@ -397,6 +397,27 @@ Once the SDK is configured in your agent code, all production calls will automat
 
 </Tab>
 </Tabs>
+
+## Recording Startup
+
+In observability mode, recording starts when Pipecat dispatches the pipeline-start lifecycle handler. By default, the handler waits up to four seconds for recording credentials and initialization. This gives recording a head start, but it is not a hard barrier before the conversation opens.
+
+Set `async_recording=True` to return from the lifecycle handler immediately while recording starts in the background. This reduces startup waiting, but audio produced before the recorder is ready may not be captured. Asynchronous startup uses a ten-second timeout by default.
+
+Override the startup deadline for an individual session with `recording_start_timeout_seconds`. The value must be a positive, finite number.
+
+```python
+task = cekura.observe_and_create_task(
+    pipeline,
+    context,
+    runner_args=runner_args,
+    transport=transport,
+    async_recording=True,
+    recording_start_timeout_seconds=8,
+)
+```
+
+If recording cannot start or exceeds the deadline, the Pipecat pipeline continues. Available transcripts, tool calls, logs, metadata, and OpenTelemetry traces are still sent to Cekura without an audio recording.
 
 ## Enhanced Data in Cekura UI
 
@@ -448,6 +469,8 @@ task = PipelineTask(pipeline, enable_tracing=True, enable_turn_tracking=True)
 ```
 
 The SDK sets up the OTel provider in both cases. In the multi-step API, it's ready for Pipecat to use once you enable tracing on the task.
+
+If your application already has a compatible global OpenTelemetry provider, the SDK reuses it and routes only the current Pipecat session's spans to Cekura instead of replacing your existing provider.
 
 ### Additional Span Attributes
 
@@ -626,11 +649,22 @@ Your `track_and_create_task()` / `observe_and_create_task()` integration works s
 
 2. **Use environment variables for credentials**: Don't hardcode API keys in your code
 
-3. **Keep the SDK updated**: Run `pip install --upgrade cekura` periodically for the latest features
+3. **Keep the SDK updated**: Run `pip install --upgrade "cekura[pipecat]"` periodically for the latest features
 
 4. **Use session IDs**: The SDK resolves the session ID in this order: explicit `session_id` parameter > `runner_args.session_id` > auto-generated. Pass a custom session ID to correlate Cekura data with your application logs
 
 5. **Create one `PipecatTracer` instance per call — do not share instances across concurrent sessions**: `PipecatTracer` is not thread-safe to share. When running multiple concurrent calls in the same event loop, instantiate a fresh `PipecatTracer` for each call (with its own `session_id`) inside the function that handles that call. With this pattern the SDK is safe for concurrent use — each instance holds its own session state and submits data independently.
+
+## Compatibility
+
+For the Pipecat integration, use Cekura Python SDK `>=1.6.8,<2`. Updates within the `1.x` release line are backward compatible.
+
+| Package | Supported versions |
+|---|---|
+| Python | `>=3.11` |
+| Cekura Python SDK | `>=1.6.8,<2` |
+| `pipecat-ai` | `>=1.0.0,<2` |
+| OpenTelemetry | `>=1.39,<2` |
 
 ## SDK Reference
 
@@ -662,7 +696,9 @@ pipeline = tracer.observe_pipeline(
     session_id=None,       # Optional: Takes precedence over runner_args.session_id
     custom_metadata=None,  # Optional: Dict of custom metadata
     defer_upload=False,    # Optional: Buffer audio until start_audio_upload() is called
-    defer_evaluation=False # Optional: Upload artifacts now; evaluate after API release
+    defer_evaluation=False, # Optional: Upload artifacts now; evaluate after API release
+    async_recording=False, # Optional: Start recording without waiting in the lifecycle handler
+    recording_start_timeout_seconds=None # Optional: Positive per-session startup deadline
 )
 ```
 
@@ -696,6 +732,8 @@ task = tracer.observe_and_create_task(
     custom_metadata=None,  # Optional: Dict of custom metadata
     defer_upload=False,    # Optional: Buffer audio until start_audio_upload() is called
     defer_evaluation=False, # Optional: Upload artifacts now; evaluate after API release
+    async_recording=False, # Optional: Start recording without waiting in the lifecycle handler
+    recording_start_timeout_seconds=None, # Optional: Positive per-session startup deadline
     **pipeline_task_kwargs # Optional: Additional args forwarded to PipelineTask
 )
 ```

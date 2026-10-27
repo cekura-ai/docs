@@ -3687,6 +3687,14 @@
             "description": "Comma-separated agent version ids (the `history_id`s reported in `agent_versions`); only calls that ran on those versions are counted."
           },
           {
+            "in": "query",
+            "name": "summary",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When true, omit the `agents` and `agent_versions` breakdowns for a faster response. Counts and filters are unchanged."
+          },
+          {
             "name": "project",
             "in": "query",
             "required": false,
@@ -37504,7 +37512,11 @@
               "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
               "x-spec-enum-id": "99d2b7efd95189c4"
             },
-            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\nUnless the agent also redacts its stored recordings, `voice_recording_url` is sent as null.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\n`voice_recording_url` is sent as null unless the agent's own `redact_fields` include every field listed here\n(recordings ingested before the agent enabled redaction are not redacted), and provider recording/log links in\n`metadata` are removed. Forwarded raw provider webhooks (`forward_vapi_webhook`, `forward_retell_webhook`) are not redacted.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+          },
+          "skip_call_log_webhook_no_content": {
+            "type": "boolean",
+            "description": "\nSkip call log webhooks for calls with no conversation content: no spoken transcript, or a busy / no-answer ended reason\nExample: `true` or `false`\n"
           },
           "notify_frequent_calls_for_number": {
             "type": "boolean"
@@ -39588,7 +39600,11 @@
               "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
               "x-spec-enum-id": "99d2b7efd95189c4"
             },
-            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\nUnless the agent also redacts its stored recordings, `voice_recording_url` is sent as null.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\n`voice_recording_url` is sent as null unless the agent's own `redact_fields` include every field listed here\n(recordings ingested before the agent enabled redaction are not redacted), and provider recording/log links in\n`metadata` are removed. Forwarded raw provider webhooks (`forward_vapi_webhook`, `forward_retell_webhook`) are not redacted.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+          },
+          "skip_call_log_webhook_no_content": {
+            "type": "boolean",
+            "description": "\nSkip call log webhooks for calls with no conversation content: no spoken transcript, or a busy / no-answer ended reason\nExample: `true` or `false`\n"
           },
           "notify_frequent_calls_for_number": {
             "type": "boolean"
@@ -46652,6 +46668,14 @@
                 "description": "Denominator used for enum daily shares."
               }
             }
+          },
+          "warning": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WidgetDataWarning"
+              }
+            ],
+            "description": "Present instead of plot data when the widget cannot be computed for the requested range, e.g. `metadata_retention` when a metadata.* widget asks for days older than the metadata retention window. `data` is then empty."
           }
         },
         "required": [
@@ -46663,6 +46687,21 @@
           "metadata",
           "time_period",
           "widget_id"
+        ]
+      },
+      "WidgetDataWarning": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
         ]
       }
     },

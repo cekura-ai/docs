@@ -1,0 +1,158 @@
+---
+title: "Amazon Connect Integration"
+sidebarTitle: "Amazon Connect"
+icon: "/images/providers/amazon-connect.svg"
+description: "Connect an Amazon Connect flow to Cekura and test it over chat through a communications widget, or over the phone by calling its number."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## Overview
+
+Cekura tests Amazon Connect in two ways:
+
+- **Chat**: Cekura starts a chat through one of your communications widgets, the same way a visitor on your website does, and plays the scenario as the customer. The chat reaches whatever your flow routes it to, such as an Amazon Lex bot or an AI agent.
+- **Voice**: Cekura calls the phone number attached to your flow and plays the scenario as the caller.
+
+<Note>
+Cekura does not import production contacts from Amazon Connect. Voice results show Cekura's own recording and transcript of the call.
+</Note>
+
+## Prerequisites
+
+- An Amazon Connect instance with a published flow that handles chats.
+- Access to the Amazon Connect admin website, to create a communications widget.
+- For voice testing: a phone number claimed in Amazon Connect and attached to the flow.
+
+## Set up a communications widget in Amazon Connect
+
+Cekura starts each test chat through a communications widget. Create a separate widget for Cekura so the widget on your website keeps its own settings.
+
+<Steps>
+  <Step title="Create the widget">
+    Log in to the Amazon Connect admin website (`https://<your-instance>.my.connect.aws/`), choose **Customize communications widget**, then **Add communications widget**. Give it a name such as `Cekura testing`. Under **Communications options**, add chat and select the flow that handles your chats. The widget's styling doesn't matter for testing.
+  </Step>
+
+  <Step title="Allow Cekura's domain">
+    On the domains step, choose **Add domain** and enter `https://api.cekura.ai`. Cekura starts chats from this address, and Amazon Connect refuses chats from domains that aren't on the list. Include `https://`.
+  </Step>
+
+  <Step title="Turn off widget security">
+    Under **Add security for your communications widget**, choose **No**, then save. With security on, every chat needs a token signed by your web server that expires within 10 minutes, and Cekura cannot sign one.
+  </Step>
+
+  <Step title="Copy the values from the widget code">
+    Amazon Connect then shows the widget's code snippet. Two of the values Cekura needs are in it:
+
+    ```html
+    <script type="text/javascript">
+      (function(w, d, x, id){
+        ...
+      })(window, document, 'amazon_connect', '<widget-id>');
+      amazon_connect('snippetId', '<snippet-id>');
+      ...
+    </script>
+    ```
+
+    | Value | Where to find it |
+    | --- | --- |
+    | **Widget ID** | The last value on the line that ends in `'amazon_connect', '…');` |
+    | **Snippet ID** | The value in `amazon_connect('snippetId', '…');` |
+    | **Connect Host** | The domain of your Amazon Connect admin website, for example `bright-dental.my.connect.aws`, without `https://` |
+    | **AWS Region** | The AWS Region of your instance, for example `us-east-1` |
+  </Step>
+</Steps>
+
+<Note>
+Amazon Connect can take a few minutes to apply changes to a widget.
+</Note>
+
+## Connect Amazon Connect in Cekura
+
+<Steps>
+  <Step title="Select Amazon">
+    In Cekura, go to **Agents**, create an agent, and select **Amazon** as the provider. If you don't see it, click **More options** to expand the full provider list.
+
+    <img src="/images/amazon-connect/select-provider.png" alt="Amazon selected in the Cekura provider grid" />
+  </Step>
+
+  <Step title="Enter the widget details">
+    Under **Connections → Chat**, select **Amazon Connect**, then fill in **Amazon Connect Settings**:
+
+    | Field | Value |
+    | --- | --- |
+    | **Widget ID** | The widget ID from the code snippet. |
+    | **Snippet ID** | The snippet ID from the code snippet. |
+    | **Connect Host** | Your instance's domain, for example `bright-dental.my.connect.aws`. |
+    | **AWS Region** | Optional. Your instance's AWS Region. Defaults to `us-east-1`. |
+
+    <img src="/images/amazon-connect/chat-settings.png" alt="Widget ID, Snippet ID, Connect Host and AWS Region fields under Amazon Connect Settings" />
+  </Step>
+
+  <Step title="Add the phone number (optional)">
+    To also test over the phone, select **Telephony** under **Connections → Voice** and enter the number attached to your flow under **Telephony Settings**. Leave **Inbound** on so Cekura calls your number.
+
+    <img src="/images/amazon-connect/telephony-settings.png" alt="Telephony Settings with the flow's phone number and Inbound enabled" />
+  </Step>
+
+  <Step title="Create the agent and test the connection">
+    Click **Next**, enter the agent's name, language and description, and click **Create**. Cekura checks the configuration, saves the agent, and offers a test. Select **Chat** and start the test: Cekura starts a chat through your widget, sends a greeting, and waits up to 30 seconds for your flow to reply.
+
+    <img src="/images/amazon-connect/connection-test.png" alt="Connection test results showing the Amazon Connect chat test passed with the flow's first reply" />
+  </Step>
+</Steps>
+
+## Chat testing
+
+Open an evaluator, click **Run**, select **Amazon Connect** under **Connections → Chat**, and start the run. Cekura starts a new chat through your widget for each conversation and records the transcript and metric results.
+
+<img src="/images/amazon-connect/configure-run-chat.png" alt="Configure Run dialog with the Amazon Connect chat connection selected" />
+
+- Your flow's messages are labeled **Main Agent** in the transcript, and Cekura's are labeled **Testing Agent**.
+- Interactive messages, such as list pickers and quick replies, appear as text: the title, then the choices after `Options:`. Cekura answers with a typed message, so your flow must accept a typed answer to those prompts.
+- The chat ends when your flow ends it, when the scenario is complete, or after 2 minutes with no message from your flow.
+
+See [Chat Testing](/documentation/integrations/chat-testing) for more on chat runs.
+
+## Voice testing
+
+Run an evaluator using the **Telephony** connection. Cekura calls the number under **Telephony Settings** for each test and plays the scenario as the caller.
+
+## Troubleshooting
+
+- **Amazon Connect refused to start a chat through the communications widget**: check that the Widget ID and Snippet ID come from the same widget, that `https://api.cekura.ai` is in the widget's allowed domains, and that the widget's security is set to **No**. Also confirm that **Connect Host** and **AWS Region** match your instance, and that the widget's flow is published.
+- **The chat started but its message stream could not be opened**: run the test again, and confirm that **AWS Region** matches your instance.
+- **The chat started but your flow sent no message**: make sure the flow replies to the customer's first message and routes the chat to your bot or AI agent.
+- **Changes don't take effect**: Amazon Connect can take a few minutes to apply widget changes. Wait, then run the test again.
+
+## Configure through the API
+
+When creating or updating an agent through the [API](/api-reference/test_framework/create-agent), set the provider to `amazon_connect` and pass the widget details in `chat_agent_details`:
+
+```json
+{
+  "name": "Support assistant",
+  "description": "Answers customer chats and calls for appointments and billing questions.",
+  "project": 123,
+  "telephony": {
+    "phone_number": "+15551234567",
+    "inbound": true
+  },
+  "provider": {
+    "type": "amazon_connect",
+    "chat_agent_details": {
+      "type": "amazon_connect",
+      "config": {
+        "widget_id": "<widget-id>",
+        "snippet_id": "<snippet-id>",
+        "connect_host": "your-instance.my.connect.aws",
+        "region": "us-east-1"
+      }
+    }
+  }
+}
+```
+
+`region` is optional and defaults to `us-east-1`. Leave out `telephony` if you only test over chat.

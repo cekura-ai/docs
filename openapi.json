@@ -10290,8 +10290,9 @@
     },
     "/test_framework/v1/scenarios-external/{id}/condition-audio/{audio_id}/": {
       "put": {
-        "operationId": "scenarios-external-condition-audio-update",
-        "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+        "operationId": "scenarios-condition-audio-replace",
+        "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes. Send the file as `multipart/form-data`, or as `application/json` with `file_name` and base64 `content_base64`.",
+        "summary": "Replace an audio clip's recording",
         "parameters": [
           {
             "in": "path",
@@ -10330,6 +10331,29 @@
                 },
                 "required": [
                   "file"
+                ]
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_name": {
+                    "type": "string",
+                    "description": "Filename including its extension: wav, mp3, m4a, ogg, webm or flac."
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Base64-encoded audio, max 25 MB decoded. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_name",
+                  "content_base64"
                 ]
               }
             }
@@ -10408,7 +10432,8 @@
             },
             "description": ""
           }
-        }
+        },
+        "x-mcp-tool-name": "scenarios_condition_audio_replace"
       }
     },
     "/test_framework/v1/scenarios/{id}/": {
@@ -10624,8 +10649,9 @@
     },
     "/test_framework/v1/scenarios/{id}/condition-audio/{audio_id}/": {
       "put": {
-        "operationId": "scenarios-v1-condition-audio-update",
-        "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+        "operationId": "scenarios-condition-audio-replace_2",
+        "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes. Send the file as `multipart/form-data`, or as `application/json` with `file_name` and base64 `content_base64`.",
+        "summary": "Replace an audio clip's recording",
         "parameters": [
           {
             "in": "path",
@@ -10664,6 +10690,29 @@
                 },
                 "required": [
                   "file"
+                ]
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_name": {
+                    "type": "string",
+                    "description": "Filename including its extension: wav, mp3, m4a, ogg, webm or flac."
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Base64-encoded audio, max 25 MB decoded. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_name",
+                  "content_base64"
                 ]
               }
             }
@@ -10742,7 +10791,8 @@
             },
             "description": ""
           }
-        }
+        },
+        "x-mcp-tool-name": "scenarios_condition_audio_replace"
       }
     },
     "/test_framework/v1/scenarios/adv_update/": {
@@ -20987,10 +21037,232 @@
         }
       }
     },
+    "/test_framework/v2/scenarios/{id}/condition-audio/": {
+      "get": {
+        "operationId": "scenarios-condition-audio-list_3",
+        "description": "List an evaluator's audio clips",
+        "summary": "List an evaluator's audio clips",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this scenario.",
+            "required": true
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "A page number within the paginated result set.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_size",
+            "required": false,
+            "in": "query",
+            "description": "Number of results to return per page.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "test_framework"
+        ],
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "oauth2": []
+          },
+          {
+            "supabase_session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedConditionAudioEntryList"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "x-mcp-expose": true,
+        "x-mcp-tool-name": "scenarios_condition_audio_list",
+        "x-mint": {
+          "mcp": {
+            "enabled": true,
+            "name": "scenarios-condition-audio-list",
+            "description": "List an evaluator's audio clips"
+          }
+        }
+      },
+      "post": {
+        "operationId": "scenarios-condition-audio-upload_3",
+        "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of verbatim steps; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Send the file as `multipart/form-data`, or as `application/json` with `file_name` and base64 `content_base64`.",
+        "summary": "Upload an audio clip to an evaluator",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this scenario.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "test_framework"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "condition_id": {
+                    "type": "integer"
+                  },
+                  "action_template": {
+                    "type": "string"
+                  },
+                  "replace_audio_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_name": {
+                    "type": "string",
+                    "description": "Filename including its extension: wav, mp3, m4a, ogg, webm or flac."
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Base64-encoded audio, max 25 MB decoded. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "condition_id": {
+                    "type": "integer"
+                  },
+                  "action_template": {
+                    "type": "string"
+                  },
+                  "replace_audio_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_name",
+                  "content_base64"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "oauth2": []
+          },
+          {
+            "supabase_session": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConditionAudioEntry"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field_name": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field_name": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "x-mcp-expose": true,
+        "x-mcp-destructive": true,
+        "x-mcp-tool-name": "scenarios_condition_audio_upload",
+        "x-mint": {
+          "mcp": {
+            "enabled": true,
+            "name": "scenarios-condition-audio-upload",
+            "description": "Add an audio clip to this scenario. The clip is transcoded to 24kHz mono PCM WAV, stored, and transcribed asynchronously. Give it a `name` to reference it as `<audio id=\"name\"/>` from any number of verbatim steps; omit it and a readable name is derived from the filename, the same convention the editor uses. Pass `condition_id` to also insert that tag into one condition, with `action_template` choosing the insertion point. Send the file as `multipart/form-data`, or as `application/json` with `file_name` and base64 `content_base64`."
+          }
+        }
+      }
+    },
     "/test_framework/v2/scenarios/{id}/condition-audio/{audio_id}/": {
       "put": {
-        "operationId": "scenarios-condition-audio-update",
-        "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes.",
+        "operationId": "scenarios-condition-audio-replace_3",
+        "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes. Send the file as `multipart/form-data`, or as `application/json` with `file_name` and base64 `content_base64`.",
+        "summary": "Replace an audio clip's recording",
         "parameters": [
           {
             "in": "path",
@@ -21029,6 +21301,29 @@
                 },
                 "required": [
                   "file"
+                ]
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_name": {
+                    "type": "string",
+                    "description": "Filename including its extension: wav, mp3, m4a, ogg, webm or flac."
+                  },
+                  "content_base64": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Base64-encoded audio, max 25 MB decoded. Accepts a raw base64 string or a `data:<mime>;base64,...` data URI."
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file_name",
+                  "content_base64"
                 ]
               }
             }
@@ -21106,6 +21401,145 @@
               }
             },
             "description": ""
+          }
+        },
+        "x-mcp-expose": true,
+        "x-mcp-destructive": true,
+        "x-mcp-tool-name": "scenarios_condition_audio_replace",
+        "x-mint": {
+          "mcp": {
+            "enabled": true,
+            "name": "scenarios-condition-audio-replace",
+            "description": "Replace this clip's audio. Every action referencing it plays the new recording. Pass `name` to rename the clip at the same time — its `<audio>` tags are repointed for you, and the response carries `previous_audio_id` and the rewritten `actions`. The clip is transcoded and re-transcribed, so runs are blocked again until that finishes. Send the file as `multipart/form-data`, or as `application/json` with `file_name` and base64 `content_base64`."
+          }
+        }
+      },
+      "patch": {
+        "operationId": "scenarios-condition-audio-transcript-update_3",
+        "description": "Correct an audio clip's transcript and word timings",
+        "summary": "Correct an audio clip's transcript and word timings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this scenario.",
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "audio_id",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "test_framework"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedConditionAudioTranscript"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedConditionAudioTranscript"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedConditionAudioTranscript"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "oauth2": []
+          },
+          {
+            "supabase_session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConditionAudioEntry"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field_name": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field_name": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "x-mcp-expose": true,
+        "x-mcp-tool-name": "scenarios_condition_audio_transcript_update",
+        "x-mint": {
+          "mcp": {
+            "enabled": true,
+            "name": "scenarios-condition-audio-transcript-update",
+            "description": "Correct an audio clip's transcript and word timings"
           }
         }
       }
@@ -28118,9 +28552,8 @@
             "in": "path",
             "name": "id",
             "schema": {
-              "type": "integer"
+              "type": "string"
             },
-            "description": "A unique integer value identifying this project.",
             "required": true
           }
         ],
@@ -28167,9 +28600,8 @@
             "in": "path",
             "name": "id",
             "schema": {
-              "type": "integer"
+              "type": "string"
             },
-            "description": "A unique integer value identifying this project.",
             "required": true
           }
         ],
@@ -28239,9 +28671,8 @@
             "in": "path",
             "name": "id",
             "schema": {
-              "type": "integer"
+              "type": "string"
             },
-            "description": "A unique integer value identifying this project.",
             "required": true
           }
         ],
@@ -28294,9 +28725,8 @@
             "in": "path",
             "name": "id",
             "schema": {
-              "type": "integer"
+              "type": "string"
             },
-            "description": "A unique integer value identifying this project.",
             "required": true
           }
         ],
@@ -28369,9 +28799,8 @@
             "in": "path",
             "name": "id",
             "schema": {
-              "type": "integer"
+              "type": "string"
             },
-            "description": "A unique integer value identifying this project.",
             "required": true
           }
         ],
@@ -28556,12 +28985,18 @@
             "description": "\nVariables for the test profile, split by which agent receives them.\n```json\n{\n    \"main_agent_variables\": {\"user_id\": \"U-123\"},\n    \"testing_agent_variables\": {\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\"}\n}\n```\n`main_agent_variables` are sent to the agent under test as dynamic variables. `testing_agent_variables` shape the simulated caller's persona. A legacy flat dict (no section keys) is accepted for backward compatibility and is sent to both agents.\n\nKeys in `main_agent_variables` starting with `X-` are additionally sent as custom SIP headers (SIP runs) or connection headers (WebSocket runs) to the agent under test. For SIP runs this is the only way to pass custom headers; `X-Run-Id`, `X-Scenario-Id`, and `X-Result-Id` are reserved and always set by Cekura.\n"
           },
           "created_by": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true,
             "description": "ID of the user who created this test profile"
           },
           "last_updated_by": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true,
             "description": "ID of the user who last updated this test profile"
           },
@@ -28615,12 +29050,18 @@
             "description": "\nVariables for the test profile, split by which agent receives them.\n```json\n{\n    \"main_agent_variables\": {\"user_id\": \"U-123\"},\n    \"testing_agent_variables\": {\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\"}\n}\n```\n`main_agent_variables` are sent to the agent under test as dynamic variables. `testing_agent_variables` shape the simulated caller's persona. A legacy flat dict (no section keys) is accepted for backward compatibility and is sent to both agents.\n\nKeys in `main_agent_variables` starting with `X-` are additionally sent as custom SIP headers (SIP runs) or connection headers (WebSocket runs) to the agent under test. For SIP runs this is the only way to pass custom headers; `X-Run-Id`, `X-Scenario-Id`, and `X-Result-Id` are reserved and always set by Cekura.\n"
           },
           "created_by": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true,
             "description": "ID of the user who created this test profile"
           },
           "last_updated_by": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true,
             "description": "ID of the user who last updated this test profile"
           },
@@ -28980,7 +29421,10 @@
             "readOnly": true
           },
           "project": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true
           },
           "agent": {
@@ -29277,7 +29721,10 @@
             "readOnly": true
           },
           "promoted_by_email": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "readOnly": true,
             "default": ""
           },
@@ -29881,7 +30328,10 @@
             "description": "User who last updated this alert"
           },
           "last_updated_by_email": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "readOnly": true
           }
         },
@@ -32116,7 +32566,10 @@
             "type": "boolean"
           },
           "created_by": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true
           },
           "created_via": {
@@ -36054,6 +36507,37 @@
           }
         }
       },
+      "PaginatedConditionAudioEntryList": {
+        "type": "object",
+        "required": [
+          "count",
+          "results"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConditionAudioEntry"
+            }
+          }
+        }
+      },
       "PaginatedCriticalMetricScenarioList": {
         "type": "object",
         "required": [
@@ -36463,6 +36947,24 @@
             "x-spec-enum-id": "a6fd953985219e0b",
             "writeOnly": true,
             "description": "Optional shorthand for trend alerts: 'conservative' | 'balanced' | 'aggressive'. Expands to std_multiplier / ewma_alpha / window_size. Explicit values in `source` or `threshold` override the preset. Ignored unless the alert's sub_type == 'significant_change'. Prefer it over setting those three by hand; 'balanced' is the safe default.\n\n* `conservative` - conservative\n* `balanced` - balanced\n* `aggressive` - aggressive"
+          }
+        }
+      },
+      "PatchedConditionAudioTranscript": {
+        "type": "object",
+        "description": "Validates a hand-corrected transcript for one clip.",
+        "properties": {
+          "transcript": {
+            "type": "string",
+            "description": "What the clip actually says, as plain text. The testing agent records these words as what it said when the clip plays, and speaks them if the audio cannot be loaded. Only a clip whose status is `ready` can be edited; replacing its audio transcribes it again and discards the edit.",
+            "maxLength": 16384
+          },
+          "words": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConditionAudioWord"
+            },
+            "description": "Optional timings for the transcript, one entry per word in playback order, ending within the clip. Together the words must spell out the transcript, ignoring case, spacing and punctuation. Omit them to keep the clip's current timings when the word count is unchanged, or to spread the new words over the span the old ones covered."
           }
         }
       },
@@ -37504,7 +38006,11 @@
               "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
               "x-spec-enum-id": "99d2b7efd95189c4"
             },
-            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\nUnless the agent also redacts its stored recordings, `voice_recording_url` is sent as null.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\n`voice_recording_url` is sent as null unless the agent's own `redact_fields` include every field listed here\n(recordings ingested before the agent enabled redaction are not redacted), and provider recording/log links in\n`metadata` are removed. Forwarded raw provider webhooks (`forward_vapi_webhook`, `forward_retell_webhook`) are not redacted.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+          },
+          "skip_call_log_webhook_no_content": {
+            "type": "boolean",
+            "description": "\nSkip call log webhooks for calls with no conversation content: no spoken transcript, or a busy / no-answer ended reason\nExample: `true` or `false`\n"
           },
           "notify_frequent_calls_for_number": {
             "type": "boolean"
@@ -39588,7 +40094,11 @@
               "description": "* `person_name` - person_name\n* `age` - age\n* `phone_number` - phone_number\n* `email_address` - email_address\n* `date` - date\n* `time` - time\n* `location` - location\n* `origin` - origin\n* `gender_sexuality` - gender_sexuality\n* `physical_attribute` - physical_attribute\n* `occupation` - occupation\n* `username` - username\n* `password` - password\n* `ip_address` - ip_address\n* `url` - url\n* `filename` - filename\n* `event` - event\n* `vehicle_id` - vehicle_id\n* `dob` - dob\n* `healthcare_number` - healthcare_number\n* `medical_professional` - medical_professional\n* `credit_card` - credit_card\n* `account_number` - account_number\n* `bank_account` - bank_account\n* `money` - money\n* `ssn` - ssn\n* `passport_number` - passport_number\n* `driver_license` - driver_license\n* `numerical_pii` - numerical_pii",
               "x-spec-enum-id": "99d2b7efd95189c4"
             },
-            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\nUnless the agent also redacts its stored recordings, `voice_recording_url` is sent as null.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+            "description": "\nPII fields to redact from outgoing call log webhook payloads (including metadata and dynamic variables).\nStored call logs are not changed. Empty list disables it.\n`voice_recording_url` is sent as null unless the agent's own `redact_fields` include every field listed here\n(recordings ingested before the agent enabled redaction are not redacted), and provider recording/log links in\n`metadata` are removed. Forwarded raw provider webhooks (`forward_vapi_webhook`, `forward_retell_webhook`) are not redacted.\nExample: `[\"ssn\", \"dob\", \"email_address\"]`\n"
+          },
+          "skip_call_log_webhook_no_content": {
+            "type": "boolean",
+            "description": "\nSkip call log webhooks for calls with no conversation content: no spoken transcript, or a busy / no-answer ended reason\nExample: `true` or `false`\n"
           },
           "notify_frequent_calls_for_number": {
             "type": "boolean"
@@ -40871,7 +41381,8 @@
               "string",
               "null"
             ],
-            "description": "Optional name for the scenario result"
+            "description": "Optional name for the scenario result",
+            "maxLength": 255
           },
           "frequency": {
             "type": "integer",
@@ -42054,12 +42565,18 @@
             "description": "Timestamp when the scenario was last updated"
           },
           "created_by": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true,
             "description": "ID of the user who created this scenario"
           },
           "last_updated_by": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true,
             "description": "ID of the user who last updated this scenario"
           },
@@ -46187,7 +46704,10 @@
         "description": "",
         "properties": {
           "id": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "readOnly": true
           },
           "name": {
@@ -46195,13 +46715,15 @@
             "maxLength": 255
           },
           "email": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "email",
-            "maxLength": 254
+            "readOnly": true
           }
         },
         "required": [
-          "email",
           "name"
         ]
       },
@@ -46652,6 +47174,14 @@
                 "description": "Denominator used for enum daily shares."
               }
             }
+          },
+          "warning": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WidgetDataWarning"
+              }
+            ],
+            "description": "Present instead of plot data when the widget cannot be computed for the requested range, e.g. `metadata_retention` when a metadata.* widget asks for days older than the metadata retention window. `data` is then empty."
           }
         },
         "required": [
@@ -46663,6 +47193,21 @@
           "metadata",
           "time_period",
           "widget_id"
+        ]
+      },
+      "WidgetDataWarning": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
         ]
       }
     },

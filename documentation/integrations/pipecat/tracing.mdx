@@ -15,7 +15,7 @@ export const pipecatPrompt = [
   "OBJECTIVE",
   "Add the Cekura PipecatTracer SDK so that:",
   "- Production calls are monitored with transcripts, tool calls, audio recording, logs, and OpenTelemetry traces (observability mode).",
-  "- UAT/dev/staging calls support simulation testing from the Cekura platform with transcripts, logs, and OTel traces but no audio recording (testing mode).",
+  "- UAT/dev/staging calls support simulation testing from the Cekura platform with transcripts, tool calls, mock tools, logs, and OTel traces but no audio recording (testing mode).",
   "",
   "The user's codebase likely has separate entrypoints or environment-based configuration for prod vs UAT. Ask the user how they distinguish between these environments before writing code.",
   "",
@@ -33,9 +33,10 @@ export const pipecatPrompt = [
   "",
   "For the UAT / testing entrypoint:",
   "- Use cekura.track_pipeline() or cekura.track_and_create_task() — these capture transcripts only, no audio. This is what Cekura simulation calls use.",
+  "- During simulations, these methods automatically replace registered tool handlers with mock tools configured in Cekura. Keep registering tools with llm.register_function() as usual — no extra code is needed.",
   "",
   "Common setup for both:",
-  "1. Install the SDK: pip install \"cekura[pipecat]>=1.6.4\"",
+  "1. Install the SDK: pip install \"cekura[pipecat]>=1.6.8\"",
   "2. Import PipecatTracer: from cekura.pipecat import PipecatTracer",
   "3. Initialize the tracer:",
   "   cekura = PipecatTracer(",
@@ -63,11 +64,13 @@ export const pipecatPrompt = [
   "- register_task_handlers hooks into the task lifecycle for cleanup — call it after PipelineTask creation.",
   "- If runner_args is available, pass it so the SDK can extract the session ID automatically.",
   "- The transport parameter enables automatic cleanup on participant disconnect.",
+  "- Create the LLM service and the PipecatTracer inside the per-call function. Do not share one LLM service across concurrent calls, because mock tools replace handlers in that LLM's function registry.",
   "",
   "SUCCESS CRITERIA",
   "- Production calls appear in the Cekura dashboard Calls section with transcripts, audio, tool calls, logs, and OTel traces.",
   "- UAT/simulation calls from the Cekura platform appear in the Runs section with transcripts, tool calls, logs, and OTel traces.",
   "- No audio recording in UAT mode.",
+  "- Mock tools configured in Cekura are used in place of the real tool handlers during simulations.",
   "- The pipeline runs identically to before — the tracer is non-intrusive.",
   "- CEKURA_API_KEY is read from environment, not hardcoded.",
   "- Existing pipeline structure, error handling, and patterns in the codebase are preserved.",
@@ -115,7 +118,7 @@ export const pipecatPrompt = [
   "If the Cekura MCP server is available in your environment, use its tools/skills to create scenarios, trigger test runs, review results, and set up metrics — all without leaving your coding agent.",
   "",
   "ADDITIONAL REFERENCE",
-  "For full SDK reference, OTel tracing details, troubleshooting, and advanced options see: https://docs.cekura.ai/documentation/integrations/pipecat/tracing",
+  "For full SDK reference, OTel tracing details, mock tools, troubleshooting, and advanced options see: https://docs.cekura.ai/documentation/integrations/pipecat/tracing",
 ].join("\n");
 
 <CopyPageButton />
@@ -134,6 +137,7 @@ Pipecat Tracing provides deep observability into your Pipecat agent's performanc
 
 - Complete agent-side conversation transcripts with UTC timestamps
 - Tool/function calls with inputs and outputs
+- Mock tools support for testing with predictable tool responses
 - Dual-channel audio recording (agent + user) for production monitoring
 - OpenTelemetry traces with conversation, turn, and service spans (STT, LLM, TTS)
 - Session logs capture from agent
@@ -165,7 +169,7 @@ Use this setup in your test agents while running simulation calls from the Cekur
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install "cekura[pipecat]>=1.6.4"
+pip install "cekura[pipecat]>=1.6.8"
 ```
 
 </Step>
@@ -234,8 +238,10 @@ async def run_bot(transport, runner_args):
 
 **What this does:**
 - Captures transcripts and tool calls
+- Replaces registered tool handlers with your [mock tools](#using-mock-tools-with-pipecat-tracing) during simulations
 - Captures session logs (INFO+)
 - Exports OpenTelemetry traces (conversation, turn, STT/LLM/TTS spans)
+- Automatically configures chat/text mode when running text-based tests
 - Sends data to Cekura's simulation webhook for test analysis
 - No audio recording — lightweight for testing
 
@@ -267,6 +273,9 @@ Configure at least one connection type for voice-based testing:
 - **WebRTC**: Direct Pipecat session connection using the credentials configured above
 - **Telephony**: Phone-based testing if your Pipecat agent is connected to a phone system (requires Contact Number)
 
+For text-based testing:
+- **Pipecat Chat**: Enable Pipecat Chat under Chat connections for chat-based testing (uses the same Pipecat credentials, no additional setup required)
+
 See the [Pipecat Automated Testing](/documentation/integrations/pipecat/automated) guide for details on all configuration fields including Agent Configuration JSON and Room Properties.
 
 </Step>
@@ -277,6 +286,7 @@ Run tests using your preferred connection type:
 
 - **WebRTC**: Select WebRTC under Voice connections in the Configure Run dialog for WebRTC-based testing
 - **Telephony**: Select Telephony under Voice connections for phone-based testing
+- **Pipecat Chat**: Select Pipecat Chat under Chat connections for text-based testing
 
 Test results will appear in the Runs section with enhanced data including transcripts, tool calls, logs, and OTel traces.
 
@@ -293,7 +303,7 @@ Use this setup in your production agents for monitoring live calls with audio re
 <Step title="Install the Cekura Python SDK">
 
 ```bash
-pip install "cekura[pipecat]>=1.6.4"
+pip install "cekura[pipecat]>=1.6.8"
 ```
 
 </Step>
@@ -368,7 +378,7 @@ async def run_bot(transport, runner_args):
 - Exports data to Cekura observability endpoint
 
 <Note>
-  `observe_pipeline()` registers its own audio frame processor and performs a parallel recording independently of any audio capture you already have in your pipeline. The two recordings are completely separate — the SDK's recording is asynchronous and does not add latency. If you already record audio and want to understand the impact, see [Will the Cekura SDK record audio again if I already capture it?](/documentation/FAQ#if-i-already-capture-and-store-audio-in-my-own-pipecat-pipeline-will-the-cekura-sdk-record-it-again) in the FAQ. To avoid recording entirely or control it per call, see [Can I disable or selectively control audio recording?](/documentation/FAQ#can-i-disable-or-selectively-control-audio-recording-in-the-pipecat-sdk).
+  `observe_pipeline()` registers its own audio frame processor and performs a parallel recording independently of any audio capture you already have in your pipeline. The two recordings are completely separate. If you already record audio and want to understand the impact, see [Will the Cekura SDK record audio again if I already capture it?](/documentation/FAQ#if-i-already-capture-and-store-audio-in-my-own-pipecat-pipeline-will-the-cekura-sdk-record-it-again) in the FAQ. To avoid recording entirely or control it per call, see [Can I disable or selectively control audio recording?](/documentation/FAQ#can-i-disable-or-selectively-control-audio-recording-in-the-pipecat-sdk).
 </Note>
 
 For simpler setups, you can combine all steps into one call:
@@ -392,6 +402,27 @@ Once the SDK is configured in your agent code, all production calls will automat
 
 </Tab>
 </Tabs>
+
+## Recording Startup
+
+In observability mode, recording starts when Pipecat dispatches the pipeline-start lifecycle handler. By default, the handler waits up to four seconds for recording credentials and initialization. This gives recording a head start, but it is not a hard barrier before the conversation opens.
+
+Set `async_recording=True` to return from the lifecycle handler immediately while recording starts in the background. This reduces startup waiting, but audio produced before the recorder is ready may not be captured. Asynchronous startup uses a ten-second timeout by default.
+
+Override the startup deadline for an individual session with `recording_start_timeout_seconds`. The value must be a positive, finite number.
+
+```python
+task = cekura.observe_and_create_task(
+    pipeline,
+    context,
+    runner_args=runner_args,
+    transport=transport,
+    async_recording=True,
+    recording_start_timeout_seconds=8,
+)
+```
+
+If recording cannot start or exceeds the deadline, the Pipecat pipeline continues. Available transcripts, tool calls, logs, metadata, and OpenTelemetry traces are still sent to Cekura without an audio recording.
 
 ## Enhanced Data in Cekura UI
 
@@ -443,6 +474,8 @@ task = PipelineTask(pipeline, enable_tracing=True, enable_turn_tracking=True)
 ```
 
 The SDK sets up the OTel provider in both cases. In the multi-step API, it's ready for Pipecat to use once you enable tracing on the task.
+
+If your application already has a compatible global OpenTelemetry provider, the SDK reuses it and routes only the current Pipecat session's spans to Cekura instead of replacing your existing provider.
 
 ### Additional Span Attributes
 
@@ -603,17 +636,77 @@ task = cekura.observe_and_create_task(
   If you already capture audio in your own pipeline and want to understand how the SDK's parallel recording works, see [If I already capture and store audio in my own Pipecat pipeline, will the Cekura SDK record it again?](/documentation/FAQ#if-i-already-capture-and-store-audio-in-my-own-pipecat-pipeline-will-the-cekura-sdk-record-it-again) in the FAQ.
 </Note>
 
+## Automatic Chat Mode Support
+
+The SDK automatically handles chat/text mode when you run scenarios with the **Pipecat Chat** connection — **no code changes required**.
+
+When you run a text-based test, the SDK switches the session to pure text, so the conversation is exchanged as typed turns with no audio processing. This provides:
+
+- **Targeted testing** of your agent's conversational logic without audio overhead
+- **Cost savings** by eliminating STT/TTS provider costs
+- **Faster simulations** compared to voice-based tests
+
+Your `track_and_create_task()` / `observe_and_create_task()` integration works seamlessly for both voice and text modes. Pass `runner_args` to the tracer so it can detect the run mode.
+
+## Using Mock Tools with Pipecat Tracing
+
+The SDK supports mock tools, allowing you to test your agent with predictable tool responses. This is useful for creating reproducible test scenarios without relying on live external services. Mock tools work in voice, text, and telephony simulations.
+
+**To use mock tools:**
+
+1. **Create mock tools in Cekura**: Set up your mock tool configurations in the Cekura dashboard. See the [Mock Tools guide](/documentation/key-concepts/evaluators/mock-tools) for detailed instructions. The mock tool name must exactly match the function name you register in Pipecat.
+
+2. **SDK handles the rest**: Keep registering your tools with Pipecat's normal API. When you use `track_pipeline()` or `track_and_create_task()`, the SDK swaps in the mock responses during simulations — no additional code changes needed.
+
+   ```python
+   llm.register_function("get_appointments", get_appointments)
+
+   # Build your pipeline and context as usual
+   task = cekura.track_and_create_task(
+       pipeline, context, runner_args=runner_args, transport=transport
+   )
+   await PipelineRunner().run(task)
+   ```
+
+3. **Test with predictable data**: Your agent will receive the mock responses you configured, making it easy to test specific scenarios and edge cases.
+
+### How It Works
+
+- **Discovery**: `track_pipeline()` and `track_and_create_task()` find the LLM services in your pipeline, including those inside nested pipelines.
+- **Retrieval**: Before the LLM starts, the SDK fetches the agent's mock tools from Cekura once per session, with a three-second deadline.
+- **Replacement**: Each registered handler whose function name exactly matches a mock tool is replaced for that session. Handlers without a matching mock keep running your real code. Tool schemas, interruption settings, and per-tool timeouts stay as you configured them.
+- **Matching**: When the LLM calls a mocked tool, the SDK returns the output of the first configured input/output pair whose input fields equal the call's arguments. Extra arguments are ignored, matching is case-sensitive, and an empty input matches any arguments.
+- **No match**: If a mocked tool has no matching pair, the tool returns `{"error": "No matching mock data found"}`. If its mock data is missing or invalid, it returns `{"error": "No mock data available"}`. The real handler is never called for a mocked tool.
+- **Fallback**: If mock retrieval fails or times out, the real handlers stay active and the simulation continues.
+
+Mock tools apply only to simulations. `observe_pipeline()` and `observe_and_create_task()` never fetch mocks and leave your handlers unchanged. To keep real handlers in a simulation, set `CEKURA_MOCK_TOOLS_ENABLED=false`.
+
+<Warning>
+Create one LLM service and one `PipecatTracer` per call. Mock tools replace handlers in the LLM service's function registry, so an LLM service shared across concurrent calls cannot safely hold real and mock handlers at the same time.
+</Warning>
+
 ## Best Practices
 
-1. **Use the right method for your environment**: Use `track_pipeline()` / `track_and_create_task()` in your test/UAT environments for simulation testing. Use `observe_pipeline()` / `observe_and_create_task()` in your production environment for monitoring live calls with audio recording.
+1. **Use the right method for your environment**: Use `track_pipeline()` / `track_and_create_task()` in your test/UAT environments for simulation testing with mock tools. Use `observe_pipeline()` / `observe_and_create_task()` in your production environment for monitoring live calls with audio recording.
 
 2. **Use environment variables for credentials**: Don't hardcode API keys in your code
 
-3. **Keep the SDK updated**: Run `pip install --upgrade cekura` periodically for the latest features
+3. **Keep the SDK updated**: Run `pip install --upgrade "cekura[pipecat]"` periodically for the latest features
 
 4. **Use session IDs**: The SDK resolves the session ID in this order: explicit `session_id` parameter > `runner_args.session_id` > auto-generated. Pass a custom session ID to correlate Cekura data with your application logs
 
 5. **Create one `PipecatTracer` instance per call — do not share instances across concurrent sessions**: `PipecatTracer` is not thread-safe to share. When running multiple concurrent calls in the same event loop, instantiate a fresh `PipecatTracer` for each call (with its own `session_id`) inside the function that handles that call. With this pattern the SDK is safe for concurrent use — each instance holds its own session state and submits data independently.
+
+## Compatibility
+
+For the Pipecat integration, use Cekura Python SDK `>=1.6.8,<2`. Updates within the `1.x` release line are backward compatible.
+
+| Package | Supported versions |
+|---|---|
+| Python | `>=3.11` |
+| Cekura Python SDK | `>=1.6.8,<2` |
+| `pipecat-ai` | `>=1.0.0,<2` |
+| OpenTelemetry | `>=1.39,<2` |
 
 ## SDK Reference
 
@@ -645,7 +738,9 @@ pipeline = tracer.observe_pipeline(
     session_id=None,       # Optional: Takes precedence over runner_args.session_id
     custom_metadata=None,  # Optional: Dict of custom metadata
     defer_upload=False,    # Optional: Buffer audio until start_audio_upload() is called
-    defer_evaluation=False # Optional: Upload artifacts now; evaluate after API release
+    defer_evaluation=False, # Optional: Upload artifacts now; evaluate after API release
+    async_recording=False, # Optional: Start recording without waiting in the lifecycle handler
+    recording_start_timeout_seconds=None # Optional: Positive per-session startup deadline
 )
 ```
 
@@ -679,6 +774,8 @@ task = tracer.observe_and_create_task(
     custom_metadata=None,  # Optional: Dict of custom metadata
     defer_upload=False,    # Optional: Buffer audio until start_audio_upload() is called
     defer_evaluation=False, # Optional: Upload artifacts now; evaluate after API release
+    async_recording=False, # Optional: Start recording without waiting in the lifecycle handler
+    recording_start_timeout_seconds=None, # Optional: Positive per-session startup deadline
     **pipeline_task_kwargs # Optional: Additional args forwarded to PipelineTask
 )
 ```
@@ -752,6 +849,7 @@ metadata = tracer.get_custom_metadata()
 
 **Environment variables:**
 - `CEKURA_TRACER_ENABLED="false"`: Disable the tracer entirely
+- `CEKURA_MOCK_TOOLS_ENABLED="false"`: Keep real tool handlers during simulations
 
 ## Troubleshooting
 
@@ -788,6 +886,27 @@ pipeline = Pipeline([
     assistant_agg,  # Add assistant aggregator
 ])
 ```
+
+### Chat runs behave like voice runs
+
+The SDK needs `runner_args` to detect a text run. If it is not passed to the tracer, the session is treated as voice. Pass it through from your bot entry point:
+
+```python
+async def bot(runner_args: RunnerArguments):
+    ...
+    task = cekura.track_and_create_task(
+        pipeline, context, runner_args=runner_args, transport=transport
+    )
+```
+
+### Real tool handlers run during a simulation
+
+If your real tool code runs instead of the mock response:
+
+- Confirm you use `track_pipeline()` or `track_and_create_task()`. The `observe_*` methods do not apply mock tools.
+- Confirm the mock tool name in Cekura exactly matches the name passed to `llm.register_function()`.
+- Confirm `CEKURA_MOCK_TOOLS_ENABLED` is not set to `false`.
+- Check your agent logs for a warning such as `Unable to retrieve Pipecat mock tools; keeping real handlers`. If retrieval fails or times out, the SDK keeps the real handlers.
 
 ### Import Error
 

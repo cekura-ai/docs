@@ -2,7 +2,7 @@
 title: 'Creating Custom Personalities'
 icon: "user-cog"
 iconType: "regular"
-description: "Personalities in Cekura define how the simulated caller behaves when it tests your agent — its voice, language, speaking pace, interruption and idle timing, background noise and persona. A personality is the caller; an evaluator is the test case that caller runs."
+description: "Personalities in Cekura define how the simulated caller behaves when it tests your agent — its voice, language, speaking pace, interruption, backchanneling and idle timing, background noise and persona. A personality is the caller; an evaluator is the test case that caller runs."
 ---
 
 import { CopyPageButton } from "/snippets/copy-page-button.mdx";
@@ -79,6 +79,7 @@ Open the **Advanced Settings** section of the personality form for these. They c
 | **Idle Timeout (seconds)** | Seconds of silence before the testing agent prompts ("Are you still there?") | 10 |
 | **Max Idle Prompts** | How many times it prompts before ending the call | 3 |
 | **Interruption Level** | How aggressively the testing agent talks over your agent | Preset per personality |
+| **Backchanneling** | Whether the testing agent says short listening cues ("mm-hmm") while your agent is talking. See [Backchanneling](#backchanneling) | Off |
 | **Start Wait Seconds / stop speaking plan** | Fine-grained control over when the caller starts and stops speaking. Ignored when an Interruption Level preset is set | — |
 | **Network Simulation** | Packet loss, jitter and latency, for degraded-network testing | Off |
 
@@ -87,6 +88,29 @@ Open the **Advanced Settings** section of the personality form for these. They c
 </Tip>
 
 Both idle fields must be set together, and both must be 1 or greater — the idle prompt can be pushed out but not switched off entirely.
+
+### Backchanneling
+
+Real callers say "mm-hmm", "okay" or "right" while an agent is explaining something. They are signalling that they are listening, not asking for the turn. Many voice agents mishandle this: they stop mid-sentence, start the sentence over, or reply to the cue ("Sorry, did you say something?"). Turn on **Backchanneling** to test for it.
+
+| Preset | Behavior |
+|---|---|
+| **Off** | No listening cues. This is the default. |
+| **Occasional** | Now and then, at most one cue per agent turn, and only during longer stretches of speech. |
+| **Frequent** | More often, up to three cues per agent turn, including during shorter stretches of speech. |
+
+How cues are placed:
+
+- A cue is only said while your agent is in the middle of a turn and keeps talking. It never lands at the end of your agent's turn, after a question, or before the testing agent has said its first line.
+- It is spoken in the personality's own voice and language, and is short, under 1.5 seconds.
+- It appears in the transcript as its own testing-agent line, so you can see exactly where each cue fell.
+- It does not change what the testing agent says next.
+
+The [pre-defined interruption, barge-in and latency metrics](/documentation/key-concepts/metrics/pre-defined-metrics#conversation-quality-metrics) treat a cue as deliberate overlap, not an interruption or a turn, so turning backchanneling on does not inflate their counts.
+
+<Note>
+Backchanneling applies to voice simulations only, and is available for English, Hindi, Spanish, French, German, Italian and Portuguese personalities. In any other language the setting has no effect.
+</Note>
 
 ## Updating a personality over the API
 
@@ -103,6 +127,14 @@ To customise a pre-defined personality, fork it and then update the copy:
     "idle_timeout_seconds": 45,
     "idle_message_max_spoken_count": 1
   }
+}
+```
+
+Backchanneling is set with `backchannel_plan` (`"off"`, `"occasional"` or `"frequent"`):
+
+```json Turn on backchanneling
+{
+  "backchannel_plan": "frequent"
 }
 ```
 

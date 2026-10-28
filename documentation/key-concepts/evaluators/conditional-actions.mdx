@@ -971,7 +971,7 @@ If you only need a **second speaker** rather than a specific recording, use the 
 4. When the condition fires, text, recordings, and tags run from left to right. The same clip plays wherever it is referenced.
 
 <Warning>
-The transcript is **derived from the recording** and is read-only.
+The transcript is **derived from the recording** automatically. In the editor UI it is read-only; to correct a misheard word through the API, see [Editing a clip's transcript](#editing-a-clips-transcript).
 </Warning>
 
 ### Attaching audio (UI)
@@ -984,14 +984,14 @@ In the Structured Tests editor, each verbatim step has an **Attach audio at curs
 
 ### Attaching audio (API)
 
-Four endpoints on the scenario manage attached audio. Clips are uploaded as `multipart/form-data`.
+Five endpoints on the scenario manage attached audio. Clips are uploaded as `multipart/form-data`.
 
 <CodeGroup>
 
 ```bash Upload (with condition)
 # Attach a clip named "greeting" to step 2 of scenario 39001
 curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
-  -H "Authorization: Bearer $CEKURA_API_KEY" \
+  -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
   -F "name=greeting" \
   -F "condition_id=2" \
   -F 'action_template=Before the tone <audio /> <silence time="1s"/> continue' \
@@ -1002,7 +1002,7 @@ curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-
 ```bash Upload (without condition)
 # Add a clip to the scenario without touching any step
 curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
-  -H "Authorization: Bearer $CEKURA_API_KEY" \
+  -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
   -F "name=hold-music" \
   -F "file=@hold-music.wav"
 # Then reference it from any verbatim step: <audio id="hold-music"/>
@@ -1011,27 +1011,35 @@ curl -X POST "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-
 ```bash List
 # List every clip on the scenario with its current status and references
 curl "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/" \
-  -H "Authorization: Bearer $CEKURA_API_KEY"
+  -H "X-CEKURA-API-KEY: $CEKURA_API_KEY"
 ```
 
 ```bash Replace
 # Replace a clip's audio (every reference plays the new recording)
 curl -X PUT "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
-  -H "Authorization: Bearer $CEKURA_API_KEY" \
+  -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
   -F "file=@greeting-v2.mp3"
 # Pass name=new-name to rename the clip at the same time
+```
+
+```bash Edit transcript
+# Correct a ready clip's transcript; the audio is untouched
+curl -X PATCH "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
+  -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"transcript": "Hello, John Smith."}'
 ```
 
 ```bash Delete
 # Delete a clip and remove every <audio> reference to it
 curl -X DELETE "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
-  -H "Authorization: Bearer $CEKURA_API_KEY"
+  -H "X-CEKURA-API-KEY: $CEKURA_API_KEY"
 # Returns 409 if deleting would leave a step other than the first message empty
 ```
 
 </CodeGroup>
 
-The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry — from the list, upload and replace responses — looks like:
+The upload returns the clip's entry immediately with `status: "pending"`; poll the list endpoint until it becomes `ready`. Each entry — from the list, upload, replace and edit responses — looks like:
 
 ```json
 {
@@ -1042,6 +1050,13 @@ The upload returns the clip's entry immediately with `status: "pending"`; poll t
   "status": "ready",
   "transcript": "Hello, thanks for calling.",
   "duration": 1.78,
+  "words": [
+    {"word": "hello", "start": 0.12, "end": 0.48},
+    {"word": "thanks", "start": 0.56, "end": 0.9},
+    {"word": "for", "start": 0.9, "end": 1.04},
+    {"word": "calling", "start": 1.04, "end": 1.6}
+  ],
+  "timing_source": "deepgram",
   "filename": "greeting.mp3",
   "playback_url": "https://…/greeting.wav"
 }
@@ -1083,6 +1098,30 @@ The scenario's GET response also includes a read-only `condition_audio` summary 
 <ParamField path="replace_audio_id" type="string">
   Requires `condition_id`. Points that step's existing tag at the new clip. To swap a clip's audio while keeping every reference to it, PUT to `condition-audio/{audio_id}/` instead.
 </ParamField>
+
+### Editing a clip's transcript
+
+`PATCH` on a clip corrects its `transcript` and, optionally, its word timings (`words`). The testing agent records the corrected text as what it said when the clip plays.
+
+- **`words` sent**: stored as given. They must spell out the transcript (case, spacing and punctuation are ignored), be in playback order, have each `end` at or after its `start`, and end within the clip's duration. At most 5,000 words of up to 100 characters each; otherwise the request returns 400.
+- **`words` omitted, same word count**: every word keeps its current timing.
+- **`words` omitted, different word count**: the new words are spread across the span the old ones covered.
+- Only a `ready` clip can be edited. A pending, processing or failed clip returns 409.
+- Replacing the clip's audio transcribes it again and discards the edit.
+- Runs already in progress are unaffected; the edit applies from the next run.
+
+The response is the clip's entry, with `timing_source` showing where its timings came from: `deepgram` (measured), `interpolated` (spread evenly) or `manual` (sent with an edit).
+
+```bash
+# Correct the transcript and send the word timings with it
+curl -X PATCH "https://api.cekura.ai/test_framework/v1/scenarios/39001/condition-audio/greeting/" \
+  -H "X-CEKURA-API-KEY: $CEKURA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"transcript": "Hello, John Smith.",
+       "words": [{"word": "Hello,", "start": 0.12, "end": 0.48},
+                 {"word": "John", "start": 0.6, "end": 0.9},
+                 {"word": "Smith.", "start": 0.95, "end": 1.5}]}'
+```
 
 ### Statuses & run gating
 

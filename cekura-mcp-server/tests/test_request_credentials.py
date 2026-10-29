@@ -33,7 +33,7 @@ def mcp_request(monkeypatch):
         return ctx
 
     yield _install
-    for token in tokens:
+    for token in reversed(tokens):
         request_ctx.reset(token)
 
 
@@ -89,6 +89,14 @@ class TestGetRequestCredential:
 
 
 class TestResolveClientIdentifier:
+    def test_claude_web_origin_and_other_clients(self, mcp_request):
+        for origin in ("https://claude.ai", "https://claude.com"):
+            mcp_request({"origin": origin, "user-agent": "Mozilla/5.0"})
+            assert srv._resolve_client_identifier() == "claude-web/unknown"
+        for origin in ("https://claude.ai.example.com", "http://claude.ai", "https://cursor.com"):
+            mcp_request({"origin": origin, "user-agent": "cursor/1.0"})
+            assert srv._resolve_client_identifier() == "cursor/1.0"
+
     def test_falls_back_to_user_agent_without_initialize_session(self, mcp_request):
         # Stateless mode: tool calls run in sessions that never saw
         # `initialize`, so clientInfo is unavailable and the HTTP

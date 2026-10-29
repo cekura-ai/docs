@@ -962,15 +962,24 @@ def get_request_credential() -> tuple[str, str]:
 def _resolve_client_identifier() -> str:
     """Best-effort client identifier from the active request context.
 
-    Prefers ``clientInfo`` from the MCP ``initialize`` params; in stateless
-    mode tool calls run in sessions that never saw ``initialize``, so fall
-    back to the HTTP ``User-Agent`` header. ``unknown`` when neither is
+    Recognizes Claude web Origins, otherwise prefers ``clientInfo`` from
+    MCP ``initialize`` params. Stateless tool-call sessions never saw
+    ``initialize``, so fall back to ``User-Agent``. ``unknown`` when neither is
     available (e.g. unit tests).
     """
     try:
         # `request_context` is a property that returns the current RequestContext
         # via the underlying ContextVar — no `.get()` needed.
         req_ctx = mcp._mcp_server.request_context
+        headers = getattr(getattr(req_ctx, "request", None), "headers", None)
+        if headers is not None:
+            from urllib.parse import urlsplit
+            try:
+                origin = urlsplit(headers.get("origin") or headers.get("Origin") or "")
+            except ValueError:
+                origin = None
+            if origin and origin.scheme == "https" and origin.hostname in {"claude.ai", "claude.com"}:
+                return "claude-web/unknown"
         session = getattr(req_ctx, "session", None)
         params = getattr(session, "client_params", None) if session else None
         ci = getattr(params, "clientInfo", None) if params else None

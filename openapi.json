@@ -3687,14 +3687,6 @@
             "description": "Comma-separated agent version ids (the `history_id`s reported in `agent_versions`); only calls that ran on those versions are counted."
           },
           {
-            "in": "query",
-            "name": "summary",
-            "schema": {
-              "type": "boolean"
-            },
-            "description": "When true, omit the `agents` and `agent_versions` breakdowns for a faster response. Counts and filters are unchanged."
-          },
-          {
             "name": "project",
             "in": "query",
             "required": false,
@@ -6793,6 +6785,7 @@
         "x-mcp-expose": true,
         "x-mcp-tool-name": "critical_metric_scenarios_list",
         "summary": "List critical metric scenarios",
+        "x-mcp-summary-derived": true,
         "x-mint": {
           "mcp": {
             "enabled": true,
@@ -7846,6 +7839,7 @@
         "x-mcp-expose": true,
         "x-mcp-tool-name": "personalities_list",
         "summary": "List personalities",
+        "x-mcp-summary-derived": true,
         "x-mint": {
           "mcp": {
             "enabled": true,
@@ -8455,6 +8449,7 @@
         "x-mcp-expose": true,
         "x-mcp-tool-name": "predefined_metrics_list",
         "summary": "List predefined metrics",
+        "x-mcp-summary-derived": true,
         "x-mint": {
           "mcp": {
             "enabled": true,
@@ -10444,7 +10439,7 @@
         "x-mcp-tool-name": "scenarios_condition_audio_replace"
       },
       "patch": {
-        "operationId": "scenarios-external-condition-audio-partial-update",
+        "operationId": "scenarios-condition-audio-transcript-update",
         "description": "Correct an audio clip's transcript and word timings",
         "summary": "Correct an audio clip's transcript and word timings",
         "parameters": [
@@ -10561,7 +10556,8 @@
             },
             "description": ""
           }
-        }
+        },
+        "x-mcp-tool-name": "scenarios_condition_audio_transcript_update"
       }
     },
     "/test_framework/v1/scenarios/{id}/": {
@@ -10923,7 +10919,7 @@
         "x-mcp-tool-name": "scenarios_condition_audio_replace"
       },
       "patch": {
-        "operationId": "scenarios-v1-condition-audio-partial-update",
+        "operationId": "scenarios-condition-audio-transcript-update_2",
         "description": "Correct an audio clip's transcript and word timings",
         "summary": "Correct an audio clip's transcript and word timings",
         "parameters": [
@@ -11040,7 +11036,8 @@
             },
             "description": ""
           }
-        }
+        },
+        "x-mcp-tool-name": "scenarios_condition_audio_transcript_update"
       }
     },
     "/test_framework/v1/scenarios/adv_update/": {
@@ -15635,6 +15632,7 @@
         "x-mcp-expose": true,
         "x-mcp-tool-name": "test_profiles_list",
         "summary": "List test profiles",
+        "x-mcp-summary-derived": true,
         "x-mint": {
           "mcp": {
             "enabled": true,
@@ -23254,6 +23252,102 @@
         }
       }
     },
+    "/test_framework/v2/scenarios/run/": {
+      "post": {
+        "operationId": "scenarios-run",
+        "description": "Start evaluator runs against an agent. Pick how the simulated user reaches the agent with `transport`; it must be one of the agent's `enabled_connections` (see `aiagents_retrieve`), and a transport that is not enabled is rejected with the list of enabled ones. Fields that belong to another transport are rejected.\n\n**Scenario selection (pick one):** `scenarios` (evaluator IDs), `tags`, or `folder_path` with `project_id`. `websocket` and `pipecat_v1` take their evaluators inside `websocket_urls` / `pipecat_rooms` instead, one entry per evaluator with its own URL.\n\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`. `text`, `email` and `websocket` runs bill at the text-simulation rate; every other transport places a voice call and bills at the voice rate.\n\n**Polling for completion:** the response is the result itself — read its top-level `id`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is `completed`, `failed`, `timeout` or `cancelled`. Check `failed_reasons` for infrastructure errors and `runs[].error_message` for per-run errors.",
+        "summary": "Run evaluators against an agent over any transport",
+        "tags": [
+          "Evaluators"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunScenariosRequest"
+              },
+              "examples": {
+                "VAPIWebRTCRun": {
+                  "value": {
+                    "transport": "vapi_webrtc",
+                    "agent": 12,
+                    "scenarios": [
+                      101,
+                      102
+                    ],
+                    "frequency": 1,
+                    "name": "Q3 regression",
+                    "concurrency_limit": 5
+                  },
+                  "summary": "VAPI WebRTC run"
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/RunScenariosRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/RunScenariosRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "oauth2": []
+          },
+          {
+            "supabase_session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunScenarioResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "field_name": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "x-mcp-expose": true,
+        "x-mcp-tool-name": "scenarios_run",
+        "x-mint": {
+          "mcp": {
+            "enabled": true,
+            "name": "scenarios-run",
+            "description": "Start evaluator runs against an agent. Pick how the simulated user reaches the agent with `transport`; it must be one of the agent's `enabled_connections` (see `aiagents_retrieve`), and a transport that is not enabled is rejected with the list of enabled ones. Fields that belong to another transport are rejected.\n\n**Scenario selection (pick one):** `scenarios` (evaluator IDs), `tags`, or `folder_path` with `project_id`. `websocket` and `pipecat_v1` take their evaluators inside `websocket_urls` / `pipecat_rooms` instead, one entry per evaluator with its own URL.\n\n**Run-count math:** total runs = `len(scenarios) × frequency × max(1, len(personality_ids)) × max(1, len(test_profile_ids))`. `text`, `email` and `websocket` runs bill at the text-simulation rate; every other transport places a voice call and bills at the voice rate.\n\n**Polling for completion:** the response is the result itself — read its top-level `id`. Poll `GET /test_framework/v1/results/{result_id}/` until `status` is `completed`, `failed`, `timeout` or `cancelled`. Check `failed_reasons` for infrastructure errors and `runs[].error_message` for per-run errors."
+          }
+        }
+      }
+    },
     "/test_framework/v2/scenarios/run_scenarios/": {
       "post": {
         "operationId": "scenarios-run-voice_3",
@@ -29427,6 +29521,31 @@
             "readOnly": true,
             "description": "AI platform integration (provider type, agent id, credential status, chat config)."
           },
+          "enabled_connections": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "voice",
+                "sip",
+                "text",
+                "email",
+                "vapi_webrtc",
+                "retell_webrtc",
+                "elevenlabs",
+                "livekit_v2",
+                "pipecat_v2",
+                "chirp",
+                "agora",
+                "websocket",
+                "pipecat_v1"
+              ],
+              "type": "string",
+              "description": "* `voice` - Voice\n* `sip` - SIP\n* `text` - Text\n* `email` - Email\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat Cloud\n* `chirp` - Raw-PCM WebSocket\n* `agora` - Agora\n* `websocket` - WebSocket (per-scenario URLs)\n* `pipecat_v1` - Pipecat (per-scenario room URLs)",
+              "x-spec-enum-id": "971409196dcf842e"
+            },
+            "readOnly": true,
+            "description": "Transports an evaluator run can use against this agent, as accepted by the unified run endpoint's `transport` field. Omitted from list responses."
+          },
           "agent_speaks_first": {
             "type": [
               "boolean",
@@ -30180,7 +30299,7 @@
             ],
             "type": "string",
             "x-spec-enum-id": "344119656d78c0bb",
-            "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, assemblyai, smallest, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `smallest` - Smallest AI\n* `custom` - Custom (chat-only, no voice provider)"
+            "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, smallest, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `smallest` - Smallest AI\n* `custom` - Custom (chat-only, no voice provider)"
           },
           "agent_id": {
             "type": [
@@ -32552,6 +32671,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -32561,7 +32684,7 @@
                 "minimum": 1
               }
             },
-            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
+            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_messages_enabled (boolean), idle_timeout_seconds (positive int), and idle_message_max_spoken_count (positive int).\nSet idle_messages_enabled to false to disable check-ins. Omitted fields preserve existing settings.\nExample: {\"idle_messages_enabled\": false, \"idle_timeout_seconds\": 15}\n"
           },
           "start_speaking_plan": {
             "type": "number",
@@ -37415,6 +37538,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -37424,7 +37551,7 @@
                 "minimum": 1
               }
             },
-            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
+            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_messages_enabled (boolean), idle_timeout_seconds (positive int), and idle_message_max_spoken_count (positive int).\nSet idle_messages_enabled to false to disable check-ins. Omitted fields preserve existing settings.\nExample: {\"idle_messages_enabled\": false, \"idle_timeout_seconds\": 15}\n"
           },
           "start_speaking_plan": {
             "type": "number",
@@ -38569,6 +38696,31 @@
             "writeOnly": true,
             "description": "AI platform integration. Nested credentials replace the flat {provider}_api_key fields."
           },
+          "enabled_connections": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "voice",
+                "sip",
+                "text",
+                "email",
+                "vapi_webrtc",
+                "retell_webrtc",
+                "elevenlabs",
+                "livekit_v2",
+                "pipecat_v2",
+                "chirp",
+                "agora",
+                "websocket",
+                "pipecat_v1"
+              ],
+              "type": "string",
+              "description": "* `voice` - Voice\n* `sip` - SIP\n* `text` - Text\n* `email` - Email\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat Cloud\n* `chirp` - Raw-PCM WebSocket\n* `agora` - Agora\n* `websocket` - WebSocket (per-scenario URLs)\n* `pipecat_v1` - Pipecat (per-scenario room URLs)",
+              "x-spec-enum-id": "971409196dcf842e"
+            },
+            "readOnly": true,
+            "description": "Transports an evaluator run can use against this agent, as accepted by the unified run endpoint's `transport` field. Omitted from list responses."
+          },
           "agent_speaks_first": {
             "type": [
               "boolean",
@@ -39664,6 +39816,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -39803,6 +39959,35 @@
           }
         },
         "title": "Pipecat"
+      },
+      "PipecatRoomEntry": {
+        "type": "object",
+        "properties": {
+          "scenario": {
+            "type": "integer",
+            "description": "Evaluator ID to run."
+          },
+          "pipecat_room_url": {
+            "type": "string",
+            "description": "Daily.co room URL this evaluator joins.",
+            "pattern": "^https?://"
+          },
+          "pipecat_token": {
+            "type": "string",
+            "description": "Room token, when the room requires one."
+          },
+          "call_id": {
+            "type": "string",
+            "description": "Call ID to associate with the Pipecat session."
+          },
+          "publish_data_message": {
+            "description": "Data message published into the room when the session starts."
+          }
+        },
+        "required": [
+          "pipecat_room_url",
+          "scenario"
+        ]
       },
       "PredefinedMetric": {
         "type": "object",
@@ -41956,6 +42141,209 @@
           "scenarios"
         ]
       },
+      "RunScenariosRequest": {
+        "type": "object",
+        "properties": {
+          "transport": {
+            "enum": [
+              "voice",
+              "sip",
+              "text",
+              "email",
+              "vapi_webrtc",
+              "retell_webrtc",
+              "elevenlabs",
+              "livekit_v2",
+              "pipecat_v2",
+              "chirp",
+              "agora",
+              "websocket",
+              "pipecat_v1"
+            ],
+            "type": "string",
+            "x-spec-enum-id": "971409196dcf842e",
+            "description": "How the simulated user reaches the agent. Must be enabled on the agent; `aiagents_retrieve` lists the options under `enabled_connections`. `websocket` and `pipecat_v1` carry their connection details per scenario instead.\n\n* `voice` - Voice\n* `sip` - SIP\n* `text` - Text\n* `email` - Email\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat Cloud\n* `chirp` - Raw-PCM WebSocket\n* `agora` - Agora\n* `websocket` - WebSocket (per-scenario URLs)\n* `pipecat_v1` - Pipecat (per-scenario room URLs)"
+          },
+          "agent": {
+            "type": "integer",
+            "description": "Agent ID to run against. Required unless every selected evaluator already belongs to an agent."
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Evaluator IDs to run, in order. Provide exactly one of `scenarios`, `tags`, `folder_path`. The dashboard may also send its selection shorthand (`\"all\"`, a count, or a folder path)."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Run every evaluator carrying any of these tags."
+          },
+          "folder_path": {
+            "type": "string",
+            "description": "Dot-separated folder path whose evaluators run. Requires `project_id`."
+          },
+          "project_id": {
+            "type": "integer",
+            "description": "Project ID. Required with `folder_path`."
+          },
+          "frequency": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Times each evaluator runs. Total runs = evaluators × frequency × personalities × test profiles."
+          },
+          "name": {
+            "type": "string",
+            "description": "Label for the result.",
+            "maxLength": 255
+          },
+          "personality_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "description": "Personality IDs to run each evaluator with instead of its own. Only personalities enabled for the project."
+          },
+          "test_profile_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "description": "Test profile IDs to run each evaluator with instead of its own."
+          },
+          "concurrency_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "description": "Cap on runs executing in parallel. Default: unbounded."
+          },
+          "calls_per_second": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "maximum": 4,
+            "minimum": 0.1,
+            "description": "Most calls started per second for this run, a number from 0.1 to 4 (e.g. 0.5 starts one call every 2 seconds). Leave unset for no limit."
+          },
+          "mock_tool_names": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Mock tools to activate for this run. Omit to mock every configured tool; send an empty list to mock none."
+          },
+          "agent_version_id": {
+            "type": "string",
+            "description": "Version label or numeric history id of a stored agent version to run against instead of the live agent."
+          },
+          "outbound_phone_number": {
+            "type": "string",
+            "description": "`voice`, `text`: override the number dialed, in E.164 format."
+          },
+          "agent_number": {
+            "type": "string",
+            "description": "`voice`, `text`: override the number the agent under test receives calls on, in E.164 format."
+          },
+          "mode": {
+            "enum": [
+              "same_number",
+              "different_numbers"
+            ],
+            "type": "string",
+            "x-spec-enum-id": "9ea0c9743bd9d873",
+            "description": "`voice`: use one phone number for every run (`same_number`) or rotate numbers (`different_numbers`).\n\n* `same_number` - same_number\n* `different_numbers` - different_numbers"
+          },
+          "sip_endpoint": {
+            "type": "string",
+            "description": "`sip`: override the agent's SIP endpoint for this run."
+          },
+          "websocket_url": {
+            "type": "string",
+            "description": "`text`: websocket URL the simulated user connects to instead of the agent's chat gateway. `chirp`: override the agent's raw-PCM websocket endpoint.",
+            "pattern": "^wss?://"
+          },
+          "websocket_headers": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "`text`: headers sent on the websocket connection, merged over the agent's configured headers."
+          },
+          "agent_email": {
+            "type": "string",
+            "format": "email",
+            "description": "`email`: override the agent's configured email address for this run."
+          },
+          "vapi_assistant_id": {
+            "type": "string",
+            "description": "`vapi_webrtc`: VAPI assistant ID to test. Defaults to the agent's stored assistant id."
+          },
+          "retell_agent_id": {
+            "type": "string",
+            "description": "`retell_webrtc`: Retell agent ID to test. Defaults to the agent's stored assistant id."
+          },
+          "elevenlabs_agent_id": {
+            "type": "string",
+            "description": "`elevenlabs`: ElevenLabs agent ID to test. Defaults to the agent's stored assistant id."
+          },
+          "elevenlabs_data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SchemaElevenLabsData"
+              }
+            ],
+            "description": "`elevenlabs`: per-run overrides (`elevenlabs_base_url_override`, `elevenlabs_environment`, `elevenlabs_branch_id`)."
+          },
+          "livekit_data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LivekitRunDataOverride"
+              }
+            ],
+            "description": "`livekit_v2`: per-run overrides (`agent_name`, `url`, `config`). Credentials come from the agent or project."
+          },
+          "pipecat_data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SchemaPipecatV2Data"
+              }
+            ],
+            "description": "`pipecat_v2`: per-run overrides (`pipecat_agent_name`, `config`, `room_properties`). Credentials come from the agent or project."
+          },
+          "websocket_urls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WebsocketScenarioEntry"
+            },
+            "description": "`websocket`: the evaluators to run, each with its own websocket URL. Replaces `scenarios`."
+          },
+          "pipecat_rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PipecatRoomEntry"
+            },
+            "description": "`pipecat_v1`: the evaluators to run, each with its own Daily.co room URL. Replaces `scenarios`."
+          }
+        },
+        "required": [
+          "transport"
+        ]
+      },
       "RunScenariosWithWebsockets": {
         "type": "object",
         "properties": {
@@ -43231,7 +43619,7 @@
             ],
             "type": "string",
             "x-spec-enum-id": "344119656d78c0bb",
-            "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, assemblyai, smallest, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `smallest` - Smallest AI\n* `custom` - Custom (chat-only, no voice provider)"
+            "description": "Voice/inbound platform provider type. Valid values: vapi, retell, elevenlabs, bland, livekit, cisco, gemini_cx, smallest, synthflow, koreai, genesys, amazon_connect, pipecat, custom. Use 'custom' (or omit) for chat-only agents with no voice provider — the chat channel goes in chat_agent_details.type. For a raw-PCM websocket voice agent you host yourself, use type='custom' and put the endpoint in telephony.websocket_url. Text-only channels (sms, whatsapp, agentforce, sierra) belong in chat_agent_details.type, not here.\n\n* `vapi` - Vapi\n* `retell` - Retell\n* `elevenlabs` - Elevenlabs\n* `agentforce` - Agentforce\n* `cisco` - Cisco\n* `bland` - Bland\n* `livekit` - Livekit\n* `pipecat` - Pipecat\n* `synthflow` - Synthflow\n* `agora` - Agora\n* `koreai` - Koreai\n* `genesys` - Genesys\n* `amazon_connect` - Amazon Connect\n* `telnyx` - Telnyx\n* `gemini_cx` - Gemini Enterprise CX\n* `assemblyai` - AssemblyAI\n* `smallest` - Smallest AI\n* `custom` - Custom (chat-only, no voice provider)"
           },
           "agent_id": {
             "type": [
@@ -43876,6 +44264,31 @@
             ],
             "writeOnly": true,
             "description": "AI platform integration. Nested credentials replace the flat {provider}_api_key fields."
+          },
+          "enabled_connections": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "voice",
+                "sip",
+                "text",
+                "email",
+                "vapi_webrtc",
+                "retell_webrtc",
+                "elevenlabs",
+                "livekit_v2",
+                "pipecat_v2",
+                "chirp",
+                "agora",
+                "websocket",
+                "pipecat_v1"
+              ],
+              "type": "string",
+              "description": "* `voice` - Voice\n* `sip` - SIP\n* `text` - Text\n* `email` - Email\n* `vapi_webrtc` - VAPI WebRTC\n* `retell_webrtc` - Retell WebRTC\n* `elevenlabs` - ElevenLabs\n* `livekit_v2` - LiveKit\n* `pipecat_v2` - Pipecat Cloud\n* `chirp` - Raw-PCM WebSocket\n* `agora` - Agora\n* `websocket` - WebSocket (per-scenario URLs)\n* `pipecat_v1` - Pipecat (per-scenario room URLs)",
+              "x-spec-enum-id": "971409196dcf842e"
+            },
+            "readOnly": true,
+            "description": "Transports an evaluator run can use against this agent, as accepted by the unified run endpoint's `transport` field. Omitted from list responses."
           },
           "agent_speaks_first": {
             "type": [
@@ -46994,6 +47407,24 @@
           }
         },
         "title": "VAPI"
+      },
+      "WebsocketScenarioEntry": {
+        "type": "object",
+        "properties": {
+          "scenario": {
+            "type": "integer",
+            "description": "Evaluator ID to run."
+          },
+          "websocket_url": {
+            "type": "string",
+            "description": "ws:// or wss:// URL this evaluator connects to.",
+            "pattern": "^wss?://"
+          }
+        },
+        "required": [
+          "scenario",
+          "websocket_url"
+        ]
       },
       "Widget": {
         "type": "object",

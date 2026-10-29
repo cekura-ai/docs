@@ -34,6 +34,7 @@ from http_client import (
 )
 from openapi_parser import load_openapi_spec
 from tool_generator import (
+    apply_overlay_argument_defaults,
     apply_overlay_to_description,
     apply_overlay_to_schema,
     build_input_schema,
@@ -1157,7 +1158,9 @@ def setup_dynamic_tool_handlers():
                 k: v.get('type') for k, v in schema_properties.items() if isinstance(v, dict)
             }
 
-            resolved_path, query_args, body_payload = _dispatch_args(op, arguments or {})
+            resolved_path, query_args, body_payload = _dispatch_args(
+                op, apply_overlay_argument_defaults(name, arguments or {})
+            )
             try:
                 result = await user_api_client.execute_request(
                     method=op.method,

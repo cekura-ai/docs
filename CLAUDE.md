@@ -28,6 +28,7 @@ That is the only inclusion signal. The spec is the source of truth; the server d
 |---|---|
 | `description_suffix` | Appended to the spec-derived description. Use for MCP-transport caveats or cross-tool guidance. |
 | `required` | Additional fields the LLM should always supply (validated against the tool's input schema). |
+| `argument_defaults` | Values filled in when the caller omits a field (or sends null), and shown as the field's `default`. The API's own default is unchanged. |
 | `examples` / `example_request` | Override or extend openapi examples shown to the model. |
 | `max_examples`, `example_names` | Filter/cap the openapi examples surfaced. |
 | `destructive` | Mark the tool as destructive when the description doesn't already include "⚠ Irreversible…". |

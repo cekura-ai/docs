@@ -111,6 +111,24 @@ def _check_required_fields(ctx: _Context) -> None:
                 )
 
 
+def _check_argument_defaults(ctx: _Context) -> None:
+    for tool_name, overlay in ctx.overlays.items():
+        defaults = overlay.get("argument_defaults") or {}
+        schema = ctx.schema_by_tool.get(tool_name)
+        if not defaults or schema is None:
+            continue
+        known = set((schema.get("properties") or {}).keys())
+        for field_name in defaults:
+            if field_name not in known:
+                ctx.add(
+                    "error",
+                    "missing_default_field",
+                    tool_name,
+                    f"Overlay sets a default for '{field_name}', but the tool's input schema "
+                    f"has no such property. Schema properties: {sorted(known)}",
+                )
+
+
 def _check_example_fields(ctx: _Context) -> None:
     for tool_name, overlay in ctx.overlays.items():
         example = overlay.get("example_request")
@@ -198,6 +216,7 @@ def run_checks(
 
     _check_orphans(ctx)
     _check_required_fields(ctx)
+    _check_argument_defaults(ctx)
     _check_example_fields(ctx)
     _check_schema_example_fields(ctx)
     _check_destructive_coverage(ctx)

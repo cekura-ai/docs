@@ -7850,7 +7850,7 @@
       },
       "post": {
         "operationId": "personalities-create_2",
-        "description": "Create a personality — the simulated caller your evaluators run as. A personality carries the caller's voice, language, speaking speed, interruption behavior, background noise and idle timing; an evaluator carries what that caller is trying to do. Evaluator instructions cannot override any of it, so a call-wide trait belongs here and nowhere else.\n\n`voice_id` and `provider` decide how the caller actually sounds, including its accent — list the catalog with `personalities_elevenlabs_voices` or `personalities_cartesia_voices` (both filter by `language`) and pass an id from there. `accent` is a read-only label derived from that voice and cannot be set.\n\nTo reuse a predefined personality with one thing changed, fork it instead of building a new one: forks inherit every setting.",
+        "description": "Create a personality — the simulated caller your evaluators run as. A personality carries the caller's voice, language, speaking speed, interruption behavior, backchanneling, background noise and idle timing; an evaluator carries what that caller is trying to do. Evaluator instructions cannot override any of it, so a call-wide trait belongs here and nowhere else.\n\n`voice_id` and `provider` decide how the caller actually sounds, including its accent — list the catalog with `personalities_elevenlabs_voices` or `personalities_cartesia_voices` (both filter by `language`) and pass an id from there. `accent` is a read-only label derived from that voice and cannot be set.\n\nTo reuse a predefined personality with one thing changed, fork it instead of building a new one: forks inherit every setting.",
         "summary": "Create a personality",
         "tags": [
           "test_framework"
@@ -7904,7 +7904,7 @@
           "mcp": {
             "enabled": true,
             "name": "personalities-create",
-            "description": "Create a personality — the simulated caller your evaluators run as. A personality carries the caller's voice, language, speaking speed, interruption behavior, background noise and idle timing; an evaluator carries what that caller is trying to do. Evaluator instructions cannot override any of it, so a call-wide trait belongs here and nowhere else.\n\n`voice_id` and `provider` decide how the caller actually sounds, including its accent — list the catalog with `personalities_elevenlabs_voices` or `personalities_cartesia_voices` (both filter by `language`) and pass an id from there. `accent` is a read-only label derived from that voice and cannot be set.\n\nTo reuse a predefined personality with one thing changed, fork it instead of building a new one: forks inherit every setting."
+            "description": "Create a personality — the simulated caller your evaluators run as. A personality carries the caller's voice, language, speaking speed, interruption behavior, backchanneling, background noise and idle timing; an evaluator carries what that caller is trying to do. Evaluator instructions cannot override any of it, so a call-wide trait belongs here and nowhere else.\n\n`voice_id` and `provider` decide how the caller actually sounds, including its accent — list the catalog with `personalities_elevenlabs_voices` or `personalities_cartesia_voices` (both filter by `language`) and pass an id from there. `accent` is a read-only label derived from that voice and cannot be set.\n\nTo reuse a predefined personality with one thing changed, fork it instead of building a new one: forks inherit every setting."
           }
         }
       }
@@ -32743,6 +32743,16 @@
             "readOnly": true,
             "description": "\nRead-only. The volume the call will actually play at: voice_volume if set, else a\nlegacy generation_config.volume, else 1.0. Use this to populate a volume control.\n"
           },
+          "backchannel_plan": {
+            "enum": [
+              "off",
+              "occasional",
+              "frequent"
+            ],
+            "type": "string",
+            "description": "\nHow often the testing agent says short listening cues (e.g. \"Mm-hmm\") while your agent\nkeeps talking: off (default), occasional or frequent. Voice simulations only; supported\nfor English, Hindi, Spanish, French, German, Italian and Portuguese. The setting is\naccepted for other languages but has no effect there.\n",
+            "x-spec-enum-id": "d02f393231763383"
+          },
           "patronus_settings": {
             "oneOf": [
               {},
@@ -36389,6 +36399,20 @@
             "type": "boolean",
             "readOnly": true
           },
+          "enabled_suites": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "infrastructure",
+                "benchmark"
+              ],
+              "type": "string",
+              "description": "* `infrastructure` - Infrastructure Suite\n* `benchmark` - Benchmark Suite",
+              "x-spec-enum-id": "cd6d2d7f56c4ada3"
+            },
+            "readOnly": true,
+            "description": "Predefined suite categories this organization can preview and add to projects"
+          },
           "notify_daily_report": {
             "type": "boolean"
           },
@@ -36639,6 +36663,10 @@
           },
           "is_2fa_required": {
             "type": "boolean"
+          },
+          "hipaa_enabled": {
+            "type": "boolean",
+            "readOnly": true
           },
           "skip_onboarding": {
             "type": "boolean"
@@ -37609,6 +37637,16 @@
             "type": "string",
             "readOnly": true,
             "description": "\nRead-only. The volume the call will actually play at: voice_volume if set, else a\nlegacy generation_config.volume, else 1.0. Use this to populate a volume control.\n"
+          },
+          "backchannel_plan": {
+            "enum": [
+              "off",
+              "occasional",
+              "frequent"
+            ],
+            "type": "string",
+            "description": "\nHow often the testing agent says short listening cues (e.g. \"Mm-hmm\") while your agent\nkeeps talking: off (default), occasional or frequent. Voice simulations only; supported\nfor English, Hindi, Spanish, French, German, Italian and Portuguese. The setting is\naccepted for other languages but has no effect there.\n",
+            "x-spec-enum-id": "d02f393231763383"
           },
           "patronus_settings": {
             "oneOf": [
@@ -39881,6 +39919,16 @@
           "effective_voice_volume": {
             "type": "string",
             "readOnly": true
+          },
+          "backchannel_plan": {
+            "enum": [
+              "off",
+              "occasional",
+              "frequent"
+            ],
+            "type": "string",
+            "description": "* `off` - Off\n* `occasional` - Occasional\n* `frequent` - Frequent",
+            "x-spec-enum-id": "d02f393231763383"
           },
           "patronus_settings": {
             "oneOf": [
@@ -42589,14 +42637,19 @@
           "suite_type": {
             "enum": [
               "undefined",
-              "infrastructure"
+              "infrastructure",
+              "voice_quality",
+              "appointment_workflow",
+              "medicare_workflow"
             ],
             "type": "string",
-            "x-spec-enum-id": "643f6a8cdc799a77",
-            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure"
+            "x-spec-enum-id": "ca0561c2b942e037",
+            "readOnly": true,
+            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure Suite\n* `voice_quality` - Voice Quality\n* `appointment_workflow` - Agent Workflow - Appointment\n* `medicare_workflow` - Agent Workflow - Medicare"
           },
           "is_predefined": {
             "type": "boolean",
+            "readOnly": true,
             "description": "Whether this is a predefined scenario (template)"
           },
           "test_profile": {
@@ -43413,14 +43466,19 @@
           "suite_type": {
             "enum": [
               "undefined",
-              "infrastructure"
+              "infrastructure",
+              "voice_quality",
+              "appointment_workflow",
+              "medicare_workflow"
             ],
             "type": "string",
-            "x-spec-enum-id": "643f6a8cdc799a77",
-            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure"
+            "x-spec-enum-id": "ca0561c2b942e037",
+            "readOnly": true,
+            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure Suite\n* `voice_quality` - Voice Quality\n* `appointment_workflow` - Agent Workflow - Appointment\n* `medicare_workflow` - Agent Workflow - Medicare"
           },
           "is_predefined": {
             "type": "boolean",
+            "readOnly": true,
             "description": "Whether this is a predefined scenario (template)"
           },
           "test_profile": {
@@ -46428,14 +46486,19 @@
           "suite_type": {
             "enum": [
               "undefined",
-              "infrastructure"
+              "infrastructure",
+              "voice_quality",
+              "appointment_workflow",
+              "medicare_workflow"
             ],
             "type": "string",
-            "x-spec-enum-id": "643f6a8cdc799a77",
-            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure"
+            "x-spec-enum-id": "ca0561c2b942e037",
+            "readOnly": true,
+            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure Suite\n* `voice_quality` - Voice Quality\n* `appointment_workflow` - Agent Workflow - Appointment\n* `medicare_workflow` - Agent Workflow - Medicare"
           },
           "is_predefined": {
             "type": "boolean",
+            "readOnly": true,
             "description": "Whether this is a predefined scenario (template)"
           },
           "test_profile": {

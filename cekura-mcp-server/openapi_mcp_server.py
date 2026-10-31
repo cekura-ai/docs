@@ -14,7 +14,7 @@ import httpx
 import jwt
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
 # Load secrets from AWS Secrets Manager before any env var is read
 if os.getenv("AWS_SECRET_NAME"):
@@ -428,6 +428,11 @@ async def list_available_tools() -> str:
 )
 async def test_simple_tool(message: str) -> str:
     return f"Hello from Cekura MCP Server! You said: {message}"
+
+
+def _tool_error(text: str) -> CallToolResult:
+    """A failed tool call: the same text block, flagged so clients can tell it from a success."""
+    return CallToolResult(content=[TextContent(type="text", text=text)], isError=True)
 
 
 def _append_call_id_to_text(result: Any, mcp_call_id: str) -> Any:
@@ -1191,14 +1196,14 @@ def setup_dynamic_tool_handlers():
                 "conversation_id": telemetry["conversation_id"],
                 "cred_hash": _credential_fingerprint(),
             }))
-            return [{"type": "text", "text": f"Error: {e}{call_id_suffix}"}]
+            return _tool_error(f"Error: {e}{call_id_suffix}")
         except ValueError as e:
-            return [{"type": "text", "text": f"Authentication Error: {e}{call_id_suffix}"}]
+            return _tool_error(f"Authentication Error: {e}{call_id_suffix}")
         except Exception as e:
             # Log the traceback for ops; return only the actionable message to
             # the LLM (no /app/ paths, no Python stack frames).
             logger.exception("Tool %s failed", name)
-            return [{"type": "text", "text": f"Error: {e}{call_id_suffix}"}]
+            return _tool_error(f"Error: {e}{call_id_suffix}")
 
     mcp._mcp_server.list_tools()(list_tools_with_dynamic)
     mcp._mcp_server.call_tool(validate_input=False)(call_tool_with_dynamic)

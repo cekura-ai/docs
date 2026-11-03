@@ -42,47 +42,62 @@ This guide walks you through setting up and monitoring your ElevenLabs-based voi
     </Tip>
 
     <Note>
-    If ElevenLabs Zero Retention Mode is on, ElevenLabs returns redacted transcripts and no recording to auto-fetch. Use the webhook-based setup instead; once a webhook secret is set on an agent, auto-fetch skips that agent.
+    If your ElevenLabs workspace has **Zero Retention Mode** on, auto-fetch only gets redacted transcripts and no recordings. Use the **Post-call webhook** tab instead.
     </Note>
 
   </Tab>
-  <Tab title="No-code ElevenLabs Integration">
-    Follow these steps to connect your ElevenLabs agent with Cekura's observability suite:
+  <Tab title="Post-call webhook">
+    ElevenLabs sends each call to Cekura as soon as it ends. Use this setup if your workspace has **Zero Retention Mode** on: ElevenLabs doesn't keep readable transcripts or recordings, so the webhook is the only way to get them.
 
     <Steps>
-      <Step title="Configure webhook URL in ElevenLabs">
-        In your ElevenLabs dashboard, go to **Developers → Webhooks** and add an endpoint with HMAC authentication pointing to the URL below. Then select it as the post-call webhook, either for the whole workspace or in the agent's own settings:
+      <Step title="Create the webhook in ElevenLabs">
+        In ElevenLabs, go to **Developers → Webhooks** and click **Add endpoint**:
+        1. Enter the Cekura webhook URL:
 
-        ```
-        https://api.cekura.ai/observability/v1/elevenlabs/observe/
-        ```
+           ```
+           https://api.cekura.ai/observability/v1/elevenlabs/observe/
+           ```
 
-        ![ElevenLabs Observability Configuration](/images/elevenlabs-observe.png)
+        2. Choose **HMAC** as the authentication method.
+        3. Save, and copy the webhook secret ElevenLabs shows you.
       </Step>
-      <Step title="Copy the webhook secret">
-        Enable the **transcript** and **audio** post-call events (with **Send audio** on, if you want recordings) and copy the webhook signing secret from ElevenLabs. Cekura only accepts deliveries whose `ElevenLabs-Signature` matches this secret. Deliveries for agents without a secret are ignored.
-      </Step>
-      <Step title="Verify ElevenLabs API key and Agent ID">
-        Go to the API keys section in your ElevenLabs dashboard and ensure you have at least one API key configured. Also note your Agent ID from the dashboard:
+      <Step title="Send your agent's calls to the webhook">
+        In the ElevenLabs agents platform, open **Settings**, click **Select Webhook** under **Post-Call Webhook**, and pick the webhook you created. To get recordings as well as transcripts, turn on **Send audio data**.
 
-        ![ElevenLabs API Key Configuration](/images/elevenlabs-api-key.png)
-        ![ElevenLabs Agent ID](/images/elevenlabs-agent.png)
+        ![ElevenLabs post-call webhook settings](/images/elevenlabs-observe.png)
+
+        <Tip>
+        This setting covers every agent in the workspace. To send only some agents' calls, select the webhook in each of those agents' settings instead.
+        </Tip>
       </Step>
-      <Step title="Add credentials to Cekura">
-        In your Cekura Agent Settings page, add the API key from ElevenLabs and ensure you have copied your `agent ID` from ElevenLabs:
+      <Step title="Add the secret to your agent in Cekura">
+        In your Cekura Agent Settings page, with **ElevenLabs** as the voice integration provider:
+        1. Make sure your ElevenLabs API key and Agent ID are filled in.
+        2. Paste the secret into **Post-call Webhook Secret** and save.
 
         ![ElevenLabs Agent Settings](/images/elevenlabs/agent-settings.png)
 
-        Paste the webhook signing secret into the **Post-call Webhook Secret** field (`webhook_secret` in the API). It is stored encrypted and never returned; responses show `webhook_secret_configured` instead. The secret is set per agent, so staging and production agents can use different secrets.
+        Add the secret to every Cekura agent that should receive these calls. The secret is set per agent, so agents connected to different ElevenLabs workspaces, such as staging and production, can each use their own webhook.
       </Step>
       <Step title="Test your integration">
-        Make a test call from ElevenLabs (phone number based or webcall). Your calls should now appear in the Cekura observability `Calls` section.
+        Make a test call to your ElevenLabs agent. Within a minute, it should appear in the Cekura observability `Calls` section with its transcript and, if **Send audio data** is on, its recording.
       </Step>
     </Steps>
 
     <Note>
-    This setup works with ElevenLabs Zero Retention Mode, where the post-call webhook is the only source of a readable transcript and recording. The recording arrives as a separate event; if it does not arrive within about 30 seconds of the transcript, the call is saved without audio.
+    Once an agent has a webhook secret, Cekura stops auto-fetching its calls. You don't need to turn off **Auto-fetch Production Calls**.
     </Note>
+
+    <AccordionGroup>
+      <Accordion title="Calls don't appear in Cekura">
+        - Check that the secret in Cekura matches the webhook in ElevenLabs. If you're not sure, create a new webhook and paste its secret.
+        - Check that the Agent ID in Cekura matches your ElevenLabs agent.
+        - ElevenLabs turns off webhooks that keep failing. Make sure the webhook is still enabled under **Developers → Webhooks**.
+      </Accordion>
+      <Accordion title="Calls appear without a recording">
+        Turn on **Send audio data** in ElevenLabs. Text-only conversations never have a recording.
+      </Accordion>
+    </AccordionGroup>
   </Tab>
   <Tab title="Forwarding ElevenLabs response">
     If you already have an existing webhook setup and want to forward the ElevenLabs response to Cekura's observability suite:

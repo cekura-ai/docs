@@ -1,0 +1,131 @@
+---
+title: "Cisco Webex Integration"
+sidebarTitle: "Cisco Webex"
+icon: "/images/providers/cisco.svg"
+description: "Test a Webex Contact Center voice agent by calling its number, see Webex's own transcript on every result, and import production calls automatically."
+---
+
+import { CopyPageButton } from "/snippets/copy-page-button.mdx";
+
+<CopyPageButton />
+
+## Overview
+
+Cekura tests Webex Contact Center voice agents over the phone: it calls your agent's number and plays the scenario as the caller.
+
+Connect Webex with one sign-in from a Contact Center administrator, and Cekura also:
+
+- finds the Webex interaction behind each test call and shows Webex's transcript and interaction ID on the result;
+- imports your production calls automatically, with **Auto-fetch Production Calls**.
+
+<Note>
+Webex agents are tested over the phone only. Chat testing is not available for Webex.
+</Note>
+
+## Prerequisites
+
+- A Webex Contact Center voice agent reachable on a phone number.
+- A Webex account with Contact Center administrator access, to connect Webex.
+- For Webex transcripts and recordings: recording and transcription turned on in Webex Contact Center for the calls you test. Webex keeps a recording only where recording is enabled for the tenant or queue, and a transcript only where a transcription feature is enabled.
+
+## Connect Webex in Cekura
+
+<Steps>
+  <Step title="Select Webex">
+    In Cekura, go to **Agents**, create an agent, and select **Webex** as the provider.
+
+    <img src="/images/cisco-webex/select-provider.png" alt="Webex selected in the Cekura provider grid" />
+  </Step>
+
+  <Step title="Add the phone number">
+    Under **Connections → Voice**, select **Telephony** and enter your agent's phone number under **Telephony Settings**. Leave **Inbound** on so Cekura calls your number.
+
+    <img src="/images/cisco-webex/telephony-settings.png" alt="Telephony Settings with the Webex agent's phone number and Inbound enabled" />
+  </Step>
+
+  <Step title="Create the agent and sign in to Webex">
+    **Integration Settings** shows the Webex steps. Click **Next**, enter the agent's name, language and description, and click **Create**. Cekura checks the phone connection and offers a test call, which you can skip.
+
+    Cekura then takes you to Webex. Sign in with your Contact Center administrator account and accept the request. Webex sends you back to the agent in Cekura. Cekura finds your Webex organization and datacenter from the sign-in, so there is nothing to type.
+
+    <img src="/images/cisco-webex/integration-settings.png" alt="Integration Settings for Webex before the agent is created, listing the sign-in steps" />
+  </Step>
+
+  <Step title="Check the connection">
+    On the agent's page, **Integration Settings** shows **Connected** with your Webex organization and the account that connected it. If the sign-in didn't start, click **Connect Webex** there.
+
+    <img src="/images/cisco-webex/webex-connected.png" width="366" alt="Webex connection showing Connected, the organization and admin account, and the Auto-fetch Production Calls switch" />
+  </Step>
+</Steps>
+
+Cekura asks Webex for read-only access: the signed-in user's identity, your organization, and your Contact Center configuration, interactions, recordings and transcripts. The permissions requested are `spark:people_read`, `spark:organizations_read` and `cjp:config_read`.
+
+### Connection status
+
+| Status | Meaning |
+| --- | --- |
+| **Connected** | Cekura can read your Webex Contact Center data. |
+| **Expiring soon** | The sign-in expires within 7 days. Click **Reconnect Webex**. |
+| **Expired** | The sign-in has expired. Click **Reconnect Webex**. |
+| **Disconnected** | Webex refused to renew access; the card shows Webex's message. Click **Reconnect Webex**. |
+
+Click **Disconnect** to remove Cekura's access to your Webex organization.
+
+## Run a test
+
+Open an evaluator, click **Run**, and start the run using the **Telephony** connection. Cekura calls your agent's number and plays the scenario as the caller.
+
+When Webex is connected, Cekura looks up the Webex interaction after the call ends. It searches for a call between its own number and your agent's number that started within a minute of the test call, then compares the duration and conversation, so parallel test calls are each paired with the right interaction. Webex saves the transcript shortly after the call wraps up, so this can take a couple of minutes.
+
+The result then shows:
+
+- **Provider Transcript**: the conversation as Webex transcribed it. Your Webex agent is labeled **Main Agent** and Cekura's caller **Testing Agent**. **Cekura Transcript** keeps Cekura's own transcript, and **Compare** shows them side by side.
+- **Provider Call ID**: the Webex interaction ID, so you can find the call in Webex.
+
+<img src="/images/cisco-webex/provider-transcript.png" alt="Test result showing the Webex interaction ID and the Webex transcript under Provider Transcript" />
+
+<Note>
+If Webex is not connected, or Webex has no transcript for the call, the result shows Cekura's own transcript.
+</Note>
+
+## Monitor production calls
+
+Turn on **Auto-fetch Production Calls** under **Integration Settings** once Webex is connected, and save the agent. Every 30 seconds, Cekura imports ended Webex Contact Center phone calls to or from the number under **Telephony Settings**, and runs your metrics on them.
+
+- Each imported call includes Webex's transcript and recording when Webex has them, plus the queue, entry point and Webex agent that handled it.
+- Calls between your number and Cekura's test numbers are skipped, so test calls are not imported again.
+- A call appears a few minutes after it ends.
+
+<Note>
+If Webex has no recording or transcript for a call, Cekura still imports the call with its duration and details.
+</Note>
+
+## Troubleshooting
+
+- **Webex did not authorize the connection**: sign in with an account that has Contact Center administrator access and accept the request, then click **Connect Webex** to try again.
+- **No Webex Contact Center datacenter recognises this organization**: the account that signed in is not a Contact Center administrator, or the organization has no Contact Center. Sign in with a Contact Center administrator account.
+- **Webex rejected the authorization code**: the sign-in expired or was already used. Click **Connect Webex** again.
+- **This Webex organization is already connected to a different Cekura organization**: a Webex organization can be connected to one Cekura organization only. Disconnect it there, or contact Cekura support.
+- **No Webex transcript on a result**: check that Webex shows **Connected**, that the number under **Telephony Settings** is the one Cekura called, and that Webex records and transcribes calls on that number's queue. The transcript can take a couple of minutes after the call.
+- **Production calls are not imported**: check that **Auto-fetch Production Calls** is on, Webex shows **Connected**, and the number under **Telephony Settings** matches your agent's number in Webex.
+
+## Configure through the API
+
+Create the agent through the [API](/api-reference/test_framework/create-agent) with the provider set to `cisco` and the agent's phone number:
+
+```json
+{
+  "name": "Support line",
+  "description": "Answers customer calls.",
+  "project": 123,
+  "telephony": {
+    "phone_number": "+15551234567",
+    "inbound": true
+  },
+  "provider": {
+    "type": "cisco"
+  }
+}
+```
+
+Connecting Webex needs a browser sign-in, so open the agent in Cekura and click **Connect Webex**. The agent's `provider.credentials.connection` field then reports the connection, with `status`, `org_name`, `connected_by` and `refresh_token_expires_at`. Turn on production-call import with `provider.auto_import_calls: true` once Webex is connected.

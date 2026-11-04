@@ -202,3 +202,42 @@ class TestMaybeAppendOrgProjectHint:
         schema = {}
         result = maybe_append_org_project_hint("anything", schema, "Base description.")
         assert result == "Base description."
+
+
+class TestArgumentDefaults:
+    """Overlay `argument_defaults` fill omitted args without changing the API default."""
+
+    def test_generate_bg_defaults_to_conditional_actions(self):
+        from tool_generator import apply_overlay_argument_defaults
+
+        args = apply_overlay_argument_defaults("scenarios_generate_bg", {"agent_id": 1})
+
+        assert args == {"agent_id": 1, "simulation_type": "conditional_actions"}
+
+    def test_explicit_value_wins(self):
+        from tool_generator import apply_overlay_argument_defaults
+
+        args = apply_overlay_argument_defaults(
+            "scenarios_generate_bg", {"agent_id": 1, "simulation_type": "instruction"}
+        )
+
+        assert args["simulation_type"] == "instruction"
+
+    def test_null_value_gets_the_default(self):
+        from tool_generator import apply_overlay_argument_defaults
+
+        args = apply_overlay_argument_defaults(
+            "scenarios_generate_bg", {"agent_id": 1, "simulation_type": None}
+        )
+
+        assert args["simulation_type"] == "conditional_actions"
+
+    def test_schema_shows_the_default(self):
+        from tool_generator import apply_overlay_to_schema
+
+        schema = apply_overlay_to_schema(
+            "scenarios_generate_bg",
+            {"properties": {"simulation_type": {"type": "string"}}},
+        )
+
+        assert schema["properties"]["simulation_type"]["default"] == "conditional_actions"

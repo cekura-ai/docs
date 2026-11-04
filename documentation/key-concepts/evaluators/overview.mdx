@@ -15,6 +15,39 @@ import { CopyPageButton } from "/snippets/copy-page-button.mdx";
 
 Evaluators are like test cases for your AI voice agents. Each evaluator simulates a conversation with your agent to systematically test its performance and behavior.
 
+### Evaluator Formats
+
+An evaluator describes the simulated caller in one of two formats:
+
+- **[Structured Tests](/documentation/key-concepts/evaluators/conditional-actions)** (conditional actions) — the default. Conditions say what the caller says when the agent does something.
+- **Instruction-based** — plain-text [instructions](#instructions) that the caller follows and paraphrases.
+
+#### In the dashboard
+
+New evaluators default to Structured Tests, whether you generate them or create one by hand. Which other formats you can pick depends on the organization's **Conditional Actions Only** setting:
+
+- **On** — Structured Tests only; the dashboard does not offer instruction-based evaluators. This is the default for new organizations.
+- **Off** — Structured Tests stay the default, and you can also choose **Instruction**. Older organizations start with the setting off unless it was turned on for them.
+
+Org admins can change the setting under [Settings → Organization → General](https://dashboard.cekura.ai/settings/org/general): toggle **Conditional Actions Only** and save.
+
+<Warning>
+The setting also changes the API default for evaluator generation. If your integration calls the generation API without `simulation_type`, turning the setting on switches those calls from instruction-based to Structured Tests, and turning it off switches them back. Send `simulation_type` explicitly so the setting cannot change the output.
+</Warning>
+
+#### Through MCP and the Cekura skills
+
+The `scenarios_generate_bg` MCP tool and the Cekura skills generate Structured Tests for every organization, whatever the setting. Pass `simulation_type: "instruction"` to get instruction-based evaluators.
+
+#### In the API
+
+On the generation endpoints (`scenarios/generate-bg`, and `scenarios/generate` in v3), set the format with `simulation_type`: `conditional_actions` or `instruction`. An explicit value is always used. When it is left out:
+
+- With **Conditional Actions Only** on, you get Structured Tests.
+- With it off, you get instruction-based evaluators, unless a workflow request asks for interruptions, silences, holds or pauses during the call, in which case Structured Tests are generated so the caller can act on them.
+
+Creating an evaluator directly (`POST /test_framework/v1/scenarios/`) is not affected by the setting: its `scenario_type` defaults to `instruction` for every organization, so send `scenario_type: "conditional_actions"` with a `conditional_actions` payload to create a Structured Test.
+
 ### Evaluator Components
 
 An evaluator is composed of five key components:

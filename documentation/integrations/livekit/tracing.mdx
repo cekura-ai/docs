@@ -573,6 +573,47 @@ The SDK supports mock tools, allowing you to test your agent with predictable to
 
 3. **Test with predictable data**: Your agent will receive the mock responses you configured, making it easy to test specific scenarios and edge cases.
 
+How the Python SDK serves mock tools:
+
+- **Per call.** Each mock tool call is sent to Cekura with the room name as the call ID, so [per-call state](/documentation/key-concepts/evaluators/mock-tools#stateful-mocks) works: a booking that fails once and then succeeds, followed by a lookup that shows it.
+- **Configured failures.** An entry with an error `response` (status 400 or above) reaches the model as a `ToolError` that carries the configured `output`, the way a real tool reports an upstream error.
+- **Handoffs.** Every agent the session switches to (a tool that returns an `Agent`, `update_agent`, or an `AgentTask`) gets its tools mocked as it becomes active, not only the agent passed to `track_session()`.
+- **If Cekura can't be reached,** the SDK answers from the mock data it fetched at the start of the session, with the call in its first state, and tries Cekura again after 60 seconds.
+
+<Note>
+  Earlier SDK versions match mock inputs inside your agent: they return the first entry whose input values are all equal, and ignore `match`, `state`, `then` and `response`. Upgrade the SDK before using those keys with LiveKit.
+</Note>
+
+### Without the SDK
+
+If your agent doesn't use `track_session()`, your tool code can call Cekura's mock directly during test calls. Each mock tool has its own URL, shown in the dashboard and returned as `mock_tools[].served_via.url` on the [agent](/api-reference/test_framework/get-agent). POST the tool's arguments as JSON to that URL, with the room name in the `X-Cekura-Mock-Session` header so that each call keeps its own state:
+
+```python
+import aiohttp
+from livekit.agents import ToolError, get_job_context
+
+async def call_cekura_mock(mock_url: str, arguments: dict) -> dict:
+    room = get_job_context().room.name  # unique per call, the same after handoffs
+    async with aiohttp.ClientSession() as http:
+        async with http.post(
+            mock_url,
+            json=arguments,
+            headers={"X-Cekura-Mock-Session": room},
+            timeout=aiohttp.ClientTimeout(total=10),
+        ) as response:
+            body = await response.json(content_type=None)
+    if response.status >= 400:
+        raise ToolError(f"HTTP {response.status}: {body}")
+    return body
+```
+
+Use a timeout of at least 10 seconds, because a mock entry can delay its reply. Without the header, mock replies still work, but every call stays in its first state.
+
+The mock only answers your tools. It does not tell Cekura what your agent said or which tools it called, and evaluators and the [Mock Tool Call Accuracy](/documentation/key-concepts/evaluators/mock-tools#verifying-tool-calls-the-mock-tool-call-accuracy-metric) metric need both. Send your agent's side of the call in one of two ways:
+
+- Call `track_session()` with `CEKURA_MOCK_TOOLS_ENABLED="false"`. The SDK sends the transcript and tool calls at the end of each call and leaves your tool code unchanged.
+- Post the transcript, with each tool call as a `function_call` message, through the [Custom Integration webhook](/documentation/integrations/custom-integration#report-the-tool-call-in-your-transcript).
+
 ## Best Practices
 
 1. **Use the right method for your environment**: Use `track_session()` / `trackSession()` in your test/UAT environments for simulation testing with mock tools. Use `observe_session()` / `observeSession()` in your production environment for monitoring live calls with audio recording.

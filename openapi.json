@@ -3687,6 +3687,14 @@
             "description": "Comma-separated agent version ids (the `history_id`s reported in `agent_versions`); only calls that ran on those versions are counted."
           },
           {
+            "in": "query",
+            "name": "summary",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When true, omit the `agents` and `agent_versions` breakdowns for a faster response. Counts and filters are unchanged."
+          },
+          {
             "name": "project",
             "in": "query",
             "required": false,
@@ -6785,7 +6793,6 @@
         "x-mcp-expose": true,
         "x-mcp-tool-name": "critical_metric_scenarios_list",
         "summary": "List critical metric scenarios",
-        "x-mcp-summary-derived": true,
         "x-mint": {
           "mcp": {
             "enabled": true,
@@ -7839,7 +7846,6 @@
         "x-mcp-expose": true,
         "x-mcp-tool-name": "personalities_list",
         "summary": "List personalities",
-        "x-mcp-summary-derived": true,
         "x-mint": {
           "mcp": {
             "enabled": true,
@@ -7850,7 +7856,7 @@
       },
       "post": {
         "operationId": "personalities-create_2",
-        "description": "Create a personality — the simulated caller your evaluators run as. A personality carries the caller's voice, language, speaking speed, interruption behavior, background noise and idle timing; an evaluator carries what that caller is trying to do. Evaluator instructions cannot override any of it, so a call-wide trait belongs here and nowhere else.\n\n`voice_id` and `provider` decide how the caller actually sounds, including its accent — list the catalog with `personalities_elevenlabs_voices` or `personalities_cartesia_voices` (both filter by `language`) and pass an id from there. `accent` is a read-only label derived from that voice and cannot be set.\n\nTo reuse a predefined personality with one thing changed, fork it instead of building a new one: forks inherit every setting.",
+        "description": "Create a personality — the simulated caller your evaluators run as. A personality carries the caller's voice, language, speaking speed, interruption behavior, backchanneling, background noise and idle timing; an evaluator carries what that caller is trying to do. Evaluator instructions cannot override any of it, so a call-wide trait belongs here and nowhere else.\n\n`voice_id` and `provider` decide how the caller actually sounds, including its accent — list the catalog with `personalities_elevenlabs_voices` or `personalities_cartesia_voices` (both filter by `language`) and pass an id from there. `accent` is a read-only label derived from that voice and cannot be set.\n\nTo reuse a predefined personality with one thing changed, fork it instead of building a new one: forks inherit every setting.",
         "summary": "Create a personality",
         "tags": [
           "test_framework"
@@ -7904,7 +7910,7 @@
           "mcp": {
             "enabled": true,
             "name": "personalities-create",
-            "description": "Create a personality — the simulated caller your evaluators run as. A personality carries the caller's voice, language, speaking speed, interruption behavior, background noise and idle timing; an evaluator carries what that caller is trying to do. Evaluator instructions cannot override any of it, so a call-wide trait belongs here and nowhere else.\n\n`voice_id` and `provider` decide how the caller actually sounds, including its accent — list the catalog with `personalities_elevenlabs_voices` or `personalities_cartesia_voices` (both filter by `language`) and pass an id from there. `accent` is a read-only label derived from that voice and cannot be set.\n\nTo reuse a predefined personality with one thing changed, fork it instead of building a new one: forks inherit every setting."
+            "description": "Create a personality — the simulated caller your evaluators run as. A personality carries the caller's voice, language, speaking speed, interruption behavior, backchanneling, background noise and idle timing; an evaluator carries what that caller is trying to do. Evaluator instructions cannot override any of it, so a call-wide trait belongs here and nowhere else.\n\n`voice_id` and `provider` decide how the caller actually sounds, including its accent — list the catalog with `personalities_elevenlabs_voices` or `personalities_cartesia_voices` (both filter by `language`) and pass an id from there. `accent` is a read-only label derived from that voice and cannot be set.\n\nTo reuse a predefined personality with one thing changed, fork it instead of building a new one: forks inherit every setting."
           }
         }
       }
@@ -8449,7 +8455,6 @@
         "x-mcp-expose": true,
         "x-mcp-tool-name": "predefined_metrics_list",
         "summary": "List predefined metrics",
-        "x-mcp-summary-derived": true,
         "x-mint": {
           "mcp": {
             "enabled": true,
@@ -15632,7 +15637,6 @@
         "x-mcp-expose": true,
         "x-mcp-tool-name": "test_profiles_list",
         "summary": "List test profiles",
-        "x-mcp-summary-derived": true,
         "x-mint": {
           "mcp": {
             "enabled": true,
@@ -17696,6 +17700,46 @@
               "type": "object"
             },
             "description": "JSON filter parameter for advanced filtering.\n\nExample:\n```json\n{\"operator\":\"and\",\"conditions\":[{\"field\":\"agents__id\",\"op\":\"in\",\"value\":[1,2,3]}]}\n```\n\nSupported fields: agents__id, eval_type, type, name\nSupported operators: in, eq, contains"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive match on metric name or slug."
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated metric IDs to return, at most 200. Empty segments are ignored."
+          },
+          {
+            "in": "query",
+            "name": "user_defined",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "`true` (or `1`) returns only custom metrics, `false` (or `0`) only predefined ones. Case-insensitive; any other value is a 400."
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Paginate the response with this many metrics per page (max 200)."
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number when `page_size` is set."
           },
           {
             "in": "query",
@@ -32743,6 +32787,16 @@
             "readOnly": true,
             "description": "\nRead-only. The volume the call will actually play at: voice_volume if set, else a\nlegacy generation_config.volume, else 1.0. Use this to populate a volume control.\n"
           },
+          "backchannel_plan": {
+            "enum": [
+              "off",
+              "occasional",
+              "frequent"
+            ],
+            "type": "string",
+            "description": "\nHow often the testing agent says short listening cues (e.g. \"Mm-hmm\") while your agent\nkeeps talking: off (default), occasional or frequent. Voice simulations only; supported\nfor English, Hindi, Spanish, French, German, Italian and Portuguese. The setting is\naccepted for other languages but has no effect there.\n",
+            "x-spec-enum-id": "d02f393231763383"
+          },
           "patronus_settings": {
             "oneOf": [
               {},
@@ -33528,6 +33582,11 @@
             "type": "string",
             "writeOnly": true,
             "description": "Optional shared secret sent as the X-CEKURA-SECRET header on trigger URL requests, so your endpoint can reject calls it didn't expect. Write-only — responses expose trigger_secret_configured instead."
+          },
+          "webhook_secret": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "Secret ElevenLabs shows when you create the post-call webhook that sends this agent's calls to Cekura. Set per agent, so stage and production agents can use different webhooks. Write-only — responses expose webhook_secret_configured instead."
           },
           "elevenlabs_region": {
             "enum": [
@@ -36389,6 +36448,20 @@
             "type": "boolean",
             "readOnly": true
           },
+          "enabled_suites": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "infrastructure",
+                "benchmark"
+              ],
+              "type": "string",
+              "description": "* `infrastructure` - Infrastructure Suite\n* `benchmark` - Benchmark Suite",
+              "x-spec-enum-id": "cd6d2d7f56c4ada3"
+            },
+            "readOnly": true,
+            "description": "Predefined suite categories this organization can preview and add to projects"
+          },
           "notify_daily_report": {
             "type": "boolean"
           },
@@ -36488,7 +36561,7 @@
           },
           "conditional_actions_generation_enabled": {
             "type": "boolean",
-            "description": "When enabled, auto-generated scenarios use conditional actions format instead of instructions"
+            "description": "When enabled, generated scenarios use conditional actions unless instruction is requested, and the dashboard offers only conditional actions scenarios. Enabled for organizations created at signup."
           },
           "vapi_api_key": {
             "type": "string",
@@ -36639,6 +36712,10 @@
           },
           "is_2fa_required": {
             "type": "boolean"
+          },
+          "hipaa_enabled": {
+            "type": "boolean",
+            "readOnly": true
           },
           "skip_onboarding": {
             "type": "boolean"
@@ -37609,6 +37686,16 @@
             "type": "string",
             "readOnly": true,
             "description": "\nRead-only. The volume the call will actually play at: voice_volume if set, else a\nlegacy generation_config.volume, else 1.0. Use this to populate a volume control.\n"
+          },
+          "backchannel_plan": {
+            "enum": [
+              "off",
+              "occasional",
+              "frequent"
+            ],
+            "type": "string",
+            "description": "\nHow often the testing agent says short listening cues (e.g. \"Mm-hmm\") while your agent\nkeeps talking: off (default), occasional or frequent. Voice simulations only; supported\nfor English, Hindi, Spanish, French, German, Italian and Portuguese. The setting is\naccepted for other languages but has no effect there.\n",
+            "x-spec-enum-id": "d02f393231763383"
           },
           "patronus_settings": {
             "oneOf": [
@@ -39881,6 +39968,16 @@
           "effective_voice_volume": {
             "type": "string",
             "readOnly": true
+          },
+          "backchannel_plan": {
+            "enum": [
+              "off",
+              "occasional",
+              "frequent"
+            ],
+            "type": "string",
+            "description": "* `off` - Off\n* `occasional` - Occasional\n* `frequent` - Frequent",
+            "x-spec-enum-id": "d02f393231763383"
           },
           "patronus_settings": {
             "oneOf": [
@@ -42589,14 +42686,19 @@
           "suite_type": {
             "enum": [
               "undefined",
-              "infrastructure"
+              "infrastructure",
+              "voice_quality",
+              "appointment_workflow",
+              "medicare_workflow"
             ],
             "type": "string",
-            "x-spec-enum-id": "643f6a8cdc799a77",
-            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure"
+            "x-spec-enum-id": "ca0561c2b942e037",
+            "readOnly": true,
+            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure Suite\n* `voice_quality` - Voice Quality\n* `appointment_workflow` - Agent Workflow - Appointment\n* `medicare_workflow` - Agent Workflow - Medicare"
           },
           "is_predefined": {
             "type": "boolean",
+            "readOnly": true,
             "description": "Whether this is a predefined scenario (template)"
           },
           "test_profile": {
@@ -43413,14 +43515,19 @@
           "suite_type": {
             "enum": [
               "undefined",
-              "infrastructure"
+              "infrastructure",
+              "voice_quality",
+              "appointment_workflow",
+              "medicare_workflow"
             ],
             "type": "string",
-            "x-spec-enum-id": "643f6a8cdc799a77",
-            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure"
+            "x-spec-enum-id": "ca0561c2b942e037",
+            "readOnly": true,
+            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure Suite\n* `voice_quality` - Voice Quality\n* `appointment_workflow` - Agent Workflow - Appointment\n* `medicare_workflow` - Agent Workflow - Medicare"
           },
           "is_predefined": {
             "type": "boolean",
+            "readOnly": true,
             "description": "Whether this is a predefined scenario (template)"
           },
           "test_profile": {
@@ -46428,14 +46535,19 @@
           "suite_type": {
             "enum": [
               "undefined",
-              "infrastructure"
+              "infrastructure",
+              "voice_quality",
+              "appointment_workflow",
+              "medicare_workflow"
             ],
             "type": "string",
-            "x-spec-enum-id": "643f6a8cdc799a77",
-            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure"
+            "x-spec-enum-id": "ca0561c2b942e037",
+            "readOnly": true,
+            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure Suite\n* `voice_quality` - Voice Quality\n* `appointment_workflow` - Agent Workflow - Appointment\n* `medicare_workflow` - Agent Workflow - Medicare"
           },
           "is_predefined": {
             "type": "boolean",
+            "readOnly": true,
             "description": "Whether this is a predefined scenario (template)"
           },
           "test_profile": {
@@ -47140,7 +47252,7 @@
             "description": "\nDescription of the mock tool.\nExample: \"This tool retrieves user data from the database based on user ID\"\n"
           },
           "information": {
-            "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_seconds}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_seconds up to 300.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\n\nMappings may also follow the call's progress: `state` (the call state(s) a mapping answers in,\na name or a list; every call starts in \"start\") and `then` (the state the call moves to after the\nmapping replies). `match` \"exact\" requires every input key to be present and equal (default\n\"flexible\"). The call is identified by the `X-Cekura-Mock-Session` header, or by the provider's\ncall id; without one the call stays in \"start\".\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_seconds\": 2}\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"start\",\n        \"output\": {\"detail\": \"busy\"},\n        \"response\": {\"status_code\": 503},\n        \"then\": \"retried\"\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"retried\",\n        \"output\": {\"status\": \"active\"}\n    }\n]\n```\n"
+            "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_seconds}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_seconds up to 300.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\n\nMappings may also follow the call's progress: `state` (the call state(s) a mapping answers in,\na name or a list; every call starts in \"start\") and `then` (the state the call moves to after the\nmapping replies). `match` \"exact\" requires every input key to be present and equal (default\n\"flexible\"). Mappings for the call's current state are served before mappings without a state, and\nwithin each, a mapping whose input is identical to the call's arguments comes first. The call is\nidentified by the `X-Cekura-Mock-Session` header, or by the provider's call id; without one the\ncall stays in \"start\".\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_seconds\": 2}\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"start\",\n        \"output\": {\"detail\": \"busy\"},\n        \"response\": {\"status_code\": 503},\n        \"then\": \"retried\"\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"retried\",\n        \"output\": {\"status\": \"active\"}\n    }\n]\n```\n"
           },
           "freetext_params": {
             "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"

@@ -3687,6 +3687,14 @@
             "description": "Comma-separated agent version ids (the `history_id`s reported in `agent_versions`); only calls that ran on those versions are counted."
           },
           {
+            "in": "query",
+            "name": "summary",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When true, omit the `agents` and `agent_versions` breakdowns for a faster response. Counts and filters are unchanged."
+          },
+          {
             "name": "project",
             "in": "query",
             "required": false,
@@ -17692,6 +17700,46 @@
               "type": "object"
             },
             "description": "JSON filter parameter for advanced filtering.\n\nExample:\n```json\n{\"operator\":\"and\",\"conditions\":[{\"field\":\"agents__id\",\"op\":\"in\",\"value\":[1,2,3]}]}\n```\n\nSupported fields: agents__id, eval_type, type, name\nSupported operators: in, eq, contains"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive match on metric name or slug."
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated metric IDs to return, at most 200. Empty segments are ignored."
+          },
+          {
+            "in": "query",
+            "name": "user_defined",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "`true` (or `1`) returns only custom metrics, `false` (or `0`) only predefined ones. Case-insensitive; any other value is a 400."
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Paginate the response with this many metrics per page (max 200)."
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Page number when `page_size` is set."
           },
           {
             "in": "query",
@@ -32667,6 +32715,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -32676,7 +32728,7 @@
                 "minimum": 1
               }
             },
-            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
+            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_messages_enabled (boolean), idle_timeout_seconds (positive int), and idle_message_max_spoken_count (positive int).\nSet idle_messages_enabled to false to disable check-ins. Omitted fields preserve existing settings.\nExample: {\"idle_messages_enabled\": false, \"idle_timeout_seconds\": 15}\n"
           },
           "start_speaking_plan": {
             "type": "number",
@@ -33530,6 +33582,11 @@
             "type": "string",
             "writeOnly": true,
             "description": "Optional shared secret sent as the X-CEKURA-SECRET header on trigger URL requests, so your endpoint can reject calls it didn't expect. Write-only — responses expose trigger_secret_configured instead."
+          },
+          "webhook_secret": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "Secret ElevenLabs shows when you create the post-call webhook that sends this agent's calls to Cekura. Set per agent, so stage and production agents can use different webhooks. Write-only — responses expose webhook_secret_configured instead."
           },
           "elevenlabs_region": {
             "enum": [
@@ -36504,7 +36561,7 @@
           },
           "conditional_actions_generation_enabled": {
             "type": "boolean",
-            "description": "When enabled, auto-generated scenarios use conditional actions format instead of instructions"
+            "description": "When enabled, generated scenarios use conditional actions unless instruction is requested, and the dashboard offers only conditional actions scenarios. Enabled for organizations created at signup."
           },
           "vapi_api_key": {
             "type": "string",
@@ -37558,6 +37615,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -37567,7 +37628,7 @@
                 "minimum": 1
               }
             },
-            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
+            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_messages_enabled (boolean), idle_timeout_seconds (positive int), and idle_message_max_spoken_count (positive int).\nSet idle_messages_enabled to false to disable check-ins. Omitted fields preserve existing settings.\nExample: {\"idle_messages_enabled\": false, \"idle_timeout_seconds\": 15}\n"
           },
           "start_speaking_plan": {
             "type": "number",
@@ -39842,6 +39903,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -47187,7 +47252,7 @@
             "description": "\nDescription of the mock tool.\nExample: \"This tool retrieves user data from the database based on user ID\"\n"
           },
           "information": {
-            "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_seconds}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_seconds up to 300.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\n\nMappings may also follow the call's progress: `state` (the call state(s) a mapping answers in,\na name or a list; every call starts in \"start\") and `then` (the state the call moves to after the\nmapping replies). `match` \"exact\" requires every input key to be present and equal (default\n\"flexible\"). The call is identified by the `X-Cekura-Mock-Session` header, or by the provider's\ncall id; without one the call stays in \"start\".\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_seconds\": 2}\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"start\",\n        \"output\": {\"detail\": \"busy\"},\n        \"response\": {\"status_code\": 503},\n        \"then\": \"retried\"\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"retried\",\n        \"output\": {\"status\": \"active\"}\n    }\n]\n```\n"
+            "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_seconds}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_seconds up to 300.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\n\nMappings may also follow the call's progress: `state` (the call state(s) a mapping answers in,\na name or a list; every call starts in \"start\") and `then` (the state the call moves to after the\nmapping replies). `match` \"exact\" requires every input key to be present and equal (default\n\"flexible\"). Mappings for the call's current state are served before mappings without a state, and\nwithin each, a mapping whose input is identical to the call's arguments comes first. The call is\nidentified by the `X-Cekura-Mock-Session` header, or by the provider's call id; without one the\ncall stays in \"start\".\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_seconds\": 2}\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"start\",\n        \"output\": {\"detail\": \"busy\"},\n        \"response\": {\"status_code\": 503},\n        \"then\": \"retried\"\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"retried\",\n        \"output\": {\"status\": \"active\"}\n    }\n]\n```\n"
           },
           "freetext_params": {
             "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"

@@ -21834,6 +21834,146 @@
         }
       }
     },
+    "/test_framework/v2/scenarios/{id}/history/": {
+      "get": {
+        "operationId": "scenarios-history-list_3",
+        "description": "List the saved versions of an evaluator, newest first. Each record is a full snapshot of the evaluator at that point (`instructions`, `expected_outcome_prompt`, `metrics_snapshot`, etc.) with its `version_id`, optional `version_name`, `history_date` and the user who made the change. Pass a record's `history_id` to `scenarios_restore` to roll the evaluator back to it.",
+        "summary": "List an evaluator's version history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this scenario.",
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "tags": [
+          "Scenarios"
+        ],
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "oauth2": []
+          },
+          {
+            "supabase_session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedScenarioHistoryList"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "x-mcp-expose": true,
+        "x-mcp-tool-name": "scenarios_history_list",
+        "x-mint": {
+          "mcp": {
+            "enabled": true,
+            "name": "scenarios-history-list",
+            "description": "List the saved versions of an evaluator, newest first. Each record is a full snapshot of the evaluator at that point (`instructions`, `expected_outcome_prompt`, `metrics_snapshot`, etc.) with its `version_id`, optional `version_name`, `history_date` and the user who made the change. Pass a record's `history_id` to `scenarios_restore` to roll the evaluator back to it."
+          }
+        }
+      }
+    },
+    "/test_framework/v2/scenarios/{id}/restore/": {
+      "post": {
+        "operationId": "scenarios-restore_3",
+        "description": "Restore an evaluator to the state saved in one of its history records, including the metrics attached at that point (metrics deleted since are skipped). The restore is saved as a new version, so the current state stays in the history and can be restored again. Get `history_id` from `scenarios_history_list`.",
+        "summary": "Restore an evaluator to a previous version",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "A unique integer value identifying this scenario.",
+            "required": true
+          }
+        ],
+        "tags": [
+          "Scenarios"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioRestoreRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioRestoreRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ScenarioRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "api_key": []
+          },
+          {
+            "oauth2": []
+          },
+          {
+            "supabase_session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScenarioSerializerV2"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "x-mcp-expose": true,
+        "x-mcp-tool-name": "scenarios_restore",
+        "x-mint": {
+          "mcp": {
+            "enabled": true,
+            "name": "scenarios-restore",
+            "description": "Restore an evaluator to the state saved in one of its history records, including the metrics attached at that point (metrics deleted since are skipped). The restore is saved as a new version, so the current state stays in the history and can be restored again. Get `history_id` from `scenarios_history_list`."
+          }
+        }
+      }
+    },
     "/test_framework/v2/scenarios/adv_update/": {
       "post": {
         "operationId": "scenarios-bulk-update_3",
@@ -32715,6 +32855,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -32724,7 +32868,7 @@
                 "minimum": 1
               }
             },
-            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
+            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_messages_enabled (boolean), idle_timeout_seconds (positive int), and idle_message_max_spoken_count (positive int).\nSet idle_messages_enabled to false to disable check-ins. Omitted fields preserve existing settings.\nExample: {\"idle_messages_enabled\": false, \"idle_timeout_seconds\": 15}\n"
           },
           "start_speaking_plan": {
             "type": "number",
@@ -37204,6 +37348,37 @@
           }
         }
       },
+      "PaginatedScenarioHistoryList": {
+        "type": "object",
+        "required": [
+          "count",
+          "results"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "example": 123
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "https://api.cekura.ai/example/v1/example-external/?page=4"
+          },
+          "previous": {
+            "type": "string",
+            "nullable": true,
+            "format": "uri",
+            "example": "https://api.cekura.ai/example/v1/example-external/?page=3"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScenarioHistory"
+            }
+          }
+        }
+      },
       "PaginatedScenarioList": {
         "type": "object",
         "required": [
@@ -37611,6 +37786,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -37620,7 +37799,7 @@
                 "minimum": 1
               }
             },
-            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_timeout_seconds (positive int) and idle_message_max_spoken_count (positive int).\nExample: {\"idle_timeout_seconds\": 15, \"idle_message_max_spoken_count\": 2}\n"
+            "description": "\nMessage plan configuration for idle timeout behavior.\nSupports idle_messages_enabled (boolean), idle_timeout_seconds (positive int), and idle_message_max_spoken_count (positive int).\nSet idle_messages_enabled to false to disable check-ins. Omitted fields preserve existing settings.\nExample: {\"idle_messages_enabled\": false, \"idle_timeout_seconds\": 15}\n"
           },
           "start_speaking_plan": {
             "type": "number",
@@ -39895,6 +40074,10 @@
           "message_plan": {
             "type": "object",
             "properties": {
+              "idle_messages_enabled": {
+                "type": "boolean",
+                "description": "False disables idle check-ins; true restores the default check-in for the personality language. Omit to preserve the current setting."
+              },
               "idle_timeout_seconds": {
                 "type": "integer",
                 "minimum": 1
@@ -42924,6 +43107,262 @@
           "project_id"
         ]
       },
+      "ScenarioHistory": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "history_id": {
+            "type": "integer",
+            "readOnly": true
+          },
+          "history_date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "history_type": {
+            "enum": [
+              "+",
+              "~",
+              "-"
+            ],
+            "type": "string",
+            "description": "* `+` - Created\n* `~` - Changed\n* `-` - Deleted",
+            "x-spec-enum-id": "c2e35addebb4f5da"
+          },
+          "history_change_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "history_user": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserInline"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "readOnly": true
+          },
+          "version_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 12
+          },
+          "version_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 255
+          },
+          "metrics_snapshot": {
+            "oneOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the scenario",
+            "maxLength": 80
+          },
+          "project": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "agent": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "personality": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "tags": {
+            "description": "\nTags associated with the scenario\nExample: `[\"tag1\", \"tag2\"]`\n"
+          },
+          "tool_ids": {
+            "description": "\nList of tool IDs to associate with this scenario\nExample: `[\"TOOL_DTMF\", \"TOOL_END_CALL\"]`\n"
+          },
+          "first_message": {
+            "type": "string",
+            "description": "First message to be sent to the Main Agent"
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Scenario Instructions"
+          },
+          "simulation_description": {
+            "type": "string",
+            "description": "Simulation Description"
+          },
+          "information_fields": {
+            "description": "\nInformation fields associated with the scenario\nExample: `{\"user_name\": \"John Doe\", \"user_email\": \"john.doe@example.com\", \"order_id\": \"1234567890\"}`\n"
+          },
+          "expected_outcome_prompt": {
+            "type": "string",
+            "description": "\nExpected Outcome Prompt\nExample: `\"The user should be able to complete the order\"`\n"
+          },
+          "scenario_language": {
+            "enum": [
+              "af",
+              "ar",
+              "bn",
+              "bg",
+              "zh",
+              "cs",
+              "da",
+              "nl",
+              "en",
+              "et",
+              "fi",
+              "fr",
+              "de",
+              "el",
+              "gu",
+              "hi",
+              "he",
+              "hu",
+              "id",
+              "it",
+              "ja",
+              "kn",
+              "kk",
+              "ko",
+              "ms",
+              "ml",
+              "mr",
+              "multi",
+              "no",
+              "pl",
+              "pa",
+              "pt",
+              "ro",
+              "ru",
+              "sk",
+              "es",
+              "sv",
+              "th",
+              "tr",
+              "tl",
+              "ta",
+              "te",
+              "uk",
+              "uz",
+              "vi",
+              "",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ],
+            "x-spec-enum-id": "f996e9ef7edb7fea",
+            "description": "Language of the scenario\n\n* `af` - Afrikaans\n* `ar` - Arabic\n* `bn` - Bengali\n* `bg` - Bulgarian\n* `zh` - Chinese Simplified\n* `cs` - Czech\n* `da` - Danish\n* `nl` - Dutch\n* `en` - English\n* `et` - Estonian\n* `fi` - Finnish\n* `fr` - French\n* `de` - German\n* `el` - Greek\n* `gu` - Gujarati\n* `hi` - Hindi\n* `he` - Hebrew\n* `hu` - Hungarian\n* `id` - Indonesian\n* `it` - Italian\n* `ja` - Japanese\n* `kn` - Kannada\n* `kk` - Kazakh\n* `ko` - Korean\n* `ms` - Malay\n* `ml` - Malayalam\n* `mr` - Marathi\n* `multi` - Multilingual\n* `no` - Norwegian\n* `pl` - Polish\n* `pa` - Punjabi\n* `pt` - Portuguese\n* `ro` - Romanian\n* `ru` - Russian\n* `sk` - Slovak\n* `es` - Spanish\n* `sv` - Swedish\n* `th` - Thai\n* `tr` - Turkish\n* `tl` - Tagalog\n* `ta` - Tamil\n* `te` - Telugu\n* `uk` - Ukrainian\n* `uz` - Uzbek\n* `vi` - Vietnamese"
+          },
+          "scenario_type": {
+            "enum": [
+              "instruction",
+              "conditional_actions"
+            ],
+            "type": "string",
+            "x-spec-enum-id": "97f8e4b948b4e205",
+            "description": "Type of scenario\n\n* `instruction` - Instruction\n* `conditional_actions` - Conditional Actions"
+          },
+          "suite_type": {
+            "enum": [
+              "undefined",
+              "infrastructure",
+              "voice_quality",
+              "appointment_workflow",
+              "medicare_workflow"
+            ],
+            "type": "string",
+            "x-spec-enum-id": "ca0561c2b942e037",
+            "description": "Type of predefined suite (e.g., infrastructure)\n\n* `undefined` - Undefined\n* `infrastructure` - Infrastructure Suite\n* `voice_quality` - Voice Quality\n* `appointment_workflow` - Agent Workflow - Appointment\n* `medicare_workflow` - Agent Workflow - Medicare"
+          },
+          "is_predefined": {
+            "type": "boolean",
+            "description": "Whether this is a predefined scenario (template)"
+          },
+          "max_duration": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "maximum": 2147483647,
+            "minimum": -2147483648,
+            "description": "\nMax call duration in seconds for this scenario. If not set, uses the project's max_call_duration setting.\nExample: `600` (10 minutes)\n"
+          },
+          "dynamic_variable_values": {
+            "oneOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "description": "REMOVED FROM API. Historically stored a flat copy of the agent's dynamic-variable values for the scenario. The column is retained read-only for legacy rows; reads still return its historical value, but writes via the API are rejected with a 400. At call time the Run-level helper consults this column ONLY when the attached test_profile is legacy-flat (or absent) — sectioned test profiles are the canonical source and ignore this column. Put dynamic-variable values in `test_profile.information.main_agent_variables` for new scenarios."
+          },
+          "phone_number": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "inbound_phone_number": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "test_profile": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "folder": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "generated_mock_tool_entries": {
+            "oneOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mock tool data generated for this scenario. Format: [{tool_id, tool_name, new_entry: {input, output}}]. Stored for evaluation and debugging purposes."
+          }
+        },
+        "required": [
+          "history_date",
+          "history_type",
+          "scenario_type"
+        ]
+      },
       "ScenarioImprovementSessionCreate": {
         "type": "object",
         "description": "",
@@ -43318,6 +43757,18 @@
           "agent",
           "instructions",
           "name"
+        ]
+      },
+      "ScenarioRestoreRequest": {
+        "type": "object",
+        "properties": {
+          "history_id": {
+            "type": "integer",
+            "description": "`history_id` of the version to restore, from `scenarios_history_list`."
+          }
+        },
+        "required": [
+          "history_id"
         ]
       },
       "ScenarioSerializerV2": {

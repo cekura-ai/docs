@@ -24,7 +24,7 @@ These insights surface the dominant patterns behind a metric's failures, so you 
   Insights only investigate metrics you've enabled. To find misbehavior no metric measures, run [Deep Research](/documentation/guides/observability/deep-research) — a project-wide audit of a window of calls.
 </Note>
 
-## Viewing and generating insights in the dashboard
+## Viewing insights in the dashboard
 
 Navigate to **Observability → Insights** in the sidebar. The page displays a card for each metric you've enabled insights for.
 
@@ -32,14 +32,23 @@ Use the **View** dropdown at the top of the page to filter by view. When a view 
 
 Use the **agents** dropdown next to the date-range picker to filter by specific agents. When agents are selected, failure-mode counts, example calls, and failure rates reflect only calls handled by those agents; failure modes with no matching calls are hidden. Clear the selection to include every agent.
 
-Each card shows one of the following:
-- The latest failure-mode audit with identified themes
-- A message indicating not enough failures were found in the analyzed window
-- A **Generate** button if no audit has run yet
+Each card shows either the metric's failure modes for the selected window, or a message that no failures were found in that window. There is no **Generate** or **Regenerate** button: insights are not run on demand. A failing call is categorized automatically at the moment its metric is evaluated, and the card fills in as those calls arrive.
 
-Click **Generate** (or **Regenerate** for an existing audit) to run a new analysis on demand. The page polls automatically until the audit completes.
+Each failure mode includes a title, a brief description, and clickable call IDs that link directly to the corresponding call logs.
 
-Each failure theme includes a title, a brief description, and clickable call IDs that link directly to the corresponding call logs.
+### Generating insights for calls that were already evaluated
+
+Enabling insights on a metric does not reprocess calls that were evaluated before you turned it on. To get insights for those calls, re-evaluate the metric on them: categorization is triggered whenever a metric's evaluation is written to a call log, and a re-evaluation counts the same as a fresh one.
+
+1. Go to **Observability → Calls** and select the calls you want covered (individual checkboxes or the header checkbox).
+2. Click **Reevaluate Metrics** in the toolbar and choose the insights-enabled metric(s) to rerun.
+3. Each call that fails the metric's passing threshold is triaged and added to the metric's failure modes. Widen the date range on the Insights page to the period those calls belong to — the card defaults to the last 24 hours.
+
+Re-evaluation is also how you refresh a call's existing insight: rerunning the metric drops the call's previous root-cause analysis and produces a new one, and a call that now passes is removed from the failure mode it was in.
+
+<Note>
+  Re-evaluation consumes credits at the standard metric-evaluation rate on top of the per-metric insights cost, and each metric triages only up to its daily failure limit — failures past the limit still count toward the failure rate but are not categorized.
+</Note>
 
 ## Seeing the impact of an agent version
 
@@ -76,7 +85,7 @@ Insights are opt-in per metric. A metric produces no failure modes until you tur
 
 On the Insights page, click **Enable insights for a metric**, pick the metric, then set its **passing threshold** — the condition a call must meet to count as a pass. Calls that don't meet it are the failures Cekura investigates.
 
-The threshold uses the same condition shape as a rubric rule. It applies only to new evaluated calls after Insights is enabled: Cekura does not reprocess historical calls. Failed calls are triaged as they arrive, so the metric's failure modes populate over time. To change the threshold later, reopen the metric's card configuration; to stop analysing a metric, turn insights off.
+The threshold uses the same condition shape as a rubric rule. It applies only to calls evaluated after Insights is enabled: Cekura does not reprocess historical calls on its own. Failed calls are triaged as they arrive, so the metric's failure modes populate over time. To cover calls evaluated before you enabled insights, [re-evaluate the metric on them](#generating-insights-for-calls-that-were-already-evaluated). To change the threshold later, reopen the metric's card configuration; to stop analysing a metric, turn insights off.
 
 <Note>
   Insights cost 10 credits per metric per day. The dialog shows this cost before you enable a metric.

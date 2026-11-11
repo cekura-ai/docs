@@ -3687,6 +3687,14 @@
             "description": "Comma-separated agent version ids (the `history_id`s reported in `agent_versions`); only calls that ran on those versions are counted."
           },
           {
+            "in": "query",
+            "name": "summary",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When true, omit the `agents` and `agent_versions` breakdowns for a faster response. Counts and filters are unchanged."
+          },
+          {
             "name": "project",
             "in": "query",
             "required": false,
@@ -30438,6 +30446,10 @@
             },
             "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])."
           },
+          "update_mock_everywhere": {
+            "type": "boolean",
+            "description": "When an added mock_data row's input already returns a different response in one of the project's evaluators, give those evaluators' rows this response instead of rejecting the save."
+          },
           "served_via": {
             "allOf": [
               {
@@ -31749,6 +31761,14 @@
             "type": "string",
             "format": "date-time",
             "description": "When the call occurred.\nExample: `2024-03-15T10:15:45Z`"
+          },
+          "provider_ended_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the call ended, as reported by the provider. Null when the provider\npayload carries no end time.\nExample: `2024-03-15T10:19:02Z`"
           },
           "success": {
             "type": [
@@ -41794,8 +41814,7 @@
           },
           "transcript": {
             "type": "string",
-            "readOnly": true,
-            "description": "Full text transcript of the call.\nExample: \n```text\n[00:01] Testing Agent: Hello. \n[00:02] Main Agent: Hello, how can I help you today?\n[00:03] Testing Agent: Well, I mean, sure. What time exactly are we talking about here\n[00:04] Main Agent: 6 PM.\n[00:05] Testing Agent: Great. I'll book that for you. Just a sec.\n[00:06] Main Agent: Okay.\n```\n"
+            "readOnly": true
           },
           "transcript_object": {
             "type": "array",
@@ -42891,6 +42910,12 @@
               }
             ],
             "description": "Expected mock tool calls for this evaluator. Each entry has shape {tool_id, tool_name, new_entry: {input, output, response?}}. Auto-generated during scenario generation when the agent has mock tools attached; can also be set or edited manually."
+          },
+          "update_mock_everywhere": {
+            "type": "boolean",
+            "writeOnly": true,
+            "default": false,
+            "description": "When an added mock row's input already returns a different response for the tool elsewhere in the project, give all of those rows this response instead of rejecting the save."
           },
           "folder_path": {
             "type": [
@@ -43988,6 +44013,12 @@
               }
             ],
             "description": "Expected mock tool calls for this evaluator. Each entry has shape {tool_id, tool_name, new_entry: {input, output, response?}}. Auto-generated during scenario generation when the agent has mock tools attached; can also be set or edited manually."
+          },
+          "update_mock_everywhere": {
+            "type": "boolean",
+            "writeOnly": true,
+            "default": false,
+            "description": "When an added mock row's input already returns a different response for the tool elsewhere in the project, give all of those rows this response instead of rejecting the save."
           },
           "folder_path": {
             "type": [
@@ -47009,6 +47040,12 @@
             ],
             "description": "Expected mock tool calls for this evaluator. Each entry has shape {tool_id, tool_name, new_entry: {input, output, response?}}. Auto-generated during scenario generation when the agent has mock tools attached; can also be set or edited manually."
           },
+          "update_mock_everywhere": {
+            "type": "boolean",
+            "writeOnly": true,
+            "default": false,
+            "description": "When an added mock row's input already returns a different response for the tool elsewhere in the project, give all of those rows this response instead of rejecting the save."
+          },
           "folder_path": {
             "type": [
               "string",
@@ -47684,6 +47721,12 @@
           },
           "information": {
             "description": "\nInformation of the tool - must be a list of input-output mappings. Each mapping may add\nan optional `response` ({status_code, headers, delay_seconds}) to simulate a failing or slow tool:\nstatus_code 200-299 (except 204 and 205) or 400-599 (default 200), delay_seconds up to 300.\n`headers` apply to webhook-style tools only; MCP and VAPI function calls carry the status in\nthe tool result instead.\n\nMappings may also follow the call's progress: `state` (the call state(s) a mapping answers in,\na name or a list; every call starts in \"start\") and `then` (the state the call moves to after the\nmapping replies). `match` \"exact\" requires every input key to be present and equal (default\n\"flexible\"). Mappings for the call's current state are served before mappings without a state, and\nwithin each, a mapping whose input is identical to the call's arguments comes first. The call is\nidentified by the `X-Cekura-Mock-Session` header, or by the provider's call id; without one the\ncall stays in \"start\".\nExample:\n```json\n[\n    {\n        \"input\": {\"user_id\": 1},\n        \"output\": {\"name\": \"John Doe\", \"age\": 30, \"email\": \"john@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 2},\n        \"output\": {\"name\": \"Jane Smith\", \"age\": 25, \"email\": \"jane@example.com\"}\n    },\n    {\n        \"input\": {\"user_id\": 3},\n        \"output\": {\"detail\": \"Service temporarily unavailable\"},\n        \"response\": {\"status_code\": 503, \"headers\": {\"Retry-After\": \"30\"}, \"delay_seconds\": 2}\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"start\",\n        \"output\": {\"detail\": \"busy\"},\n        \"response\": {\"status_code\": 503},\n        \"then\": \"retried\"\n    },\n    {\n        \"input\": {\"user_id\": 4},\n        \"state\": \"retried\",\n        \"output\": {\"status\": \"active\"}\n    }\n]\n```\n"
+          },
+          "update_mock_everywhere": {
+            "type": "boolean",
+            "writeOnly": true,
+            "default": false,
+            "description": "When an added row's input already returns a different response in one of the project's evaluators, give those evaluators' rows this response instead of rejecting the save."
           },
           "freetext_params": {
             "description": "Parameter names skipped during mock matching because they are free-text (e.g. [\"notes\", \"reason\"])"

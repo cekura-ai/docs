@@ -100,44 +100,28 @@ Here's a practical example of testing an agent that requires menu navigation:
 
 ```json
 {
+  "role": "A customer who presses phone keypad buttons while talking",
+  "first_message": "Hi I am here for ordering a pizza.",
   "conditions": [
     {
-      "id": 0,
-      "condition": "FIRST_MESSAGE",
-      "action": "Hi I am here for ordering a pizza.",
-      "type": "standard",
-      "fixed_message": true
+      "when": "contains \"pull \" OR contains \"moment\" OR contains \"1234\" OR contains \"help you\"",
+      "say": "Great I want to order a pizza, let me enter the account number, can you please repeat what you received.",
+      "then": [
+        "<dtmf digits=\"123\" />"
+      ]
     },
     {
-      "id": 1,
-      "condition": "contains \"pull \" OR contains \"moment\" OR contains \"1234\" OR contains \"help you\"",
-      "action": "Great I want to order a pizza, let me enter the account number, can you please repeat what you received.",
-      "type": "standard",
-      "fixed_message": true
-    },
-    {
-      "id": 2,
-      "condition": 1,
-      "action": "<dtmf digits=\"123\" />",
-      "type": "action_followup",
-      "fixed_message": true
-    },
-    {
-      "id": 3,
-      "condition": "contains \"123\" OR contains \"1 2 3\"",
-      "action": "<endcall />",
-      "type": "standard",
-      "fixed_message": true
+      "when": "contains \"123\" OR contains \"1 2 3\"",
+      "say": "<endcall />"
     }
-  ],
-  "role": "A customer who presses phone keypad buttons while talking"
+  ]
 }
 ```
 
 In this example:
 1. Evaluator starts the conversation
 2. When the agent asks for account number, evaluator responds
-3. Immediately after, the `<dtmf>` tag sends "123" via keypad
+3. On its next turn — after one reply from the agent — the `then` step's `<dtmf>` tag sends "123" via keypad
 4. Agent confirms receiving "123" and the call ends
 
 ### Combining DTMF with Text
@@ -146,19 +130,19 @@ You can combine DTMF tags with text messages:
 
 ```json
 {
-  "action": "Let me enter that now. <dtmf digits=\"*99\" />"
+  "say": "Let me enter that now. <dtmf digits=\"*99\" />"
 }
 ```
 
 This will speak "Let me enter that now." and then send the `*99` button sequence.
 
-### DTMF-Only Actions
+### DTMF-Only Steps
 
 To send button presses without speaking:
 
 ```json
 {
-  "action": "<dtmf digits=\"1\" />"
+  "say": "<dtmf digits=\"1\" />"
 }
 ```
 
@@ -172,7 +156,7 @@ instead of hardcoding them, so one evaluator covers every profile you run it wit
 
 ```json
 {
-  "action": "<dtmf digits=\"{{test_profile.customer_number}}#\" />"
+  "say": "<dtmf digits=\"{{test_profile.customer_number}}#\" />"
 }
 ```
 
@@ -182,7 +166,7 @@ tones are sent — a profile value of `4711 2200` dials `47112200`.
 
 <Note>
 The key must exist in the caller variables of the test profile the run uses. If it
-does not, no tones are sent for that action and the call continues.
+does not, no tones are sent for that step and the call continues.
 </Note>
 
 ## Valid DTMF Characters
@@ -208,8 +192,7 @@ Test agents that navigate phone menus:
 
 ```json
 {
-  "action": "<dtmf digits=\"1\" />",
-  "type": "action_followup"
+  "then": ["<dtmf digits=\"1\" />"]
 }
 ```
 
@@ -219,8 +202,7 @@ Test multi-digit input scenarios:
 
 ```json
 {
-  "action": "<dtmf digits=\"123456789\" />",
-  "type": "action_followup"
+  "then": ["<dtmf digits=\"123456789\" />"]
 }
 ```
 
@@ -230,7 +212,7 @@ Test secure input flows:
 
 ```json
 {
-  "action": "Let me enter my PIN. <dtmf digits=\"9876\" />"
+  "say": "Let me enter my PIN. <dtmf digits=\"9876\" />"
 }
 ```
 
@@ -240,8 +222,7 @@ Test call transfer scenarios:
 
 ```json
 {
-  "action": "<dtmf digits=\"0\" />",
-  "type": "action_followup"
+  "then": ["<dtmf digits=\"0\" />"]
 }
 ```
 
@@ -251,8 +232,7 @@ Test special IVR functions:
 
 ```json
 {
-  "action": "<dtmf digits=\"*99#\" />",
-  "type": "action_followup"
+  "then": ["<dtmf digits=\"*99#\" />"]
 }
 ```
 

@@ -302,6 +302,19 @@ When writing your custom code, you have access to different variables depending 
 ##### Simulation Only
 
 <AccordionGroup>
+  <Accordion title="backchannel_evidence_v2">
+    **Availability:** ✅ Simulation | ❌ Observability
+
+    Recording-aligned listening-cue evidence with `version: 2`, `total_cues`,
+    `omitted_cues`, and a `cues` list. Each cue includes `start_s`, `end_s`, `text`,
+    `status` and `reason`. An inconclusive cue stays counted in coverage.
+    `text_alignment_verified` indicates whether recording-aligned text can be used.
+
+    Use `.get()` for older runs. An unknown total is insufficient to report a
+    failure percentage. The legacy `backchannel_cues` input uses the session
+    clock; `backchannel_cues_recording` uses the recording clock and retains its
+    all-or-nothing alignment behavior.
+  </Accordion>
   <Accordion title="tags" href="#tags">
     **Availability:** ✅ Simulation | ❌ Observability
 
@@ -736,6 +749,32 @@ if isinstance(customer_satisfaction, (int, float)) and customer_satisfaction > 4
 ```
 
 
+### Backchannel handling
+
+**Backchannel Handling** answers whether your agent handled delivered listening
+cues, such as “mm-hmm” or “uh-huh”, properly:
+
+- **Pass:** every delivered cue was confidently handled; the agent continued naturally.
+- **Fail:** at least one cue caused a supported stop, unnecessary restart or an
+  inappropriate answer that disrupted the explanation.
+- **Unscored:** no failure was proven, but some cues could not be judged, the cue
+  total is unknown, or no cues were delivered.
+
+The explanation identifies each cue by its recording timestamp and text, then
+states whether it was handled properly, not handled properly or could not be
+judged, with the reason and supporting speech. One failed cue, three handled cues
+and one unclear cue produce **Fail**, with all five outcomes explained. Four
+handled cues and one unclear cue remain **Unscored**, rather than a false pass.
+Results also include scored/total coverage for assessing the available evidence.
+
+The evaluator combines measured speech timing with conversational evidence. It
+judges at most 25 eligible cues within a 90-second budget; remaining cues are
+inconclusive. The initial timing threshold is uncalibrated: validate reviewed
+continuation and failure recordings, including whole-call error rates at different
+cue counts, before using the result as a release gate. Existing installations
+are only replaced through an explicit update; numeric metrics and rubric rules
+are not converted automatically.
+
 ### Calling LLM Judge Metrics from Python
 
 #### Function Reference: `evaluate_llm_judge_metric`
@@ -754,6 +793,8 @@ def evaluate_llm_judge_metric(
     audio: bool = False,
     audio_start_time: float|None = None,
     audio_end_time: float|None = None,
+    audio_channel: str|None = None,
+    timeout_seconds: float|None = None,
 ) -> Dict:
 ```
 
@@ -798,6 +839,14 @@ def evaluate_llm_judge_metric(
 
 <ParamField path="audio_end_time" type="float|None" default="None">
   Clip end in seconds from the call start when `audio=True`. Must be greater than `audio_start_time` if both are provided.
+</ParamField>
+
+<ParamField path="audio_channel" type="str|None" default="None">
+  Recording channel to analyze when `audio=True`: `"testing"` (the testing agent only), `"main"` (your agent only) or `"mixed"`. If omitted, the mixed recording is analyzed. Isolated channels (`"testing"`, `"main"`) require a recording with separable channels.
+</ParamField>
+
+<ParamField path="timeout_seconds" type="float|None" default="None">
+  Optional limit in seconds for this helper call's request and polling wait. Omit to preserve the existing evaluation deadline. An exhausted limit returns an unscored result; it does not cancel an evaluation already started.
 </ParamField>
 
 **Return Value:**

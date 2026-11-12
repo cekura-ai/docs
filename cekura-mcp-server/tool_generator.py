@@ -89,8 +89,31 @@ def apply_overlay_to_description(tool_name: str, description: str) -> str:
     return "\n\n".join(p for p in parts if p)
 
 
+def apply_overlay_argument_defaults(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Fill the overlay's `argument_defaults` into args the caller left out (or sent as null).
+
+    Lets the MCP tool default a field differently from the API itself without
+    changing what direct API callers get.
+    """
+    defaults = (load_tool_overlays().get(tool_name) or {}).get('argument_defaults') or {}
+    if not defaults:
+        return arguments
+    merged = dict(arguments or {})
+    for key, value in defaults.items():
+        if merged.get(key) is None:
+            merged[key] = value
+    return merged
+
+
 def apply_overlay_to_schema(tool_name: str, schema: Dict[str, Any]) -> Dict[str, Any]:
     overlay = load_tool_overlays().get(tool_name) or {}
+
+    # Show the MCP-side default on the field so the model sees what an omitted
+    # value becomes.
+    for field_name, value in (overlay.get('argument_defaults') or {}).items():
+        prop = (schema.get('properties') or {}).get(field_name)
+        if isinstance(prop, dict):
+            prop['default'] = value
 
     if 'required' in overlay:
         existing = set(schema.get('required', []) or [])

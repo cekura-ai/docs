@@ -57,21 +57,31 @@ def check(root: Path, unchanged_from: Path | None = None) -> list[str]:
     loaded = _load(spec_path, problems)
     if loaded is not None:
         spec, text = loaded
-        if text != json.dumps(spec, indent=2, ensure_ascii=False) + "\n":
+        canonical = json.dumps(spec, indent=2, ensure_ascii=False) + "\n"
+        if text != canonical:
+            line = next(
+                (n for n, (a, b) in enumerate(zip(text.splitlines(), canonical.splitlines()), 1) if a != b), "the end"
+            )
             problems.append(
-                f"{spec_path}: not in canonical form; it is generated from the backend and "
-                "must not be edited or merged by hand"
+                f"{spec_path}: not in canonical form (first difference at line {line}); it is generated "
+                "from the backend and must not be edited or merged by hand"
             )
         if unchanged_from is not None and spec != json.loads(unchanged_from.read_text(encoding="utf-8")):
             problems.append(
                 f"{spec_path}: content changed outside the automated release PR (branch "
-                "docs/openapi-sync); schema changes reach this repo only through that PR"
+                "docs/openapi-sync); schema changes reach this repo only through that PR. "
+                "Restore it with: git checkout origin/main -- openapi.json"
             )
 
     overlay_path = root / "cekura-mcp-server" / "mcp_tools.json"
     loaded = _load(overlay_path, problems)
-    if loaded is not None and isinstance(loaded[0], dict) and list(loaded[0]) != sorted(loaded[0]):
-        problems.append(f"{overlay_path}: top-level keys must be sorted (insert new tools in order)")
+    if loaded is not None and isinstance(loaded[0], dict):
+        keys = list(loaded[0])
+        unsorted = next(((a, b) for a, b in zip(keys, keys[1:]) if b < a), None)
+        if unsorted:
+            problems.append(
+                f"{overlay_path}: top-level keys must be sorted; {unsorted[0]!r} comes before {unsorted[1]!r}"
+            )
 
     _load(root / "mint.json", problems)
     return problems

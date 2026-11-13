@@ -6,7 +6,7 @@ This is the public Mintlify documentation repo for Cekura. It hosts the user-fac
 
 - `documentation/`, `api-reference/`, `mcp/`, `cli-sdk/` — Mintlify `.mdx` source for the docs site.
 - `mint.json` — Mintlify navigation and site config.
-- `openapi.json` — OpenAPI 3.0 spec. **Generated upstream — do not hand-edit.** See "How `openapi.json` changes" below.
+- `openapi.json` — OpenAPI 3.1 spec. **Generated upstream — do not hand-edit.** See "How `openapi.json` changes" below.
 - `cekura-mcp-server/` — Python MCP server that turns `openapi.json` into Model-Context-Protocol tools.
 - `scripts/` — local automation (description sync, llms.txt generator, generated-JSON check, etc.).
 

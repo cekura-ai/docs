@@ -6,9 +6,17 @@ This is the public Mintlify documentation repo for Cekura. It hosts the user-fac
 
 - `documentation/`, `api-reference/`, `mcp/`, `cli-sdk/` — Mintlify `.mdx` source for the docs site.
 - `mint.json` — Mintlify navigation and site config.
-- `openapi.json` — OpenAPI 3.0 spec. **Generated upstream — do not hand-edit.**
+- `openapi.json` — OpenAPI 3.1 spec. **Generated upstream — do not hand-edit.** See "How `openapi.json` changes" below.
 - `cekura-mcp-server/` — Python MCP server that turns `openapi.json` into Model-Context-Protocol tools.
-- `scripts/` — local automation (description sync, llms.txt generator, etc.).
+- `scripts/` — local automation (description sync, llms.txt generator, generated-JSON check, etc.).
+
+## How `openapi.json` changes
+
+After each production release, an automated PR titled `[Auto] Publish API schema for release <version>` (branch `docs/openapi-sync`) regenerates `openapi.json` from the released API. In the same PR it proposes API-reference pages for new operations, re-points or removes pages whose operation moved or was removed, and re-keys `mcp_tools.json` overlays for renamed tools. It is the only change that should touch `openapi.json`; merging it is what updates the docs site's API reference and the MCP tools.
+
+- Never edit `openapi.json`, or resolve a merge conflict in it, by hand. If a schema description is wrong, it is fixed where the API is defined and arrives with the next release.
+- Other fixes (a page title, MCP server code that still names a removed tool) can be pushed to the `docs/openapi-sync` branch; only `openapi.json` is rewritten on every run.
+- `python3 scripts/check_generated_json.py` runs in the **Generated JSON** check and before every MCP server deploy. It fails on duplicate keys in `openapi.json`, `mint.json` or `mcp_tools.json` (a text merge can create one; parsers silently keep the last copy), on a non-canonical `openapi.json`, and on unsorted `mcp_tools.json` keys. On a PR from any other branch than `docs/openapi-sync`, it also fails if `openapi.json` says anything different from `main`.
 
 ## MCP server (`cekura-mcp-server/`)
 
@@ -33,14 +41,14 @@ That is the only inclusion signal. The spec is the source of truth; the server d
 | `max_examples`, `example_names` | Filter/cap the openapi examples surfaced. |
 | `destructive` | Mark the tool as destructive when the description doesn't already include "⚠ Irreversible…". |
 
-Run `python3 cekura-mcp-server/validate_overlays.py` to catch drift: orphan entries, stale field names, missing destructive markers.
+Run `python3 cekura-mcp-server/validate_overlays.py` to catch drift: stale field names and missing destructive markers fail it. An overlay for a tool that is not in `openapi.json` yet is a warning, because overlay prose can merge before the release that adds the tool.
 
 ### Adding a new tool overlay
 
 1. Confirm the operation in `openapi.json` carries `x-mcp-expose: true`.
 2. Identify its tool name (the kebab-case `operationId` converted to snake_case — the value used by `validate_overlays`).
-3. Add an entry to `cekura-mcp-server/mcp_tools.json` keyed by that tool name.
-4. `python3 cekura-mcp-server/validate_overlays.py` — must report no drift.
+3. Add an entry to `cekura-mcp-server/mcp_tools.json` keyed by that tool name, at its sorted position (top-level keys stay sorted so overlays added by different PRs don't collide).
+4. `python3 cekura-mcp-server/validate_overlays.py` — must report no drift — and `python3 scripts/check_generated_json.py`.
 
 ### Tests
 

@@ -41,7 +41,7 @@ That is the only inclusion signal. The spec is the source of truth; the server d
 | `max_examples`, `example_names` | Filter/cap the openapi examples surfaced. |
 | `destructive` | Mark the tool as destructive when the description doesn't already include "⚠ Irreversible…". |
 
-Run `python3 cekura-mcp-server/validate_overlays.py` to catch drift: orphan entries, stale field names, missing destructive markers.
+Run `python3 cekura-mcp-server/validate_overlays.py` to catch drift: stale field names and missing destructive markers fail it. An overlay for a tool that is not in `openapi.json` yet is a warning, because overlay prose can merge before the release that adds the tool.
 
 ### Adding a new tool overlay
 

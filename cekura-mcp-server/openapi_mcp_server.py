@@ -83,6 +83,10 @@ _issuer_host = _urlparse(MCP_ISSUER_URL).netloc
 _server_host = _urlparse(MCP_SERVER_URL).netloc
 _allowed_hosts = [
     "api.cekura.ai",
+    "vm.cekura.ai",
+    "vm.cekura.ai:*",
+    "vm.cekura.ai.",
+    "vm.cekura.ai.:*",
     "test.cekura.ai",
     "localhost",
     "localhost:8000",
@@ -694,7 +698,7 @@ async def _forward_skill_activation(
         credential, credential_type = get_request_credential()
     except ValueError:
         return
-    base_url = request_base_url.get() or (server_config.base_url if server_config else None)
+    base_url = get_request_base_url()
     if not base_url:
         return
 
@@ -928,6 +932,33 @@ async def cekura_load_skill(skill_name: str) -> Dict[str, Any]:
     }
 
 
+def _vm_backend_base_url(headers) -> Optional[str]:
+    # Use the raw Host header, never X-Forwarded-Host or a client URL override.
+    host = (headers.get("Host") or headers.get("host") or "").strip().lower()
+    if re.fullmatch(r"vm\.cekura\.ai\.?(?::[0-9]+)?", host):
+        return "https://vm.cekura.ai"
+    return None
+
+
+def get_request_base_url() -> Optional[str]:
+    """Resolve the current call's backend, pinning VM-host calls to the VM API."""
+    try:
+        request = mcp._mcp_server.request_context.request
+        headers = getattr(request, "headers", None)
+    except LookupError:
+        headers = None
+    if headers is not None:
+        vm_base_url = _vm_backend_base_url(headers)
+        if vm_base_url:
+            return vm_base_url
+        if _ALLOW_BASE_URL_OVERRIDE:
+            override = headers.get("X-CEKURA-BASE-URL") or headers.get("x-cekura-base-url")
+            if override:
+                return override.rstrip("/")
+        return server_config.base_url if server_config else None
+    return request_base_url.get() or (server_config.base_url if server_config else None)
+
+
 def get_request_credential() -> tuple[str, str]:
     """Return (credential, type) from request context. Type is 'bearer' or 'api_key'.
 
@@ -1138,7 +1169,7 @@ def setup_dynamic_tool_handlers():
             credential, credential_type = get_request_credential()
             op = tool_data['operation']
 
-            base_url = request_base_url.get() or server_config.base_url
+            base_url = get_request_base_url()
             user_api_client = create_client(
                 base_url,
                 credential,
@@ -1294,8 +1325,11 @@ def main():
                     reset_tokens.append((request_api_key, request_api_key.set(api_key)))
                     has_api_key = True
 
-                # Base URL override — only honoured when ALLOW_BASE_URL_OVERRIDE=true (dev/staging)
-                if _ALLOW_BASE_URL_OVERRIDE:
+                # VM-host requests must stay on the VM API even when overrides are enabled.
+                vm_base_url = _vm_backend_base_url(request.headers)
+                if vm_base_url:
+                    reset_tokens.append((request_base_url, request_base_url.set(vm_base_url)))
+                elif _ALLOW_BASE_URL_OVERRIDE:
                     base_url_override = request.headers.get('X-CEKURA-BASE-URL') or request.headers.get('x-cekura-base-url')
                     if base_url_override:
                         reset_tokens.append((

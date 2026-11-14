@@ -632,6 +632,79 @@ Turn on **Skip Calls Without Content** (`skip_call_log_webhook_no_content`) to s
 ```
 </CodeGroup>
 
+## Alert Notifications
+
+Sent each time an [alert](/documentation/guides/observability/alerts) fires, so your own
+agent can act on it — for example, pulling the failed calls and improving your prompt.
+Enable **Alert Notifications** (failure, threshold and trend alerts) and **Insight Alert
+Notifications** (new failure mode and failure mode spike alerts) in your project's webhook
+settings. Both are off by default.
+
+Every payload includes the alert (`alert_id`, `alert_name`, `sub_type`), the fire
+(`fire_event_id`, `fired_at`), the project and agent, the metric, a `review_url` and
+`call_log_ids` — the calls involved, which you can fetch through the API.
+
+- `alert.fired` — `sub_type` is `normal` (failure alert), `threshold` or `significant_change`
+  (trend alert). Trend alerts also carry `description`, `change_type`, `affected_keys` and
+  `window_size`, and `call_log_ids` holds the calls in the compared window.
+- `insight_alert.fired` — `sub_type` is `insight_new_mode` or `insight_uptick`. Carries the
+  `failure_mode` (`slug`, `title`, `details`), `call_count`, an `insights_url`, and for spikes an
+  `uptick` object (`recent`, `expected`, `window_hours`, `baseline_count`, `baseline_hours`,
+  `multiplier`).
+
+<CodeGroup>
+```json Alert Fired
+{
+  "event_type": "alert.fired",
+  "data": {
+    "alert_id": 12,
+    "alert_name": "Appointment booked",
+    "sub_type": "normal",
+    "fire_event_id": 345,
+    "fired_at": "2025-09-22T14:49:49.880556+00:00",
+    "project_id": 2,
+    "agent_id": 1,
+    "agent_name": "Agent",
+    "call_log_id": 95,
+    "review_url": "https://dashboard.cekura.ai/2/alerts/review/12",
+    "metric_id": 7,
+    "metric_name": "Appointment booked",
+    "title": "Binary Metric Alert",
+    "call_log_ids": [95]
+  }
+}
+```
+
+```json Insight Alert Fired
+{
+  "event_type": "insight_alert.fired",
+  "data": {
+    "alert_id": 13,
+    "alert_name": "New failure modes",
+    "sub_type": "insight_new_mode",
+    "fire_event_id": 346,
+    "fired_at": "2025-09-22T14:49:49.880556+00:00",
+    "project_id": 2,
+    "agent_id": 1,
+    "agent_name": "Agent",
+    "call_log_id": 95,
+    "review_url": "https://dashboard.cekura.ai/2/alerts/review/13",
+    "metric_id": 7,
+    "metric_name": "Appointment booked",
+    "failure_mode": {
+      "slug": "missed-date-confirmation",
+      "title": "Missed date confirmation",
+      "details": "The agent booked the appointment without confirming the date with the caller."
+    },
+    "call_count": 3,
+    "uptick": null,
+    "call_log_ids": [95, 94, 91],
+    "insights_url": "https://dashboard.cekura.ai/2/insights?metric=7&category=missed-date-confirmation"
+  }
+}
+```
+</CodeGroup>
+
 ## Webhook Forwarding
 <CodeGroup>
 ```json Vapi Forward Webhook 

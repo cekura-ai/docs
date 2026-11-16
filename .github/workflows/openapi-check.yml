@@ -1,0 +1,57 @@
+name: OpenAPI Check
+
+on:
+  pull_request:
+    paths:
+      - 'openapi.json'
+      - 'mint.json'
+      - 'scripts/check_json_duplicate_keys.py'
+      - '.github/workflows/openapi-check.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'openapi.json'
+      - 'mint.json'
+      - 'scripts/check_json_duplicate_keys.py'
+      - '.github/workflows/openapi-check.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  duplicate-keys:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject duplicated JSON keys
+        id: check
+        continue-on-error: true
+        run: python3 scripts/check_json_duplicate_keys.py openapi.json mint.json --report "$RUNNER_TEMP/report.md"
+      - name: Comment on the pull request
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          OUTCOME: ${{ steps.check.outcome }}
+        run: |
+          set -euo pipefail
+          existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.body | contains("<!-- openapi-duplicate-keys -->")) | .id' | head -n 1)
+          if [ "$OUTCOME" = "failure" ]; then
+            if [ -n "$existing" ]; then
+              gh api "repos/$REPO/issues/comments/$existing" -X PATCH -F body=@"$RUNNER_TEMP/report.md" > /dev/null
+            else
+              gh api "repos/$REPO/issues/$PR/comments" -F body=@"$RUNNER_TEMP/report.md" > /dev/null
+            fi
+          elif [ -n "$existing" ]; then
+            gh api "repos/$REPO/issues/comments/$existing" -X PATCH -F body=@"$RUNNER_TEMP/report.md" > /dev/null
+          fi
+      - name: Fail when duplicated keys were found
+        if: steps.check.outcome == 'failure'
+        run: exit 1

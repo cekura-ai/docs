@@ -270,6 +270,26 @@ The server provides 84 tools across two main groups:
 
 **Note:** All configuration is optional. The set of registered tools is determined by the `x-mcp-expose: true` marker on each operation in `openapi.json`.
 
+## VM endpoint backend routing
+
+When the server is exposed at `https://vm.cekura.ai/mcp`, backend tool calls
+always use `https://vm.cekura.ai`. The caller's API key is forwarded to that API,
+which applies its access restrictions. Clients cannot change this destination
+with `X-CEKURA-BASE-URL`, even when `ALLOW_BASE_URL_OVERRIDE` is enabled.
+Selection uses the HTTP `Host` header; `X-Forwarded-Host` is ignored.
+
+Connect with an API key authorized for the VM API:
+
+```bash
+claude mcp add --transport http cekura --scope user https://vm.cekura.ai/mcp \
+  --header "X-CEKURA-API-KEY:YOUR_API_KEY_HERE"
+```
+
+The MCP endpoint must be exposed on that hostname before this command can work.
+This routing applies to backend requests; MCP initialization and tool discovery
+do not validate the key's organization. Other hostnames continue to use
+`CEKURA_BASE_URL`, with client URL overrides honored only when explicitly enabled.
+
 ## Authentication
 
 API keys are **required** via the `X-CEKURA-API-KEY` HTTP header. The server:

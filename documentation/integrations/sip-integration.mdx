@@ -96,6 +96,27 @@ By default, Cekura's SIP calls leave Twilio from its North America Virginia regi
 
 Through the API, set `telephony.sip_originating_region` on the agent to `"us-east"`, `"us-west"`, or `null` for the provider default. The setting applies to every SIP run for that agent.
 
+## Encrypting SIP Calls
+
+Cekura dials your SIP endpoint as you enter it, so a plain `sip:` URI uses unencrypted signaling and audio. If your endpoint supports TLS and SRTP, add `;transport=tls;secure=true` to the URI to encrypt both:
+
+```
+sip:agent@yourdomain.com;transport=tls;secure=true
+```
+
+Twilio then sends SIP signaling over TLS and encrypts the call audio with SRTP. Before you add the parameters, check that your endpoint:
+
+- Accepts SIP over TLS on port `5061`, or on the port your URI names (for example, `sip:agent@yourdomain.com:5071;transport=tls;secure=true`).
+- Supports SRTP with the `AES_CM_128_HMAC_SHA1_80` crypto suite, the only one Twilio offers on these calls.
+
+If it doesn't, calls to your endpoint may fail to connect. Cekura still sends its `X-` headers and your custom headers on encrypted calls.
+
+<Note>
+Use the `sip:` scheme with `;transport=tls`. Twilio doesn't support `sips:` URIs.
+</Note>
+
+If your endpoint is behind a firewall, allow TLS on that port from the Twilio signaling ranges in [Firewall Requirements](#firewall-requirements).
+
 ## Firewall Requirements
 
 Unless you select **US West** above, Cekura places SIP calls through Twilio's Virginia (`us1`) region. If your SIP endpoint is behind a firewall, allow:
@@ -119,7 +140,7 @@ Go to your agent settings and configure the SIP endpoint:
 <img src="/images/sip/endpoint-config.png" alt="SIP Endpoint Configuration" />
 
 **Required field:**
-- **SIP Endpoint**: The SIP URI where your agent receives calls (e.g., `sip:agent@yourdomain.com` or `sip:192.168.1.100:5060`)
+- **SIP Endpoint**: The SIP URI where your agent receives calls (e.g., `sip:agent@yourdomain.com` or `sip:192.168.1.100:5060`). To encrypt calls, see [Encrypting SIP Calls](#encrypting-sip-calls).
 
 **Optional fields (for secure private endpoints):**
 - **Username**: Digest authentication username (only required if your SIP endpoint uses digest authentication)
@@ -169,7 +190,7 @@ Configure the SIP endpoint in your agent settings:
 <img src="/images/sip/endpoint-config.png" alt="SIP Endpoint Configuration" />
 
 **Required field:**
-- **SIP Endpoint**: The SIP URI where your agent receives calls (e.g., `sip:agent@yourdomain.com` or `sip:192.168.1.100:5060`)
+- **SIP Endpoint**: The SIP URI where your agent receives calls (e.g., `sip:agent@yourdomain.com` or `sip:192.168.1.100:5060`). To encrypt calls, see [Encrypting SIP Calls](#encrypting-sip-calls).
 
 **Optional fields (for secure private endpoints):**
 - **Username**: Digest authentication username (only required if your SIP endpoint uses digest authentication)

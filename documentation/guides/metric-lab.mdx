@@ -158,6 +158,22 @@ An optimization can pause and ask you a question when it hits something it canno
 The run waits for your answer and resumes as soon as you submit it, so you can leave the page and come back. If it has been waiting a while it checkpoints itself and resumes automatically once you answer, rather than failing.
 
 
+### Ways to Run the Optimizer
+
+The same optimizer can be started in three ways. Each one optimizes against every sample currently in the metric's Lab.
+
+| How | Trigger | What happens to the result |
+| :--- | :--- | :--- |
+| **Manual** | Click **Auto Improve** in the Metric Lab. | You review the diff and click **Save**. |
+| **Background (automatic)** | About once an hour, Cekura checks each metric's Lab for corrected samples it has not optimized on yet. A corrected sample is one where your expected value differs from the metric's actual value. One new corrected sample is enough to start a run; there is no minimum count. | The improved definition is saved as a proposal for you to review in the Metric Lab. It is never applied automatically. Questions from the optimizer arrive in the Cekura agent chat. |
+| **Scheduled** | A cron you configure in project settings. See [Schedule Metric Optimiser Runs](/documentation/guides/auto-optimise-metrics-schedule). | Emailed summary; optionally auto-applied when the score does not regress. |
+
+The background optimizer is on by default. Organization admins can turn it off with the **Background Metric Optimiser** toggle under **Settings → Organization → General**.
+
+<Tip>
+To feed the background optimizer from your call logs, downvote the metric on a call, set the correct expected value, optionally add a note explaining why the metric was wrong, and click **Add to Lab**. A downvote that is not added to the Lab does not start an optimization.
+</Tip>
+
 ### Re-run and Observe Improvement
 
 Finally, verify that your new metric is robust.
@@ -166,6 +182,28 @@ Finally, verify that your new metric is robust.
 *   Future calls will be evaluated using this smarter definition.
 *   You can manually **Run** the review again to confirm the score remains high (e.g., 5/5).
 
+
+## Credits
+
+Optimization consumes credits for the evaluations it runs. Generating the improved definition itself is not charged.
+
+**Optimizer runs** (manual, background or scheduled) evaluate every Lab sample once for the baseline, then once more for each improvement pass up to the one that produced the best result:
+
+```
+credits = Lab samples × per-evaluation rate × (improvement passes + 1)
+```
+
+The per-evaluation rate depends on the metric definition, the same way as for building a metric with AI:
+
+- **LLM Judge metrics**, and Python metrics that call `evaluate_llm_judge_metric`, are charged at the **LLM-judge** per-evaluation rate.
+- **Metrics that judge audio** (voice recording enabled, or `evaluate_llm_judge_metric` with `audio=True`) are charged the **LLM-judge** rate per evaluation, plus each audio judge call at the **audio** per-minute rate for the audio it hears (at least the LLM-judge rate per call).
+- **Pure Python metrics** are charged at the **custom-code** per-evaluation rate.
+
+For example, at an LLM-judge rate of 0.1 credits, a Lab with 6 samples costs 0.6 credits per pass. A run whose best result came from the third improvement pass costs 6 × 0.1 × 4 = 2.4 credits.
+
+**Run** in the Metric Lab and **Run regression check** in the review chat are charged once per evaluated call, at the same rates.
+
+Because cost grows with the size of the Lab, add the calls that show distinct failure modes rather than many near-identical ones. To avoid background runs entirely, turn off the **Background Metric Optimiser** toggle and start optimizations manually. Your current rates are on the **Billing** page.
 
 ## Benefits of Metric Optimization
 

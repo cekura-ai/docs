@@ -1,8 +1,9 @@
 """Overlay drift tests — picked up by the existing CI pytest jobs.
 
 Fails fast if `mcp_tools.json` has drifted from the live `openapi.json`:
-orphan entries, stale required-field lists, stale example keys, or DELETE tools
-missing the destructive marker.
+stale required-field lists, stale example keys, or DELETE tools missing the
+destructive marker. An overlay whose tool is not in `openapi.json` yet is only
+a warning.
 
 Run manually: pytest tests/test_overlays.py -v
 """
@@ -18,7 +19,7 @@ ROOT = HERE.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from validate_overlays import run_checks, Finding
+from validate_overlays import run_checks
 
 
 @pytest.fixture(scope="module")
@@ -41,12 +42,12 @@ def test_no_error_level_drift(findings):
         pytest.fail(f"Overlay drift detected:\n{msg}")
 
 
-def test_no_orphan_overlays(findings):
-    orphans = [f for f in findings if f.category == "orphan"]
-    assert not orphans, (
-        "Orphaned overlay entries (tool was renamed or removed upstream): "
-        + ", ".join(f.tool for f in orphans)
-    )
+def test_an_overlay_for_a_tool_not_released_yet_is_only_a_warning():
+    """Overlay prose for a new or renamed tool can merge before the release that adds the tool."""
+    findings = run_checks(overlays={"tool_not_released_yet": {"description_suffix": "x"}})
+
+    orphans = [(f.tool, f.level) for f in findings if f.category == "orphan"]
+    assert orphans == [("tool_not_released_yet", "warning")]
 
 
 def test_required_fields_match_schema(findings):

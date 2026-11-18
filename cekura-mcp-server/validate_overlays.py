@@ -10,7 +10,6 @@ startup path for non-fatal drift warnings).
 """
 from __future__ import annotations
 
-import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -78,15 +77,19 @@ def _build_context(
 
 
 def _check_orphans(ctx: _Context) -> None:
+    # A warning, not an error: overlay prose for a new or renamed tool can merge
+    # before the release that adds the tool to openapi.json, and the release PR
+    # drops the overlay of a tool that is gone.
     for tool_name in ctx.overlays:
         if tool_name in ctx.operations_by_tool:
             continue
         ctx.add(
-            "error",
+            "warning",
             "orphan",
             tool_name,
-            f"Overlay entry '{tool_name}' does not match any registered tool. "
-            "Either the tool was renamed/removed upstream, or the overlay key is a typo.",
+            f"Overlay entry '{tool_name}' does not match any tool in openapi.json yet. "
+            "That is expected until the release that adds or renames the tool; otherwise "
+            "the overlay key is a typo.",
         )
 
 

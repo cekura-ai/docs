@@ -2,7 +2,7 @@
 title: "Cisco Webex Integration"
 sidebarTitle: "Cisco Webex"
 icon: "/images/providers/cisco.svg"
-description: "Test a Webex Contact Center voice agent by calling its number, see Webex's own transcript on every result, and import production calls automatically."
+description: "Test a Webex Contact Center voice agent by calling its number, see Webex's own transcript and the AI agent's tool calls on every result, and import production calls automatically."
 ---
 
 import { CopyPageButton } from "/snippets/copy-page-button.mdx";
@@ -16,6 +16,7 @@ Cekura tests Webex Contact Center voice agents over the phone: it calls your age
 Connect Webex with one sign-in from a Contact Center administrator, and Cekura also:
 
 - finds the Webex interaction behind each test call and shows Webex's transcript and interaction ID on the result;
+- for a Webex AI Agent Studio agent, shows the tool calls the AI agent made during each test call;
 - imports your production calls automatically, with **Auto-fetch Production Calls**.
 
 <Note>
@@ -26,6 +27,7 @@ Webex agents are tested over the phone only. Chat testing is not available for W
 
 - A Webex Contact Center voice agent reachable on a phone number.
 - A Webex account with Contact Center administrator access, to connect Webex.
+- For an AI Agent Studio agent's tool calls and conversation: the same account needs **Decrypt access** in AI Agent Studio. Being a Studio administrator is not enough on its own. See [Turn on Decrypt access](#turn-on-decrypt-access).
 - For Webex transcripts and recordings: recording and transcription turned on in Webex Contact Center for the calls you test. Webex keeps a recording only where recording is enabled for the tenant or queue, and a transcript only where a transcription feature is enabled.
 
 ## Connect Webex in Cekura
@@ -54,11 +56,13 @@ Webex agents are tested over the phone only. Chat testing is not available for W
   <Step title="Check the connection">
     On the agent's page, **Integration Settings** shows **Connected** with your Webex organization and the account that connected it. If the sign-in didn't start, click **Connect Webex** there.
 
+    If that account has no Decrypt access in AI Agent Studio, the card also shows a warning naming the account. See [Turn on Decrypt access](#turn-on-decrypt-access).
+
     <img src="/images/cisco-webex/webex-connected.png" width="366" alt="Webex connection showing Connected, the organization and admin account, and the Auto-fetch Production Calls switch" />
   </Step>
 </Steps>
 
-Cekura asks Webex for read-only access: the signed-in user's identity, your organization, and your Contact Center configuration, interactions, recordings and transcripts. The permissions requested are `spark:people_read`, `spark:organizations_read` and `cjp:config_read`.
+Cekura asks Webex for read-only access: the signed-in user's identity, your organization, and your Contact Center configuration, interactions, recordings and transcripts. The permissions requested are `spark:people_read`, `spark:organizations_read` and `cjp:config_read`. With the same sign-in, Cekura reads your AI Agent Studio call sessions for the AI agent's tool calls and conversation.
 
 ### Connection status
 
@@ -71,6 +75,24 @@ Cekura asks Webex for read-only access: the signed-in user's identity, your orga
 
 Click **Disconnect** to remove Cekura's access to your Webex organization.
 
+### Turn on Decrypt access
+
+AI Agent Studio shows call sessions only to users with **Decrypt access**, including its administrators. Without it, Cekura can't read the AI agent's tool calls or conversation, and the Webex card in Cekura shows a warning naming the account that connected Webex.
+
+A Webex full administrator can turn it on:
+
+<Steps>
+  <Step title="Open the teammates list">
+    In AI Agent Studio, click the user icon, then **Enterprise Profile** → **Teammates**.
+  </Step>
+
+  <Step title="Turn on Decrypt access">
+    Click **Modify** next to the account that connected Webex, turn on **Decrypt access**, and click **Modify**.
+  </Step>
+</Steps>
+
+You don't need to reconnect Webex. The warning clears when you come back to the agent's page in Cekura.
+
 ## Run a test
 
 Open an evaluator, click **Run**, and start the run using the **Telephony** connection. Cekura calls your agent's number and plays the scenario as the caller.
@@ -81,11 +103,24 @@ The result then shows:
 
 - **Provider Transcript**: the conversation as Webex transcribed it. Your Webex agent is labeled **Main Agent** and Cekura's caller **Testing Agent**. **Cekura Transcript** keeps Cekura's own transcript, and **Compare** shows them side by side.
 - **Provider Call ID**: the Webex interaction ID, so you can find the call in Webex.
+- **Tool calls**, for an AI Agent Studio agent: each action the AI agent ran, with its name and inputs, in place among the conversation turns. Webex keeps no output for most actions that succeed, so a result line usually appears only when an action failed.
 
 <img src="/images/cisco-webex/provider-transcript.png" alt="Test result showing the Webex interaction ID and the Webex transcript under Provider Transcript" />
 
+### AI agent calls without a Contact Center transcript
+
+Webex Contact Center often keeps no transcript of a call handled by an AI agent. Cekura then pairs the call by its start time and length. When several test calls fit, Cekura reads the AI agent's conversation from AI Agent Studio to tell them apart, and shows that conversation as the **Provider Transcript**.
+
 <Note>
-If Webex is not connected, or Webex has no transcript for the call, the result shows Cekura's own transcript.
+AI Agent Studio protects each conversation, so reading one unlocks it. Studio records each unlock in its audit log as **View interaction transcript**, under the account that connected Webex. Cekura does this only for its own test calls, and only when it needs the words to pair a call.
+</Note>
+
+<Tip>
+Test calls that play the same scenario from the same Cekura number say nearly the same words. When you run many of them at once, turn on **Randomize** in the run settings so each call comes from a different phone number and is paired by its number.
+</Tip>
+
+<Note>
+If Webex is not connected, or neither Contact Center nor AI Agent Studio supplied the conversation, the result shows Cekura's own transcript, with the AI agent's tool calls when Cekura found them.
 </Note>
 
 ## Monitor production calls
@@ -108,6 +143,9 @@ If Webex has no recording or transcript for a call, Cekura still imports the cal
 - **This Webex organization is already connected to a different Cekura organization**: a Webex organization can be connected to one Cekura organization only. Disconnect it there, or contact Cekura support.
 - **No Webex transcript on a result**: check that Webex shows **Connected**, that the number under **Telephony Settings** is the one Cekura called, and that Webex records and transcribes calls on that number's queue. The transcript can take a couple of minutes after the call.
 - **Production calls are not imported**: check that **Auto-fetch Production Calls** is on, Webex shows **Connected**, and the number under **Telephony Settings** matches your agent's number in Webex.
+- **"… has no Decrypt access in AI Agent Studio", or no tool calls on a result**: the account that connected Webex can't read AI Agent Studio's call sessions. [Turn on Decrypt access](#turn-on-decrypt-access) for it, or reconnect Webex with an account that has it.
+- **Tool calls show inputs but no result**: Webex keeps no output for most actions that succeed, so a result usually appears only when an action fails.
+- **Parallel test calls are not paired**: if the calls came from one Cekura number and played the same scenario, their words can be too alike to tell apart. Turn on **Randomize** in the run settings and run them again.
 
 ## Configure through the API
 
@@ -128,4 +166,4 @@ Create the agent through the [API](/api-reference/test_framework/create-agent) w
 }
 ```
 
-Connecting Webex needs a browser sign-in, so open the agent in Cekura and click **Connect Webex**. The agent's `provider.credentials.connection` field then reports the connection, with `status`, `org_name`, `connected_by` and `refresh_token_expires_at`. Turn on production-call import with `provider.auto_import_calls: true` once Webex is connected.
+Connecting Webex needs a browser sign-in, so open the agent in Cekura and click **Connect Webex**. The agent's `provider.credentials.connection` field then reports the connection, with `status`, `org_name`, `connected_by`, `refresh_token_expires_at` and `studio_decrypt_access` (`true` or `false` for whether that account has Decrypt access in AI Agent Studio, `null` when unknown). Turn on production-call import with `provider.auto_import_calls: true` once Webex is connected.

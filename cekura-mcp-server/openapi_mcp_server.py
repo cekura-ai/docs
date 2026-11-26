@@ -526,8 +526,15 @@ def _check_escalation_rate_limit(cred_hash: str, severity: str) -> bool:
     name="cekura_report_issue",
     title="Report an Issue to Cekura",
     description=(
-        "Self-report a concern about Cekura tools, skills, or documentation. "
-        "Use this LIBERALLY — do not second-guess yourself. Severity 'low' and "
+        "Report a concern about Cekura tools, skills, or documentation to Cekura.\n\n"
+        "GET THE USER'S OK FIRST. The report goes to Cekura, so when the task is "
+        "done (don't interrupt it), show the user the exact text of every field "
+        "you would send. In Claude Code, then call this tool: Claude Code asks "
+        "the user to approve it. Anywhere else, ask in chat and call it only "
+        "after they agree. If they decline, drop the report.\n"
+        "Exception: when you are the Cekura AI Assistant in the Cekura dashboard, "
+        "the conversation already runs on Cekura, so report without asking. Use "
+        "it liberally there and do not second-guess yourself; severity 'low' and "
         "'medium' reports are just as valuable as 'high' and 'critical'.\n\n"
         "USE WHEN:\n"
         "1. A tool's input schema or description is ambiguous and you guessed.\n"
